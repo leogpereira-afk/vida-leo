@@ -1,0 +1,14 @@
+# Site estático + function de sincronização.
+[build]
+  publish = "publico"
+  command = "npm i @netlify/blobs --no-save || true"
+
+[functions]
+  directory = "netlify/functions"
+
+# Nada de indexação: é um painel pessoal.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+    Referrer-Policy = "no-referrer"
