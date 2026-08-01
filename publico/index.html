@@ -411,7 +411,7 @@ function gRosca(dados,{fmt=brl}={}){
 }
 
 /* ---------- painel de configuração (topo de toda seção) ---------- */
-let filtro={viagens:'Todas',viagensAno:null,planoAno:null,demandas:'Todas',gastosMes:null,rendAno:null,rendEmp:'Todas',rendAnoSel:-1};
+let filtro={viagens:'Todas',viagensAno:null,planoAno:null,rendVisao:'Anual',demandas:'Todas',gastosMes:null,rendAno:null,rendEmp:'Todas',rendAnoSel:-1};
 function painel(...itens){
   const p=el('<div class="painel"></div>');
   itens.flat().forEach(it=>p.appendChild(typeof it==='string'
@@ -1854,8 +1854,14 @@ function vRendimentos(m){
     seletor(empSel,[['Todas','Todas as empresas ('+doAnoTudo.length+')'],
       ...empresasR.map(e=>[e,e+' ('+doAnoTudo.filter(x=>x.empresa===e).length+')'])],
       v=>{filtro.rendEmp=v;r()}),
+    seletor(filtro.rendVisao,[['Anual','Visão anual'],['Mensal','Visão mensal']],
+      v=>{filtro.rendVisao=v;r()}),
     acao('⬇ Excel',baixarRendimentosExcel,'ghost'),
     acao('🖨 PDF',baixarRendimentosPDF,'ghost'),'|'));
+
+  // na visão mensal, os agregados do ano saem de cena; o mês a mês assume
+  const vAnual = filtro.rendVisao !== 'Mensal';
+  const mA = { appendChild: x => { if (vAnual) m.appendChild(x) } };
 
   /* ---- números do recorte escolhido ---- */
   const totalSel=todos?H.totalGeral:(H.totalAno[iAno]||0);
@@ -1960,7 +1966,7 @@ function vRendimentos(m){
   lc.appendChild(tl);
   if(!temDetalhe&&!todos) lc.appendChild(el(`<div style="padding:11px 17px 2px;font-size:12px;color:var(--suave)">
     Sem detalhe por negócio em ${ano} — a planilha desse ano trazia só o total por empresa.</div>`));
-  m.appendChild(bloco('rd-rank','🏆 O que mais deu lucro',
+  mA.appendChild(bloco('rd-rank','🏆 O que mais deu lucro',
     temDetalhe?(todos?`por empresa nos 7 anos — clique para abrir os negócios`:`por empresa em ${ano} — clique para abrir os negócios`):(todos?'somando os 7 anos':'por empresa em '+ano),lc));
 
   /* ---- LEITURA DE ANALISTA ---- */
@@ -1991,7 +1997,7 @@ function vRendimentos(m){
     ${brl(Math.max(...H.totalAno))}. A média dos anos completos é ${brl(H.mediaAnual)} —
     e a tendência dos últimos anos é de crescimento, com 2025 como exceção.</p></div>`);
   an.innerHTML=`<div class="lista-sug">${notas.join('')}</div>`;
-  m.appendChild(bloco('rd-analise','🔎 Leitura dos números','o que eu olharia no seu lugar',an));
+  mA.appendChild(bloco('rd-analise','🔎 Leitura dos números','o que eu olharia no seu lugar',an));
   // evolução anual: clicar no ano abre as empresas daquele ano
   const iSel=filtro.rendAnoSel;
   const gEl=el(`<div class="grafico"></div>`);
@@ -2036,7 +2042,7 @@ function vRendimentos(m){
     });
   };
   pintaEvo();
-  m.appendChild(bloco('rd-dash','Evolução anual','clique num ano para abrir as empresas',gEl));
+  mA.appendChild(bloco('rd-dash','Evolução anual','clique num ano para abrir as empresas',gEl));
   // ---- acumulado geral: quanto você já somou até cada ano ----
   const acum=H.anos.map((_,i)=>H.totalAno.slice(0,i+1).reduce((s,v)=>s+v,0));
   const ac=el('<div></div>');
@@ -2054,9 +2060,9 @@ function vRendimentos(m){
           ${cr==null?'—':(cr>=0?'+':'')+cr.toFixed(0)+'%'}</td></tr>`}).join('')}
   </tbody></table>`;
   ac.appendChild(tac);
-  m.appendChild(bloco('rd-acum','Acumulado geral','o do ano e o total somado até ali',ac));
+  mA.appendChild(bloco('rd-acum','Acumulado geral','o do ano e o total somado até ali',ac));
 
-  m.appendChild(bloco('rd-emp','Participação por empresa','no acumulado',graficoEl(gRosca(
+  mA.appendChild(bloco('rd-emp','Participação por empresa','no acumulado',graficoEl(gRosca(
     Object.entries(H.empresas).map(([n,v])=>({r:n,v:v.reduce((a,b)=>a+b,0)}))))));
 
   // ---- aplicações por instituição ----
@@ -2081,7 +2087,7 @@ function vRendimentos(m){
       const d=Object.entries(API[a]).map(([r2,v])=>({r:r2,v})).sort((x,y)=>y.v-x.v);
       ai.appendChild(el(`<div class="grafico"><div style="font-size:12px;color:var(--suave);margin-bottom:8px">${a}</div>${gRosca(d)}</div>`));
     });
-    m.appendChild(bloco('rd-aplic','Aplicações por instituição','rendimento de cada conta',ai));
+    mA.appendChild(bloco('rd-aplic','Aplicações por instituição','rendimento de cada conta',ai));
   }
 
   const linhas=Object.entries(H.empresas).map(([nome,vals])=>({nome,vals,tot:vals.reduce((a,b)=>a+b,0)})).sort((a,b)=>b.tot-a.tot);
@@ -2092,13 +2098,73 @@ function vRendimentos(m){
       ${l.vals.map(v=>`<td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;color:${v?'inherit':'var(--suave)'}">${v?brl(v):'—'}</td>`).join('')}
       <td style="padding:9px 10px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${brl(l.tot)}</td></tr>`).join('')}
     </tbody><tfoot><tr class="tfim"><td>Total</td>${H.totalAno.map(v=>`<td style="text-align:right">${brl(v)}</td>`).join('')}<td style="text-align:right">${brl(H.totalGeral)}</td></tr></tfoot></table>`;
-  m.appendChild(bloco('rd-hist','Histórico por empresa','da sua planilha',th));
+  mA.appendChild(bloco('rd-hist','Histórico por empresa','da sua planilha',th));
 
-  const tm=el('<div class="rolagem"></div>');
-  tm.innerHTML=`<table><thead><tr>${MESES.map(x=>`<th style="text-align:right">${x}</th>`).join('')}</tr></thead><tbody><tr>
-    ${porMes.map((v,i)=>`<td style="padding:11px 10px;text-align:right;font-variant-numeric:tabular-nums;${i===mesN?'background:var(--verde-cl);color:var(--verde);font-weight:600':''}">${v?brl(v):'—'}</td>`).join('')}
-    </tr></tbody></table>`;
-  m.appendChild(bloco('rd-mes','Mês a mês de '+ano,'preenche conforme você lança',tm));
+  /* ---- MENSAL: cada mês abre os lançamentos daquele mês ---- */
+  const tmc = el('<div></div>');
+  const mesesComAlgo = porMes.filter(v => v).length;
+  if (!mesesComAlgo) {
+    tmc.innerHTML = `<div class="vazio">Nenhum lançamento em ${ano}. Os anos anteriores vieram da planilha só com o total do ano —
+      o mês a mês existe a partir do que você lança aqui.</div>`;
+  } else {
+    const rolM = el('<div class="rolagem"></div>');
+    const tM = document.createElement('table');
+    tM.innerHTML = '<thead><tr><th>Mês</th><th style="text-align:right">Lançamentos</th>' +
+      '<th style="text-align:right">Total</th><th style="text-align:right">% do ano</th><th>Peso no ano</th></tr></thead>';
+    const tbM = document.createElement('tbody');
+    const totAnoLanc = porMes.reduce((s, v) => s + v, 0);
+    const maiorMes = Math.max(...porMes, 1);
+    MESES.forEach((nomeMes, i) => {
+      const doMes = doAno.filter(x => +((x.data || '').slice(5, 7)) === i + 1)
+        .sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+      const tot = porMes[i];
+      if (!doMes.length && !tot) return;
+      const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.style.background = 'var(--bg)';
+      if (i === mesN && ano === anoHoje) tr.style.boxShadow = 'inset 3px 0 0 var(--verde)';
+      tr.innerHTML = `<td style="padding:11px 10px"><b style="font-size:14px">${nomeMes}</b>
+          <span class="setaM" style="color:var(--suave);font-size:11px;margin-left:6px">▸ ${doMes.length} lançamento(s)</span></td>
+        <td style="padding:11px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${doMes.length || '—'}</td>
+        <td style="padding:11px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:14px">${tot ? brl(tot) : '—'}</td>
+        <td style="padding:11px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${totAnoLanc ? (tot / totAnoLanc * 100).toFixed(1) + '%' : '—'}</td>
+        <td style="padding:11px 10px"><div class="barra"><i style="width:${(tot / maiorMes * 100).toFixed(0)}%;background:var(--verde)"></i></div></td>`;
+      tbM.appendChild(tr);
+      // os lançamentos do mês, escondidos até clicar
+      const filhas = [];
+      doMes.forEach(x => {
+        const trf = document.createElement('tr');
+        trf.style.display = 'none'; trf.style.cursor = 'pointer';
+        trf.innerHTML = `<td style="padding:7px 10px 7px 30px;font-size:13px">↳ ${fmtDataAno(x.data)}
+            <b style="margin-left:8px">${esc(x.empresa || '—')}</b>
+            ${x.tipo ? `<span style="color:var(--suave)"> · ${esc(x.tipo)}</span>` : ''}</td>
+          <td style="padding:7px 10px;color:var(--suave);font-size:12.5px">${esc(x.instituicao || '')}</td>
+          <td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums">${brl(+x.valor || 0)}</td>
+          <td style="padding:7px 10px;text-align:right;color:var(--suave);font-size:12.5px;font-variant-numeric:tabular-nums">${tot ? ((+x.valor || 0) / tot * 100).toFixed(0) + '% do mês' : ''}</td>
+          <td style="padding:7px 10px;color:var(--suave);font-size:12.5px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.obs || '')}</td>`;
+        trf.onclick = ev => { ev.stopPropagation(); modalRendimento(x) };
+        tbM.appendChild(trf); filhas.push(trf);
+      });
+      if (filhas.length) tr.onclick = () => {
+        const fechado = filhas[0].style.display === 'none';
+        filhas.forEach(f => f.style.display = fechado ? '' : 'none');
+        tr.querySelector('.setaM').textContent = (fechado ? '▾ ' : '▸ ') + filhas.length + ' lançamento(s)';
+      };
+    });
+    tM.appendChild(tbM);
+    const tfM = document.createElement('tfoot');
+    tfM.innerHTML = `<tr class="tfim"><td colspan="2" style="padding:10px">TOTAL LANÇADO EM ${ano}</td>
+      <td style="text-align:right">${brl(totAnoLanc)}</td><td colspan="2"></td></tr>`;
+    tM.appendChild(tfM); rolM.appendChild(tM); tmc.appendChild(rolM);
+    tmc.appendChild(el(`<div class="grafico">${gBarras(MESES.map((nm, i) => ({ r: nm, v: porMes[i] })), { fmt: brl })}</div>`));
+    const media = totAnoLanc / (porMes.filter(v => v).length || 1);
+    const melhor = porMes.indexOf(Math.max(...porMes));
+    tmc.appendChild(el(`<div style="padding:11px 17px 4px;font-size:12.5px;color:var(--suave)">
+      Média dos meses com lançamento: <b style="color:var(--tinta)">${brl(media)}</b>.
+      Melhor mês: <b style="color:var(--tinta)">${MESES[melhor]}</b> (${brl(porMes[melhor])}).</div>`));
+  }
+  if (!vAnual) m.appendChild(bloco('rd-mes', 'Mês a mês de ' + ano, 'clique no mês para ver os lançamentos daquele mês', tmc));
+
 
   /* ---- lançamentos: linha clicável, abre o detalhe ---- */
   const novoRend=()=>{const x={id:uid(),data:hoje(),empresa:(empSel!=='Todas'?empSel:CFG('empresas')[0]||'Outro'),
@@ -2331,6 +2397,24 @@ function baixarRendimentosExcel() {
   if (E.rendimentos.length)
     a4.push([{ v: 'TOTAL', s: N }, '', '', '', { v: E.rendimentos.reduce((s, x) => s + (+x.valor || 0), 0), s: NM }, '']);
 
+  /* 4b. Mês a mês — total do mês e, embaixo, os lançamentos daquele mês */
+  const anosLanc = [...new Set(E.rendimentos.map(x => (x.data || '').slice(0, 4)).filter(Boolean))].sort();
+  const aMes = [[{ v: 'Mês a mês', s: 5 }], [],
+    [{ v: 'Ano', s: N }, { v: 'Mês', s: N }, { v: 'Data', s: N }, { v: 'Empresa', s: N },
+     { v: 'Instituição', s: N }, { v: 'Tipo', s: N }, { v: 'Valor', s: N }]];
+  anosLanc.forEach(a => {
+    MESES.forEach((nomeMes, i) => {
+      const doMes = E.rendimentos
+        .filter(x => (x.data || '').startsWith(a) && +((x.data || '').slice(5, 7)) === i + 1)
+        .sort((p, q) => (p.data || '').localeCompare(q.data || ''));
+      if (!doMes.length) return;
+      const tot = doMes.reduce((acc, x) => acc + (+x.valor || 0), 0);
+      aMes.push([{ v: +a, s: N }, { v: nomeMes, s: N }, '', '', '', { v: 'total do mês', s: N }, { v: tot, s: NM }]);
+      doMes.forEach(x => aMes.push(['', '', fmtDataAno(x.data), x.empresa || '', x.instituicao || '',
+        x.tipo || '', { v: +x.valor || 0, s: M }]));
+    });
+  });
+
   /* 5. Aplicações por instituição */
   const a5 = [[{ v: 'Aplicações por instituição', s: 5 }], [],
     [{ v: 'Ano', s: N }, { v: 'Instituição', s: N }, { v: 'Rendimento', s: N }]];
@@ -2343,6 +2427,7 @@ function baixarRendimentosExcel() {
     { nome: 'Detalhe por negócio', linhas: a3, larguras: [8, 18, 34, 13, 15] },
     { nome: 'Lançamentos', linhas: a4, larguras: [12, 18, 18, 18, 14, 30] },
   ];
+  if (aMes.length > 3) abas.splice(3, 0, { nome: 'Mês a mês', linhas: aMes, larguras: [8, 12, 12, 18, 18, 16, 15] });
   if (a5.length > 3) abas.push({ nome: 'Aplicações', linhas: a5, larguras: [8, 26, 15] });
 
   baixarBlob(gerarXlsx(abas), 'Rendimentos-Leo-' + hoje() + '.xlsx');
@@ -2395,6 +2480,27 @@ function baixarRendimentosPDF() {
     <td class="n">${brl2(totalGeral)}</td><td class="n">100%</td></tr></tbody></table>
 
   ${det ? '<h2>Detalhe por negócio</h2>' + det : ''}
+  ${(() => {
+    const anosL = [...new Set(E.rendimentos.map(x => (x.data || '').slice(0, 4)).filter(Boolean))].sort();
+    const blocos = anosL.map(a => {
+      const linhas = MESES.map((nm, i) => {
+        const doMes = E.rendimentos.filter(x => (x.data || '').startsWith(a) && +((x.data || '').slice(5, 7)) === i + 1)
+          .sort((p, q) => (p.data || '').localeCompare(q.data || ''));
+        if (!doMes.length) return '';
+        const tot = doMes.reduce((acc, x) => acc + (+x.valor || 0), 0);
+        return `<tr><td><b>${nm}</b></td><td colspan="2" style="color:#888">${doMes.length} lançamento(s)</td>
+            <td class="n"><b>${brl2(tot)}</b></td></tr>`
+          + doMes.map(x => `<tr><td style="padding-left:22px;color:#555">${fmtDataAno(x.data)}</td>
+            <td>${esc(x.empresa || '')}</td><td style="color:#777">${esc(x.tipo || '')}</td>
+            <td class="n">${brl2(+x.valor || 0)}</td></tr>`).join('');
+      }).join('');
+      if (!linhas) return '';
+      const totA = E.rendimentos.filter(x => (x.data || '').startsWith(a)).reduce((acc, x) => acc + (+x.valor || 0), 0);
+      return `<h3>${a}</h3><table><thead><tr><th>Mês / data</th><th>Empresa</th><th>Tipo</th><th class="n">Valor</th></tr></thead>
+        <tbody>${linhas}<tr class="tot"><td colspan="3">TOTAL ${a}</td><td class="n">${brl2(totA)}</td></tr></tbody></table>`;
+    }).filter(Boolean).join('');
+    return blocos ? '<h2>Mês a mês</h2>' + blocos : '';
+  })()}
   <div class="cab" style="margin-top:26px">Central do Léo — documento pessoal</div>`);
   w.document.close();
   setTimeout(() => w.print(), 400);
