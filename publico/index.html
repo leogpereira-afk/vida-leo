@@ -202,6 +202,8 @@ tr:hover .lixo{opacity:1}
       <button onclick="salvarPDF()">🖨 PDF</button>
       <button onclick="exportar()">⬇ Backup</button>
       <button onclick="pedirArquivo(restaurarBackup,'.json')">⬆ Restaurar</button>
+      <button onclick="exportarArquivos()">⬇ Arquivos</button>
+      <button onclick="pedirArquivo(importarArquivos,'.zip')">⬆ Restaurar arquivos</button>
       <button onclick="sairApp()" style="color:var(--vermelho)">⏻ Sair</button>
       <div id="stSync" style="width:100%;font-size:11px;color:var(--suave);padding:4px 2px 0">☁ —</div>
     </div>
@@ -260,6 +262,102 @@ async function arqDel(id){const d=await db();return new Promise((ok,err)=>{
 async function arqTotal(){const d=await db();return new Promise(ok=>{let n=0,b=0;
   const t=d.transaction('arq');const c=t.objectStore('arq').openCursor();
   c.onsuccess=e=>{const cur=e.target.result;if(cur){n++;b+=cur.value.tam||0;cur.continue()}else ok({n,b})}})}
+
+/* ============================================================
+   Levar os anexos de um endereço para outro.
+   Os arquivos vivem no IndexedDB, que é preso ao domínio: o que foi
+   anexado no site antigo não enxerga o site novo. Estas duas funções
+   fazem a ponte — exporta tudo num .zip lá, importa aqui.
+   ============================================================ */
+async function todosArquivos() {
+  const d = await db();
+  return new Promise(ok => {
+    const out = [], t = d.transaction('arq'), c = t.objectStore('arq').openCursor();
+    c.onsuccess = e => { const cur = e.target.result; if (cur) { out.push(cur.value); cur.continue() } else ok(out) };
+  });
+}
+
+async function exportarArquivos() {
+  const regs = await todosArquivos();
+  if (!regs.length) { alert('Não há anexo guardado neste endereço.'); return }
+  const usados = {};                       // nome de arquivo repetido vira nome-2, nome-3…
+  const entradas = [];
+  const indice = [];
+  for (const r of regs) {
+    let nome = (r.nome || 'arquivo').replace(/[\/\\:*?"<>|]/g, '_');
+    usados[nome] = (usados[nome] || 0) + 1;
+    if (usados[nome] > 1) {
+      const p = nome.lastIndexOf('.');
+      nome = p > 0 ? nome.slice(0, p) + '-' + usados[nome] + nome.slice(p) : nome + '-' + usados[nome];
+    }
+    const buf = new Uint8Array(await r.blob.arrayBuffer());
+    entradas.push({ nome: 'arquivos/' + nome, bytes: buf });
+    indice.push({ id: r.id, ref: r.ref, nome: r.nome, tipo: r.tipo, tam: r.tam, em: r.em, arquivo: 'arquivos/' + nome });
+  }
+  entradas.unshift({ nome: 'indice.json', texto: JSON.stringify(indice, null, 1) });
+  const total = indice.reduce((s, x) => s + (x.tam || 0), 0);
+  baixar(zipStore(entradas), 'central-leo-arquivos-' + hoje() + '.zip');
+  alert(regs.length + ' arquivo(s) — ' + tamanho(total) + ' — baixados.\n\n'
+    + 'Abra o site novo e use "⬆ Restaurar arquivos" para trazer tudo.');
+}
+
+/* leitor de ZIP: só o necessário para ler o que a gente mesmo escreveu (sem compressão) */
+function lerZip(u8) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  // acha o fim do diretório central, varrendo de trás para frente
+  let fim = -1;
+  for (let i = u8.length - 22; i >= 0 && i > u8.length - 65558; i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { fim = i; break }
+  }
+  if (fim < 0) throw new Error('não parece um .zip');
+  const qtd = dv.getUint16(fim + 10, true);
+  let p = dv.getUint32(fim + 16, true);
+  const dec = new TextDecoder();
+  const saida = {};
+  for (let k = 0; k < qtd; k++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error('diretório do zip corrompido');
+    const metodo = dv.getUint16(p + 10, true);
+    const tamComp = dv.getUint32(p + 20, true);
+    const nLen = dv.getUint16(p + 28, true), eLen = dv.getUint16(p + 30, true), cLen = dv.getUint16(p + 32, true);
+    const desloc = dv.getUint32(p + 42, true);
+    const nome = dec.decode(u8.subarray(p + 46, p + 46 + nLen));
+    if (metodo !== 0) throw new Error('este zip está comprimido — use o arquivo gerado pelo próprio app');
+    // cabeçalho local: o tamanho dos campos variáveis pode diferir do central
+    const nL2 = dv.getUint16(desloc + 26, true), eL2 = dv.getUint16(desloc + 28, true);
+    const ini = desloc + 30 + nL2 + eL2;
+    saida[nome] = u8.subarray(ini, ini + tamComp);
+    p += 46 + nLen + eLen + cLen;
+  }
+  return saida;
+}
+
+async function importarArquivos(f) {
+  try {
+    const u8 = new Uint8Array(await f.arrayBuffer());
+    const zip = lerZip(u8);
+    if (!zip['indice.json']) throw new Error('falta o indice.json — este zip não veio daqui');
+    const indice = JSON.parse(new TextDecoder().decode(zip['indice.json']));
+    const jaTem = new Set((await todosArquivos()).map(x => x.id));
+    let novos = 0, repetidos = 0, faltando = 0;
+    const d = await db();
+    for (const it of indice) {
+      if (jaTem.has(it.id)) { repetidos++; continue }
+      const bytes = zip[it.arquivo];
+      if (!bytes) { faltando++; continue }
+      const reg = { id: it.id, ref: it.ref, nome: it.nome, tipo: it.tipo, tam: it.tam, em: it.em,
+        blob: new Blob([bytes], { type: it.tipo || 'application/octet-stream' }) };
+      await new Promise((ok, err) => {
+        const t = d.transaction('arq', 'readwrite'); t.objectStore('arq').put(reg);
+        t.oncomplete = ok; t.onerror = () => err(t.error);
+      });
+      novos++;
+    }
+    tela();
+    alert('Arquivos restaurados: ' + novos + '.'
+      + (repetidos ? '\n' + repetidos + ' já estavam aqui (não dupliquei).' : '')
+      + (faltando ? '\n⚠️ ' + faltando + ' constavam no índice mas não vieram no zip.' : ''));
+  } catch (e) { alert('Não consegui ler: ' + e.message) }
+}
 
 /* ---------------- dados iniciais ---------------- */
 const SEED={
@@ -2248,8 +2346,8 @@ function zipStore(arquivos) {
   let desloc = 0;
   const u16 = n => [n & 255, (n >>> 8) & 255];
   const u32 = n => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
-  arquivos.forEach(({ nome, texto }) => {
-    const dados = enc.encode(texto), nomeB = enc.encode(nome), crc = crc32(dados);
+  arquivos.forEach(({ nome, texto, bytes }) => {
+    const dados = bytes || enc.encode(texto), nomeB = enc.encode(nome), crc = crc32(dados);
     const cab = [...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
       ...u32(crc), ...u32(dados.length), ...u32(dados.length), ...u16(nomeB.length), ...u16(0)];
     partes.push(new Uint8Array(cab), nomeB, dados);
