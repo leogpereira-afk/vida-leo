@@ -1937,7 +1937,10 @@ function vRendimentos(m){
   // anos do histórico + anos com lançamento + o ano vigente, sempre
   const anosR=[...new Set([...H.anos,...E.rendimentos.map(x=>+(x.data||'').slice(0,4)).filter(Boolean),anoHoje])]
     .filter(Boolean).sort((a,b)=>a-b);
-  const empresasR=[...new Set(E.rendimentos.filter(x=>(x.data||'').startsWith(ano)).map(x=>x.empresa).filter(Boolean))].sort();
+  // inclui tambem as empresas que so existem no historico da planilha (sem lancamento no ano),
+  // senao clicar nelas no ranking nao seleciona nada
+  const empresasR=[...new Set([...E.rendimentos.filter(x=>(x.data||'').startsWith(ano)).map(x=>x.empresa),
+    ...Object.keys(H.empresas||{})].filter(Boolean))].sort();
   const empSel=filtro.rendEmp||'Todas';
   const doAnoTudo=E.rendimentos.filter(x=>(x.data||'').startsWith(ano));
   const doAno=empSel==='Todas'?doAnoTudo:doAnoTudo.filter(x=>x.empresa===empSel);
@@ -2120,7 +2123,7 @@ function vRendimentos(m){
       const somaEmp=emp.reduce((s,x)=>s+x.v,0), difA=totA-somaEmp;
       det.querySelector('.det').innerHTML=(emp.length
         ? `<table><thead><tr><th>Empresa</th><th style="text-align:right">Valor</th><th style="text-align:right">% do ano</th></tr></thead><tbody>
-            ${emp.map((x,j)=>`<tr><td style="padding:9px 10px"><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${PALETA[j%PALETA.length]};margin-right:7px"></span>${esc(x.r)}
+            ${emp.map((x,j)=>`<tr data-emp="${esc(x.r)}" style="cursor:pointer"><td style="padding:9px 10px"><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${PALETA[j%PALETA.length]};margin-right:7px"></span>${esc(x.r)}
               <div class="barra"><i style="width:${(x.v/emp[0].v*100).toFixed(0)}%;background:${PALETA[j%PALETA.length]}"></i></div></td>
               <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${brl(x.v)}</td>
               <td style="padding:9px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${(x.v/totA*100).toFixed(0)}%</td></tr>`).join('')}
@@ -2133,6 +2136,48 @@ function vRendimentos(m){
             As empresas somam ${brl(somaEmp)}, mas o total de ${anoS} é ${brl(totA)} —
             faltam <b>${brl(Math.abs(difA))}</b>. Isso vem da planilha de origem, que mistura lançamentos com blocos de
             resumo. Corrija os valores em <b>⚙️ Configurações → Histórico de rendimentos</b>.</div>` : '');
+      /* ---- resumo mensal do ano escolhido ---- */
+      const doAnoS = E.rendimentos.filter(x => (x.data || '').startsWith(anoS));
+      const porMesS = MESES.map((_, k) => doAnoS.filter(x => +((x.data || '').slice(5, 7)) === k + 1)
+        .reduce((a, x) => a + (+x.valor || 0), 0));
+      const lancAno = porMesS.reduce((a, v) => a + v, 0);
+      const cxMes = el('<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--linha)"></div>');
+      cxMes.appendChild(el('<div style="font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--suave);margin-bottom:8px">Resumo mensal de ' + anoS + '</div>'));
+      if (!lancAno) {
+        cxMes.appendChild(el(`<div style="font-size:12.5px;color:var(--suave)">
+          ${anoS} veio da planilha só com o total do ano — o mês a mês aparece a partir do que você lança no app.</div>`));
+      } else {
+        const maiorM = Math.max(...porMesS, 1);
+        const rolMS = el('<div class="rolagem"></div>');
+        rolMS.innerHTML = '<table><thead><tr><th>Mês</th><th style="text-align:right">Lanç.</th>'
+          + '<th style="text-align:right">Total</th><th style="text-align:right">% do ano</th><th>Peso</th></tr></thead><tbody>'
+          + MESES.map((nm, k) => {
+            const doM = doAnoS.filter(x => +((x.data || '').slice(5, 7)) === k + 1);
+            if (!doM.length) return '';
+            const v = porMesS[k];
+            return `<tr data-mes="${k}" style="cursor:pointer"><td style="padding:9px 10px"><b>${nm}</b></td>
+              <td style="padding:9px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${doM.length}</td>
+              <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${brl(v)}</td>
+              <td style="padding:9px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${(v / lancAno * 100).toFixed(0)}%</td>
+              <td style="padding:9px 10px"><div class="barra"><i style="width:${(v / maiorM * 100).toFixed(0)}%;background:var(--verde)"></i></div></td></tr>`;
+          }).join('')
+          + `<tr class="tfim"><td colspan="2">Lançado em ${anoS}</td>
+             <td style="text-align:right">${brl(lancAno)}</td><td colspan="2"></td></tr></tbody></table>`;
+        cxMes.appendChild(rolMS);
+        // clicar num mês abre a visão mensal daquele ano
+        rolMS.querySelectorAll('[data-mes]').forEach(tr => tr.onclick = () => {
+          filtro.rendAno = anoS; filtro.rendVisao = 'Mensal'; filtro.rendEmp = 'Todas'; r();
+        });
+        if (Math.abs(lancAno - totA) > 1) cxMes.appendChild(el(`<div style="font-size:12px;color:var(--suave);margin-top:8px">
+          Os lançamentos somam ${brl(lancAno)}; o total do ano na planilha é ${brl(totA)}.
+          A diferença é o que veio do histórico sem detalhe por mês.</div>`));
+      }
+      det.appendChild(cxMes);
+
+      // clicar numa empresa abre o ano já filtrado nela
+      det.querySelectorAll('[data-emp]').forEach(tr => tr.onclick = () => {
+        filtro.rendAno = anoS; filtro.rendEmp = tr.dataset.emp; filtro.rendAnoSel = -1; r();
+      });
       gEl.appendChild(det);
     }
     gEl.querySelectorAll('[data-bar]').forEach(g=>g.onclick=()=>{
@@ -2140,7 +2185,7 @@ function vRendimentos(m){
     });
   };
   pintaEvo();
-  mA.appendChild(bloco('rd-dash','Evolução anual','clique num ano para abrir as empresas',gEl));
+  mA.appendChild(bloco('rd-dash','Evolução anual','clique num ano para abrir as empresas e o resumo mensal — e clique numa empresa ou num mês para ir até os lançamentos',gEl));
   // ---- acumulado geral: quanto você já somou até cada ano ----
   const acum=H.anos.map((_,i)=>H.totalAno.slice(0,i+1).reduce((s,v)=>s+v,0));
   const ac=el('<div></div>');
@@ -2151,14 +2196,17 @@ function vRendimentos(m){
     ${H.anos.map((a,i)=>{
       const cr=i? (H.totalAno[i]/H.totalAno[i-1]-1)*100 : null;
       const parcial=(H.parciais||[]).includes(a);
-      return `<tr><td style="padding:9px 10px"><b>${a}</b>${parcial?' <span style="font-size:11px;color:var(--areia)">parcial</span>':''}</td>
+      return `<tr data-ano="${a}" style="cursor:pointer"><td style="padding:9px 10px"><b>${a}</b>${parcial?' <span style="font-size:11px;color:var(--areia)">parcial</span>':''}</td>
         <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums">${brl(H.totalAno[i])}</td>
         <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${brl(acum[i])}</td>
         <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;color:${cr==null?'var(--suave)':cr>=0?'var(--verde)':'var(--vermelho)'}">
           ${cr==null?'—':(cr>=0?'+':'')+cr.toFixed(0)+'%'}</td></tr>`}).join('')}
   </tbody></table>`;
   ac.appendChild(tac);
-  mA.appendChild(bloco('rd-acum','Acumulado geral','o do ano e o total somado até ali',ac));
+  tac.querySelectorAll('[data-ano]').forEach(tr => tr.onclick = () => {
+    filtro.rendAno = +tr.dataset.ano; filtro.rendEmp = 'Todas'; filtro.rendAnoSel = -1; r();
+  });
+  mA.appendChild(bloco('rd-acum','Acumulado geral','clique num ano para abrir só ele',ac));
 
   mA.appendChild(bloco('rd-emp','Participação por empresa','no acumulado',graficoEl(gRosca(
     Object.entries(H.empresas).map(([n,v])=>({r:n,v:v.reduce((a,b)=>a+b,0)}))))));
@@ -2192,11 +2240,19 @@ function vRendimentos(m){
   const maiorTot=linhas[0].tot;
   const th=el('<div class="rolagem"></div>');
   th.innerHTML=`<table><thead><tr><th>Empresa</th>${H.anos.map(a=>`<th style="text-align:right">${a}</th>`).join('')}<th style="text-align:right">Total</th></tr></thead><tbody>
-    ${linhas.map(l=>`<tr><td style="padding:9px 10px"><b>${l.nome}</b><div class="barra"><i style="width:${(l.tot/maiorTot*100).toFixed(0)}%"></i></div></td>
+    ${linhas.map(l=>`<tr data-hemp="${esc(l.nome)}" style="cursor:pointer"><td style="padding:9px 10px"><b>${l.nome}</b><div class="barra"><i style="width:${(l.tot/maiorTot*100).toFixed(0)}%"></i></div></td>
       ${l.vals.map(v=>`<td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;color:${v?'inherit':'var(--suave)'}">${v?brl(v):'—'}</td>`).join('')}
       <td style="padding:9px 10px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${brl(l.tot)}</td></tr>`).join('')}
     </tbody><tfoot><tr class="tfim"><td>Total</td>${H.totalAno.map(v=>`<td style="text-align:right">${brl(v)}</td>`).join('')}<td style="text-align:right">${brl(H.totalGeral)}</td></tr></tfoot></table>`;
-  mA.appendChild(bloco('rd-hist','Histórico por empresa','da sua planilha',th));
+  th.querySelectorAll('[data-hemp]').forEach(tr => tr.onclick = () => {
+    const nome = tr.dataset.hemp, vals = (H.empresas || {})[nome] || [];
+    // cai no ano em que essa empresa mais rendeu — clicar e ir parar num ano vazio nao ajuda
+    let melhor = -1, mv = 0;
+    vals.forEach((v, i) => { if (v > mv) { mv = v; melhor = i } });
+    if (melhor >= 0) filtro.rendAno = H.anos[melhor];
+    filtro.rendEmp = nome; filtro.rendAnoSel = -1; r();
+  });
+  mA.appendChild(bloco('rd-hist','Histórico por empresa','clique numa empresa para filtrar por ela',th));
 
   /* ---- MENSAL: cada mês abre os lançamentos daquele mês ---- */
   const tmc = el('<div></div>');
