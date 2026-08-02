@@ -119,11 +119,10 @@ Deno.serve(async (req: Request) => {
     }
 
     if (acao === "trocar") {
-      // troca exige sessão válida E a senha atual — token roubado não troca senha
+      // decisão do dono: basta a sessão válida — a senha antiga não é exigida.
+      // (o custo assumido: um aparelho logado consegue definir senha nova)
       const t = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
       if (!(await tokenOk(t))) return json({ erro: "Não autorizado" }, 401);
-      const reg = await senhaDoBanco();
-      if (!(await senhaConfere(String(senhaAtual ?? ""), reg))) { await freia(); return json({ erro: "Senha atual incorreta" }, 401); }
       const nova = String(senhaNova ?? "");
       if (nova.length < 8) return json({ erro: "A senha nova precisa de pelo menos 8 caracteres" }, 400);
       const salt = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
