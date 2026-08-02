@@ -376,6 +376,7 @@ const SEED={
     tipoJung:'',tracoPrincipal:'',motivadorPrincipal:'',motivadorSecundario:'',medos:'',
     positividade:'',estima:'',flexibilidade:'',fonteLaudo:'',eneagramaTipo:'',comoDecido:'',oQueMeMove:'',comoMeRecarrego:'',meusPontosCegos:'',comoMeAjudar:'',numerologia:'',perfilDisc:'',eneagrama:'',bigfive:''},
   perfil:{nascimento:''},
+  marcas:{},
   config:{
     empresas:['Outro'],
     instituicoes:['Outra'],
@@ -432,6 +433,7 @@ function carregar(){
     delete g.categoria;delete g.obs;
   });
   if(!d.colapso)d.colapso={};
+  if(!d.marcas||typeof d.marcas!=='object'||Array.isArray(d.marcas))d.marcas={};
   // objetos únicos: garante que existam mesmo em backup antigo
   for(const k of ['sos','norte','roda','perfil','comportamento']) d[k]={...structuredClone(SEED[k]),...(d[k]||{})};
   for(const k of ['vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','seguros','planos','casa','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio']) if(!Array.isArray(d[k])) d[k]=[];
@@ -455,6 +457,57 @@ const CORES_STATUS={'Realizado':['var(--verde-cl)','var(--verde)'],'Confirmado':
 const chip=t=>{const c=CORES_STATUS[t]||['var(--bg)','var(--suave)'];
   return `<span class="chip" style="background:${c[0]};color:${c[1]}">${esc(t||'—')}</span>`};
 const PALETA=['#1f6f5c','#c98a4b','#3d5a80','#b4443a','#6d5a8c','#7a8b53','#a8674b','#4a8fa0'];
+
+/* ---- identidade visual das empresas: cor fixa + logo em bolinha ----------
+   A cor deixa de depender da posição no ranking (que muda a cada ano) e passa
+   a ser DA empresa: ou a escolhida em Configurações, ou uma estável pelo nome. */
+const CORES_MARCA=[...PALETA,'#4e8e8b','#8e4e7e','#5e6eb8'];
+function marcaDe(nome){
+  const m=(E.marcas&&E.marcas[nome])||{};
+  if(m.cor||m.logo) return {cor:m.cor||PALETA[0],logo:m.logo||''};
+  let h=0;const str=String(nome||'');for(let i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))>>>0;
+  return {cor:CORES_MARCA[h%CORES_MARCA.length],logo:''};
+}
+const iniciaisDe=nm=>{const p=String(nm||'?').trim().split(/\s+/);
+  return (p.length>1?(p[0][0]||'')+(p[1][0]||''):p[0].slice(0,2)).toUpperCase()};
+function avatar(nome,tam=22){
+  const m=marcaDe(nome);
+  const st=`width:${tam}px;height:${tam}px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-right:7px`;
+  if(m.logo) return `<span style="${st};background:#fff;border:1.5px solid ${m.cor};overflow:hidden"><img src="${m.logo}" alt="" style="width:100%;height:100%;object-fit:cover"></span>`;
+  return `<span style="${st};background:${m.cor};color:#fff;font-weight:700;font-size:${Math.max(9,Math.round(tam*0.42))}px;letter-spacing:.02em">${esc(iniciaisDe(nome))}</span>`;
+}
+// logo enviado vira um quadradinho de 64px (recorte central) — pesa pouco e sincroniza
+function lerLogo(file,cb){const fr=new FileReader();fr.onload=()=>{const img=new Image();
+  img.onload=()=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');
+    const lado=Math.min(img.width,img.height);
+    g.drawImage(img,(img.width-lado)/2,(img.height-lado)/2,lado,lado,0,0,64,64);cb(c.toDataURL('image/png'))};
+  img.onerror=()=>alert('Não consegui ler essa imagem.');
+  img.src=fr.result};fr.readAsDataURL(file)}
+// mês seguinte com o dia preso ao fim do mês (31/01 → 28/02)
+function mesSeguinte(iso){const a=+iso.slice(0,4),m=+iso.slice(5,7),d=+iso.slice(8,10);
+  const a2=m===12?a+1:a,m2=m===12?1:m+1,ult=new Date(a2,m2,0).getDate();
+  return a2+'-'+String(m2).padStart(2,'0')+'-'+String(Math.min(d,ult)).padStart(2,'0')}
+/* ---- conferência: possíveis duplicatas de rendimento ----------------------
+   mesma empresa, mesmo valor, até 3 dias de distância. O pró-labore mensal
+   (mesmo valor, ~30 dias) NÃO cai aqui de propósito. */
+function duplicatasRend(lista){
+  const f=new Set(),ord=[...lista].sort((a,b)=>(a.empresa||'').localeCompare(b.empresa||'')
+    ||((+a.valor||0)-(+b.valor||0))||(a.data||'').localeCompare(b.data||''));
+  for(let i=1;i<ord.length;i++){const a=ord[i-1],b=ord[i];
+    if((a.empresa||'')===(b.empresa||'')&&(+a.valor||0)>0&&Math.abs((+a.valor)-(+b.valor))<0.005
+      &&Math.abs(new Date(b.data)-new Date(a.data))/864e5<=3){f.add(a.id);f.add(b.id)}}
+  return f;
+}
+let _dupCache=null,_dupMt=-1;
+const dupRendSet=()=>{if(_dupMt!==E._mt||!_dupCache){_dupCache=duplicatasRend(E.rendimentos||[]);_dupMt=E._mt}return _dupCache};
+// etiquetas de atenção de um lançamento (ajuste, sem data, possível duplicata)
+function flagsLan(y){
+  let h='';
+  if(/ajuste/i.test(y.tipo||'')) h+=` <span class="chip" style="background:var(--areia-cl);color:var(--areia)">ajuste</span>`;
+  else if(/lançado em 31\/12/i.test(y.obs||'')) h+=` <span class="chip" style="background:var(--areia-cl);color:var(--areia)">sem data</span>`;
+  if(dupRendSet().has(y.id)) h+=` <span class="chip" style="background:var(--vermelho-cl);color:var(--vermelho)">duplicata?</span>`;
+  return h;
+}
 
 /* ---------- gráficos SVG (sem biblioteca) ---------- */
 function gBarras(dados,{alt=150,fmt=brl,cor=null,clicavel=false,sel=-1}={}){
@@ -498,13 +551,13 @@ function gRosca(dados,{fmt=brl}={}){
     const p=(rr,t)=>[C+rr*Math.cos(t),C+rr*Math.sin(t)].join(' ');
     const g=a>Math.PI?1:0;
     const path=`M${p(R,ang)} A${R} ${R} 0 ${g} 1 ${p(R,f)} L${p(r,f)} A${r} ${r} 0 ${g} 0 ${p(r,ang)} Z`;
-    ang=f;return `<path d="${path}" fill="${PALETA[i%PALETA.length]}" opacity=".92"><title>${esc(d.r)}: ${fmt(d.v)}</title></path>`}).join('');
+    ang=f;return `<path d="${path}" fill="${d.cor||PALETA[i%PALETA.length]}" opacity=".92"><title>${esc(d.r)}: ${fmt(d.v)}</title></path>`}).join('');
   return `<div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
     <svg viewBox="0 0 160 160" style="width:160px;height:160px;flex:0 0 auto">${arcos}
       <text x="80" y="76" text-anchor="middle" font-size="11" fill="var(--suave)">total</text>
       <text x="80" y="93" text-anchor="middle" font-size="14" font-weight="600" fill="var(--tinta)">${fmt(tot)}</text></svg>
     <div class="legenda" style="flex-direction:column;gap:6px;flex:1;min-width:150px">
-      ${val.map((d,i)=>`<span><i style="background:${PALETA[i%PALETA.length]}"></i>${esc(d.r)} · <b style="color:var(--tinta)">${fmt(d.v)}</b>
+      ${val.map((d,i)=>`<span><i style="background:${d.cor||PALETA[i%PALETA.length]}"></i>${esc(d.r)} · <b style="color:var(--tinta)">${fmt(d.v)}</b>
         <span style="opacity:.7">(${(d.v/tot*100).toFixed(0)}%)</span></span>`).join('')}</div></div>`;
 }
 
@@ -1981,7 +2034,10 @@ function vRendimentos(m){
       todos?'tudo somado':(ehParcial?'jan–jun (parcial)':'no ano inteiro'),'v')}
     ${kpi('Média por mês',brl(totalSel/(todos?H.anos.length*12:mesesDecorridos)),
       todos?'nos 7 anos':mesesDecorridos+' meses',null)}
-    ${kpi('Maior fonte',maior?maior.r:'—',maior?brl(maior.v)+' · '+conc.toFixed(0)+'% do total':'','a')}
+    ${kpi('Maior fonte',maior?avatar(maior.r,22)+esc(maior.r):'—',maior?brl(maior.v)+' · '+conc.toFixed(0)+'% do total':'','a')}
+    ${(()=>{const ls=todos?E.rendimentos:doAnoTudo;
+      const ult=[...ls].sort((a,b)=>(a.data||'').localeCompare(b.data||'')).map(y=>y.data).pop();
+      return kpi('Lançamentos',ls.length,ult?'último em '+fmtDataAno(ult):'nenhum ainda')})()}
     ${cresc==null?kpi('Média anual',brl(H.mediaAnual),'anos completos')
       :kpi('Contra '+(ano-1),(cresc>=0?'+':'')+cresc.toFixed(0)+'%',
         brl(Math.abs(H.totalAno[iAno]-H.totalAno[iAno-1]))+(cresc>=0?' a mais':' a menos'),cresc>=0?'v':'r')}</div>`));
@@ -2025,24 +2081,29 @@ function vRendimentos(m){
     '<th style="text-align:right">Valor</th><th style="text-align:right">% do total</th></tr></thead>';
   const tbg=document.createElement('tbody');
   grupos.forEach((g,i)=>{
-    const cor=PALETA[i%PALETA.length];
-    // linha da empresa (destacada, clicável quando tem detalhe)
+    const cor=marcaDe(g.empresa).cor;
+    // lançamentos da empresa no recorte (ano escolhido, ou todos)
+    const lanR=E.rendimentos.filter(y=>y.empresa===g.empresa&&(todos||String(y.data||'').startsWith(ano)))
+      .sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+    const rotSeta=(g.itens.length?g.itens.length+' origem(ns) · ':'')+lanR.length+' lançamento(s)';
+    // linha da empresa (destacada, clicável quando tem o que abrir)
     const tre=document.createElement('tr');
     tre.style.background='var(--bg)';
     tre.style.boxShadow='inset 3px 0 0 '+cor;
-    if(g.itens.length) tre.style.cursor='pointer';
+    if(g.itens.length||lanR.length) tre.style.cursor='pointer';
     tre.innerHTML=`<td style="padding:11px 10px;color:var(--suave);font-weight:600">${i+1}º</td>
-      <td style="padding:11px 10px"><b style="font-size:14.5px">${esc(g.empresa)}</b>
-        ${g.itens.length?`<span class="setaG" style="color:var(--suave);font-size:11px;margin-left:6px">▾ ${g.itens.length} origem(ns)</span>`:''}
+      <td style="padding:11px 10px">${avatar(g.empresa,26)}<b style="font-size:14.5px">${esc(g.empresa)}</b>
+        ${(g.itens.length||lanR.length)?`<span class="setaG" style="color:var(--suave);font-size:11px;margin-left:6px">▸ ${rotSeta}</span>`:''}
         <div class="barra"><i style="width:${(g.total/(grupos[0].total||1)*100).toFixed(0)}%;background:${cor}"></i></div></td>
       <td style="padding:11px 10px"></td>
       <td style="padding:11px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:14px">${brl(g.total)}</td>
       <td style="padding:11px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums;font-weight:600">${(g.total/totalSel*100).toFixed(1)}%</td>`;
     tbg.appendChild(tre);
-    // linhas do detalhe, recuadas
+    // linhas do detalhe, recuadas — começam fechadas (a lista cresceu com os lançamentos)
     const filhas=[];
     g.itens.forEach(it=>{
       const tr=document.createElement('tr');
+      tr.style.display='none';
       tr.innerHTML=`<td></td>
         <td style="padding:7px 10px 7px 30px;color:var(--tinta);font-size:13px">↳ ${esc(it.nome)}
           <div class="barra" style="height:5px;max-width:210px"><i style="width:${(it.v/(g.total||1)*100).toFixed(0)}%;background:${cor};opacity:.55"></i></div></td>
@@ -2051,11 +2112,33 @@ function vRendimentos(m){
         <td style="padding:7px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums;font-size:12.5px">${(it.v/g.total*100).toFixed(0)}% da empresa</td>`;
       tbg.appendChild(tr); filhas.push(tr);
     });
+    // os lançamentos de verdade — cada um abre para corrigir
+    if(lanR.length){
+      const trh=document.createElement('tr');trh.style.display='none';
+      trh.innerHTML=`<td></td><td colspan="4" style="padding:9px 10px 3px 30px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--suave)">Lançamentos — clique para corrigir</td>`;
+      tbg.appendChild(trh);filhas.push(trh);
+      lanR.forEach(y=>{
+        const trl=document.createElement('tr');trl.style.display='none';trl.style.cursor='pointer';
+        trl.innerHTML=`<td></td>
+          <td style="padding:6px 10px 6px 30px;font-size:12.5px;white-space:nowrap">↳ ${fmtDataAno(y.data)}${y.tipo?` <span style="color:var(--suave)">· ${esc(y.tipo)}</span>`:''}${flagsLan(y)}</td>
+          <td style="padding:6px 10px;color:var(--suave);font-size:12px">${esc(y.instituicao||'')}</td>
+          <td style="padding:6px 10px;text-align:right;font-variant-numeric:tabular-nums">${brl(+y.valor||0)}</td>
+          <td style="padding:6px 10px;text-align:right;color:var(--suave);font-size:11.5px">✎ corrigir</td>`;
+        trl.onclick=ev=>{ev.stopPropagation();modalRendimento(y)};
+        tbg.appendChild(trl);filhas.push(trl);
+      });
+      const tra=document.createElement('tr');tra.style.display='none';tra.style.cursor='pointer';
+      tra.innerHTML=`<td></td><td colspan="4" style="padding:5px 10px 11px 30px;font-size:12px;color:var(--verde)">+ lançamento de ${esc(g.empresa)}${todos?'':' em '+ano}</td>`;
+      tra.onclick=ev=>{ev.stopPropagation();
+        const y={id:uid(),data:(todos||+ano===anoHoje)?hoje():ano+'-12-31',empresa:g.empresa,instituicao:'',tipo:'',valor:0,obs:''};
+        E.rendimentos.push(y);salvar();modalRendimento(y)};
+      tbg.appendChild(tra);filhas.push(tra);
+    }
     if(filhas.length) tre.onclick=()=>{
-      const fechado=filhas[0].style.display==='none';
-      filhas.forEach(f=>f.style.display=fechado?'':'none');
+      const fech=filhas[0].style.display==='none';
+      filhas.forEach(f=>f.style.display=fech?'':'none');
       const st=tre.querySelector('.setaG');
-      if(st) st.textContent=(fechado?'▾ ':'▸ ')+g.itens.length+' origem(ns)';
+      if(st) st.textContent=(fech?'▾ ':'▸ ')+rotSeta;
     };
   });
   tg.appendChild(tbg);
@@ -2099,6 +2182,51 @@ function vRendimentos(m){
     e a tendência dos últimos anos é de crescimento, com 2025 como exceção.</p></div>`);
   an.innerHTML=`<div class="lista-sug">${notas.join('')}</div>`;
   mA.appendChild(bloco('rd-analise','🔎 Leitura dos números','o que eu olharia no seu lugar',an));
+
+  /* ---- conferência: o lançado bate com o histórico? — com o dedo no que destoa ---- */
+  const cfx=el('<div></div>');
+  {
+    const rolC=el('<div class="rolagem"></div>');
+    const cel='padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums';
+    let corpo='';
+    if(todos){
+      corpo=H.anos.map((a2,i2)=>{
+        const ls=E.rendimentos.filter(y=>String(y.data||'').startsWith(a2));
+        const soma=ls.reduce((s2,y)=>s2+(+y.valor||0),0), hist=H.totalAno[i2]||0, dif=soma-hist;
+        return `<tr data-cfano="${a2}" style="cursor:pointer"><td style="padding:9px 10px"><b>${a2}</b></td>
+          <td style="${cel};color:var(--suave)">${ls.length}</td>
+          <td style="${cel}">${brl(soma)}</td>
+          <td style="${cel}">${brl(hist)}</td>
+          <td style="${cel};font-weight:600;color:${Math.abs(dif)>1?'var(--vermelho)':'var(--verde)'}">${Math.abs(dif)>1?brl(dif):'✓ confere'}</td></tr>`}).join('');
+    } else {
+      const iC=H.anos.indexOf(ano);
+      const nomesC=[...new Set([...Object.keys(H.empresas||{}),...doAnoTudo.map(y=>y.empresa)])].filter(Boolean);
+      corpo=nomesC.map(nm=>{
+        const ls=doAnoTudo.filter(y=>y.empresa===nm);
+        const soma=ls.reduce((s2,y)=>s2+(+y.valor||0),0);
+        const hist=iC>=0?(((H.empresas||{})[nm]||[])[iC]||0):0;
+        const dif=soma-hist;
+        if(!ls.length&&!hist) return '';
+        return `<tr data-cfemp="${esc(nm)}" style="cursor:pointer"><td style="padding:9px 10px;white-space:nowrap">${avatar(nm,20)}<b>${esc(nm)}</b></td>
+          <td style="${cel};color:var(--suave)">${ls.length}</td>
+          <td style="${cel}">${brl(soma)}</td>
+          <td style="${cel}">${brl(hist)}</td>
+          <td style="${cel};font-weight:600;color:${Math.abs(dif)>1?'var(--vermelho)':'var(--verde)'}">${Math.abs(dif)>1?brl(dif):'✓ confere'}</td></tr>`}).join('');
+    }
+    rolC.innerHTML=`<table><thead><tr><th>${todos?'Ano':'Empresa'}</th><th style="text-align:right">Lançamentos</th>
+      <th style="text-align:right">Somam</th><th style="text-align:right">Histórico</th><th style="text-align:right">Diferença</th></tr></thead><tbody>${corpo}</tbody></table>`;
+    cfx.appendChild(rolC);
+    const nd=dupRendSet().size;
+    const semD=E.rendimentos.filter(y=>/lançado em 31\/12/i.test(y.obs||'')).length;
+    const najus=E.rendimentos.filter(y=>/ajuste/i.test(y.tipo||'')).length;
+    cfx.appendChild(el(`<div style="padding:10px 17px 14px;font-size:12.5px;color:var(--suave)">
+      ${nd?`⚠️ <b style="color:var(--vermelho)">${nd} lançamento(s)</b> parecem duplicados (mesma empresa, mesmo valor, poucos dias de distância) — estão etiquetados nas listas. `:'Sem duplicata aparente. '}
+      ${semD?semD+' sem data real (estão em 31/12 do ano). ':''}
+      ${najus?najus+' ajuste(s) de fechamento do histórico.':''}</div>`));
+    rolC.querySelectorAll('[data-cfemp]').forEach(tr2=>tr2.onclick=()=>{filtro.rendEmp=tr2.dataset.cfemp;r()});
+    rolC.querySelectorAll('[data-cfano]').forEach(tr2=>tr2.onclick=()=>{filtro.rendAno=+tr2.dataset.cfano;filtro.rendEmp='Todas';filtro.rendAnoSel=-1;r()});
+  }
+  mA.appendChild(bloco('rd-conf','🧾 Conferência','lançado x histórico da planilha — clique numa linha para investigar',cfx));
   // evolução anual: clicar no ano abre as empresas daquele ano
   const iSel=filtro.rendAnoSel;
   const gEl=el(`<div class="grafico"></div>`);
@@ -2121,14 +2249,27 @@ function vRendimentos(m){
         <div class="det"></div></div>`);
       det.querySelector('button').onclick=()=>{filtro.rendAnoSel=-1;pintaEvo()};
       const somaEmp=emp.reduce((s,x)=>s+x.v,0), difA=totA-somaEmp;
+      // cada empresa mostra QUANTOS lançamentos tem no ano; clicar expande, e cada um abre para corrigir
+      const lanDe=nome=>E.rendimentos.filter(y=>String(y.data||'').startsWith(anoS)&&y.empresa===nome)
+        .sort((a,b)=>(a.data||'').localeCompare(b.data||''));
       det.querySelector('.det').innerHTML=(emp.length
-        ? `<table><thead><tr><th>Empresa</th><th style="text-align:right">Valor</th><th style="text-align:right">% do ano</th></tr></thead><tbody>
-            ${emp.map((x,j)=>`<tr data-emp="${esc(x.r)}" style="cursor:pointer"><td style="padding:9px 10px"><span style="display:inline-block;width:9px;height:9px;border-radius:3px;background:${PALETA[j%PALETA.length]};margin-right:7px"></span>${esc(x.r)}
-              <div class="barra"><i style="width:${(x.v/emp[0].v*100).toFixed(0)}%;background:${PALETA[j%PALETA.length]}"></i></div></td>
+        ? `<table><thead><tr><th>Empresa</th><th>Lançamentos</th><th style="text-align:right">Valor</th><th style="text-align:right">% do ano</th><th></th></tr></thead><tbody>
+            ${emp.map((x,j)=>{const corE=marcaDe(x.r).cor,lan=lanDe(x.r);
+              return `<tr data-empx="${esc(x.r)}" data-nlan="${lan.length}" style="cursor:pointer"><td style="padding:9px 10px">${avatar(x.r,24)}<b>${esc(x.r)}</b>
+                <div class="barra"><i style="width:${(x.v/emp[0].v*100).toFixed(0)}%;background:${corE}"></i></div></td>
+              <td style="padding:9px 10px"><span class="chip nchip" style="background:var(--bg);border:1px solid var(--linha);color:var(--suave)">${lan.length?`▸ ${lan.length} lançamento(s)`:'nenhum lançado'}</span></td>
               <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${brl(x.v)}</td>
-              <td style="padding:9px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${(x.v/totA*100).toFixed(0)}%</td></tr>`).join('')}
-            <tr class="tfim"><td>Soma das empresas</td><td style="text-align:right">${brl(somaEmp)}</td>
-              <td style="text-align:right">${(somaEmp/totA*100).toFixed(0)}%</td></tr>
+              <td style="padding:9px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${(x.v/totA*100).toFixed(0)}%</td>
+              <td style="padding:9px 10px;text-align:right"><button class="btn ghost mini" data-filtrar="${esc(x.r)}">abrir ›</button></td></tr>`
+              +lan.map(y=>`<tr data-lan="${y.id}" class="lanoc" style="display:none;cursor:pointer">
+                <td style="padding:6px 10px 6px 40px;font-size:12.5px;white-space:nowrap">↳ ${fmtDataAno(y.data)}${y.tipo?` <span style="color:var(--suave)">· ${esc(y.tipo)}</span>`:''}${flagsLan(y)}</td>
+                <td style="padding:6px 10px;color:var(--suave);font-size:12px">${esc(y.instituicao||'')}</td>
+                <td style="padding:6px 10px;text-align:right;font-variant-numeric:tabular-nums">${brl(+y.valor||0)}</td>
+                <td style="padding:6px 10px;text-align:right;color:var(--suave);font-size:11.5px" colspan="2">✎ corrigir</td></tr>`).join('')
+              +(lan.length?`<tr data-addlan="${esc(x.r)}" class="lanoc" style="display:none;cursor:pointer">
+                <td colspan="5" style="padding:5px 10px 10px 40px;font-size:12px;color:var(--verde)">+ lançamento de ${esc(x.r)} em ${anoS}</td></tr>`:'')}).join('')}
+            <tr class="tfim"><td colspan="2">Soma das empresas</td><td style="text-align:right">${brl(somaEmp)}</td>
+              <td style="text-align:right">${(somaEmp/totA*100).toFixed(0)}%</td><td></td></tr>
           </tbody></table>`
         : '<div class="vazio">Nenhuma empresa registrada neste ano.</div>')
         // guarda de honestidade: se a planilha não fecha, mostra a diferença em vez de esconder
@@ -2174,10 +2315,23 @@ function vRendimentos(m){
       }
       det.appendChild(cxMes);
 
-      // clicar numa empresa abre o ano já filtrado nela
-      det.querySelectorAll('[data-emp]').forEach(tr => tr.onclick = () => {
-        filtro.rendAno = anoS; filtro.rendEmp = tr.dataset.emp; filtro.rendAnoSel = -1; r();
+      // linha da empresa expande os lançamentos; ✎ abre para corrigir; "abrir ›" filtra o ano nela
+      det.querySelectorAll('[data-empx]').forEach(tr=>{
+        const fx=[];let nx=tr.nextElementSibling;
+        while(nx&&nx.classList.contains('lanoc')){fx.push(nx);nx=nx.nextElementSibling}
+        tr.onclick=()=>{if(!fx.length)return;
+          const fech=fx[0].style.display==='none';
+          fx.forEach(f=>f.style.display=fech?'':'none');
+          const ch=tr.querySelector('.nchip');
+          if(ch)ch.textContent=(fech?'▾ ':'▸ ')+tr.dataset.nlan+' lançamento(s)';};
       });
+      det.querySelectorAll('[data-lan]').forEach(tr=>tr.onclick=ev=>{ev.stopPropagation();
+        const y=E.rendimentos.find(q=>q.id===tr.dataset.lan);if(y)modalRendimento(y)});
+      det.querySelectorAll('[data-addlan]').forEach(tr=>tr.onclick=ev=>{ev.stopPropagation();
+        const y={id:uid(),data:(+anoS===anoHoje?hoje():anoS+'-12-31'),empresa:tr.dataset.addlan,instituicao:'',tipo:'',valor:0,obs:''};
+        E.rendimentos.push(y);salvar();modalRendimento(y)});
+      det.querySelectorAll('[data-filtrar]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();
+        filtro.rendAno=+anoS;filtro.rendEmp=b.dataset.filtrar;filtro.rendAnoSel=-1;r()});
       gEl.appendChild(det);
     }
     gEl.querySelectorAll('[data-bar]').forEach(g=>g.onclick=()=>{
@@ -2209,7 +2363,7 @@ function vRendimentos(m){
   mA.appendChild(bloco('rd-acum','Acumulado geral','clique num ano para abrir só ele',ac));
 
   mA.appendChild(bloco('rd-emp','Participação por empresa','no acumulado',graficoEl(gRosca(
-    Object.entries(H.empresas).map(([n,v])=>({r:n,v:v.reduce((a,b)=>a+b,0)}))))));
+    Object.entries(H.empresas).map(([nm,v])=>({r:nm,v:v.reduce((a,b)=>a+b,0),cor:marcaDe(nm).cor}))))));
 
   // ---- aplicações por instituição ----
   // junta o que veio da planilha antiga com o que ele lança hoje — senão o campo
@@ -2240,7 +2394,7 @@ function vRendimentos(m){
   const maiorTot=linhas[0].tot;
   const th=el('<div class="rolagem"></div>');
   th.innerHTML=`<table><thead><tr><th>Empresa</th>${H.anos.map(a=>`<th style="text-align:right">${a}</th>`).join('')}<th style="text-align:right">Total</th></tr></thead><tbody>
-    ${linhas.map(l=>`<tr data-hemp="${esc(l.nome)}" style="cursor:pointer"><td style="padding:9px 10px"><b>${l.nome}</b><div class="barra"><i style="width:${(l.tot/maiorTot*100).toFixed(0)}%"></i></div></td>
+    ${linhas.map(l=>`<tr data-hemp="${esc(l.nome)}" style="cursor:pointer"><td style="padding:9px 10px;white-space:nowrap">${avatar(l.nome,22)}<b>${esc(l.nome)}</b><div class="barra"><i style="width:${(l.tot/maiorTot*100).toFixed(0)}%;background:${marcaDe(l.nome).cor}"></i></div></td>
       ${l.vals.map(v=>`<td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;color:${v?'inherit':'var(--suave)'}">${v?brl(v):'—'}</td>`).join('')}
       <td style="padding:9px 10px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${brl(l.tot)}</td></tr>`).join('')}
     </tbody><tfoot><tr class="tfim"><td>Total</td>${H.totalAno.map(v=>`<td style="text-align:right">${brl(v)}</td>`).join('')}<td style="text-align:right">${brl(H.totalGeral)}</td></tr></tfoot></table>`;
@@ -2289,9 +2443,9 @@ function vRendimentos(m){
       doMes.forEach(x => {
         const trf = document.createElement('tr');
         trf.style.display = 'none'; trf.style.cursor = 'pointer';
-        trf.innerHTML = `<td style="padding:7px 10px 7px 30px;font-size:13px">↳ ${fmtDataAno(x.data)}
-            <b style="margin-left:8px">${esc(x.empresa || '—')}</b>
-            ${x.tipo ? `<span style="color:var(--suave)"> · ${esc(x.tipo)}</span>` : ''}</td>
+        trf.innerHTML = `<td style="padding:7px 10px 7px 30px;font-size:13px;white-space:nowrap">↳ ${fmtDataAno(x.data)}
+            <span style="margin-left:8px">${avatar(x.empresa||'—',18)}</span><b>${esc(x.empresa || '—')}</b>
+            ${x.tipo ? `<span style="color:var(--suave)"> · ${esc(x.tipo)}</span>` : ''}${flagsLan(x)}</td>
           <td style="padding:7px 10px;color:var(--suave);font-size:12.5px">${esc(x.instituicao || '')}</td>
           <td style="padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums">${brl(+x.valor || 0)}</td>
           <td style="padding:7px 10px;text-align:right;color:var(--suave);font-size:12.5px;font-variant-numeric:tabular-nums">${tot ? ((+x.valor || 0) / tot * 100).toFixed(0) + '% do mês' : ''}</td>
@@ -2335,9 +2489,9 @@ function vRendimentos(m){
     ordR.forEach(x=>{
       const tr=document.createElement('tr'); tr.style.cursor='pointer';
       tr.innerHTML=`<td style="padding:9px 10px;white-space:nowrap;font-variant-numeric:tabular-nums">${fmtDataAno(x.data)}</td>
-        <td style="padding:9px 10px"><b>${esc(x.empresa||'—')}</b></td>
+        <td style="padding:9px 10px;white-space:nowrap">${avatar(x.empresa||'—',20)}<b>${esc(x.empresa||'—')}</b></td>
         <td style="padding:9px 10px;color:var(--suave)">${esc(x.instituicao||'—')}</td>
-        <td style="padding:9px 10px">${esc(x.tipo||'—')}</td>
+        <td style="padding:9px 10px">${esc(x.tipo||'—')}${flagsLan(x)}</td>
         <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${brl(+x.valor||0)}</td>
         <td style="padding:9px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${totLanc?((+x.valor||0)/totLanc*100).toFixed(1)+'%':'—'}</td>
         <td style="padding:9px 10px;color:var(--suave);font-size:12.5px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.obs||'')}</td>`;
@@ -2354,11 +2508,11 @@ function vRendimentos(m){
   const pe2=el('<div style="padding:0 17px 15px"></div>');
   const bt2=el('<button class="mais">+ Novo lançamento</button>'); bt2.onclick=novoRend;
   pe2.appendChild(bt2); lc2.appendChild(pe2);
-  m.appendChild(bloco('rd-lanc','Lançamentos de '+ano,'clique numa linha para abrir e anexar comprovante',lc2));
+  m.appendChild(bloco('rd-lanc','Lançamentos de '+ano,doAno.length+' lançamento(s) — clique para corrigir e anexar comprovante',lc2));
 }
 
 function modalRendimento(x){
-  abrirModal(esc(x.empresa||'Novo lançamento'),(x.tipo?esc(x.tipo)+' · ':'')+brl(+x.valor||0),(c,fechar)=>{
+  abrirModal((x.empresa?avatar(x.empresa,26):'')+esc(x.empresa||'Novo lançamento'),(x.tipo?esc(x.tipo)+' · ':'')+brl(+x.valor||0),(c,fechar)=>{
     const s1=el('<div class="secao"><h4>Dados</h4></div>');
     s1.appendChild(campos(x,[
       {k:'data',t:'Data',tipo:'date'},
@@ -2378,7 +2532,12 @@ function modalRendimento(x){
     del.onclick=async()=>{if(!confirm('Apagar este lançamento e seus arquivos?'))return;
       for(const a of await arqPor('rendimento:'+x.id))await arqDel(a.id);
       E.rendimentos=E.rendimentos.filter(y=>y.id!==x.id);salvar();fechar()};
-    s3.appendChild(del);s3.appendChild(el('<span class="cresce"></span>'));
+    s3.appendChild(del);
+    // pró-labore e rendimento repetem: um clique cria o do mês seguinte já preenchido
+    const dup=el('<button class="btn ghost">↻ Mês seguinte</button>');
+    dup.onclick=()=>{const c2={...x,id:uid(),data:mesSeguinte(x.data||hoje()),obs:''};
+      E.rendimentos.push(c2);salvar();fechar();modalRendimento(c2)};
+    s3.appendChild(dup);s3.appendChild(el('<span class="cresce"></span>'));
     const ok=el('<button class="btn">Pronto</button>');ok.onclick=fechar;s3.appendChild(ok);
     c.appendChild(s3);
   });
@@ -2569,6 +2728,23 @@ function baixarRendimentosExcel() {
     });
   });
 
+  /* 4c. Conferência — o lançado bate com o histórico? */
+  const aConf=[[{v:'Conferência — lançado x histórico',s:5}],[],
+    [{v:'Ano',s:N},{v:'Empresa',s:N},{v:'Lançamentos',s:N},{v:'Somam',s:N},{v:'Histórico',s:N},{v:'Diferença',s:N}]];
+  anos.forEach((a2,i2)=>{
+    const nomesC=[...new Set([...Object.keys(H.empresas||{}),
+      ...E.rendimentos.filter(x=>String(x.data||'').startsWith(a2)).map(x=>x.empresa)])].filter(Boolean);
+    nomesC.forEach(nm=>{
+      const ls=E.rendimentos.filter(x=>String(x.data||'').startsWith(a2)&&x.empresa===nm);
+      const soma=+ls.reduce((s2,x)=>s2+(+x.valor||0),0).toFixed(2);
+      const hist=+((((H.empresas||{})[nm]||[])[i2]||0)).toFixed(2);
+      if(!ls.length&&!hist) return;
+      const dif=+(soma-hist).toFixed(2);
+      aConf.push([a2,nm,ls.length,{v:soma,s:M},{v:hist,s:M},
+        Math.abs(dif)>0.01?{v:dif,s:NM}:{v:0,s:M}]);
+    });
+  });
+
   /* 5. Aplicações por instituição */
   const a5 = [[{ v: 'Aplicações por instituição', s: 5 }], [],
     [{ v: 'Ano', s: N }, { v: 'Instituição', s: N }, { v: 'Rendimento', s: N }]];
@@ -2582,6 +2758,7 @@ function baixarRendimentosExcel() {
     { nome: 'Lançamentos', linhas: a4, larguras: [12, 18, 18, 18, 14, 30] },
   ];
   if (aMes.length > 3) abas.splice(3, 0, { nome: 'Mês a mês', linhas: aMes, larguras: [8, 12, 12, 18, 18, 16, 15] });
+  if (aConf.length > 3) abas.push({ nome: 'Conferência', linhas: aConf, larguras: [8, 18, 12, 15, 15, 15] });
   if (a5.length > 3) abas.push({ nome: 'Aplicações', linhas: a5, larguras: [8, 26, 15] });
 
   baixarBlob(gerarXlsx(abas), 'Rendimentos-Leo-' + hoje() + '.xlsx');
@@ -2597,7 +2774,7 @@ function baixarRendimentosPDF() {
     return `<tr><td>${a}</td><td class="n">${brl2(v)}</td>
       <td class="n" style="color:${dif == null ? '#999' : dif >= 0 ? '#1b7a4b' : '#b3261e'}">${dif == null ? '—' : (dif >= 0 ? '+' : '') + dif.toFixed(0) + '%'}</td></tr>`;
   }).join('');
-  const linhasEmp = emp.map(e => `<tr><td>${esc(e.nome)}</td>${e.vals.map(v => `<td class="n">${v ? brl2(v) : '—'}</td>`).join('')}
+  const linhasEmp = emp.map(e => `<tr><td style="white-space:nowrap">${avatar(e.nome,15)}${esc(e.nome)}</td>${e.vals.map(v => `<td class="n">${v ? brl2(v) : '—'}</td>`).join('')}
     <td class="n"><b>${brl2(e.tot)}</b></td><td class="n">${totalGeral ? (e.tot / totalGeral * 100).toFixed(1) + '%' : '—'}</td></tr>`).join('');
   const det = Object.entries(H.detalhe || {}).sort().map(([ano, empresas]) => {
     const its = Object.entries(empresas).flatMap(([ne, itens]) =>
@@ -2633,6 +2810,13 @@ function baixarRendimentosPDF() {
   <tbody>${linhasEmp}<tr class="tot"><td>TOTAL</td>${anos.map((_, i) => `<td class="n">${brl2(H.totalAno[i] || 0)}</td>`).join('')}
     <td class="n">${brl2(totalGeral)}</td><td class="n">100%</td></tr></tbody></table>
 
+  <h2>Conferência — lançado x histórico</h2>
+  <table><thead><tr><th>Ano</th><th class="n">Lançamentos</th><th class="n">Somam</th><th class="n">Histórico</th><th class="n">Diferença</th></tr></thead><tbody>
+  ${anos.map((a2,i2)=>{const ls=E.rendimentos.filter(x=>String(x.data||'').startsWith(a2));
+    const soma=ls.reduce((s2,x)=>s2+(+x.valor||0),0), hist=H.totalAno[i2]||0, dif=soma-hist;
+    return `<tr><td>${a2}</td><td class="n">${ls.length}</td><td class="n">${brl2(soma)}</td><td class="n">${brl2(hist)}</td>
+      <td class="n" style="color:${Math.abs(dif)>1?'#b3261e':'#1b7a4b'}">${Math.abs(dif)>1?brl2(dif):'✓ confere'}</td></tr>`}).join('')}
+  </tbody></table>
   ${det ? '<h2>Detalhe por negócio</h2>' + det : ''}
   ${(() => {
     const anosL = [...new Set(E.rendimentos.map(x => (x.data || '').slice(0, 4)).filter(Boolean))].sort();
@@ -3886,6 +4070,34 @@ async function vConfig(m){
 
   GRUPOS_CFG.forEach(g=>m.appendChild(bloco('cf-'+g.k,g.ic+' '+g.t,g.d,editorLista(g.k,r))));
 
+  /* ---- as bolinhas: cor fixa e logo por empresa ---- */
+  const mcx=el('<div class="corpo"></div>');
+  const nomesM=[...new Set([...Object.keys((E.rendHist&&E.rendHist.empresas)||{}),
+    ...(E.rendimentos||[]).map(x=>x.empresa),...(E.empresasPJ||[]).map(x=>x.nome)])]
+    .filter(Boolean).sort((a,b)=>a.localeCompare(b));
+  if(!nomesM.length) mcx.appendChild(el('<div class="vazio">Cadastre empresas em Rendimentos para configurar as marcas.</div>'));
+  nomesM.forEach(nm=>{
+    const temLogo=!!(E.marcas[nm]&&E.marcas[nm].logo);
+    const linha=el(`<div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--linha)">
+      <span class="prevAv">${avatar(nm,32)}</span><b style="flex:1">${esc(nm)}</b>
+      <input type="color" value="${marcaDe(nm).cor}" title="cor da bolinha" style="width:36px;height:30px;border:1px solid var(--linha);border-radius:8px;background:none;padding:2px;cursor:pointer">
+      <button class="btn ghost mini">${temLogo?'trocar logo':'+ logo'}</button>
+      ${temLogo?'<button class="btn ghost mini" style="color:var(--vermelho)">tirar logo</button>':''}
+    </div>`);
+    const bts=linha.querySelectorAll('button');
+    linha.querySelector('input').onchange=ev=>{
+      E.marcas[nm]={...(E.marcas[nm]||{}),cor:ev.target.value};salvar();
+      linha.querySelector('.prevAv').innerHTML=avatar(nm,32)};
+    bts[0].onclick=()=>pedirArquivo(f=>lerLogo(f,uri=>{
+      E.marcas[nm]={...(E.marcas[nm]||{}),logo:uri};salvar();r()}),'image/*');
+    if(bts[1])bts[1].onclick=()=>{delete E.marcas[nm].logo;salvar();r()};
+    mcx.appendChild(linha);
+  });
+  mcx.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin-top:10px">
+    A bolinha aparece em Rendimentos, nos gráficos e nos relatórios em PDF.
+    O logo é reduzido para 64px e sincroniza com a nuvem — aparece em todos os aparelhos.</p>`));
+  m.appendChild(bloco('cf-marcas','🎨 Logos e cores das empresas','a bolinha de cada empresa — cor fixa e logo',mcx));
+
   // histórico de rendimentos — editável
   const H=E.rendHist;
   if(H.anos&&H.anos.length){
@@ -4002,15 +4214,36 @@ async function apiSync(metodo,corpo){
 let syncTimer=null;
 function pintaSync(t){const x=document.getElementById('stSync');if(x)x.textContent='☁ '+t}
 function agendaPush(){if(DEV||!pegaToken())return;clearTimeout(syncTimer);syncTimer=setTimeout(enviarNuvem,2500)}
+// o "carimbo" do servidor que este aparelho viu por último — a peça que faltava
+// para uma aba aberta há horas não gravar dado velho por cima de correção nova
+const BASE_MT='cl_baseMt';
+const baseMt=()=>+(localStorage.getItem(BASE_MT)||0);
+const marcaBase=mt=>{if(mt)localStorage.setItem(BASE_MT,String(mt))};
 async function enviarNuvem(){if(DEV)return;
-  try{pintaSync('enviando…');await apiSync('PUT',{dados:E});pintaSync('sincronizado')}
-  catch(e){pintaSync('erro ao enviar')}}
+  try{
+    pintaSync('conferindo…');
+    const r=await apiSync('GET');
+    if(r&&r.mt&&r.mt>baseMt()&&r.dados){
+      // o servidor tem coisa que este aparelho nunca viu — adotar, não atropelar
+      const meuMt=E._mt||0;
+      try{localStorage.setItem('cl_descartado',JSON.stringify({em:Date.now(),dados:JSON.parse(localStorage.getItem(CHAVE))}))}catch(_){}
+      localStorage.setItem(CHAVE,JSON.stringify(r.dados));marcaBase(r.mt);E=carregar();tela();
+      pintaSync('atualizado de outro acesso');
+      if(meuMt>((r.dados&&r.dados._mt)||0))
+        alert('Este aparelho estava com uma versão antiga: outro acesso gravou depois da última sincronização daqui.\n\nPuxei a versão mais nova para não apagar nada de lá. Confira sua última alteração e refaça se for preciso — a versão deste aparelho ficou guardada por segurança.');
+      return;
+    }
+    pintaSync('enviando…');
+    const p=await apiSync('PUT',{dados:E});marcaBase(p&&p.mt);
+    pintaSync('sincronizado');
+  }catch(e){pintaSync('erro ao enviar')}}
 async function puxarNuvem(){if(DEV){pintaSync('modo local');return}
   try{pintaSync('baixando…');
     const r=await apiSync('GET');
+    marcaBase(r&&r.mt);
     const remoto=r&&r.dados;
     if(remoto&&(remoto._mt||0)>(E._mt||0)){localStorage.setItem(CHAVE,JSON.stringify(remoto));E=carregar()}
-    else if((E._mt||0)>((remoto&&remoto._mt)||0)){await apiSync('PUT',{dados:E})}
+    else if((E._mt||0)>((remoto&&remoto._mt)||0)){const p=await apiSync('PUT',{dados:E});marcaBase(p&&p.mt)}
     pintaSync('sincronizado');
   }catch(e){pintaSync('sem conexão')}}
 async function sincronizarAgora(){await puxarNuvem();tela()}
