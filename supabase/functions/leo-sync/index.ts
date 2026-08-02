@@ -1,18 +1,20 @@
 // ============================================================================
 // leo-sync — Central do Leo (substitui netlify/functions/sync.mjs)
 //
-// O CONTRATO E O MESMO, inclusive os metodos HTTP:
-//   POST {acao:'login', senha}  -> { token }
-//   GET  (Bearer)               -> { mt, dados }  |  { mt: 0, dados: null }
-//   PUT  (Bearer) { dados }     -> { mt }
+// O CONTRATO:
+//   POST {acao:'login', senha}                       -> { token }
+//   POST {acao:'trocar', senhaAtual, senhaNova} +Bearer -> { ok: true }
+//   GET  (Bearer)                                    -> { mt, dados } | { mt: 0, dados: null }
+//   PUT  (Bearer) { dados }                          -> { mt }
 //
 // De-para: store "central" chave "estado" -> tabela leo_estado (uma linha so).
 //
-// Este e o unico sistema com LOGIN DE VERDADE: senha conferida no servidor e
-// sessao assinada por HMAC. Os apps de campo usam token compartilhado que viaja
-// no bundle -- aqui nao, e por isso o desenho fica como esta.
+// SENHA: mora no banco (leo_config, chave "senha") como PBKDF2 — trocavel de
+// dentro do app. A secret LEO_APP_SENHA vira so o bootstrap: vale enquanto
+// nenhuma senha foi gravada no banco; depois da primeira troca, quem manda e o
+// banco. Mesmo desenho dos outros sistemas (a senha "master" e so a inicial).
 //
-// PROJETO COMPARTILHADO: prefixo obrigatorio no nome da function e da tabela.
+// PROJETO COMPARTILHADO: prefixo obrigatorio no nome da function e das tabelas.
 //
 // verify_jwt = false: quem autoriza e o token HMAC proprio, conferido aqui
 // dentro. O preflight CORS tambem chega sem credencial nenhuma.
@@ -50,8 +52,7 @@ async function assina(exp: number): Promise<string> {
 }
 
 // Comparacao em tempo constante: comparar com === vazaria, pelo tempo de
-// resposta, quantos caracteres bateram -- e isso permite adivinhar a assinatura
-// byte a byte. Vale para a senha e para o mac.
+// resposta, quantos caracteres bateram. Vale para a senha e para o mac.
 function igual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let dif = 0;
@@ -72,6 +73,34 @@ async function tokenOk(t: string | null): Promise<boolean> {
   return igual(mac, await assina(exp));
 }
 
+// ---------------------------------------------------------------- senha
+// PBKDF2-SHA256; o registro no banco guarda { salt, iter, hash } em hex.
+
+type RegSenha = { salt: string; iter: number; hash: string };
+
+async function pbkdf2(senha: string, saltHex: string, iter: number): Promise<string> {
+  const chave = await crypto.subtle.importKey("raw", enc.encode(senha), "PBKDF2", false, ["deriveBits"]);
+  const salt = new Uint8Array((saltHex.match(/../g) ?? []).map((h) => parseInt(h, 16)));
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt, iterations: iter }, chave, 256);
+  return [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function senhaDoBanco(): Promise<RegSenha | null> {
+  const { data } = await sb.from("leo_config").select("valor").eq("chave", "senha").maybeSingle();
+  const v = data?.valor as RegSenha | undefined;
+  return v && v.salt && v.iter && v.hash ? v : null;
+}
+
+async function senhaConfere(senha: string, reg: RegSenha | null): Promise<boolean> {
+  if (reg) return igual(await pbkdf2(senha, reg.salt, reg.iter), reg.hash);
+  if (!APP_SENHA) return false;
+  return igual(senha, APP_SENHA);
+}
+
+// senha errada espera um pouco: força-bruta fica cara sem atrapalhar quem digita
+const freia = () => new Promise((r) => setTimeout(r, 400));
+
 // ---------------------------------------------------------------- handler
 
 Deno.serve(async (req: Request) => {
@@ -80,11 +109,34 @@ Deno.serve(async (req: Request) => {
   if (!SESSION_SECRET) return json({ erro: "LEO_SESSION_SECRET ausente" }, 500);
 
   if (req.method === "POST") {
-    const { acao, senha } = await req.json().catch(() => ({}));
-    if (acao !== "login") return json({ erro: "ação inválida" }, 400);
-    if (!APP_SENHA) return json({ erro: "LEO_APP_SENHA não configurada" }, 500);
-    if (!igual(String(senha ?? ""), APP_SENHA)) return json({ erro: "Senha incorreta" }, 401);
-    return json({ token: await novoToken() });
+    const { acao, senha, senhaAtual, senhaNova } = await req.json().catch(() => ({}));
+
+    if (acao === "login") {
+      const reg = await senhaDoBanco();
+      if (!reg && !APP_SENHA) return json({ erro: "senha não configurada" }, 500);
+      if (!(await senhaConfere(String(senha ?? ""), reg))) { await freia(); return json({ erro: "Senha incorreta" }, 401); }
+      return json({ token: await novoToken() });
+    }
+
+    if (acao === "trocar") {
+      // troca exige sessão válida E a senha atual — token roubado não troca senha
+      const t = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+      if (!(await tokenOk(t))) return json({ erro: "Não autorizado" }, 401);
+      const reg = await senhaDoBanco();
+      if (!(await senhaConfere(String(senhaAtual ?? ""), reg))) { await freia(); return json({ erro: "Senha atual incorreta" }, 401); }
+      const nova = String(senhaNova ?? "");
+      if (nova.length < 8) return json({ erro: "A senha nova precisa de pelo menos 8 caracteres" }, 400);
+      const salt = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
+      const iter = 120000;
+      const hash = await pbkdf2(nova, salt, iter);
+      const { error } = await sb.from("leo_config").upsert(
+        { chave: "senha", valor: { salt, iter, hash }, atualizado_em: new Date().toISOString() },
+        { onConflict: "chave" });
+      if (error) return json({ erro: error.message }, 500);
+      return json({ ok: true });
+    }
+
+    return json({ erro: "ação inválida" }, 400);
   }
 
   const t = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -94,8 +146,6 @@ Deno.serve(async (req: Request) => {
     const { data, error } = await sb
       .from("leo_estado").select("mt, dados").eq("id", true).maybeSingle();
     if (error) return json({ erro: error.message }, 500);
-    // Primeira vez (nada gravado): devolve o mesmo formato vazio de antes, para
-    // o cliente saber que a nuvem esta atras e subir o que ele tem.
     return json(data ? { mt: Number(data.mt), dados: data.dados } : { mt: 0, dados: null });
   }
 

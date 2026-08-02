@@ -4082,7 +4082,7 @@ async function vConfig(m){
       <span class="prevAv">${avatar(nm,32)}</span><b style="flex:1">${esc(nm)}</b>
       <input type="color" value="${marcaDe(nm).cor}" title="cor da bolinha" style="width:36px;height:30px;border:1px solid var(--linha);border-radius:8px;background:none;padding:2px;cursor:pointer">
       <button class="btn ghost mini">${temLogo?'trocar logo':'+ logo'}</button>
-      ${temLogo?'<button class="btn ghost mini" style="color:var(--vermelho)">tirar logo</button>':''}
+      ${temLogo?'<button class="btn ghost mini" style="color:var(--vermelho)">✕ apagar logo</button>':''}
     </div>`);
     const bts=linha.querySelectorAll('button');
     linha.querySelector('input').onchange=ev=>{
@@ -4097,6 +4097,41 @@ async function vConfig(m){
     A bolinha aparece em Rendimentos, nos gráficos e nos relatórios em PDF.
     O logo é reduzido para 64px e sincroniza com a nuvem — aparece em todos os aparelhos.</p>`));
   m.appendChild(bloco('cf-marcas','🎨 Logos e cores das empresas','a bolinha de cada empresa — cor fixa e logo',mcx));
+
+  /* ---- 🔒 senha de entrada — trocável daqui, sem mexer em servidor ---- */
+  const sx=el('<div class="corpo"></div>');
+  const sform={atual:'',nova:'',rep:''};
+  sx.appendChild(campos(sform,[
+    {k:'atual',t:'Senha atual',tipo:'password'},
+    {k:'nova',t:'Senha nova (mínimo 8)',tipo:'password'},
+    {k:'rep',t:'Repita a senha nova',tipo:'password'},
+  ],()=>{}));
+  const bs=el('<button class="btn" style="margin-top:12px">Trocar a senha</button>');
+  bs.onclick=async()=>{
+    if(!sform.atual){alert('Preencha a senha atual.');return}
+    if((sform.nova||'').length<8){alert('A senha nova precisa de pelo menos 8 caracteres.');return}
+    if(sform.nova!==sform.rep){alert('A confirmação não bate com a senha nova.');return}
+    if(sform.nova===sform.atual){alert('A senha nova é igual à atual.');return}
+    if(DEV){alert('Em modo local não há senha para trocar.');return}
+    bs.disabled=true;bs.textContent='Trocando…';
+    try{
+      // chamada própria: aqui um 401 significa "senha atual errada", não sessão caída
+      const r2=await fetch(API_SYNC,{method:'POST',
+        headers:{'content-type':'application/json',authorization:'Bearer '+pegaToken()},
+        body:JSON.stringify({acao:'trocar',senhaAtual:sform.atual,senhaNova:sform.nova})});
+      const j=await r2.json().catch(()=>({}));
+      if(r2.ok&&j.ok){
+        alert('Senha trocada. Vale a partir do próximo login — a sessão deste aparelho continua aberta.');
+        sform.atual=sform.nova=sform.rep='';r();
+      } else alert(j.erro||('Não deu certo (HTTP '+r2.status+').'));
+    }catch(e2){alert('Sem conexão — tente de novo.')}
+    bs.disabled=false;bs.textContent='Trocar a senha';
+  };
+  sx.appendChild(bs);
+  sx.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin-top:10px">
+    A troca vale para todos os aparelhos no próximo login. Quem já está logado continua
+    logado — a sessão não cai. A senha é conferida e guardada só no servidor, embaralhada.</p>`));
+  m.appendChild(bloco('cf-senha','🔒 Senha de entrada','troque a senha do painel aqui mesmo',sx));
 
   // histórico de rendimentos — editável
   const H=E.rendHist;
