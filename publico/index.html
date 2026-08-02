@@ -4116,20 +4116,32 @@ async function vConfig(m){
     .filter(Boolean).sort((a,b)=>a.localeCompare(b));
   if(!nomesM.length) mcx.appendChild(el('<div class="vazio">Cadastre empresas em Rendimentos para configurar as marcas.</div>'));
   nomesM.forEach(nm=>{
-    const temLogo=!!(E.marcas[nm]&&E.marcas[nm].logo);
-    const linha=el(`<div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--linha)">
-      <span class="prevAv">${avatar(nm,32)}</span><b style="flex:1">${esc(nm)}</b>
+    // as duas acoes ficam SEMPRE visiveis; apagar so habilita quando ha logo
+    const linha=el(`<div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--linha);flex-wrap:wrap">
+      <span class="prevAv">${avatar(nm,32)}</span><b style="flex:1;min-width:120px">${esc(nm)}</b>
       <input type="color" value="${marcaDe(nm).cor}" title="cor da bolinha" style="width:36px;height:30px;border:1px solid var(--linha);border-radius:8px;background:none;padding:2px;cursor:pointer">
-      <button class="btn ghost mini">${temLogo?'trocar logo':'+ logo'}</button>
-      ${temLogo?'<button class="btn ghost mini" style="color:var(--vermelho)">✕ apagar logo</button>':''}
+      <button class="btn ghost mini bLogo"></button>
+      <button class="btn ghost mini bDel" style="color:var(--vermelho)">✕ apagar logo</button>
     </div>`);
-    const bts=linha.querySelectorAll('button');
+    const bLogo=linha.querySelector('.bLogo'), bDel=linha.querySelector('.bDel');
+    const pinta=()=>{
+      const tem=!!(E.marcas[nm]&&E.marcas[nm].logo);
+      linha.querySelector('.prevAv').innerHTML=avatar(nm,32);
+      bLogo.textContent=tem?'trocar logo':'+ logo';
+      bDel.disabled=!tem; bDel.style.opacity=tem?'1':'.35'; bDel.style.cursor=tem?'pointer':'default';
+      bDel.title=tem?'remover o logo desta empresa':'esta empresa ainda nao tem logo';
+    };
+    pinta();
     linha.querySelector('input').onchange=ev=>{
-      E.marcas[nm]={...(E.marcas[nm]||{}),cor:ev.target.value};salvar();
-      linha.querySelector('.prevAv').innerHTML=avatar(nm,32)};
-    bts[0].onclick=()=>pedirArquivo(f=>lerLogo(f,uri=>{
-      E.marcas[nm]={...(E.marcas[nm]||{}),logo:uri};salvar();r()}),'image/*');
-    if(bts[1])bts[1].onclick=()=>{delete E.marcas[nm].logo;salvar();r()};
+      E.marcas[nm]={...(E.marcas[nm]||{}),cor:ev.target.value};salvar();pinta()};
+    bLogo.onclick=()=>pedirArquivo(f=>lerLogo(f,uri=>{
+      E.marcas[nm]={...(E.marcas[nm]||{}),logo:uri};salvar();pinta()}),'image/*');
+    bDel.onclick=()=>{
+      if(!(E.marcas[nm]&&E.marcas[nm].logo))return;
+      if(!confirm('Apagar o logo de '+nm+'? A bolinha volta para as iniciais.'))return;
+      delete E.marcas[nm].logo;
+      if(!Object.keys(E.marcas[nm]).length)delete E.marcas[nm];
+      salvar();pinta()};
     mcx.appendChild(linha);
   });
   mcx.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin-top:10px">
