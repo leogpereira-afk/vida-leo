@@ -2830,6 +2830,19 @@ function vGastos(m){
     return {classe:cl,total:itens.reduce((s,i)=>s+i.v,0),itens:itens.sort((a,b)=>b.v-a.v)};
   }).filter(g=>g.total>0).sort((a,b)=>b.total-a.total);
 
+  // serie mensal de uma classificacao: o variavel varia mes a mes, o fixo se repete igual
+  const mesesTodos=[...new Set(E.gastos.map(g=>g.mes).filter(Boolean))].sort();
+  const serieClasse=cl=>{
+    const fixoCl=FIXOS().filter(f=>f.classe===cl)
+      .reduce((a,f)=>a+f.lista.reduce((b,x)=>b+valorMensal(x),0),0);
+    return mesesTodos.map(mm=>({
+      mes:mm,
+      variavel:E.gastos.filter(g=>g.mes===mm&&(g.classe||g.categoria)===cl)
+        .reduce((a,g)=>a+(+g.valor||0),0),
+      fixo:fixoCl,
+    })).map(x=>({...x,total:x.variavel+x.fixo}));
+  };
+
   const lc=el('<div></div>');
   if(!grupos.length) lc.innerHTML='<div class="vazio">Sem gasto ainda neste período. Lance abaixo ou cadastre os fixos.</div>';
   else{
@@ -2854,6 +2867,34 @@ function vGastos(m){
         <td style="padding:11px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums;font-weight:600">${(g.total/tot*100).toFixed(1)}%</td>`;
       tbg.appendChild(tre);
       const filhas=[];
+      // linha 1 da expansao: como essa classificacao se comporta mes a mes
+      const serie=serieClasse(g.classe).filter(x=>x.total>0);
+      if(serie.length>1){
+        const maiorS=Math.max(...serie.map(x=>x.total),1);
+        const trM=document.createElement('tr');
+        trM.style.display='none';
+        trM.innerHTML=`<td colspan="5" style="padding:10px 10px 12px 30px;background:var(--bg)">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--suave);margin-bottom:7px">
+            ${esc(g.classe)} mês a mês</div>
+          <table style="width:100%"><thead><tr>
+            <th style="text-align:left">Mês</th><th style="text-align:right">Variável</th>
+            <th style="text-align:right">Fixo</th><th style="text-align:right">Total</th><th>Peso</th></tr></thead><tbody>
+          ${serie.map(x=>`<tr data-gmes="${x.mes}" style="cursor:pointer">
+            <td style="padding:6px 8px"><b>${rot(x.mes)}</b></td>
+            <td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums">${x.variavel?brl(x.variavel):'—'}</td>
+            <td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;color:var(--suave)">${x.fixo?brl(x.fixo):'—'}</td>
+            <td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${brl(x.total)}</td>
+            <td style="padding:6px 8px"><div class="barra" style="height:6px"><i style="width:${(x.total/maiorS*100).toFixed(0)}%;background:${cor}"></i></div></td></tr>`).join('')}
+          </tbody></table>
+          <div style="font-size:11.5px;color:var(--suave);margin-top:7px">
+            Média por mês: <b style="color:var(--tinta)">${brl(serie.reduce((a,x)=>a+x.total,0)/serie.length)}</b>
+            · maior: <b style="color:var(--tinta)">${rot(serie.reduce((a,x)=>x.total>a.total?x:a).mes)}</b>
+            ${serie[0].fixo?' · o fixo se repete todo mês':''}</div></td>`;
+        tbg.appendChild(trM); filhas.push(trM);
+        trM.querySelectorAll('[data-gmes]').forEach(tr2=>tr2.onclick=ev=>{
+          ev.stopPropagation(); filtro.gastosMes=tr2.dataset.gmes; r();
+        });
+      }
       g.itens.forEach(it=>{
         const tr=document.createElement('tr');
         tr.style.display='none';
@@ -2866,11 +2907,12 @@ function vGastos(m){
           <td style="padding:7px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums;font-size:12.5px">${(it.v/g.total*100).toFixed(0)}% da classe</td>`;
         tbg.appendChild(tr);filhas.push(tr);
       });
-      tre.querySelector('.setaG').textContent='▸ '+g.itens.length+' item(ns)';
+      const rotSeta=g.itens.length+' item(ns)'+(serie.length>1?' · mês a mês':'');
+      tre.querySelector('.setaG').textContent='▸ '+rotSeta;
       if(filhas.length) tre.onclick=()=>{
         const fechado=filhas[0].style.display==='none';
         filhas.forEach(f=>f.style.display=fechado?'':'none');
-        tre.querySelector('.setaG').textContent=(fechado?'▾ ':'▸ ')+g.itens.length+' item(ns)';
+        tre.querySelector('.setaG').textContent=(fechado?'▾ ':'▸ ')+rotSeta;
       };
     });
     tg.appendChild(tbg);
@@ -2879,7 +2921,7 @@ function vGastos(m){
       <td style="text-align:right">${brl(tot)}</td><td style="text-align:right">100%</td></tr>`;
     tg.appendChild(tf);tl.appendChild(tg);lc.appendChild(tl);
   }
-  m.appendChild(bloco('gt-classe','💸 Para onde vai o dinheiro','clique na classificação para abrir os itens — fixo e variável juntos',lc));
+  m.appendChild(bloco('gt-classe','💸 Para onde vai o dinheiro','clique na classificação para abrir o mês a mês e os itens — e clique num mês para ir até ele',lc));
 
   /* ---- mês vazio e o anterior tem lançamento: oferece clonar ---- */
   if(!todos&&!doMes.length){
