@@ -461,12 +461,33 @@ const PALETA=['#1f6f5c','#c98a4b','#3d5a80','#b4443a','#6d5a8c','#7a8b53','#a867
 /* ---- identidade visual das empresas: cor fixa + logo em bolinha ----------
    A cor deixa de depender da posição no ranking (que muda a cada ano) e passa
    a ser DA empresa: ou a escolhida em Configurações, ou uma estável pelo nome. */
-const CORES_MARCA=[...PALETA,'#4e8e8b','#8e4e7e','#5e6eb8'];
+const CORES_MARCA=[...PALETA,'#4e8e8b','#8e4e7e','#5e6eb8','#997a2f','#5b8a72','#a04a6b',
+  '#3f7fb0','#7f5539','#557a2f','#8a5ea0','#2f8a8a','#b0663f'];
+const hashNome=nome=>{let h=0;const str=String(nome||'');
+  for(let i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))>>>0;return h};
+// cor automática SEM colisão entre as empresas conhecidas: cada nome tenta a
+// cor do seu hash; se outra empresa já a ocupou, anda para a próxima livre.
+// Determinístico e estável entre sessões — não depende de ranking nem de ano.
+let _corMapa=null,_corMt=-2;
+function corAuto(nome){
+  if(_corMt!==E._mt||!_corMapa){
+    _corMapa={};const usadas=new Set();
+    const nomes=[...new Set([...Object.keys((E.rendHist&&E.rendHist.empresas)||{}),
+      ...(E.rendimentos||[]).map(x=>x.empresa),...(E.empresasPJ||[]).map(x=>x.nome)])]
+      .filter(Boolean).sort((a,b)=>a.localeCompare(b));
+    nomes.forEach(nm=>{
+      if(usadas.size>=CORES_MARCA.length){_corMapa[nm]=CORES_MARCA[hashNome(nm)%CORES_MARCA.length];return}
+      let i=hashNome(nm)%CORES_MARCA.length;
+      while(usadas.has(i))i=(i+1)%CORES_MARCA.length;
+      usadas.add(i);_corMapa[nm]=CORES_MARCA[i];
+    });
+    _corMt=E._mt;
+  }
+  return _corMapa[nome]||CORES_MARCA[hashNome(nome)%CORES_MARCA.length];
+}
 function marcaDe(nome){
   const m=(E.marcas&&E.marcas[nome])||{};
-  if(m.cor||m.logo) return {cor:m.cor||PALETA[0],logo:m.logo||''};
-  let h=0;const str=String(nome||'');for(let i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))>>>0;
-  return {cor:CORES_MARCA[h%CORES_MARCA.length],logo:''};
+  return {cor:m.cor||corAuto(nome),logo:m.logo||''};   // logo não interfere na cor
 }
 const iniciaisDe=nm=>{const p=String(nm||'?').trim().split(/\s+/);
   return (p.length>1?(p[0][0]||'')+(p[1][0]||''):p[0].slice(0,2)).toUpperCase()};
@@ -658,10 +679,10 @@ function tabelaBloco(id,titulo,dica,lista,colunas,novo,render,rodape,alvo,abrir)
 }
 
 /* ---------- modal ---------- */
-function abrirModal(titulo,sub,montar){
+function abrirModal(titulo,sub,montar,aoFechar){
   const f=el(`<div class="fundo"><div class="modal"><header><div><h3>${titulo}</h3><p>${sub||''}</p></div>
     <button class="fechar">✕</button></header><div class="mcorpo"></div></div></div>`);
-  const fechar=()=>{f.remove();tela()};
+  const fechar=()=>{f.remove();aoFechar&&aoFechar();tela()};
   f.querySelector('.fechar').onclick=fechar;
   f.onclick=ev=>{if(ev.target===f)fechar()};
   document.addEventListener('keydown',function esc(ev){if(ev.key==='Escape'){fechar();document.removeEventListener('keydown',esc)}});
@@ -2131,7 +2152,7 @@ function vRendimentos(m){
       tra.innerHTML=`<td></td><td colspan="4" style="padding:5px 10px 11px 30px;font-size:12px;color:var(--verde)">+ lançamento de ${esc(g.empresa)}${todos?'':' em '+ano}</td>`;
       tra.onclick=ev=>{ev.stopPropagation();
         const y={id:uid(),data:(todos||+ano===anoHoje)?hoje():ano+'-12-31',empresa:g.empresa,instituicao:'',tipo:'',valor:0,obs:''};
-        E.rendimentos.push(y);salvar();modalRendimento(y)};
+        E.rendimentos.push(y);salvar();modalRendimento(y,true)};
       tbg.appendChild(tra);filhas.push(tra);
     }
     if(filhas.length) tre.onclick=()=>{
@@ -2190,9 +2211,12 @@ function vRendimentos(m){
     const cel='padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums';
     let corpo='';
     if(todos){
-      corpo=H.anos.map((a2,i2)=>{
+      const anosCf=[...new Set([...H.anos.map(String),...E.rendimentos.map(y=>String(y.data||'').slice(0,4))])]
+        .filter(a2=>/^\d{4}$/.test(a2)).sort();
+      corpo=anosCf.map(a2=>{
+        const i2=H.anos.indexOf(+a2);
         const ls=E.rendimentos.filter(y=>String(y.data||'').startsWith(a2));
-        const soma=ls.reduce((s2,y)=>s2+(+y.valor||0),0), hist=H.totalAno[i2]||0, dif=soma-hist;
+        const soma=ls.reduce((s2,y)=>s2+(+y.valor||0),0), hist=i2>=0?(H.totalAno[i2]||0):0, dif=soma-hist;
         return `<tr data-cfano="${a2}" style="cursor:pointer"><td style="padding:9px 10px"><b>${a2}</b></td>
           <td style="${cel};color:var(--suave)">${ls.length}</td>
           <td style="${cel}">${brl(soma)}</td>
@@ -2261,7 +2285,7 @@ function vRendimentos(m){
               <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${brl(x.v)}</td>
               <td style="padding:9px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${(x.v/totA*100).toFixed(0)}%</td>
               <td style="padding:9px 10px;text-align:right"><button class="btn ghost mini" data-filtrar="${esc(x.r)}">abrir ›</button></td></tr>`
-              +lan.map(y=>`<tr data-lan="${y.id}" class="lanoc" style="display:none;cursor:pointer">
+              +lan.map(y=>`<tr data-lan="${esc(y.id)}" class="lanoc" style="display:none;cursor:pointer">
                 <td style="padding:6px 10px 6px 40px;font-size:12.5px;white-space:nowrap">↳ ${fmtDataAno(y.data)}${y.tipo?` <span style="color:var(--suave)">· ${esc(y.tipo)}</span>`:''}${flagsLan(y)}</td>
                 <td style="padding:6px 10px;color:var(--suave);font-size:12px">${esc(y.instituicao||'')}</td>
                 <td style="padding:6px 10px;text-align:right;font-variant-numeric:tabular-nums">${brl(+y.valor||0)}</td>
@@ -2329,7 +2353,7 @@ function vRendimentos(m){
         const y=E.rendimentos.find(q=>q.id===tr.dataset.lan);if(y)modalRendimento(y)});
       det.querySelectorAll('[data-addlan]').forEach(tr=>tr.onclick=ev=>{ev.stopPropagation();
         const y={id:uid(),data:(+anoS===anoHoje?hoje():anoS+'-12-31'),empresa:tr.dataset.addlan,instituicao:'',tipo:'',valor:0,obs:''};
-        E.rendimentos.push(y);salvar();modalRendimento(y)});
+        E.rendimentos.push(y);salvar();modalRendimento(y,true)});
       det.querySelectorAll('[data-filtrar]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();
         filtro.rendAno=+anoS;filtro.rendEmp=b.dataset.filtrar;filtro.rendAnoSel=-1;r()});
       gEl.appendChild(det);
@@ -2476,7 +2500,7 @@ function vRendimentos(m){
 
   /* ---- lançamentos: linha clicável, abre o detalhe ---- */
   const novoRend=()=>{const x={id:uid(),data:hoje(),empresa:(empSel!=='Todas'?empSel:CFG('empresas')[0]||'Outro'),
-    instituicao:'',tipo:'',valor:0,obs:''};E.rendimentos.push(x);salvar();modalRendimento(x)};
+    instituicao:'',tipo:'',valor:0,obs:''};E.rendimentos.push(x);salvar();modalRendimento(x,true)};
   const lc2=el('<div></div>');
   const rol2=el('<div class="rolagem"></div>');
   const ordR=[...doAno].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
@@ -2511,7 +2535,8 @@ function vRendimentos(m){
   m.appendChild(bloco('rd-lanc','Lançamentos de '+ano,doAno.length+' lançamento(s) — clique para corrigir e anexar comprovante',lc2));
 }
 
-function modalRendimento(x){
+function modalRendimento(x,novo){
+  const vazio=()=>!(+x.valor)&&!String(x.tipo||'').trim()&&!String(x.obs||'').trim()&&!String(x.instituicao||'').trim();
   abrirModal((x.empresa?avatar(x.empresa,26):'')+esc(x.empresa||'Novo lançamento'),(x.tipo?esc(x.tipo)+' · ':'')+brl(+x.valor||0),(c,fechar)=>{
     const s1=el('<div class="secao"><h4>Dados</h4></div>');
     s1.appendChild(campos(x,[
@@ -2536,10 +2561,19 @@ function modalRendimento(x){
     // pró-labore e rendimento repetem: um clique cria o do mês seguinte já preenchido
     const dup=el('<button class="btn ghost">↻ Mês seguinte</button>');
     dup.onclick=()=>{const c2={...x,id:uid(),data:mesSeguinte(x.data||hoje()),obs:''};
-      E.rendimentos.push(c2);salvar();fechar();modalRendimento(c2)};
+      E.rendimentos.push(c2);salvar();fechar();modalRendimento(c2,true)};
     s3.appendChild(dup);s3.appendChild(el('<span class="cresce"></span>'));
     const ok=el('<button class="btn">Pronto</button>');ok.onclick=fechar;s3.appendChild(ok);
     c.appendChild(s3);
+  },()=>{
+    // criado agora e fechado em branco (sem valor, texto ou anexo): some sozinho
+    if(!novo||!vazio())return;
+    arqPor('rendimento:'+x.id).then(fs2=>{
+      if(fs2.length)return;
+      const antes=E.rendimentos.length;
+      E.rendimentos=E.rendimentos.filter(q=>q.id!==x.id);
+      if(E.rendimentos.length!==antes){salvar();if(atual==='rendimentos')tela()}
+    });
   });
 }
 
@@ -2731,16 +2765,19 @@ function baixarRendimentosExcel() {
   /* 4c. Conferência — o lançado bate com o histórico? */
   const aConf=[[{v:'Conferência — lançado x histórico',s:5}],[],
     [{v:'Ano',s:N},{v:'Empresa',s:N},{v:'Lançamentos',s:N},{v:'Somam',s:N},{v:'Histórico',s:N},{v:'Diferença',s:N}]];
-  anos.forEach((a2,i2)=>{
+  const anosCf=[...new Set([...anos.map(String),...E.rendimentos.map(x=>String(x.data||'').slice(0,4))])]
+    .filter(a2=>/^\d{4}$/.test(a2)).sort();
+  anosCf.forEach(a2=>{
+    const i2=anos.indexOf(+a2);
     const nomesC=[...new Set([...Object.keys(H.empresas||{}),
       ...E.rendimentos.filter(x=>String(x.data||'').startsWith(a2)).map(x=>x.empresa)])].filter(Boolean);
     nomesC.forEach(nm=>{
       const ls=E.rendimentos.filter(x=>String(x.data||'').startsWith(a2)&&x.empresa===nm);
       const soma=+ls.reduce((s2,x)=>s2+(+x.valor||0),0).toFixed(2);
-      const hist=+((((H.empresas||{})[nm]||[])[i2]||0)).toFixed(2);
+      const hist=+((i2>=0?(((H.empresas||{})[nm]||[])[i2]||0):0)).toFixed(2);
       if(!ls.length&&!hist) return;
       const dif=+(soma-hist).toFixed(2);
-      aConf.push([a2,nm,ls.length,{v:soma,s:M},{v:hist,s:M},
+      aConf.push([+a2,nm,ls.length,{v:soma,s:M},{v:hist,s:M},
         Math.abs(dif)>0.01?{v:dif,s:NM}:{v:0,s:M}]);
     });
   });
@@ -2812,8 +2849,10 @@ function baixarRendimentosPDF() {
 
   <h2>Conferência — lançado x histórico</h2>
   <table><thead><tr><th>Ano</th><th class="n">Lançamentos</th><th class="n">Somam</th><th class="n">Histórico</th><th class="n">Diferença</th></tr></thead><tbody>
-  ${anos.map((a2,i2)=>{const ls=E.rendimentos.filter(x=>String(x.data||'').startsWith(a2));
-    const soma=ls.reduce((s2,x)=>s2+(+x.valor||0),0), hist=H.totalAno[i2]||0, dif=soma-hist;
+  ${[...new Set([...anos.map(String),...E.rendimentos.map(x=>String(x.data||'').slice(0,4))])]
+    .filter(a2=>/^\d{4}$/.test(a2)).sort().map(a2=>{const i2=anos.indexOf(+a2);
+    const ls=E.rendimentos.filter(x=>String(x.data||'').startsWith(a2));
+    const soma=ls.reduce((s2,x)=>s2+(+x.valor||0),0), hist=i2>=0?(H.totalAno[i2]||0):0, dif=soma-hist;
     return `<tr><td>${a2}</td><td class="n">${ls.length}</td><td class="n">${brl2(soma)}</td><td class="n">${brl2(hist)}</td>
       <td class="n" style="color:${Math.abs(dif)>1?'#b3261e':'#1b7a4b'}">${Math.abs(dif)>1?brl2(dif):'✓ confere'}</td></tr>`}).join('')}
   </tbody></table>
@@ -4102,12 +4141,12 @@ async function vConfig(m){
   const sx=el('<div class="corpo"></div>');
   const sform={nova:'',rep:''};
   sx.appendChild(campos(sform,[
-    {k:'nova',t:'Senha nova (mínimo 8)',tipo:'password'},
+    {k:'nova',t:'Senha nova (mínimo 6)',tipo:'password'},
     {k:'rep',t:'Repita a senha nova',tipo:'password'},
   ],()=>{}));
   const bs=el('<button class="btn" style="margin-top:12px">Trocar a senha</button>');
   bs.onclick=async()=>{
-    if((sform.nova||'').length<8){alert('A senha nova precisa de pelo menos 8 caracteres.');return}
+    if((sform.nova||'').length<6){alert('A senha nova precisa de pelo menos 6 caracteres.');return}
     if(sform.nova!==sform.rep){alert('A confirmação não bate com a senha nova.');return}
     if(DEV){alert('Em modo local não há senha para trocar.');return}
     bs.disabled=true;bs.textContent='Trocando…';
@@ -4129,6 +4168,24 @@ async function vConfig(m){
     A troca vale para todos os aparelhos no próximo login. Quem já está logado continua
     logado — a sessão não cai. A senha é conferida e guardada só no servidor, embaralhada.</p>`));
   m.appendChild(bloco('cf-senha','🔒 Senha de entrada','defina uma senha nova — sem pedir a antiga',sx));
+
+  /* ---- versão descartada: o rastro do último conflito de sincronização ---- */
+  const desc=(()=>{try{return JSON.parse(localStorage.getItem('cl_descartado')||'null')}catch(_){return null}})();
+  const dx=el('<div class="corpo"></div>');
+  if(!desc||!desc.dados){
+    dx.innerHTML='<div class="vazio">Nada descartado neste aparelho. Quando dois acessos gravam quase juntos, a versão que perde a corrida fica guardada aqui.</div>';
+  } else {
+    dx.appendChild(el(`<p style="font-size:13px">Guardada em <b>${new Date(desc.em).toLocaleString('pt-BR')}</b> —
+      é a versão deste aparelho que saiu de cena num conflito de sincronização.</p>`));
+    const bb=el('<div style="display:flex;gap:9px;margin-top:10px;flex-wrap:wrap"></div>');
+    const b1=el('<button class="btn ghost">⬇ Baixar (JSON)</button>');
+    b1.onclick=()=>baixar(new Blob([JSON.stringify(desc.dados,null,1)],{type:'application/json'}),'central-leo-descartado.json');
+    const b2=el('<button class="btn ghost" style="color:var(--vermelho)">Restaurar por cima</button>');
+    b2.onclick=()=>{if(!confirm('Substituir os dados atuais deste aparelho pela versão descartada? A próxima sincronização tenta gravá-la no servidor.'))return;
+      localStorage.setItem(CHAVE,JSON.stringify(desc.dados));E=carregar();salvar();tela()};
+    bb.appendChild(b1);bb.appendChild(b2);dx.appendChild(bb);
+  }
+  m.appendChild(bloco('cf-descartado','🗂 Versão descartada','o que saiu de cena no último conflito de sincronização',dx));
 
   // histórico de rendimentos — editável
   const H=E.rendHist;
@@ -4246,37 +4303,62 @@ async function apiSync(metodo,corpo){
 let syncTimer=null;
 function pintaSync(t){const x=document.getElementById('stSync');if(x)x.textContent='☁ '+t}
 function agendaPush(){if(DEV||!pegaToken())return;clearTimeout(syncTimer);syncTimer=setTimeout(enviarNuvem,2500)}
-// o "carimbo" do servidor que este aparelho viu por último — a peça que faltava
-// para uma aba aberta há horas não gravar dado velho por cima de correção nova
-const BASE_MT='cl_baseMt';
-const baseMt=()=>+(localStorage.getItem(BASE_MT)||0);
-const marcaBase=mt=>{if(mt)localStorage.setItem(BASE_MT,String(mt))};
-async function enviarNuvem(){if(DEV)return;
+// ---- sincronização com gravação condicional (CAS) -------------------------
+// Cada ABA guarda, em memória, a versão do servidor que viu por último
+// (_tabBase). O PUT leva essa base junto; o servidor só grava se ela ainda for
+// a atual — senão devolve 409 e NADA é sobrescrito. Aba esquecida aberta,
+// aparelho desatualizado ou dois salvamentos quase juntos: quem perde a corrida
+// adota a versão do servidor, guarda a sua de lado e avisa.
+let _tabBase=0;                       // em memória de propósito: cada aba corre sozinha
+const marcaBase=mt=>{if(mt)_tabBase=+mt};
+function guardaDescartado(){
+  try{localStorage.setItem('cl_descartado',JSON.stringify({em:Date.now(),dados:JSON.parse(localStorage.getItem(CHAVE))}))}catch(_){}
+}
+function adotaNuvem(r,avisar){
+  guardaDescartado();
+  // modal aberto sobre o estado antigo viraria órfão e comeria o que fosse digitado
+  const mo=document.getElementById('modais'); if(mo) mo.innerHTML='';
+  localStorage.setItem(CHAVE,JSON.stringify(r.dados));marcaBase(r.mt);E=carregar();tela();
+  pintaSync('atualizado de outro acesso');
+  if(avisar) alert('Outro acesso gravou primeiro. Este aparelho adotou a versão do servidor para não apagar nada de lá.\n\nSe você estava digitando algo, confira e refaça — a versão daqui ficou guardada em ⚙️ Configurações → Versão descartada.');
+}
+async function apiPut(){
+  const r=await fetch(API_SYNC,{method:'PUT',
+    headers:{'content-type':'application/json',authorization:'Bearer '+pegaToken()},
+    body:JSON.stringify({dados:E,base:_tabBase})});
+  if(r.status===401){localStorage.removeItem(T_CHAVE);sessionStorage.removeItem(T_CHAVE);location.reload();throw new Error('sessão expirou')}
+  const j=await r.json().catch(()=>({}));
+  return {status:r.status,j};
+}
+async function enviarNuvem(){if(DEV&&!window.__testeSync)return;
   try{
-    pintaSync('conferindo…');
-    const r=await apiSync('GET');
-    if(r&&r.mt&&r.mt>baseMt()&&r.dados){
-      // o servidor tem coisa que este aparelho nunca viu — adotar, não atropelar
-      const meuMt=E._mt||0;
-      try{localStorage.setItem('cl_descartado',JSON.stringify({em:Date.now(),dados:JSON.parse(localStorage.getItem(CHAVE))}))}catch(_){}
-      localStorage.setItem(CHAVE,JSON.stringify(r.dados));marcaBase(r.mt);E=carregar();tela();
-      pintaSync('atualizado de outro acesso');
-      if(meuMt>((r.dados&&r.dados._mt)||0))
-        alert('Este aparelho estava com uma versão antiga: outro acesso gravou depois da última sincronização daqui.\n\nPuxei a versão mais nova para não apagar nada de lá. Confira sua última alteração e refaça se for preciso — a versão deste aparelho ficou guardada por segurança.');
-      return;
+    if(!_tabBase){
+      // esta aba ainda não viu o servidor (abriu offline, resposta perdida):
+      // olha antes de gravar — se o CONTEÚDO remoto é mais novo, adota; se o
+      // daqui é mais novo (edição offline), segue para o PUT protegido
+      pintaSync('conferindo…');
+      const r=await apiSync('GET');
+      if(r&&r.dados&&(r.dados._mt||0)>(E._mt||0)){adotaNuvem(r,true);return}
+      marcaBase(r&&r.mt||0);
     }
     pintaSync('enviando…');
-    const p=await apiSync('PUT',{dados:E});marcaBase(p&&p.mt);
-    pintaSync('sincronizado');
+    const p=await apiPut();
+    if(p.status===409){const r=await apiSync('GET');adotaNuvem(r,true);return}
+    if(p.status===428){pintaSync('recarregue a página');return}
+    if(p.status<200||p.status>=300)throw new Error('HTTP '+p.status);
+    marcaBase(p.j&&p.j.mt);pintaSync('sincronizado');
   }catch(e){pintaSync('erro ao enviar')}}
-async function puxarNuvem(){if(DEV){pintaSync('modo local');return}
+async function puxarNuvem(){if(DEV&&!window.__testeSync){pintaSync('modo local');return}
   try{pintaSync('baixando…');
     const r=await apiSync('GET');
     marcaBase(r&&r.mt);
     const remoto=r&&r.dados;
-    if(remoto&&(remoto._mt||0)>(E._mt||0)){localStorage.setItem(CHAVE,JSON.stringify(remoto));E=carregar()}
-    else if((E._mt||0)>((remoto&&remoto._mt)||0)){const p=await apiSync('PUT',{dados:E});marcaBase(p&&p.mt)}
-    pintaSync('sincronizado');
+    if(remoto&&(remoto._mt||0)>(E._mt||0)){
+      guardaDescartado();              // até o caminho normal deixa rastro do que saiu
+      localStorage.setItem(CHAVE,JSON.stringify(remoto));E=carregar();
+      pintaSync('sincronizado');
+    } else if((E._mt||0)>((remoto&&remoto._mt)||0)){await enviarNuvem();return}
+    else pintaSync('sincronizado');
   }catch(e){pintaSync('sem conexão')}}
 async function sincronizarAgora(){await puxarNuvem();tela()}
 function salvarPDF(){

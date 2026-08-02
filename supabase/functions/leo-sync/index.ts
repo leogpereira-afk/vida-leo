@@ -124,7 +124,7 @@ Deno.serve(async (req: Request) => {
       const t = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
       if (!(await tokenOk(t))) return json({ erro: "Não autorizado" }, 401);
       const nova = String(senhaNova ?? "");
-      if (nova.length < 8) return json({ erro: "A senha nova precisa de pelo menos 8 caracteres" }, 400);
+      if (nova.length < 6) return json({ erro: "A senha nova precisa de pelo menos 6 caracteres" }, 400);
       const salt = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
       const iter = 120000;
       const hash = await pbkdf2(nova, salt, iter);
@@ -149,12 +149,33 @@ Deno.serve(async (req: Request) => {
   }
 
   if (req.method === "PUT") {
-    const { dados } = await req.json().catch(() => ({}));
+    const { dados, base } = await req.json().catch(() => ({}));
     if (!dados || typeof dados !== "object") return json({ erro: "dados ausentes" }, 400);
+    // Gravação CONDICIONAL (compare-and-swap): o cliente diz qual versão do
+    // servidor ele viu ("base"); só gravamos se ela ainda for a atual. Isso
+    // fecha a corrida de dois lados salvando quase juntos E corta os clientes
+    // antigos (sem "base"), que eram exatamente os que atropelavam correções.
+    if (base === undefined || base === null)
+      return json({ erro: "cliente desatualizado — recarregue a página" }, 428);
     const mt = Date.now();
-    const { error } = await sb.from("leo_estado").upsert(
-      { id: true, mt, dados, atualizado_em: new Date().toISOString() }, { onConflict: "id" });
+    const atual = await sb.from("leo_estado").select("mt").eq("id", true).maybeSingle();
+    if (atual.error) return json({ erro: atual.error.message }, 500);
+    if (!atual.data) {
+      // primeira gravação de todas: só vale se o cliente também partiu do zero
+      if (Number(base) !== 0) return json({ erro: "conflito", mt: 0 }, 409);
+      const { error } = await sb.from("leo_estado").insert(
+        { id: true, mt, dados, atualizado_em: new Date().toISOString() });
+      if (error) return json({ erro: error.message }, 500);
+      return json({ mt });
+    }
+    const { data, error } = await sb.from("leo_estado")
+      .update({ mt, dados, atualizado_em: new Date().toISOString() })
+      .eq("id", true).eq("mt", Number(base)).select("mt");
     if (error) return json({ erro: error.message }, 500);
+    if (!data || !data.length) {
+      const agora = await sb.from("leo_estado").select("mt").eq("id", true).maybeSingle();
+      return json({ erro: "conflito", mt: agora.data ? Number(agora.data.mt) : 0 }, 409);
+    }
     return json({ mt });
   }
 
