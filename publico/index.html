@@ -2072,13 +2072,14 @@ const SISTEMAS_ACESSO=[
   // conta que o app nunca vai procurar.
   {k:'dre',     nome:'DRE Caixa',        ic:'💰', url:'https://impresilk.com.br/dre',
    sub:'uma senha só, para quem alimenta o sistema', porta:'equipe', papelPorta:'equipe'},
+  // Estes dois têm login PRÓPRIO e mais antigo — não se entra por aqui. Mas o
+  // acesso de cada um se administra daqui, que era o pedido: um lugar só.
+  {k:'painel',  nome:'Painel de Gestão', ic:'📊', url:'https://impresilk.com.br/painel',
+   sub:'contas-atrasadas, fluxo, produtos, orçamentos', semDesativar:true, nota:'Quem é criado aqui enxerga tudo. Para liberar só alguns módulos, ajuste dentro do Painel, na tela Acessos.'},
+  {k:'rh',      nome:'RH (Pessoas)',     ic:'👥', url:'https://impresilk.com.br/rh',
+   sub:'ADMIN_RH, gestores e colaboradores', semDesativar:true, nota:'O acesso se liga à ficha da pessoa: ela precisa já existir como colaborador no RH.'},
 ];
-const SO_ATALHO=[
-  {nome:'Painel de Gestão',ic:'📊',url:'https://impresilk.com.br/painel#/acessos',
-   onde:'os acessos ficam dentro do próprio Painel, na tela Acessos'},
-  {nome:'RH (Pessoas)',ic:'👥',url:'https://impresilk.com.br/rh#/painel-controle',
-   onde:'os acessos ficam no RH, em Painel de Controle'},
-];
+const SO_ATALHO=[];
 
 async function apiEquipe(acao,corpo){
   const r=await fetch(API_EQUIPE,{method:'POST',
@@ -2142,10 +2143,13 @@ function telaAcessos(){
         tr.innerHTML=`<td style="padding:9px 10px"><b>${esc(c.nome||c.usuario)}</b>
             <div style="font-size:11.5px;color:var(--suave)">${esc(c.usuario)}</div></td>
           <td style="padding:9px 10px">${esc(c.papel)}</td>
-          <td style="padding:9px 10px">${c.ativo===false?chip('Cancelado'):c.trocarSenha?chip('Em Planejamento'):chip('Realizado')}
-            <span style="font-size:11.5px;color:var(--suave);margin-left:4px">${c.ativo===false?'desativado':c.trocarSenha?'senha temporária':'ativo'}</span></td>
+          <td style="padding:9px 10px">${sis.semDesativar?chip('Realizado'):(c.ativo===false?chip('Cancelado'):c.trocarSenha?chip('Em Planejamento'):chip('Realizado'))}
+            <span style="font-size:11.5px;color:var(--suave);margin-left:4px">${sis.semDesativar?'com acesso':(c.ativo===false?'desativado':c.trocarSenha?'senha temporária':'ativo')}</span></td>
           <td style="padding:9px 10px;text-align:right;white-space:nowrap"></td>`;
         const acoes=tr.lastElementChild;
+        // A conta da direção do Painel não se mexe daqui — o servidor recusa, e
+        // botão que sempre falha é pior que botão que não existe.
+        if(c.master){ acoes.innerHTML='<span style="font-size:11.5px;color:var(--suave)">a conta da direção se mexe dentro do Painel</span>'; tb.appendChild(tr); return; }
         const bSenha=el('<button class="btn mini ghost">🔑 senha</button>');
         bSenha.onclick=async()=>{
           const nova=senhaTemporaria();
@@ -2157,14 +2161,17 @@ function telaAcessos(){
           carregar();
         };
         acoes.appendChild(bSenha);
-        const bAtivo=el('<button class="btn mini ghost">'+(c.ativo===false?'✓ reativar':'⊘ desativar')+'</button>');
-        bAtivo.style.marginLeft='6px';
-        bAtivo.onclick=async()=>{
-          try{ await apiEquipe('salvarConta',{sistema:sis.k,usuario:c.usuario,nome:c.nome,papel:c.papel,ativo:c.ativo===false}); }
-          catch(e){ alert(e.erro||'Não consegui mudar.'); return; }
-          carregar();
-        };
-        acoes.appendChild(bAtivo);
+        // Painel e RH não têm "desativado": ou a conta existe, ou não existe.
+        if(!sis.semDesativar){
+          const bAtivo=el('<button class="btn mini ghost">'+(c.ativo===false?'✓ reativar':'⊘ desativar')+'</button>');
+          bAtivo.style.marginLeft='6px';
+          bAtivo.onclick=async()=>{
+            try{ await apiEquipe('salvarConta',{sistema:sis.k,usuario:c.usuario,nome:c.nome,papel:c.papel,ativo:c.ativo===false}); }
+            catch(e){ alert(e.erro||'Não consegui mudar.'); return; }
+            carregar();
+          };
+          acoes.appendChild(bAtivo);
+        }
         const bDel=el('<button class="btn mini ghost" style="color:var(--vermelho);margin-left:6px">🗑</button>');
         bDel.onclick=async()=>{
           if(!confirm('Tirar o acesso de '+(c.nome||c.usuario)+' em '+sis.nome+'? O trabalho dele continua onde está.'))return;
@@ -2179,6 +2186,7 @@ function telaAcessos(){
       t2.appendChild(tb); tab.appendChild(t2); corpo.appendChild(tab);
 
       const form=el('<div style="padding:12px 0 4px"></div>');
+      if(sis.nota) form.appendChild(el('<div style="font-size:12.5px;color:var(--suave);margin-bottom:9px">'+esc(sis.nota)+'</div>'));
       if(sis.porta){
         // porta: define ou troca A senha, sem inventar nome de usuário — o app
         // do DRE sempre entra como "equipe", então qualquer outro nome criaria
@@ -2235,9 +2243,9 @@ function telaAcessos(){
     cx.appendChild(linha);
   });
 
-  // os que ainda têm porta própria
+  // os que ainda têm porta própria (hoje: nenhum)
   const outros=el('<div style="margin-top:14px"></div>');
-  outros.appendChild(el('<div style="font-size:12.5px;color:var(--suave);margin-bottom:8px">Estes têm login próprio — o acesso se mexe dentro deles:</div>'));
+  if(SO_ATALHO.length) outros.appendChild(el('<div style="font-size:12.5px;color:var(--suave);margin-bottom:8px">Estes têm login próprio — o acesso se mexe dentro deles:</div>'));
   SO_ATALHO.forEach(o=>{
     const a=el(`<a href="${o.url}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;padding:11px 14px;border:1px solid var(--linha);border-radius:var(--r);margin-bottom:8px;text-decoration:none;color:inherit;background:var(--card)">
       <span style="font-size:17px">${o.ic}</span><b style="font-size:14px">${esc(o.nome)}</b>

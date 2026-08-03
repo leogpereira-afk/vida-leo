@@ -30,7 +30,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const JWT_SECRET = Deno.env.get("EQUIPE_JWT_SECRET") ?? "";
 const LEO_SECRET = Deno.env.get("LEO_SESSION_SECRET") ?? "";
 const DIAS = 30;
-const SISTEMAS = ["brief", "pcp", "compras", "dre"] as const;
+const SISTEMAS = ["brief", "pcp", "compras", "dre", "painel", "rh"] as const;
 type Sistema = typeof SISTEMAS[number];
 
 // Papéis de cada sistema, com quem administra. Lista fechada: papel digitado
@@ -48,7 +48,21 @@ const PAPEIS: Record<Sistema, { todos: string[]; admin: string[] }> = {
   // para quem alimenta o sistema. `admin: []` de propósito — ninguém administra
   // acesso de dentro do DRE; a senha se troca pela Central.
   dre: { todos: ["equipe"], admin: [] },
+  // Painel e RH têm login PRÓPRIO e mais antigo que este. Eles entram aqui só
+  // para a Central poder administrar de um lugar só — ninguém faz login por
+  // esta função neles, e ninguém administra a partir de dentro deles aqui.
+  painel: { todos: ["tudo"], admin: [] },
+  rh: { todos: ["ADMIN_RH", "GESTOR", "COLABORADOR"], admin: [] },
 };
+
+// Sistemas com mecanismo próprio: a Central administra, mas o login é lá.
+const EXTERNOS = new Set(["painel", "rh"]);
+const MODULOS_PAINEL = ["contas-atrasadas", "fluxo-caixa", "produtos", "orcamentos",
+  "bancos", "marketing", "licitacoes", "configuracoes"];
+// Calculado na hora de usar, não na carga do módulo: normalizarUsuario é um
+// const declarado mais abaixo, e chamá-lo aqui derruba a function inteira.
+const masterPainel = () => normalizarUsuario(Deno.env.get("PAINEL_AUTH_MASTER_USUARIO") || "leonardo");
+const DOMINIO_RH = "rh.impresilk.local";
 
 const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
@@ -189,6 +203,133 @@ async function ficariaSemAdmin(sistema: Sistema, usuario: string, papelNovo: str
   return admins.length === 1 && !continua;
 }
 
+// ---------------------------------------------------------------- painel
+// Mesma tabela e MESMO formato de senha que a painel-auth usa (PBKDF2 120k,
+// salt 16 bytes, tudo hex, em três colunas). Se isto divergir, a conta criada
+// aqui não abre lá — por isso não se reescreve o mecanismo, se repete.
+async function painelListar() {
+  const { data, error } = await sb.from("painel_contas")
+    .select("usuario, nome, permissoes, vendedor_id, atualizado_em").order("usuario");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((c: any) => ({
+    usuario: c.usuario,
+    nome: c.nome || c.usuario,
+    papel: (c.permissoes ?? []).includes("*") ? "tudo" : ((c.permissoes ?? []).join(", ") || "nada"),
+    ativo: true,                       // o Painel não tem "desativado": ou existe, ou não
+    trocarSenha: false,
+    atualizadoEm: c.atualizado_em,
+    master: c.usuario === masterPainel(),
+  }));
+}
+
+async function painelSalvar(body: Record<string, any>) {
+  const usuario = normalizarUsuario(body.usuario);
+  if (!usuario) return json({ erro: "Informe o usuário." }, 400);
+  if (usuario === masterPainel()) {
+    return json({ erro: "Esta é a conta da direção no Painel: ela já entra e já vê tudo. A senha dela se troca dentro do Painel." }, 400);
+  }
+  const { data: atual } = await sb.from("painel_contas").select("*").eq("usuario", usuario).maybeSingle();
+  const senha = String(body.senha ?? "");
+  if (!atual && senha.length < 6) return json({ erro: "Defina uma senha de ao menos 6 caracteres." }, 400);
+  if (senha && senha.length < 6) return json({ erro: "A senha precisa ter ao menos 6 caracteres." }, 400);
+  const reg = senha ? await hashSenha(senha) : { hash: atual!.hash, salt: atual!.salt, iter: atual!.iter };
+  // "tudo" = curinga; qualquer outra coisa vira a lista de módulos informada
+  const permissoes = body.papel === "tudo" ? ["*"]
+    : (Array.isArray(body.permissoes) ? body.permissoes.filter((p: string) => MODULOS_PAINEL.includes(p))
+      : (atual?.permissoes ?? []));
+  const { error } = await sb.from("painel_contas").upsert({
+    usuario, nome: String(body.nome ?? "").trim() || usuario, permissoes,
+    vendedor_id: atual?.vendedor_id ?? "", ...reg, atualizado_em: new Date().toISOString(),
+  }, { onConflict: "usuario" });
+  if (error) throw new Error(error.message);
+  return json({ ok: true, temporaria: false });
+}
+
+async function painelRemover(body: Record<string, any>) {
+  const usuario = normalizarUsuario(body.usuario);
+  if (!usuario) return json({ erro: "Informe o usuário." }, 400);
+  if (usuario === masterPainel()) return json({ erro: "A conta da direção não pode ser removida." }, 400);
+  const { error } = await sb.from("painel_contas").delete().eq("usuario", usuario);
+  if (error) throw new Error(error.message);
+  return json({ ok: true });
+}
+
+// ---------------------------------------------------------------- rh
+// O RH usa o Supabase Auth de verdade: a senha mora em auth.users e a tabela
+// "perfis" só liga a conta a um colaborador e a um perfil. O login é por NOME;
+// o e-mail é sintético só porque o Auth exige um.
+const emailRh = (usuario: string) => `${usuario.replace(/\s+/g, ".")}@${DOMINIO_RH}`;
+
+async function rhListar() {
+  const { data, error } = await sb.from("perfis")
+    .select("usuario, nome, perfil, colaborador_id, atualizado_em").order("usuario");
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((c: any) => ({
+    usuario: c.usuario, nome: c.nome || c.usuario, papel: c.perfil,
+    ativo: true, trocarSenha: false, atualizadoEm: c.atualizado_em,
+  }));
+}
+
+async function rhSalvar(body: Record<string, any>) {
+  const usuario = normalizarUsuario(body.usuario);
+  const perfil = String(body.papel ?? "COLABORADOR");
+  if (!usuario) return json({ erro: "Informe o nome." }, 400);
+  if (!PAPEIS.rh.todos.includes(perfil)) return json({ erro: "Perfil inválido." }, 400);
+  const senha = String(body.senha ?? "");
+  const { data: existente } = await sb.from("perfis").select("user_id, colaborador_id, nome").eq("usuario", usuario).maybeSingle();
+  if (!existente && senha.length < 6) return json({ erro: "Defina uma senha de ao menos 6 caracteres." }, 400);
+
+  // Conta nova precisa estar ligada a um colaborador — senão o RH mostra uma
+  // pessoa que não existe na ficha de ninguém.
+  let colaboradorId = existente?.colaborador_id ?? "";
+  if (!existente) {
+    const { data: regs } = await sb.from("registros").select("id, dados").eq("colecao", "colaboradores");
+    const achado = (regs ?? []).find((r: any) =>
+      normalizarUsuario((r.dados ?? {}).nome) === usuario);
+    if (!achado) {
+      return json({ erro: `Não achei "${body.usuario}" entre os colaboradores do RH. Cadastre a pessoa no RH primeiro — o acesso se liga à ficha dela.` }, 400);
+    }
+    colaboradorId = String(achado.id);
+  }
+
+  const email = emailRh(usuario);
+  let userId = existente?.user_id ?? "";
+  if (existente) {
+    if (senha) {
+      const { error } = await sb.auth.admin.updateUserById(userId, { password: senha });
+      if (error) throw new Error(error.message);
+    }
+  } else {
+    const { data, error } = await sb.auth.admin.createUser({
+      email, password: senha, email_confirm: true,
+      user_metadata: { nome: String(body.nome ?? body.usuario) },
+    });
+    if (error) throw new Error(error.message);
+    userId = data.user!.id;
+  }
+  const { error: erroPerfil } = await sb.from("perfis").upsert({
+    user_id: userId, usuario, colaborador_id: colaboradorId,
+    nome: String(body.nome ?? body.usuario), perfil, atualizado_em: new Date().toISOString(),
+  });
+  if (erroPerfil) throw new Error(erroPerfil.message);
+  return json({ ok: true, temporaria: false });
+}
+
+async function rhRemover(body: Record<string, any>) {
+  const usuario = normalizarUsuario(body.usuario);
+  if (!usuario) return json({ erro: "Informe o nome." }, 400);
+  const { data: existente } = await sb.from("perfis").select("user_id").eq("usuario", usuario).maybeSingle();
+  if (!existente) return json({ ok: true });                 // já não existe
+  const { count } = await sb.from("perfis").select("usuario", { count: "exact", head: true }).eq("perfil", "ADMIN_RH");
+  const { data: eu } = await sb.from("perfis").select("perfil").eq("usuario", usuario).maybeSingle();
+  if (eu?.perfil === "ADMIN_RH" && (count ?? 0) <= 1) {
+    return json({ erro: "Este é o único ADMIN_RH. Promova outra pessoa antes de remover esta." }, 400);
+  }
+  const { error } = await sb.auth.admin.deleteUser(existente.user_id);   // cascata apaga o perfil
+  if (error) throw new Error(error.message);
+  return json({ ok: true });
+}
+
 async function registrar(sistema: string, usuario: string, acao: string, por: string, detalhe = "") {
   await sb.from("equipe_acessos_log").insert({ sistema, usuario, acao, por, detalhe });
 }
@@ -270,6 +411,9 @@ Deno.serve(async (req: Request) => {
     switch (acao) {
       // -------------------------------------------------------------- login
       case "login": {
+        if (EXTERNOS.has(sistema)) {
+          return json({ erro: "Este sistema tem login próprio — entre por ele." }, 400);
+        }
         const usuario = normalizarUsuario(body.usuario);
         const senha = String(body.senha ?? "");
         if (!usuario || !senha) return json({ erro: "Informe usuário e senha." }, 400);
@@ -320,6 +464,8 @@ Deno.serve(async (req: Request) => {
       case "listarContas": {
         const q = await quemPede(req, sistema);
         if (!q.admin) return json({ erro: "Apenas a gestão." }, 403);
+        if (sistema === "painel") return json({ contas: await painelListar(), papeis: PAPEIS.painel.todos, modulos: MODULOS_PAINEL });
+        if (sistema === "rh") return json({ contas: await rhListar(), papeis: PAPEIS.rh.todos });
         const { data, error } = await sb.from("equipe_contas").select("*")
           .eq("sistema", sistema).order("usuario");
         if (error) throw new Error(error.message);
@@ -329,6 +475,8 @@ Deno.serve(async (req: Request) => {
       case "salvarConta": {
         const q = await quemPede(req, sistema);
         if (!q.admin) return json({ erro: "Apenas a gestão." }, 403);
+        if (sistema === "painel") { const r = await painelSalvar(body); await registrar(sistema, normalizarUsuario(body.usuario), "salvou", q.quem); return r; }
+        if (sistema === "rh") { const r = await rhSalvar(body); await registrar(sistema, normalizarUsuario(body.usuario), "salvou", q.quem); return r; }
         const usuario = normalizarUsuario(body.usuario);
         if (!usuario) return json({ erro: "Informe o usuário." }, 400);
         const papel = String(body.papel ?? "");
@@ -365,6 +513,8 @@ Deno.serve(async (req: Request) => {
       case "removerConta": {
         const q = await quemPede(req, sistema);
         if (!q.admin) return json({ erro: "Apenas a gestão." }, 403);
+        if (sistema === "painel") { const r = await painelRemover(body); await registrar(sistema, normalizarUsuario(body.usuario), "removeu", q.quem); return r; }
+        if (sistema === "rh") { const r = await rhRemover(body); await registrar(sistema, normalizarUsuario(body.usuario), "removeu", q.quem); return r; }
         const usuario = normalizarUsuario(body.usuario);
         if (!usuario) return json({ erro: "Informe o usuário." }, 400);
         if (!q.central && usuario === q.usuario) {
@@ -437,6 +587,12 @@ Deno.serve(async (req: Request) => {
     }
   } catch (e) {
     console.error("[equipe-auth]", e);
-    return json({ erro: "Falha interna." }, 500);
+    // Para a Central (que é o dono) vale dizer o que aconteceu: um "Falha
+    // interna" genérico escondeu por um bom tempo que o banco estava recusando
+    // o sistema novo por causa de uma trava de coluna. Para o resto continua
+    // opaco — mensagem de erro é mapa para quem está sondando.
+    const q = await quemPede(req, sistema).catch(() => ({ central: false }));
+    const detalhe = e instanceof Error ? e.message : String(e);
+    return json(q.central ? { erro: "Falha interna: " + detalhe } : { erro: "Falha interna." }, 500);
   }
 });
