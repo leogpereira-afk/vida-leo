@@ -30,7 +30,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const JWT_SECRET = Deno.env.get("EQUIPE_JWT_SECRET") ?? "";
 const LEO_SECRET = Deno.env.get("LEO_SESSION_SECRET") ?? "";
 const DIAS = 30;
-const SISTEMAS = ["brief", "pcp", "compras"] as const;
+const SISTEMAS = ["brief", "pcp", "compras", "dre"] as const;
 type Sistema = typeof SISTEMAS[number];
 
 // Papéis de cada sistema, com quem administra. Lista fechada: papel digitado
@@ -44,6 +44,10 @@ const PAPEIS: Record<Sistema, { todos: string[]; admin: string[] }> = {
   // Compras (03/08/2026): admin aprova e configura; comprador cota e emite OC;
   // solicitante pede material e registra recebimento.
   compras: { todos: ["admin", "comprador", "solicitante"], admin: ["admin"] },
+  // DRE (03/08/2026): é uma PORTA, não um quadro de gente. Uma senha de entrada
+  // para quem alimenta o sistema. `admin: []` de propósito — ninguém administra
+  // acesso de dentro do DRE; a senha se troca pela Central.
+  dre: { todos: ["equipe"], admin: [] },
 };
 
 const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });

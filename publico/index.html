@@ -2054,6 +2054,206 @@ function imprimirSOS() {
   w.document.close(); w.print();
 }
 
+/* ===================== ACESSOS DOS SISTEMAS ===================== */
+// Os sistemas que a Central administra de verdade falam com a mesma função
+// (equipe-auth). Painel e RH têm mecanismo próprio e por enquanto entram só
+// como atalho — dizer que administro o que não administro seria pior que a
+// falta da tela.
+const API_EQUIPE='https://heveemylixartyijxewh.supabase.co/functions/v1/equipe-auth';
+const SISTEMAS_ACESSO=[
+  {k:'brief',   nome:'Brief de Medição', ic:'📋', url:'https://impresilk.com.br/brief',
+   sub:'vendedores e designers em campo'},
+  {k:'pcp',     nome:'PCP / Instalação', ic:'🔧', url:'https://impresilk.com.br/pcp',
+   sub:'gestão; a montagem entra pelo nome, sem senha'},
+  {k:'compras', nome:'Compras',          ic:'🛒', url:'https://leogpereira-afk.github.io/impresilk-compras/',
+   sub:'quem pede, cota e recebe material'},
+  // O DRE é uma PORTA: uma senha só, sem quadro de gente. Por isso não pede
+  // nome — o login dele é sempre "equipe", e digitar outra coisa criaria uma
+  // conta que o app nunca vai procurar.
+  {k:'dre',     nome:'DRE Caixa',        ic:'💰', url:'https://impresilk.com.br/dre',
+   sub:'uma senha só, para quem alimenta o sistema', porta:'equipe', papelPorta:'equipe'},
+];
+const SO_ATALHO=[
+  {nome:'Painel de Gestão',ic:'📊',url:'https://impresilk.com.br/painel#/acessos',
+   onde:'os acessos ficam dentro do próprio Painel, na tela Acessos'},
+  {nome:'RH (Pessoas)',ic:'👥',url:'https://impresilk.com.br/rh#/painel-controle',
+   onde:'os acessos ficam no RH, em Painel de Controle'},
+];
+
+async function apiEquipe(acao,corpo){
+  const r=await fetch(API_EQUIPE,{method:'POST',
+    headers:{'content-type':'application/json',authorization:'Bearer '+pegaToken()},
+    body:JSON.stringify({acao,...corpo})});
+  let d={};try{d=await r.json()}catch(_){}
+  if(!r.ok)throw Object.assign(new Error(d.erro||('HTTP '+r.status)),{status:r.status,erro:d.erro});
+  return d;
+}
+
+// senha temporária legível: quem recebe vai digitar isso no celular, na obra
+function senhaTemporaria(){
+  const s1=['sol','lua','rio','mar','céu','pão','flor','vento','pedra','folha'];
+  const s2=['azul','verde','claro','forte','novo','leve','alto','certo'];
+  const p=a=>a[Math.floor(Math.random()*a.length)];
+  return p(s1)+'-'+p(s2)+'-'+String(Math.floor(Math.random()*900)+100);
+}
+
+function telaAcessos(){
+  const cx=el('<div class="corpo"></div>');
+  // mesma porta de teste da puxarNuvem: local não fala com o servidor, a não
+  // ser que alguém esteja justamente testando esta tela
+  if(DEV&&!window.__testeAcessos){cx.appendChild(el('<div class="aviso">Rodando local: os acessos só aparecem no site de verdade, com sessão.</div>'));return cx}
+
+  SISTEMAS_ACESSO.forEach(sis=>{
+    const aberto=!!(filtro.acessosAbertos&&filtro.acessosAbertos[sis.k]);
+    const linha=el(`<div style="border:1px solid var(--linha);border-radius:var(--r);margin-bottom:10px;overflow:hidden;background:var(--card)">
+      <button class="cabSis" style="width:100%;display:flex;align-items:center;gap:10px;padding:13px 15px;background:var(--bg);border:none;font:inherit;color:inherit;text-align:left;cursor:pointer">
+        <span class="seta" style="color:var(--suave);font-size:12px;width:12px">${aberto?'▾':'▸'}</span>
+        <span style="font-size:18px">${sis.ic}</span>
+        <b style="font-size:14.5px">${esc(sis.nome)}</b>
+        <span style="font-size:12px;color:var(--suave)">${esc(sis.sub)}</span>
+        <span class="conta" style="margin-left:auto;font-size:12px;color:var(--suave)"></span>
+      </button>
+      <div class="corpoSis" style="padding:${aberto?'13px 15px':'0'};display:${aberto?'block':'none'}"></div>
+    </div>`);
+    const corpo=linha.querySelector('.corpoSis');
+    let carregado=false;
+
+    const carregar=async()=>{
+      corpo.innerHTML='<div class="vazio">Carregando…</div>';
+      let d;
+      try{ d=await apiEquipe('listarContas',{sistema:sis.k}); }
+      catch(e){
+        corpo.innerHTML='';
+        corpo.appendChild(el(`<div class="aviso" style="background:var(--vermelho-cl);border-color:var(--vermelho)">
+          Não consegui ler os acessos do ${esc(sis.nome)}: ${esc(e.erro||e.message)}</div>`));
+        corpo.appendChild(abrirSistema(sis));
+        return;
+      }
+      carregado=true;
+      const contas=d.contas||[], papeis=d.papeis||[];
+      linha.querySelector('.conta').textContent=contas.length+(contas.length===1?' acesso':' acessos');
+      corpo.innerHTML='';
+      const tab=el('<div class="rolagem"></div>');
+      const t2=document.createElement('table');
+      t2.innerHTML='<thead><tr><th>Quem</th><th>Papel</th><th>Situação</th><th></th></tr></thead>';
+      const tb=document.createElement('tbody');
+      contas.forEach(c=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML=`<td style="padding:9px 10px"><b>${esc(c.nome||c.usuario)}</b>
+            <div style="font-size:11.5px;color:var(--suave)">${esc(c.usuario)}</div></td>
+          <td style="padding:9px 10px">${esc(c.papel)}</td>
+          <td style="padding:9px 10px">${c.ativo===false?chip('Cancelado'):c.trocarSenha?chip('Em Planejamento'):chip('Realizado')}
+            <span style="font-size:11.5px;color:var(--suave);margin-left:4px">${c.ativo===false?'desativado':c.trocarSenha?'senha temporária':'ativo'}</span></td>
+          <td style="padding:9px 10px;text-align:right;white-space:nowrap"></td>`;
+        const acoes=tr.lastElementChild;
+        const bSenha=el('<button class="btn mini ghost">🔑 senha</button>');
+        bSenha.onclick=async()=>{
+          const nova=senhaTemporaria();
+          if(!confirm('Definir a senha de '+(c.nome||c.usuario)+' em '+sis.nome+' como:\n\n    '+nova+
+            '\n\nEla é temporária — a pessoa troca na primeira entrada.'))return;
+          try{ await apiEquipe('salvarConta',{sistema:sis.k,usuario:c.usuario,nome:c.nome,papel:c.papel,senha:nova}); }
+          catch(e){ alert(e.erro||'Não consegui trocar a senha.'); return; }
+          prompt('Senha temporária de '+(c.nome||c.usuario)+' — copie e mande para ela:',nova);
+          carregar();
+        };
+        acoes.appendChild(bSenha);
+        const bAtivo=el('<button class="btn mini ghost">'+(c.ativo===false?'✓ reativar':'⊘ desativar')+'</button>');
+        bAtivo.style.marginLeft='6px';
+        bAtivo.onclick=async()=>{
+          try{ await apiEquipe('salvarConta',{sistema:sis.k,usuario:c.usuario,nome:c.nome,papel:c.papel,ativo:c.ativo===false}); }
+          catch(e){ alert(e.erro||'Não consegui mudar.'); return; }
+          carregar();
+        };
+        acoes.appendChild(bAtivo);
+        const bDel=el('<button class="btn mini ghost" style="color:var(--vermelho);margin-left:6px">🗑</button>');
+        bDel.onclick=async()=>{
+          if(!confirm('Tirar o acesso de '+(c.nome||c.usuario)+' em '+sis.nome+'? O trabalho dele continua onde está.'))return;
+          try{ await apiEquipe('removerConta',{sistema:sis.k,usuario:c.usuario}); }
+          catch(e){ alert(e.erro||'Não consegui remover.'); return; }
+          carregar();
+        };
+        acoes.appendChild(bDel);
+        tb.appendChild(tr);
+      });
+      if(!contas.length) tb.innerHTML='<tr><td colspan="4"><div class="vazio">Nenhum acesso cadastrado ainda.</div></td></tr>';
+      t2.appendChild(tb); tab.appendChild(t2); corpo.appendChild(tab);
+
+      const form=el('<div style="padding:12px 0 4px"></div>');
+      if(sis.porta){
+        // porta: define ou troca A senha, sem inventar nome de usuário — o app
+        // do DRE sempre entra como "equipe", então qualquer outro nome criaria
+        // uma conta que ele nunca vai procurar
+        const jaTem=contas.some(c=>c.usuario===sis.porta);
+        const bP=el('<button class="mais">'+(jaTem?'🔑 Trocar a senha de entrada':'🔑 Definir a senha de entrada')+'</button>');
+        bP.onclick=async()=>{
+          const senha=prompt('Senha de entrada do '+sis.nome+' (mínimo 6). Todo mundo que alimenta o sistema usa esta:');
+          if(senha==null)return;
+          if(String(senha).length<6){alert('A senha precisa de ao menos 6 caracteres.');return}
+          try{ await apiEquipe('salvarConta',{sistema:sis.k,usuario:sis.porta,nome:'Equipe',
+            papel:sis.papelPorta,senha,ativo:true,temporaria:false}); }
+          catch(e){ alert(e.erro||'Não consegui definir.'); return; }
+          alert('Pronto. Quem for entrar no '+sis.nome+' usa essa senha.');
+          carregar();
+        };
+        form.appendChild(bP);
+        corpo.appendChild(form);
+        corpo.appendChild(abrirSistema(sis));
+        return;
+      }
+      const nova={nome:'',papel:papeis[0]||''};
+      form.appendChild(campos(nova,[
+        {k:'nome',t:'Nome de quem vai entrar',ph:'ex.: Maria'},
+        {k:'papel',t:'Papel',tipo:'select',opcoes:papeis},
+      ]));
+      const bNovo=el('<button class="mais">+ Criar acesso</button>');
+      bNovo.onclick=async()=>{
+        const nome=String(nova.nome||'').trim();
+        if(!nome){alert('Diga o nome de quem vai entrar.');return}
+        const senha=senhaTemporaria();
+        if(!confirm('Criar acesso de '+nome+' em '+sis.nome+' com a senha temporária:\n\n    '+senha+
+          '\n\nEla troca na primeira entrada.'))return;
+        try{ await apiEquipe('salvarConta',{sistema:sis.k,usuario:nome,nome,papel:nova.papel,senha,ativo:true}); }
+        catch(e){ alert(e.erro||'Não consegui criar.'); return; }
+        prompt('Acesso criado. Mande isto para '+nome+':','Sistema: '+sis.nome+'  ·  Usuário: '+nome+'  ·  Senha: '+senha);
+        nova.nome='';salvar();carregar();
+      };
+      form.appendChild(bNovo);
+      corpo.appendChild(form);
+      corpo.appendChild(abrirSistema(sis));
+    };
+
+    linha.querySelector('.cabSis').onclick=()=>{
+      const abrindo=corpo.style.display==='none';
+      if(!filtro.acessosAbertos)filtro.acessosAbertos={};
+      filtro.acessosAbertos[sis.k]=abrindo;
+      corpo.style.display=abrindo?'block':'none';
+      corpo.style.padding=abrindo?'13px 15px':'0';
+      linha.querySelector('.seta').textContent=abrindo?'▾':'▸';
+      if(abrindo&&!carregado)carregar();
+    };
+    if(aberto)carregar();
+    cx.appendChild(linha);
+  });
+
+  // os que ainda têm porta própria
+  const outros=el('<div style="margin-top:14px"></div>');
+  outros.appendChild(el('<div style="font-size:12.5px;color:var(--suave);margin-bottom:8px">Estes têm login próprio — o acesso se mexe dentro deles:</div>'));
+  SO_ATALHO.forEach(o=>{
+    const a=el(`<a href="${o.url}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:10px;padding:11px 14px;border:1px solid var(--linha);border-radius:var(--r);margin-bottom:8px;text-decoration:none;color:inherit;background:var(--card)">
+      <span style="font-size:17px">${o.ic}</span><b style="font-size:14px">${esc(o.nome)}</b>
+      <span style="font-size:12px;color:var(--suave)">${esc(o.onde)}</span>
+      <span style="margin-left:auto;color:var(--suave)">abrir ›</span></a>`);
+    outros.appendChild(a);
+  });
+  cx.appendChild(outros);
+  return cx;
+}
+
+function abrirSistema(sis){
+  return el(`<div style="padding-top:10px"><a href="${sis.url}" target="_blank" rel="noopener"
+    style="font-size:12.5px;color:var(--suave);text-decoration:none">↗ abrir o ${esc(sis.nome)}</a></div>`);
+}
+
 /* ===================== RENDIMENTOS ===================== */
 /* O painel nasceu lendo os totais congelados da planilha (rendHist). Depois que
    os 186 lançamentos entraram e passaram a fechar ano a ano, isso virou uma
@@ -4433,6 +4633,13 @@ async function vConfig(m){
     A troca vale para todos os aparelhos no próximo login. Quem já está logado continua
     logado — a sessão não cai. A senha é conferida e guardada só no servidor, embaralhada.</p>`));
   m.appendChild(bloco('cf-senha','🔒 Senha de entrada','defina uma senha nova — sem pedir a antiga',sx));
+
+  /* ---- Central de Acessos: quem entra em cada sistema da empresa ----
+     O crachá desta Central é o mesmo que a equipe-auth aceita como "a direção"
+     (mesmo LEO_SESSION_SECRET da leo-sync). Por isso daqui dá para criar,
+     trocar senha e remover acesso nos sistemas sem mais nenhum segredo. */
+  m.appendChild(bloco('cf-acessos','🔑 Acessos dos sistemas',
+    'quem entra em cada sistema — criar, trocar senha, tirar',telaAcessos()));
 
   /* ---- versão descartada: o rastro do último conflito de sincronização ---- */
   const desc=(()=>{try{return JSON.parse(localStorage.getItem('cl_descartado')||'null')}catch(_){return null}})();
