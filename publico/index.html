@@ -382,6 +382,7 @@ const SEED={
   // guia de vida ampliado
   norte:{proposito:'',valores:'',legado:''},
   roda:{},rituais:[],instrucoes:[],protecao:[],planoAno:[],pdi:[],livros:[],bancos:[],empresasPJ:[],patrimonio:[],
+  oportunidades:[],
   comportamento:{temperamentos:{},disc:{},discAdaptado:{},big5:{},valores:{},lideranca:{},
     tipoJung:'',tracoPrincipal:'',motivadorPrincipal:'',motivadorSecundario:'',medos:'',
     positividade:'',estima:'',flexibilidade:'',fonteLaudo:'',eneagramaTipo:'',comoDecido:'',oQueMeMove:'',comoMeRecarrego:'',meusPontosCegos:'',comoMeAjudar:'',numerologia:'',perfilDisc:'',eneagrama:'',bigfive:''},
@@ -400,6 +401,7 @@ const SEED={
     tiposViagem:['Trabalho','Família','Casal','Amigos'],
     areasDemanda:['Pessoal','Trabalho','Família','Outro'],
     tiposCompromisso:['Pessoal','Trabalho','Família','Saúde','Outro'],
+    tipoOportunidade:['Negócio','Investimento','Imóvel','Parceria','Estudo','Ferramenta','Viagem','Pessoal','Outro'],
     tiposDoc:['Passaporte','CNH','RG','CPF','Certidão de nascimento','Certidão de casamento','Registro de arma (CR/CRAF)','CRLV / documento do veículo','Visto','Apólice de seguro','Escritura / imóvel','Contrato','Outro'],
     areasMeta:['Saúde','Dinheiro','Família','Negócios','Pessoal','Viagem'],
     areasPDI:['Liderança','Gestão','Finanças','Negociação','Comunicação','Técnico','Idiomas','Saúde','Pessoal'],
@@ -427,7 +429,7 @@ function carregar(){
   const base=structuredClone(SEED);
   const d=(s&&s.viagens)?{...base,...s}:base;
   // migração: todo registro precisa de id estável (arquivos são ligados por ele)
-  for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio'])
+  for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades'])
     (d[k]||[]).forEach(x=>{if(!x.id)x.id=uid()});
   d.viagens.forEach(v=>{if(!Array.isArray(v.custos))v.custos=[];
     if(!Array.isArray(v.viajantes))v.viajantes=[];
@@ -446,7 +448,9 @@ function carregar(){
   if(!d.marcas||typeof d.marcas!=='object'||Array.isArray(d.marcas))d.marcas={};
   // objetos únicos: garante que existam mesmo em backup antigo
   for(const k of ['sos','norte','roda','perfil','comportamento']) d[k]={...structuredClone(SEED[k]),...(d[k]||{})};
-  for(const k of ['vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','seguros','planos','casa','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio']) if(!Array.isArray(d[k])) d[k]=[];
+  for(const k of ['vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','seguros','planos','casa','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades']) if(!Array.isArray(d[k])) d[k]=[];
+  // toda oportunidade tem uma lista de links, mesmo que vazia
+  d.oportunidades.forEach(o=>{if(!Array.isArray(o.links))o.links=[]});
   if(!d.rendHist) d.rendHist=structuredClone(SEED.rendHist);
   // configurações: garante que toda lista exista mesmo em backup antigo
   d.config={...structuredClone(SEED.config),...(d.config||{})};
@@ -787,7 +791,8 @@ const MODS=[
   {id:'agenda',ic:'📅',nome:'Agenda',grupo:'',render:vAgenda},
   {id:'demandas',ic:'✅',nome:'Demandas',grupo:'',render:vDemandas},
   {id:'saude',ic:'🩺',nome:'Saúde',grupo:'',render:vSaude},
-  {id:'documentos',ic:'🪪',nome:'Documentos',grupo:'Extra',render:vDocumentos},
+  {id:'oportunidades',ic:'💡',nome:'Oportunidades',grupo:'Extra',render:vOportunidades},
+  {id:'documentos',ic:'🪪',nome:'Documentos',grupo:'',render:vDocumentos},
   {id:'guia',ic:'🧭',nome:'Guia de vida',grupo:'',render:vGuia},
   {id:'config',ic:'⚙️',nome:'Configurações',grupo:'',render:vConfig},
 ];
@@ -2052,6 +2057,316 @@ function imprimirSOS() {
   ${S.obs ? `<h2>Observações</h2><div class="l">${esc(S.obs)}</div>` : ''}
   <div style="margin-top:26px;color:#999;font-size:12px">Gerado em ${new Date().toLocaleDateString('pt-BR')}</div>`);
   w.document.close(); w.print();
+}
+
+/* ===================== OPORTUNIDADES =====================
+   Um lugar para o que você AINDA não decidiu fazer. O trabalho aqui não é
+   guardar ideia — é decidir. Toda ideia guardada cobra atenção; a tela existe
+   para dizer quais merecem a sua e quais já podem descansar.
+
+   A NOTA não é um oráculo: são seis perguntas que você responde de 0 a 5 e que
+   o sistema pesa sempre do mesmo jeito. O valor de ter isso escrito é comparar
+   coisas diferentes com a MESMA régua — e não decidir pelo que apareceu por
+   último ou pelo que estava mais empolgante naquele dia. */
+
+const ESTAGIOS=['Semente','Estudando','Decidindo','Tocando','Arquivada'];
+const CORES_ESTAGIO={Semente:'a',Estudando:'',Decidindo:'a',Tocando:'v',Arquivada:'r'};
+// peso de cada pergunta na nota. Ganho e ânimo puxam para cima; esforço, custo
+// e risco puxam para baixo. Encaixe (o quanto usa o que você já tem) entra
+// positivo porque é o que faz uma ideia sua ser melhor na sua mão que na de outro.
+const CRITERIOS=[
+  {k:'ganho',  t:'O quanto pode render',  dica:'0 = trocado, 5 = muda o jogo',        peso: 2.0},
+  {k:'animo',  t:'O quanto me anima',     dica:'0 = obrigação, 5 = acordo pensando nisso', peso: 1.5},
+  {k:'encaixe',t:'Encaixa no que já tenho',dica:'0 = do zero, 5 = uso o que já sei e tenho', peso: 1.5},
+  {k:'esforco',t:'Quanto do meu tempo',   dica:'0 = quase nada, 5 = vira meu dia',    peso:-1.5},
+  {k:'custo',  t:'Quanto custa entrar',   dica:'0 = de graça, 5 = pesado no caixa',   peso:-1.0},
+  {k:'risco',  t:'Risco se der errado',   dica:'0 = perco o tempo, 5 = machuca',      peso:-1.5},
+];
+const MAXNOTA=CRITERIOS.filter(c=>c.peso>0).reduce((a,c)=>a+c.peso*5,0);
+
+// 0 a 100. Os negativos entram como desconto sobre o total possível.
+function notaOport(o){
+  const bruto=CRITERIOS.reduce((a,c)=>a+((+o[c.k]||0)*c.peso),0);
+  return Math.max(0,Math.min(100,Math.round(bruto/MAXNOTA*100)));
+}
+const respondida=o=>CRITERIOS.some(c=>o[c.k]!=null&&o[c.k]!=='');
+const diasParado=o=>o.mexido?Math.round((new Date(hoje()+'T12:00')-new Date(String(o.mexido).slice(0,10)+'T12:00'))/864e5):null;
+// esfriou: parada há mais de 45 dias sem estar arquivada nem tocando
+const esfriou=o=>o.estagio!=='Arquivada'&&o.estagio!=='Tocando'&&(diasParado(o)??0)>45;
+const marcarMexido=o=>{o.mexido=hoje()};
+
+function vOportunidades(m){
+  const r=rr('oportunidades');
+  const L=E.oportunidades||[];
+  if(filtro.oportEstagio==null) filtro.oportEstagio='Ativas';
+  if(filtro.oportTipo==null) filtro.oportTipo='Todos';
+
+  const novo=()=>{const o={id:uid(),titulo:'',tipo:CFG('tipoOportunidade')[0],estagio:'Semente',
+    porque:'',proximoPasso:'',ate:'',links:[],obs:'',mexido:hoje(),criada:hoje()};
+    E.oportunidades.push(o);salvar();modalOport(o,true)};
+
+  m.appendChild(cab('Oportunidades','O que você ainda não decidiu fazer — e a régua para decidir.'));
+
+  const tipos=[...new Set([...CFG('tipoOportunidade'),...L.map(o=>o.tipo)])].filter(Boolean);
+  m.appendChild(painel('Ver',
+    seletor(filtro.oportEstagio,[['Ativas','Ativas ('+L.filter(o=>o.estagio!=='Arquivada').length+')'],
+      ...ESTAGIOS.map(e=>[e,e+' ('+L.filter(o=>o.estagio===e).length+')']),['Todas','Todas ('+L.length+')']],
+      v=>{filtro.oportEstagio=v;r()}),
+    seletor(filtro.oportTipo,[['Todos','Todos os tipos'],...tipos.map(x=>[x,x])],
+      v=>{filtro.oportTipo=v;r()}),
+    acao('+ Nova oportunidade',novo),'|'));
+
+  const ativas=L.filter(o=>o.estagio!=='Arquivada');
+  const tocando=L.filter(o=>o.estagio==='Tocando');
+  const frias=L.filter(esfriou);
+  const semPasso=ativas.filter(o=>!String(o.proximoPasso||'').trim());
+  const atrasadas=ativas.filter(o=>o.ate&&o.ate<hoje());
+  const melhor=[...ativas].filter(respondida).sort((a,b)=>notaOport(b)-notaOport(a))[0];
+
+  m.appendChild(ligaKpis(el(`<div class="grade">
+    ${kpi('Na mesa',ativas.length,ativas.length?'ideias vivas':'nada em aberto',null,'lista')}
+    ${kpi('Tocando',tocando.length,tocando.length?'já saíram do papel':'nenhuma em andamento',tocando.length?'v':'')}
+    ${kpi('Melhor nota',melhor?notaOport(melhor):'—',melhor?esc(melhor.titulo||'sem título'):'responda a régua de alguma','a','ranking')}
+    ${kpi('Sem próximo passo',semPasso.length,semPasso.length?'ideia sem passo não anda':'todas com passo',semPasso.length?'r':'v','lista')}
+    ${kpi('Esfriando',frias.length,frias.length?'paradas há mais de 45 dias':'nenhuma largada','a','lista')}</div>`),{
+    lista:()=>{abreBloco('op-lista');r()},
+    ranking:()=>{abreBloco('op-rank');r()},
+  }));
+
+  if(atrasadas.length) m.appendChild(el(`<div class="aviso" style="background:var(--vermelho-cl);border-color:var(--vermelho)">
+    ⏰ <b>${atrasadas.length} ${atrasadas.length===1?'oportunidade passou':'oportunidades passaram'} da data do próximo passo:</b>
+    ${atrasadas.map(o=>esc(o.titulo||'sem título')+' ('+fmtDataAno(o.ate)+')').join('; ')}.
+    Ou faça, ou remarque, ou arquive — data vencida que fica parada só ensina a ignorar data.</div>`));
+
+  if(frias.length) m.appendChild(el(`<div class="aviso">🥶 <b>${frias.length} ${frias.length===1?'ideia está':'ideias estão'} esfriando</b> —
+    sem nenhum toque há mais de 45 dias: ${frias.map(o=>esc(o.titulo||'sem título')).join(', ')}.
+    Ideia parada não é neutra: ela ocupa espaço na cabeça. Vale arquivar o que já não te interessa.</div>`));
+
+  /* ---- o que merece o seu tempo agora ---- */
+  const rank=[...ativas].filter(respondida).sort((a,b)=>notaOport(b)-notaOport(a));
+  const rk=el('<div></div>');
+  if(!rank.length) rk.innerHTML='<div class="vazio">Nenhuma oportunidade avaliada ainda. Abra uma e responda as seis perguntas — leva um minuto e serve para comparar tudo com a mesma régua.</div>';
+  else{
+    rk.appendChild(el(`<div class="grafico">${gBarras(rank.slice(0,8).map(o=>({r:o.titulo||'sem título',v:notaOport(o)})),{fmt:v=>v,cor:'var(--verde)'})}</div>`));
+    const rol=el('<div class="rolagem"></div>');
+    const tb=document.createElement('table');
+    tb.innerHTML='<thead><tr><th>#</th><th>Oportunidade</th><th>Tipo</th><th>Estágio</th>'+
+      '<th style="text-align:right">Nota</th><th>O que puxa para cima / para baixo</th></tr></thead>';
+    const corpo=document.createElement('tbody');
+    rank.forEach((o,i)=>{
+      const nota=notaOport(o);
+      const fortes=CRITERIOS.filter(c=>c.peso>0&&(+o[c.k]||0)>=4).map(c=>c.t.toLowerCase());
+      const fracos=CRITERIOS.filter(c=>c.peso<0&&(+o[c.k]||0)>=4).map(c=>c.t.toLowerCase());
+      const tr=document.createElement('tr');tr.style.cursor='pointer';
+      tr.innerHTML=`<td style="padding:9px 10px;color:var(--suave);font-weight:600">${i+1}º</td>
+        <td style="padding:9px 10px"><b>${esc(o.titulo||'sem título')}</b>
+          ${o.porque?`<div style="font-size:11.5px;color:var(--suave);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.porque)}</div>`:''}</td>
+        <td style="padding:9px 10px;color:var(--suave)">${esc(o.tipo||'—')}</td>
+        <td style="padding:9px 10px">${chip(o.estagio==='Tocando'?'Realizado':o.estagio==='Decidindo'?'Confirmado':'Em Planejamento')}
+          <span style="font-size:11.5px;color:var(--suave);margin-left:4px">${esc(o.estagio)}</span></td>
+        <td style="padding:9px 10px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;font-size:15px;color:${nota>=60?'var(--verde)':nota>=35?'var(--areia)':'var(--vermelho)'}">${nota}</td>
+        <td style="padding:9px 10px;font-size:12px;color:var(--suave)">${fortes.length?'↑ '+esc(fortes.join(', ')):''}${fortes.length&&fracos.length?' · ':''}${fracos.length?'↓ '+esc(fracos.join(', ')):''}${!fortes.length&&!fracos.length?'nada se destaca':''}</td>`;
+      tr.onclick=()=>modalOport(o);
+      corpo.appendChild(tr);
+    });
+    tb.appendChild(corpo);rol.appendChild(tb);rk.appendChild(rol);
+    rk.appendChild(el(`<div style="padding:11px 17px 4px;font-size:12.5px;color:var(--suave)">
+      A nota pesa seis respostas suas: ganho, ânimo e encaixe puxam para cima; tempo, custo e risco puxam para baixo.
+      Ela não decide nada — serve para as ideias serem comparadas pela mesma régua, e não pela ordem em que apareceram.</div>`));
+  }
+  m.appendChild(bloco('op-rank','🎯 O que merece seu tempo agora','ordenado pela régua — clique para abrir',rk));
+
+  /* ---- a lista ---- */
+  const vis=L.filter(o=>(filtro.oportEstagio==='Todas'||
+      (filtro.oportEstagio==='Ativas'?o.estagio!=='Arquivada':o.estagio===filtro.oportEstagio))
+    &&(filtro.oportTipo==='Todos'||o.tipo===filtro.oportTipo))
+    .sort((a,b)=>(notaOport(b)-notaOport(a))||String(b.mexido||'').localeCompare(String(a.mexido||'')));
+  const cx=el('<div class="corpo"></div>');
+  const grid=el('<div class="cartoes"></div>');
+  vis.forEach(o=>{
+    const nota=respondida(o)?notaOport(o):null;
+    const dias=diasParado(o);
+    const c=el(`<button class="cartao" style="text-align:left">
+      <div class="tit">${esc(o.titulo||'(sem título)')}</div>
+      <div class="sub">${esc(o.tipo||'—')}${o.porque?' · '+esc(String(o.porque).slice(0,60)):''}</div>
+      <div class="pe">${chip(o.estagio==='Tocando'?'Realizado':o.estagio==='Arquivada'?'Cancelado':o.estagio==='Decidindo'?'Confirmado':'Em Planejamento')}
+        <span style="font-size:11.5px;color:var(--suave)">${esc(o.estagio)}</span>
+        ${nota!=null?`<b style="margin-left:auto;font-size:14px;color:${nota>=60?'var(--verde)':nota>=35?'var(--areia)':'var(--vermelho)'}">${nota}</b>`:'<span style="margin-left:auto;font-size:11.5px;color:var(--suave)">sem nota</span>'}</div>
+      ${o.proximoPasso?`<div style="font-size:12px;color:var(--suave);margin-top:7px;border-top:1px solid var(--linha);padding-top:7px">
+        ▶ ${esc(o.proximoPasso)}${o.ate?' · até '+fmtDataAno(o.ate):''}${o.ate&&o.ate<hoje()?' <b style="color:var(--vermelho)">(passou)</b>':''}</div>`
+        :'<div style="font-size:12px;color:var(--vermelho);margin-top:7px;border-top:1px solid var(--linha);padding-top:7px">sem próximo passo</div>'}
+      ${(o.links||[]).length?`<div style="font-size:11.5px;color:var(--suave);margin-top:5px">🔗 ${(o.links||[]).length} link(s)</div>`:''}
+      ${esfriou(o)?`<div style="font-size:11.5px;color:var(--areia);margin-top:5px">🥶 parada há ${dias} dias</div>`:''}
+    </button>`);
+    c.onclick=()=>modalOport(o);
+    grid.appendChild(c);
+  });
+  if(!vis.length) grid.innerHTML='<div class="vazio">Nada por aqui neste recorte.</div>';
+  cx.appendChild(grid);
+  const bt=el('<button class="mais">+ Nova oportunidade</button>');bt.onclick=novo;cx.appendChild(bt);
+  m.appendChild(bloco('op-lista','Todas as oportunidades','clique para abrir, avaliar e anexar',cx));
+
+  /* ---- onde a cabeça está ---- */
+  if(L.length){
+    const porTipo={},porEst={};
+    L.forEach(o=>{porTipo[o.tipo||'—']=(porTipo[o.tipo||'—']||0)+1;porEst[o.estagio]=(porEst[o.estagio]||0)+1});
+    const gx=el('<div></div>');
+    gx.appendChild(el(`<div class="grafico">${gRosca(Object.entries(porEst).map(([r2,v])=>({r:r2,v})),{fmt:v=>v})}</div>`));
+    gx.appendChild(el(`<div class="grafico">${gBarras(Object.entries(porTipo).map(([r2,v])=>({r:r2,v})).sort((a,b)=>b.v-a.v),{fmt:v=>v})}</div>`));
+    m.appendChild(bloco('op-dash','Onde a sua cabeça está','por estágio e por tipo',gx));
+  }
+}
+
+function modalOport(o,novoReg){
+  const vazia=()=>!String(o.titulo||'').trim()&&!String(o.porque||'').trim()&&!(o.links||[]).length;
+  abrirModal(esc(o.titulo||'Nova oportunidade'),
+    (o.tipo?esc(o.tipo):'')+(respondida(o)?' · nota '+notaOport(o):''),(c,fechar)=>{
+
+    const s1=el('<div class="secao"><h4>A ideia</h4></div>');
+    s1.appendChild(campos(o,[
+      {k:'titulo',t:'O que é',ph:'ex.: comprar sala comercial no centro',full:true},
+      {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tipoOportunidade')},
+      {k:'estagio',t:'Estágio',tipo:'select',opcoes:ESTAGIOS},
+      {k:'porque',t:'Por que isso me interessa',tipo:'textarea',full:true,
+        ph:'o que te chamou a atenção — daqui a seis meses você não vai lembrar'},
+    ],()=>{marcarMexido(o);salvar()}));
+    c.appendChild(s1);
+
+    /* ---- a régua ---- */
+    const s2=el('<div class="secao"><h4>A régua — responda de 0 a 5</h4></div>');
+    s2.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin:-4px 0 10px">
+      Serve para comparar coisas diferentes com a mesma medida. Responda rápido, no chute honesto:
+      demorar aqui é sinal de que a ideia ainda não está madura o suficiente para decidir.</p>`));
+    const notaEl=el('<div style="font-family:Fraunces,serif;font-size:30px;font-weight:600;margin-bottom:10px"></div>');
+    const pintaNota=()=>{
+      const v=notaOport(o);
+      notaEl.textContent=respondida(o)?v:'—';
+      notaEl.style.color=!respondida(o)?'var(--suave)':v>=60?'var(--verde)':v>=35?'var(--areia)':'var(--vermelho)';
+      notaEl.innerHTML=notaEl.textContent+(respondida(o)?'<span style="font-size:13px;color:var(--suave);font-family:inherit;font-weight:400"> de 100</span>':'');
+    };
+    CRITERIOS.forEach(cr=>{
+      const linha=el(`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--linha);flex-wrap:wrap">
+        <div style="flex:1;min-width:170px">
+          <div style="font-size:13.5px;font-weight:600">${cr.t} <span style="font-weight:400;font-size:11px;color:${cr.peso>0?'var(--verde)':'var(--vermelho)'}">${cr.peso>0?'↑ ajuda':'↓ atrapalha'}</span></div>
+          <div style="font-size:11.5px;color:var(--suave)">${cr.dica}</div>
+        </div>
+        <div class="notas" style="display:flex;gap:5px"></div>
+      </div>`);
+      const box=linha.querySelector('.notas');
+      [0,1,2,3,4,5].forEach(v=>{
+        const b=el(`<button class="btn mini ${(+o[cr.k]||0)===v&&o[cr.k]!=null&&o[cr.k]!==''?'':'ghost'}" style="min-width:30px">${v}</button>`);
+        b.onclick=()=>{
+          o[cr.k]=v;marcarMexido(o);salvar();
+          [...box.children].forEach((x,i)=>x.className='btn mini '+(i===v?'':'ghost'));
+          pintaNota();
+        };
+        box.appendChild(b);
+      });
+      s2.appendChild(linha);
+    });
+    pintaNota();
+    s2.insertBefore(notaEl,s2.children[1]);
+    c.appendChild(s2);
+
+    /* ---- o passo ---- */
+    const s3=el('<div class="secao"><h4>O próximo passo</h4></div>');
+    s3.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin:-4px 0 8px">
+      Uma coisa só, pequena, que faz a ideia andar. Sem isso ela não é oportunidade, é lembrança.</p>`));
+    s3.appendChild(campos(o,[
+      {k:'proximoPasso',t:'O que fazer',ph:'ex.: ligar para o corretor e pedir a planta',full:true},
+      {k:'ate',t:'Até quando',tipo:'date'},
+    ],()=>{marcarMexido(o);salvar()}));
+    const bAgenda=el('<button class="btn ghost mini">📅 Levar para a Agenda</button>');
+    bAgenda.onclick=()=>{
+      const p=String(o.proximoPasso||'').trim();
+      if(!p){alert('Escreva o próximo passo antes.');return}
+      // mesmo formato dos outros compromissos: data, hora, titulo, local, tipo, obs
+      E.agenda.push({id:uid(),data:o.ate||hoje(),hora:'',titulo:p+' — '+(o.titulo||'oportunidade'),
+        local:'',tipo:CFG('tiposCompromisso')[0],obs:'veio das Oportunidades'});
+      marcarMexido(o);salvar();
+      alert('Está na Agenda.');
+    };
+    s3.appendChild(bAgenda);
+    c.appendChild(s3);
+
+    /* ---- links ---- */
+    const s4=el('<div class="secao"><h4>Links</h4></div>');
+    const lista=el('<div></div>');
+    const pintaLinks=()=>{
+      lista.innerHTML='';
+      (o.links||[]).forEach((lk,i)=>{
+        const li=el(`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--linha)">
+          <a href="${esc(lk.url)}" target="_blank" rel="noopener" style="flex:1;min-width:0;color:inherit;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            <b>${esc(lk.titulo||lk.url)}</b><div style="font-size:11px;color:var(--suave);overflow:hidden;text-overflow:ellipsis">${esc(lk.url)}</div></a>
+          <button class="btn ghost mini" style="color:var(--vermelho)">✕</button></div>`);
+        li.querySelector('button').onclick=()=>{o.links.splice(i,1);marcarMexido(o);salvar();pintaLinks()};
+        lista.appendChild(li);
+      });
+      if(!(o.links||[]).length) lista.innerHTML='<div class="vazio">Nenhum link ainda.</div>';
+    };
+    pintaLinks();
+    s4.appendChild(lista);
+    const novoLink={titulo:'',url:''};
+    s4.appendChild(campos(novoLink,[
+      {k:'titulo',t:'Nome do link',ph:'ex.: anúncio do imóvel'},
+      {k:'url',t:'Endereço',ph:'https://…'},
+    ]));
+    const bLink=el('<button class="btn mini">+ Guardar link</button>');
+    bLink.onclick=()=>{
+      let u=String(novoLink.url||'').trim();
+      if(!u){alert('Cole o endereço.');return}
+      if(!/^https?:\/\//i.test(u)) u='https://'+u;   // colar sem o http é o normal
+      o.links=[...(o.links||[]),{titulo:String(novoLink.titulo||'').trim(),url:u}];
+      marcarMexido(o);salvar();pintaLinks();
+      novoLink.titulo='';novoLink.url='';
+      s4.querySelectorAll('input').forEach(i=>i.value='');
+    };
+    s4.appendChild(bLink);
+    c.appendChild(s4);
+
+    /* ---- arquivos ---- */
+    const s5=el('<div class="secao"><h4>Arquivos</h4></div>');
+    s5.appendChild(areaArquivos('oportunidade:'+o.id,'proposta, planta, print, planilha — o que ajudar a decidir'));
+    c.appendChild(s5);
+
+    /* ---- anotações e decisão ---- */
+    const s6=el('<div class="secao"><h4>Anotações</h4></div>');
+    s6.appendChild(campos(o,[
+      {k:'obs',t:'O que fui descobrindo',tipo:'textarea',full:true,
+        ph:'conversas, números, quem indicou, o que te fez mudar de ideia'},
+    ],()=>{marcarMexido(o);salvar()}));
+    c.appendChild(s6);
+
+    const s7=el('<div class="secao" style="display:flex;gap:9px;flex-wrap:wrap"></div>');
+    if(o.estagio!=='Arquivada'){
+      const bArq=el('<button class="btn ghost">📥 Arquivar</button>');
+      bArq.onclick=()=>{
+        const p=prompt('Arquivando "'+(o.titulo||'sem título')+'". Por que não vai adiante?\n(fica registrado — é o que impede a mesma ideia de voltar daqui a um ano)');
+        if(p==null)return;
+        o.estagio='Arquivada';o.porqueNao=p;marcarMexido(o);salvar();fechar();
+      };
+      s7.appendChild(bArq);
+    } else {
+      const bVolta=el('<button class="btn ghost">↩ Tirar do arquivo</button>');
+      bVolta.onclick=()=>{o.estagio='Semente';marcarMexido(o);salvar();fechar()};
+      s7.appendChild(bVolta);
+      if(o.porqueNao) c.insertBefore(el(`<div class="aviso">📥 <b>Arquivada.</b> Motivo registrado: ${esc(o.porqueNao)}</div>`),c.firstChild);
+    }
+    const del=el('<button class="btn ghost" style="color:var(--vermelho)">Apagar</button>');
+    del.onclick=async()=>{
+      if(!confirm('Apagar esta oportunidade e seus arquivos? Arquivar guarda o motivo; apagar não deixa rastro.'))return;
+      for(const a of await arqPor('oportunidade:'+o.id))await arqDel(a.id);
+      E.oportunidades=E.oportunidades.filter(x=>x.id!==o.id);salvar();fechar();
+    };
+    s7.appendChild(del);
+    s7.appendChild(el('<span class="cresce"></span>'));
+    const ok=el('<button class="btn">Pronto</button>');ok.onclick=fechar;s7.appendChild(ok);
+    c.appendChild(s7);
+  },()=>{
+    // registro em branco criado por engano não fica sujando a lista
+    // o próprio abrirModal redesenha a tela ao fechar
+    if(novoReg&&vazia()){E.oportunidades=E.oportunidades.filter(x=>x.id!==o.id);salvar()}
+  });
 }
 
 /* ===================== ACESSOS DOS SISTEMAS ===================== */
