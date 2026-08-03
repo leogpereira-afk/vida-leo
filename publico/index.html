@@ -499,6 +499,25 @@ function corAuto(nome){
   }
   return _corMapa[nome]||CORES_MARCA[hashNome(nome)%CORES_MARCA.length];
 }
+/* Empresa ENCERRADA — vendida, fechada, ou você saiu da sociedade.
+   Encerrar não é apagar: o que ela pagou no passado aconteceu, e continua
+   contando em todos os anos em que existiu. O que muda é o futuro — ela sai da
+   lista de onde se lança dinheiro novo, para você não lançar ali por engano, e
+   passa a explicar sozinha as quedas de ano para ano que ela causou. */
+const encerrada=nome=>{const m=(E.marcas&&E.marcas[nome])||{};
+  return m.encerrada&&m.encerrada.em?m.encerrada:null};
+const rotuloEncerrada=nome=>{const e=encerrada(nome);
+  return e?(e.motivo||'Encerrada')+' em '+fmtDataAno(e.em):''};
+// selo para a empresa aparecer marcada onde ela é citada
+const seloEncerrada=nome=>{const e=encerrada(nome);
+  return e?`<span title="${esc(rotuloEncerrada(nome))}" style="font-size:10.5px;font-weight:700;letter-spacing:.03em;background:var(--bg);border:1px solid var(--linha);color:var(--suave);border-radius:999px;padding:2px 7px;margin-left:6px;white-space:nowrap">${esc((e.motivo||'ENCERRADA').toUpperCase())}</span>`:''};
+// Opções de empresa para LANÇAR: sem as encerradas — mas a do próprio registro
+// entra sempre, senão editar um lançamento antigo trocaria a empresa dele.
+const empresasParaLancar=atual=>{
+  const vivas=(CFG('empresas')||[]).filter(nm=>!encerrada(nm));
+  return atual&&!vivas.includes(atual)?[atual,...vivas]:vivas;
+};
+
 function marcaDe(nome){
   const m=(E.marcas&&E.marcas[nome])||{};
   return {cor:m.cor||corAuto(nome),logo:m.logo||''};   // logo não interfere na cor
@@ -2668,6 +2687,13 @@ function vRendimentos(m){
   const conc=maior&&totalSel?maior.v/totalSel*100:0;
   // crescimento contra o ano anterior (só faz sentido em ano específico)
   const cresc=(!todos&&iAno>0&&H.totalAno[iAno-1])?((H.totalAno[iAno]/H.totalAno[iAno-1])-1)*100:null;
+  // Quanto da queda contra o ano passado é de empresa que deixou de existir.
+  // Sem isso o painel diz "-40%" e parece que o negócio encolheu, quando na
+  // verdade uma fonte foi vendida — susto que não corresponde a nada.
+  const saíram=(!todos&&iAno>0)?Object.entries(H.empresas||{})
+    .filter(([nm,v])=>encerrada(nm)&&(v[iAno-1]||0)>0&&!(v[iAno]||0))
+    .map(([nm,v])=>({nome:nm,valor:v[iAno-1]||0})):[];
+  const totalSaiu=saíram.reduce((a,x)=>a+x.valor,0);
 
   const anoIni=H.anos[0],anoFim=H.anos[H.anos.length-1];
   m.appendChild(ligaKpis(el(`<div class="grade">
@@ -2681,7 +2707,8 @@ function vRendimentos(m){
       return kpi('Lançamentos',ls.length,ult?'último em '+fmtDataAno(ult):'nenhum ainda',null,'lanc')})()}
     ${cresc==null?kpi('Média anual',brl(H.mediaAnual),'anos completos','','evol')
       :kpi('Contra '+(ano-1),(cresc>=0?'+':'')+cresc.toFixed(0)+'%',
-        brl(Math.abs(H.totalAno[iAno]-H.totalAno[iAno-1]))+(cresc>=0?' a mais':' a menos'),cresc>=0?'v':'r','evol')}</div>`),{
+        brl(Math.abs(H.totalAno[iAno]-H.totalAno[iAno-1]))+(cresc>=0?' a mais':' a menos')
+          +(totalSaiu?' · '+brl(totalSaiu)+' era de empresa encerrada':''),cresc>=0?'v':'r','evol')}</div>`),{
     // dinheiro do período -> o mês a mês, que é onde o número se destrincha
     mes:()=>{if(todos)filtro.rendAno=anoFim;filtro.rendVisao='Mensal';abreBloco('rd-mes');r()},
     // maior fonte -> filtra por ela e desce até os lançamentos dela
@@ -2690,6 +2717,10 @@ function vRendimentos(m){
     evol:()=>{filtro.rendVisao='Anual';abreBloco('rd-dash');r()},
   }));
 
+  if(totalSaiu) m.appendChild(el(`<div class="aviso">🏁 <b>${brl(totalSaiu)} do ano passado veio de
+    ${saíram.length===1?'uma empresa que não existe mais':'empresas que não existem mais'}:</b>
+    ${saíram.map(x=>esc(x.nome)+' ('+esc(rotuloEncerrada(x.nome))+', '+brl(x.valor)+')').join('; ')}.
+    A comparação com ${ano-1} carrega isso — não é queda de operação, é fonte que saiu de cena.</div>`));
   if(ehParcial) m.appendChild(el(`<div class="aviso">📌 <b>${ano} é ano parcial</b> — ${mesesDecorridos} ${mesesDecorridos===1?'mês lançado':'meses lançados'}
     (${brl(totalSel)}). No ritmo atual, o ano fecharia perto de <b>${brl(totalSel/mesesDecorridos*12)}</b>.</div>`));
   // parte do ano que ainda não sabemos de qual empresa veio
@@ -2740,7 +2771,7 @@ function vRendimentos(m){
     tre.style.boxShadow='inset 3px 0 0 '+cor;
     if(g.itens.length||lanR.length) tre.style.cursor='pointer';
     tre.innerHTML=`<td style="padding:11px 10px;color:var(--suave);font-weight:600">${i+1}º</td>
-      <td style="padding:11px 10px">${avatar(g.empresa,26)}<b style="font-size:14.5px">${esc(g.empresa)}</b>
+      <td style="padding:11px 10px">${avatar(g.empresa,26)}<b style="font-size:14.5px">${esc(g.empresa)}</b>${seloEncerrada(g.empresa)}
         ${(g.itens.length||lanR.length)?`<span class="setaG" style="color:var(--suave);font-size:11px;margin-left:6px">▸ ${rotSeta}</span>`:''}
         <div class="barra"><i style="width:${(g.total/(grupos[0].total||1)*100).toFixed(0)}%;background:${cor}"></i></div></td>
       <td style="padding:11px 10px"></td>
@@ -3128,7 +3159,7 @@ function vRendimentos(m){
 
 
   /* ---- lançamentos: linha clicável, abre o detalhe ---- */
-  const novoRend=()=>{const x={id:uid(),data:hoje(),empresa:(empSel!=='Todas'?empSel:CFG('empresas')[0]||'Outro'),
+  const novoRend=()=>{const x={id:uid(),data:hoje(),empresa:(empSel!=='Todas'&&!encerrada(empSel)?empSel:empresasParaLancar()[0]||'Outro'),
     instituicao:'',tipo:'',valor:0,obs:''};E.rendimentos.push(x);salvar();modalRendimento(x,true)};
   const lc2=el('<div></div>');
   const rol2=el('<div class="rolagem"></div>');
@@ -3199,7 +3230,7 @@ function modalRendimento(x,novo){
     const s1=el('<div class="secao"><h4>Dados</h4></div>');
     s1.appendChild(campos(x,[
       {k:'data',t:'Data',tipo:'date'},
-      {k:'empresa',t:'Empresa / de onde veio',tipo:'select',opcoes:CFG('empresas')},
+      {k:'empresa',t:'Empresa / de onde veio',tipo:'select',opcoes:empresasParaLancar(x.empresa)},
       {k:'tipo',t:'Tipo',tipo:'sugestao',ph:'ex.: Pró-labore, Lucro, CDB',
         opcoes:maisUsados(E.rendimentos,'tipo')},
       {k:'instituicao',t:'Instituição',tipo:'sugestao',ph:'banco ou corretora',
@@ -4887,6 +4918,7 @@ async function vConfig(m){
       <button class="btn ghost mini bLogo"></button>
       <button class="btn ghost mini bDel" style="color:var(--vermelho)">✕ apagar logo</button>
       <button class="btn ghost mini bDelEmp" style="color:var(--vermelho)" title="apagar a empresa inteira">🗑 empresa</button>
+      <div class="linhaFim" style="flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:4px"></div>
     </div>`);
     const bLogo=linha.querySelector('.bLogo'), bDel=linha.querySelector('.bDel');
     const iNome=linha.querySelector('.bNome');
@@ -4902,6 +4934,39 @@ async function vConfig(m){
       if(renomeiaEmpresa(nm,novo))r();
     };
     linha.querySelector('.bDelEmp').onclick=()=>{if(apagaEmpresa(nm))r()};
+
+    /* ---- encerrar: o caminho certo para empresa vendida ou fechada ---- */
+    const fim=linha.querySelector('.linhaFim');
+    const pintaFim=()=>{
+      const e=encerrada(nm);
+      fim.innerHTML=e
+        ? `<span style="font-size:12px;color:var(--suave)">🏁 <b>${esc(rotuloEncerrada(nm))}</b> — o histórico dela continua inteiro; ela só não aparece mais para lançar dinheiro novo.</span>`
+        : `<span style="font-size:12px;color:var(--suave)">Ativa — aparece na lista de onde entra dinheiro.</span>`;
+      const b=el(`<button class="btn ghost mini">${e?'↩ Reativar':'🏁 Encerrar'}</button>`);
+      b.onclick=()=>{
+        if(e){
+          if(!confirm('Reativar "'+nm+'"? Ela volta a aparecer para lançar dinheiro novo.'))return;
+          delete E.marcas[nm].encerrada;
+          if(!Object.keys(E.marcas[nm]).length)delete E.marcas[nm];
+          salvar();pintaFim();return;
+        }
+        const motivo=prompt('Encerrando "'+nm+'". O que aconteceu?\n(ex.: Vendida, Fechada, Saí da sociedade)','Vendida');
+        if(motivo==null)return;
+        const em=prompt('Em que data? (dia/mês/ano)',fmtDataAno(hoje()));
+        if(em==null)return;
+        const iso=(()=>{const p=String(em).match(/(\d{1,2})\D(\d{1,2})\D(\d{2,4})/);
+          if(p)return p[3].padStart(4,'20')+'-'+p[2].padStart(2,'0')+'-'+p[1].padStart(2,'0');
+          return /^\d{4}-\d{2}-\d{2}$/.test(em)?em:hoje()})();
+        const quantos=(E.rendimentos||[]).filter(x=>x.empresa===nm).length;
+        if(!confirm('Encerrar "'+nm+'" como '+(motivo||'Encerrada')+' em '+fmtDataAno(iso)+'.\n\n'+
+          'Os '+quantos+' lançamento(s) dela CONTINUAM — histórico, gráficos e totais dos anos passados não mudam.\n'+
+          'O que muda: ela sai da lista de onde se lança dinheiro novo.'))return;
+        E.marcas[nm]={...(E.marcas[nm]||{}),encerrada:{em:iso,motivo:String(motivo||'').trim()||'Encerrada'}};
+        salvar();pintaFim();
+      };
+      fim.appendChild(b);
+    };
+    pintaFim();
     const pinta=()=>{
       const tem=!!(E.marcas[nm]&&E.marcas[nm].logo);
       linha.querySelector('.prevAv').innerHTML=avatar(nm,32);
