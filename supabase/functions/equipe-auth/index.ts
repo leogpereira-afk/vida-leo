@@ -157,19 +157,35 @@ async function ehCentral(token: string): Promise<boolean> {
 const bearer = (req: Request) => (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
 
 // Quem está pedindo: a Central, um admin do sistema, ou ninguém.
+//
+// O PAPEL VEM DO BANCO, NÃO DO CRACHÁ. O crachá vale 30 dias — se a permissão
+// saísse de dentro dele, rebaixar ou desligar um admin só teria efeito um mês
+// depois. Aqui o crachá só diz QUEM é; o que essa pessoa pode, pergunta-se à
+// tabela toda vez.
 async function quemPede(req: Request, sistema: Sistema) {
   const t = bearer(req);
   if (await ehCentral(t)) return { central: true, admin: true, quem: "central", usuario: "" };
   const c = await lerCracha(t);
-  if (c && c.sis === sistema) {
-    return {
-      central: false,
-      admin: PAPEIS[sistema].admin.includes(String(c.papel)),
-      quem: `${sistema}:${c.sub}`,
-      usuario: String(c.sub),
-    };
-  }
-  return { central: false, admin: false, quem: "", usuario: "" };
+  if (!c || c.sis !== sistema) return { central: false, admin: false, quem: "", usuario: "" };
+  const { data: conta } = await sb.from("equipe_contas").select("papel, ativo")
+    .eq("sistema", sistema).eq("usuario", String(c.sub)).maybeSingle();
+  // conta apagada ou desativada perde tudo na hora, mesmo com crachá válido
+  const vale = !!conta && conta.ativo !== false;
+  return {
+    central: false,
+    admin: vale && PAPEIS[sistema].admin.includes(String(conta!.papel)),
+    quem: `${sistema}:${c.sub}`,
+    usuario: String(c.sub),
+  };
+}
+
+// A operação deixaria o sistema sem nenhuma conta de gestão ativa?
+async function ficariaSemAdmin(sistema: Sistema, usuario: string, papelNovo: string, ativoNovo: boolean) {
+  const { data } = await sb.from("equipe_contas").select("usuario, papel, ativo").eq("sistema", sistema);
+  const admins = (data ?? []).filter((c: any) => c.ativo !== false && PAPEIS[sistema].admin.includes(c.papel));
+  if (!admins.some((c: any) => c.usuario === usuario)) return false;   // não é admin ativo: não muda a conta
+  const continua = ativoNovo && PAPEIS[sistema].admin.includes(papelNovo);
+  return admins.length === 1 && !continua;
 }
 
 async function registrar(sistema: string, usuario: string, acao: string, por: string, detalhe = "") {
@@ -199,13 +215,15 @@ async function espelharElenco(sistema: Sistema) {
     const base: Record<string, unknown> = {
       nome: c.nome || c.usuario, usuario: c.usuario, papel: c.papel, ativo: c.ativo !== false,
     };
-    const id = acharId(c.usuario);
-    if (id) base.id = id;         // o Brief liga o designer ao briefing por este id
+    // o Brief liga o designer ao briefing por este id; quem não tem ganha um
+    // agora, senão o designer novo não aparece para ser atribuído
+    base.id = acharId(c.usuario) || ("u-" + crypto.randomUUID().slice(0, 8));
     return base;                  // repare: SEM campo "senha"
   });
   const { error } = await sb.from(TAB_CFG[sistema])
     .upsert({ id: true, config: cfg, atualizado_em: new Date().toISOString() }, { onConflict: "id" });
-  if (error) console.error("[equipe-auth] espelharElenco", error.message);
+  if (error) { console.error("[equipe-auth] espelharElenco", error.message); return error.message; }
+  return "";
 }
 
 // Nunca devolve hash nem salt para a tela.
@@ -319,15 +337,21 @@ Deno.serve(async (req: Request) => {
         // Senha definida por outra pessoa nasce temporária: quem entra é
         // obrigado a trocar. Só a própria pessoa deixa de ter senha temporária.
         const trocar = senha ? body.temporaria !== false : !!atual?.trocar_senha;
+        const ativoNovo = body.ativo === undefined ? (atual?.ativo ?? true) : !!body.ativo;
+        // Ficar com zero admin tranca todo mundo para fora — e a contagem só
+        // vale se for feita aqui, no banco: a da tela pode estar velha.
+        if (atual && await ficariaSemAdmin(sistema, usuario, papel, ativoNovo)) {
+          return json({ erro: "Esta é a única conta de gestão ativa. Crie outra antes de mudar esta." }, 400);
+        }
         const { error } = await sb.from("equipe_contas").upsert({
           sistema, usuario, nome: String(body.nome ?? "").trim() || usuario, papel,
-          ativo: body.ativo === undefined ? (atual?.ativo ?? true) : !!body.ativo,
+          ativo: ativoNovo,
           ...reg, trocar_senha: trocar, atualizado_em: new Date().toISOString(),
         }, { onConflict: "sistema,usuario" });
         if (error) throw new Error(error.message);
         await registrar(sistema, usuario, atual ? (senha ? "trocou-senha" : "editou") : "criou", q.quem);
-        await espelharElenco(sistema);
-        return json({ ok: true, temporaria: trocar });
+        const falhaEspelho = await espelharElenco(sistema);
+        return json({ ok: true, temporaria: trocar, espelho: !falhaEspelho, erroEspelho: falhaEspelho || undefined });
       }
 
       case "removerConta": {
@@ -338,12 +362,15 @@ Deno.serve(async (req: Request) => {
         if (!q.central && usuario === q.usuario) {
           return json({ erro: "Você não pode remover o próprio acesso." }, 400);
         }
+        if (await ficariaSemAdmin(sistema, usuario, "", false)) {
+          return json({ erro: "Esta é a única conta de gestão ativa. Crie outra antes de remover esta." }, 400);
+        }
         const { error } = await sb.from("equipe_contas").delete()
           .eq("sistema", sistema).eq("usuario", usuario);
         if (error) throw new Error(error.message);
         await registrar(sistema, usuario, "removeu", q.quem);
-        await espelharElenco(sistema);
-        return json({ ok: true });
+        const falhaEspelho2 = await espelharElenco(sistema);
+        return json({ ok: true, espelho: !falhaEspelho2, erroEspelho: falhaEspelho2 || undefined });
       }
 
       // ------------------------------------------------------------ mudança
