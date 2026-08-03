@@ -3137,7 +3137,8 @@ function vRendimentos(m){
   else{
     const t2=document.createElement('table');
     t2.innerHTML='<thead><tr><th>Data</th><th>Empresa</th><th>Instituição</th><th>Tipo</th>'+
-      '<th style="text-align:right">Valor</th><th style="text-align:right">% do ano</th><th>Observação</th></tr></thead>';
+      '<th style="text-align:right">Valor</th><th style="text-align:right">% do mês</th>'+
+      '<th style="text-align:right">% do ano</th><th>Observação</th></tr></thead>';
     const tb2=document.createElement('tbody');
     // Agrupado por mês: os 2 meses mais recentes já vêm abertos e o resto fica
     // recolhido — o ano inteiro de uma vez virava uma parede de linhas.
@@ -3154,6 +3155,7 @@ function vRendimentos(m){
       trg.innerHTML=`<td colspan="4" style="padding:10px"><b style="font-size:14px">${rotG}</b>
           <span class="setaM" style="color:var(--suave);font-weight:400;font-size:11.5px;margin-left:7px">${aberto?'▾':'▸'} ${g.itens.length} lançamento(s)</span></td>
         <td style="padding:10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">${brl(somaG)}</td>
+        <td style="padding:10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">100%</td>
         <td style="padding:10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${totLanc?(somaG/totLanc*100).toFixed(1)+'%':''}</td>
         <td></td>`;
       tb2.appendChild(trg);
@@ -3166,6 +3168,7 @@ function vRendimentos(m){
           <td style="padding:9px 10px;color:var(--suave)">${esc(x.instituicao||'—')}</td>
           <td style="padding:9px 10px">${esc(x.tipo||'—')}${flagsLan(x)}</td>
           <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${brl(+x.valor||0)}</td>
+          <td style="padding:9px 10px;text-align:right;color:var(--tinta);font-variant-numeric:tabular-nums;font-weight:600">${somaG?((+x.valor||0)/somaG*100).toFixed(1)+'%':'—'}</td>
           <td style="padding:9px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${totLanc?((+x.valor||0)/totLanc*100).toFixed(1)+'%':'—'}</td>
           <td style="padding:9px 10px;color:var(--suave);font-size:12.5px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.obs||'')}</td>`;
         tr.onclick=()=>modalRendimento(x);
@@ -3180,7 +3183,7 @@ function vRendimentos(m){
     t2.appendChild(tb2);
     const tf2=document.createElement('tfoot');
     tf2.innerHTML=`<tr class="tfim"><td colspan="4" style="padding:10px">Total${empSel==='Todas'?'':' de '+esc(empSel)}</td>
-      <td style="text-align:right">${brl(doAno.reduce((a,x)=>a+(+x.valor||0),0))}</td><td colspan="2"></td></tr>`;
+      <td style="text-align:right">${brl(doAno.reduce((a,x)=>a+(+x.valor||0),0))}</td><td colspan="3"></td></tr>`;
     t2.appendChild(tf2); rol2.appendChild(t2);
   }
   lc2.appendChild(rol2);
