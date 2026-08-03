@@ -74,6 +74,10 @@ h1,h2,h3,.serif{font-family:Fraunces,Georgia,serif;font-weight:600;letter-spacin
 .kpi .val{font-family:Fraunces,serif;font-size:23px;font-weight:600;margin-top:5px;font-variant-numeric:tabular-nums}
 .kpi .sub{font-size:12px;color:var(--suave);margin-top:2px}
 .kpi.v .val{color:var(--verde)} .kpi.r .val{color:var(--vermelho)} .kpi.a .val{color:var(--areia)}
+.kpi.clic{cursor:pointer;transition:transform .12s,box-shadow .12s,border-color .12s;position:relative}
+.kpi.clic:hover{transform:translateY(-2px);border-color:var(--tinta);box-shadow:0 6px 18px rgba(0,0,0,.10)}
+.kpi.clic:after{content:'›';position:absolute;top:10px;right:13px;color:var(--suave);font-size:17px;line-height:1;opacity:.45}
+.kpi.clic:hover:after{opacity:1}
 
 .bloco{background:var(--card);border:1px solid var(--linha);border-radius:var(--r);box-shadow:var(--sombra);margin-bottom:18px;overflow:hidden}
 .bloco>header{display:flex;align-items:center;gap:10px;padding:14px 17px;border-bottom:1px solid var(--linha);
@@ -242,6 +246,12 @@ const moedaNum=t=>{
   const x=String(t||'').replace(/[^\d,.-]/g,'').replace(/\.(?=\d{3}\b)/g,'').replace(',','.');
   const n=parseFloat(x); return isNaN(n)?0:n;
 };
+// o que você mais usa vem primeiro na sugestão; o que só existe na config entra depois
+function maisUsados(lista,campo,extras){
+  const c={};(lista||[]).forEach(x=>{const v=String(x[campo]??'').trim();if(v)c[v]=(c[v]||0)+1});
+  (extras||[]).forEach(v=>{const q=String(v??'').trim();if(q&&!(q in c))c[q]=0});
+  return Object.keys(c).sort((a,b)=>c[b]-c[a]||a.localeCompare(b));
+}
 const tamanho=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(0)+' KB':(b/1048576).toFixed(1)+' MB';
 
 /* ---------------- arquivos (IndexedDB) ---------------- */
@@ -696,18 +706,42 @@ function campos(obj,defs,aoMudar){
     let inp;
     if(d.tipo==='select'){inp=el(`<select>${d.opcoes.map(o=>`<option${o===(obj[d.k]??'')?' selected':''}>${esc(o)}</option>`).join('')}</select>`)}
     else if(d.tipo==='textarea'){inp=el(`<textarea placeholder="${d.ph||''}"></textarea>`);inp.value=obj[d.k]??''}
-    // moeda: mostra R$ formatado, guarda número. Sem isso o campo virava texto
-    // e "R$ 1.200,00" era salvo como string, quebrando as somas.
+    // sugestão: escreve o que quiser, com as opções já usadas à mão (datalist).
+    // Aceita valor novo na hora — e ele passa a aparecer na próxima vez.
+    else if(d.tipo==='sugestao'){
+      const lid='dl'+Math.random().toString(36).slice(2,9);
+      inp=el(`<input type="text" list="${lid}" placeholder="${d.ph||''}" autocomplete="off">`);
+      inp.value=obj[d.k]??'';
+      w.appendChild(el(`<datalist id="${lid}">${(d.opcoes||[]).map(o=>`<option value="${esc(o)}"></option>`).join('')}</datalist>`));
+    }
+    // moeda: digita-se pelos CENTAVOS, como em caixa — 1827897 vira R$ 18.278,97.
+    // Guarda número; antes o campo virava texto e "R$ 1.200,00" quebrava as somas.
     else if(d.tipo==='moeda'){
-      inp=el(`<input type="text" inputmode="decimal" class="moeda" placeholder="R$ 0,00">`);
-      inp.value=(+obj[d.k])?brl2(+obj[d.k]):'';
-      inp.addEventListener('focusin',()=>{const v2=moedaNum(inp.value);inp.value=v2?String(v2).replace('.',','):'';inp.select&&inp.select()});
+      inp=el(`<input type="text" inputmode="numeric" class="moeda">`);
+      let cent=Math.round((+obj[d.k]||0)*100);
+      const pinta=()=>{inp.value=brl2(cent/100)};   // sempre com os ,00 à vista
+      pinta();
+      const grava=()=>{const v2=cent/100;if((+obj[d.k]||0)!==v2){obj[d.k]=v2;salvar();aoMudar&&aoMudar()}};
+      inp.addEventListener('focusin',()=>{try{inp.setSelectionRange(inp.value.length,inp.value.length)}catch(_){}});
+      inp.addEventListener('click',()=>{try{inp.setSelectionRange(inp.value.length,inp.value.length)}catch(_){}});
+      inp.addEventListener('keydown',ev=>{
+        if(ev.ctrlKey||ev.metaKey||ev.altKey)return;
+        if(ev.key==='Tab'||ev.key==='Enter'){grava();return}
+        if(/^[0-9]$/.test(ev.key)){ev.preventDefault();if(cent<1e12){cent=cent*10+ +ev.key;pinta()}}
+        else if(ev.key==='Backspace'){ev.preventDefault();cent=Math.floor(cent/10);pinta()}
+        else if(ev.key==='Delete'){ev.preventDefault();cent=0;pinta()}
+        else if(ev.key.length===1){ev.preventDefault()}   // vírgula, ponto e letras não fazem falta
+      });
+      inp.addEventListener('paste',ev=>{ev.preventDefault();
+        const txt=((ev.clipboardData||window.clipboardData).getData('text')||'');
+        cent=Math.round((moedaNum(txt)||0)*100);pinta()});
+      inp.addEventListener('blur',grava);
     }
     else{inp=el(`<input type="${d.tipo||'text'}" placeholder="${d.ph||''}">`);inp.value=obj[d.k]??''}
     if(d.full)w.style.gridColumn='1/-1';
-    inp.addEventListener('change',()=>{
-      if(d.tipo==='moeda'){const v2=moedaNum(inp.value);obj[d.k]=v2;inp.value=v2?brl2(v2):''}
-      else obj[d.k]=inp.type==='number'?(inp.value===''?0:+inp.value):inp.value;
+    if(d.tipo!=='moeda') inp.addEventListener('change',()=>{
+      obj[d.k]=inp.type==='number'?(inp.value===''?0:+inp.value):inp.value;
+      if(d.aoGravar)d.aoGravar(obj[d.k]);
       salvar();aoMudar&&aoMudar()});
     w.appendChild(inp);c.appendChild(w);
   });
@@ -763,14 +797,40 @@ function menu(){
   MODS.forEach(m=>{
     if(m.grupo)nav.appendChild(el(`<div class="sep">${m.grupo}</div>`));
     const b=el(`<button class="${m.id===atual?'on':''}"><span class="ic">${m.ic}</span><span class="tx">${m.nome}</span></button>`);
-    b.onclick=()=>{atual=m.id;menu();tela();window.scrollTo(0,0)};
+    b.onclick=()=>irTela(m.id);
     nav.appendChild(b);
   });
 }
-function tela(){const m=document.getElementById('main');m.innerHTML='';MODS.find(x=>x.id===atual).render(m)}
-const rr=id=>()=>{if(atual===id){const m=document.getElementById('main');m.innerHTML='';MODS.find(x=>x.id===id).render(m)}};
+function tela(){const m=document.getElementById('main');m.innerHTML='';MODS.find(x=>x.id===atual).render(m);return rolaAlvo()}
+const rr=id=>()=>{if(atual===id){const m=document.getElementById('main');m.innerHTML='';MODS.find(x=>x.id===id).render(m);rolaAlvo()}};
+// trocar de tela: sobe ao topo, a não ser que alguém tenha pedido um bloco
+function irTela(id){atual=id;menu();if(!tela())window.scrollTo(0,0)}
 const cab=(t,s)=>el(`<div class="topo"><div><h1>${t}</h1><p>${s||''}</p></div><span class="cresce"></span></div>`);
-const kpi=(rot,val,sub,cl)=>`<div class="kpi ${cl||''}"><div class="rot">${rot}</div><div class="val">${val}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
+const kpi=(rot,val,sub,cl,ir)=>`<div class="kpi ${cl||''}${ir?' clic':''}"${ir?` data-kpi="${ir}" title="clique para abrir"`:''}><div class="rot">${rot}</div><div class="val">${val}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
+/* Cada card leva ao bloco que explica o número. Quase sempre é preciso
+   re-renderizar antes de rolar, então o alvo fica guardado e a rolagem
+   acontece quando a tela termina de ser remontada. */
+let _alvoBloco=null;
+function abreBloco(id){if(E.colapso[id]){E.colapso[id]=false;salvar()}_alvoBloco=id;}
+function rolaAlvo(){
+  const id=_alvoBloco;_alvoBloco=null;
+  if(!id)return false;
+  setTimeout(()=>{
+    const b=document.querySelector(`[data-bid="${id}"]`);
+    if(!b)return;
+    b.classList.remove('fechado');
+    const alvoY=Math.max(0,window.scrollY+b.getBoundingClientRect().top-12);
+    window.scrollTo({top:alvoY,behavior:'smooth'});
+    // alguns navegadores engolem o 'smooth' e não saem do lugar — garante o pulo
+    setTimeout(()=>{if(Math.abs(window.scrollY-alvoY)>60)window.scrollTo(0,alvoY)},280);
+  },30);
+  return true;
+}
+/* liga os cards marcados ao mapa de destinos da tela */
+function ligaKpis(cx,mapa){
+  cx.querySelectorAll('[data-kpi]').forEach(k=>k.onclick=()=>{const f=mapa[k.dataset.kpi];if(f)f()});
+  return cx;
+}
 /* ---- viagem internacional: detecção + conferência de documentos ---- */
 const INTERNACIONAL=/guangzhou|cant[ãa]o|china|xangai|shangai|hong kong|los angeles|miami|orlando|new york|nova york|eua|estados unidos|lisboa|portugal|paris|fran[çc]a|madri|espanha|roma|it[áa]lia|londres|inglaterra|dubai|santiago|buenos aires|argentina|chile|cancun|m[ée]xico|canad[áa]|jap[ãa]o|t[óo]quio/i;
 // a marcação manual manda; se ninguém marcou, a cidade decide
@@ -887,7 +947,7 @@ function vInicio(m){
       <span class="chip" style="background:${FUNDO[x.g]};color:${COR[x.g]}">${x.g===0?'atrasado':x.g===1?'atenção':'em breve'}</span>
       <button class="btn ghost mini" data-ir="${x.secao}">ver</button></div>`).join('')
       +(rd.length>12?`<div style="padding-top:9px;font-size:12.5px;color:var(--suave)">e mais ${rd.length-12} item(ns)…</div>`:'');
-    rc2.querySelectorAll('[data-ir]').forEach(b=>b.onclick=()=>{atual=b.dataset.ir;menu();tela();window.scrollTo(0,0)});
+    rc2.querySelectorAll('[data-ir]').forEach(b=>b.onclick=()=>irTela(b.dataset.ir));
   } else rc2.innerHTML='<div class="vazio">Nada pedindo atenção agora. 👏</div>';
   m.appendChild(bloco('ini-radar',`🔔 O que precisa de você${urgentes?' · '+urgentes+' atrasado(s)':''}`,'documentos, exames, prazos, viagens e datas da família',rc2));
   m.appendChild(el(`<div class="grade">
@@ -1995,8 +2055,40 @@ function imprimirSOS() {
 }
 
 /* ===================== RENDIMENTOS ===================== */
+/* O painel nasceu lendo os totais congelados da planilha (rendHist). Depois que
+   os 186 lançamentos entraram e passaram a fechar ano a ano, isso virou uma
+   armadilha: lançar algo novo não mexia no número do topo. Aqui montamos um
+   histórico VIVO — em cada ANO que tem lançamento, quem manda é a soma dos
+   lançamentos; anos sem lançamento seguem com o valor da planilha. A planilha
+   original continua acessível em _raw, que é o que a Conferência compara. */
+let _hvCache=null,_hvMt=-2;
+function histVivo(){
+  const R=E.rendHist||{};
+  if(_hvMt===E._mt&&_hvCache) return _hvCache;
+  const L=E.rendimentos||[];
+  const anosLanc=[...new Set(L.map(x=>+String(x.data||'').slice(0,4)).filter(Boolean))];
+  const temL={};anosLanc.forEach(a=>temL[a]=true);
+  const anos=[...new Set([...(R.anos||[]),...anosLanc])].filter(Boolean).sort((a,b)=>a-b);
+  const iR=a=>(R.anos||[]).indexOf(a);
+  const somaAno=a=>L.filter(x=>String(x.data||'').startsWith(a)).reduce((s2,x)=>s2+(+x.valor||0),0);
+  const totalAno=anos.map(a=>temL[a]?somaAno(a):(iR(a)>=0?(R.totalAno[iR(a)]||0):0));
+  const nomes=[...new Set([...Object.keys(R.empresas||{}),...L.map(x=>x.empresa)])].filter(Boolean);
+  const empresas={};
+  nomes.forEach(nm=>{empresas[nm]=anos.map(a=>temL[a]
+    ? L.filter(x=>String(x.data||'').startsWith(a)&&x.empresa===nm).reduce((s2,x)=>s2+(+x.valor||0),0)
+    : (iR(a)>=0?(((R.empresas||{})[nm]||[])[iR(a)]||0):0))});
+  const totalGeral=totalAno.reduce((s2,v)=>s2+v,0);
+  const parciais=R.parciais||R.incompletos||[];
+  const completos=anos.filter(a=>!parciais.includes(a));
+  _hvCache={...R,anos,totalAno,empresas,totalGeral,parciais,
+    mediaAnual:completos.length?anos.reduce((s2,a,i)=>s2+(parciais.includes(a)?0:totalAno[i]),0)/completos.length:0,
+    _raw:R};
+  _hvMt=E._mt;
+  return _hvCache;
+}
+
 function vRendimentos(m){
-  const r=rr('rendimentos');const H=E.rendHist;
+  const r=rr('rendimentos');const H=histVivo();
   if(!H.anos||!H.anos.length){
     m.appendChild(cab('Rendimentos','Quanto você ganha — por mês, por empresa e no acumulado.'));
     m.appendChild(el(`<div class="aviso">☁ Seus dados ainda não chegaram neste aparelho — clique em <b>Sincronizar</b> no menu lateral.</div>`));
@@ -2040,8 +2132,12 @@ function vRendimentos(m){
 
   /* ---- números do recorte escolhido ---- */
   const totalSel=todos?H.totalGeral:(H.totalAno[iAno]||0);
-  const ehParcial=!todos&&parciais.includes(ano);
-  const mesesDecorridos=ehParcial?6:(ano===anoHoje?mesN+1:12);
+  // Os meses que contam para a média são os que têm lançamento — antes isso era
+  // um "6" cravado (a planilha ia até junho), e julho não entrava na conta.
+  // Sem lançamento nenhum no ano, cai no calendário e na marcação da planilha.
+  const mesesLanc=[...new Set(doAnoTudo.map(x=>+String(x.data||'').slice(5,7)).filter(Boolean))];
+  const ehParcial=!todos&&(mesesLanc.length?mesesLanc.length<12:parciais.includes(ano));
+  const mesesDecorridos=mesesLanc.length||(ano===anoHoje?mesN+1:12);
   // fontes: empresa (sempre) e negócio (quando há detalhe)
   const fontesEmp=Object.entries(H.empresas)
     .map(([n,v])=>({r:n,v:todos?v.reduce((a,b)=>a+b,0):(v[iAno]||0)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
@@ -2050,21 +2146,29 @@ function vRendimentos(m){
   // crescimento contra o ano anterior (só faz sentido em ano específico)
   const cresc=(!todos&&iAno>0&&H.totalAno[iAno-1])?((H.totalAno[iAno]/H.totalAno[iAno-1])-1)*100:null;
 
-  m.appendChild(el(`<div class="grade">
-    ${kpi(todos?'Total 2020–2026':'Ganho em '+ano,brl(totalSel),
-      todos?'tudo somado':(ehParcial?'jan–jun (parcial)':'no ano inteiro'),'v')}
+  const anoIni=H.anos[0],anoFim=H.anos[H.anos.length-1];
+  m.appendChild(ligaKpis(el(`<div class="grade">
+    ${kpi(todos?('Total '+anoIni+'–'+anoFim):'Ganho em '+ano,brl(totalSel),
+      (todos?'tudo somado':(ehParcial?'ano parcial':'no ano inteiro'))+' · ver mês a mês','v','mes')}
     ${kpi('Média por mês',brl(totalSel/(todos?H.anos.length*12:mesesDecorridos)),
-      todos?'nos 7 anos':mesesDecorridos+' meses',null)}
-    ${kpi('Maior fonte',maior?avatar(maior.r,22)+esc(maior.r):'—',maior?brl(maior.v)+' · '+conc.toFixed(0)+'% do total':'','a')}
+      (todos?('nos '+H.anos.length+' anos'):mesesDecorridos+' meses')+' · ver mês a mês',null,'mes')}
+    ${kpi('Maior fonte',maior?avatar(maior.r,22)+esc(maior.r):'—',maior?brl(maior.v)+' · '+conc.toFixed(0)+'% do total':'','a',maior?'fonte':null)}
     ${(()=>{const ls=todos?E.rendimentos:doAnoTudo;
       const ult=[...ls].sort((a,b)=>(a.data||'').localeCompare(b.data||'')).map(y=>y.data).pop();
-      return kpi('Lançamentos',ls.length,ult?'último em '+fmtDataAno(ult):'nenhum ainda')})()}
-    ${cresc==null?kpi('Média anual',brl(H.mediaAnual),'anos completos')
+      return kpi('Lançamentos',ls.length,ult?'último em '+fmtDataAno(ult):'nenhum ainda',null,'lanc')})()}
+    ${cresc==null?kpi('Média anual',brl(H.mediaAnual),'anos completos','','evol')
       :kpi('Contra '+(ano-1),(cresc>=0?'+':'')+cresc.toFixed(0)+'%',
-        brl(Math.abs(H.totalAno[iAno]-H.totalAno[iAno-1]))+(cresc>=0?' a mais':' a menos'),cresc>=0?'v':'r')}</div>`));
+        brl(Math.abs(H.totalAno[iAno]-H.totalAno[iAno-1]))+(cresc>=0?' a mais':' a menos'),cresc>=0?'v':'r','evol')}</div>`),{
+    // dinheiro do período -> o mês a mês, que é onde o número se destrincha
+    mes:()=>{if(todos)filtro.rendAno=anoFim;filtro.rendVisao='Mensal';abreBloco('rd-mes');r()},
+    // maior fonte -> filtra por ela e desce até os lançamentos dela
+    fonte:()=>{if(todos)filtro.rendAno=anoFim;filtro.rendEmp=maior.r;abreBloco('rd-lanc');r()},
+    lanc:()=>{if(todos)filtro.rendAno=anoFim;abreBloco('rd-lanc');r()},
+    evol:()=>{filtro.rendVisao='Anual';abreBloco('rd-dash');r()},
+  }));
 
-  if(ehParcial) m.appendChild(el(`<div class="aviso">📌 <b>${ano} é ano parcial</b> — jan a jun lançados
-    (${brl(totalSel)}). No ritmo atual, o ano fecharia perto de <b>${brl(totalSel/6*12)}</b>.</div>`));
+  if(ehParcial) m.appendChild(el(`<div class="aviso">📌 <b>${ano} é ano parcial</b> — ${mesesDecorridos} ${mesesDecorridos===1?'mês lançado':'meses lançados'}
+    (${brl(totalSel)}). No ritmo atual, o ano fecharia perto de <b>${brl(totalSel/mesesDecorridos*12)}</b>.</div>`));
   // parte do ano que ainda não sabemos de qual empresa veio
   const naoIdent=todos
     ? (H.empresas['A identificar']||[]).reduce((a,b)=>a+b,0)
@@ -2211,24 +2315,26 @@ function vRendimentos(m){
     const cel='padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums';
     let corpo='';
     if(todos){
-      const anosCf=[...new Set([...H.anos.map(String),...E.rendimentos.map(y=>String(y.data||'').slice(0,4))])]
+      const HR=H._raw||H;
+      const anosCf=[...new Set([...(HR.anos||[]).map(String),...E.rendimentos.map(y=>String(y.data||'').slice(0,4))])]
         .filter(a2=>/^\d{4}$/.test(a2)).sort();
       corpo=anosCf.map(a2=>{
-        const i2=H.anos.indexOf(+a2);
+        const i2=(HR.anos||[]).indexOf(+a2);
         const ls=E.rendimentos.filter(y=>String(y.data||'').startsWith(a2));
-        const soma=ls.reduce((s2,y)=>s2+(+y.valor||0),0), hist=i2>=0?(H.totalAno[i2]||0):0, dif=soma-hist;
+        const soma=ls.reduce((s2,y)=>s2+(+y.valor||0),0), hist=i2>=0?(HR.totalAno[i2]||0):0, dif=soma-hist;
         return `<tr data-cfano="${a2}" style="cursor:pointer"><td style="padding:9px 10px"><b>${a2}</b></td>
           <td style="${cel};color:var(--suave)">${ls.length}</td>
           <td style="${cel}">${brl(soma)}</td>
           <td style="${cel}">${brl(hist)}</td>
           <td style="${cel};font-weight:600;color:${Math.abs(dif)>1?'var(--vermelho)':'var(--verde)'}">${Math.abs(dif)>1?brl(dif):'✓ confere'}</td></tr>`}).join('');
     } else {
-      const iC=H.anos.indexOf(ano);
-      const nomesC=[...new Set([...Object.keys(H.empresas||{}),...doAnoTudo.map(y=>y.empresa)])].filter(Boolean);
+      const HR=H._raw||H;
+      const iC=(HR.anos||[]).indexOf(ano);
+      const nomesC=[...new Set([...Object.keys(HR.empresas||{}),...doAnoTudo.map(y=>y.empresa)])].filter(Boolean);
       corpo=nomesC.map(nm=>{
         const ls=doAnoTudo.filter(y=>y.empresa===nm);
         const soma=ls.reduce((s2,y)=>s2+(+y.valor||0),0);
-        const hist=iC>=0?(((H.empresas||{})[nm]||[])[iC]||0):0;
+        const hist=iC>=0?(((HR.empresas||{})[nm]||[])[iC]||0):0;
         const dif=soma-hist;
         if(!ls.length&&!hist) return '';
         return `<tr data-cfemp="${esc(nm)}" style="cursor:pointer"><td style="padding:9px 10px;white-space:nowrap">${avatar(nm,20)}<b>${esc(nm)}</b></td>
@@ -2250,7 +2356,7 @@ function vRendimentos(m){
     rolC.querySelectorAll('[data-cfemp]').forEach(tr2=>tr2.onclick=()=>{filtro.rendEmp=tr2.dataset.cfemp;r()});
     rolC.querySelectorAll('[data-cfano]').forEach(tr2=>tr2.onclick=()=>{filtro.rendAno=+tr2.dataset.cfano;filtro.rendEmp='Todas';filtro.rendAnoSel=-1;r()});
   }
-  mA.appendChild(bloco('rd-conf','🧾 Conferência','lançado x histórico da planilha — clique numa linha para investigar',cfx));
+  mA.appendChild(bloco('rd-conf','🧾 Conferência','lançado x planilha de origem — clique numa linha para investigar',cfx));
   // evolução anual: clicar no ano abre as empresas daquele ano
   const iSel=filtro.rendAnoSel;
   const gEl=el(`<div class="grafico"></div>`);
@@ -2430,7 +2536,7 @@ function vRendimentos(m){
     if (melhor >= 0) filtro.rendAno = H.anos[melhor];
     filtro.rendEmp = nome; filtro.rendAnoSel = -1; r();
   });
-  mA.appendChild(bloco('rd-hist','Histórico por empresa','clique numa empresa para filtrar por ela',th));
+  mA.appendChild(bloco('rd-hist','Por empresa, ano a ano','clique numa empresa para filtrar por ela',th));
 
   /* ---- MENSAL: cada mês abre os lançamentos daquele mês ---- */
   const tmc = el('<div></div>');
@@ -2510,17 +2616,43 @@ function vRendimentos(m){
     t2.innerHTML='<thead><tr><th>Data</th><th>Empresa</th><th>Instituição</th><th>Tipo</th>'+
       '<th style="text-align:right">Valor</th><th style="text-align:right">% do ano</th><th>Observação</th></tr></thead>';
     const tb2=document.createElement('tbody');
-    ordR.forEach(x=>{
-      const tr=document.createElement('tr'); tr.style.cursor='pointer';
-      tr.innerHTML=`<td style="padding:9px 10px;white-space:nowrap;font-variant-numeric:tabular-nums">${fmtDataAno(x.data)}</td>
-        <td style="padding:9px 10px;white-space:nowrap">${avatar(x.empresa||'—',20)}<b>${esc(x.empresa||'—')}</b></td>
-        <td style="padding:9px 10px;color:var(--suave)">${esc(x.instituicao||'—')}</td>
-        <td style="padding:9px 10px">${esc(x.tipo||'—')}${flagsLan(x)}</td>
-        <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${brl(+x.valor||0)}</td>
-        <td style="padding:9px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${totLanc?((+x.valor||0)/totLanc*100).toFixed(1)+'%':'—'}</td>
-        <td style="padding:9px 10px;color:var(--suave);font-size:12.5px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.obs||'')}</td>`;
-      tr.onclick=()=>modalRendimento(x);
-      tb2.appendChild(tr);
+    // Agrupado por mês: os 2 meses mais recentes já vêm abertos e o resto fica
+    // recolhido — o ano inteiro de uma vez virava uma parede de linhas.
+    const chavesMes=[...new Set(ordR.map(x=>String(x.data||'').slice(0,7)).filter(k=>/^\d{4}-\d{2}$/.test(k)))].sort().reverse();
+    const semDataR=ordR.filter(x=>!/^\d{4}-\d{2}/.test(String(x.data||'')));
+    const gruposMes=[...chavesMes.map(k=>({k,itens:ordR.filter(x=>String(x.data||'').startsWith(k))})),
+      ...(semDataR.length?[{k:'',itens:semDataR}]:[])];
+    gruposMes.forEach((g,gi)=>{
+      const aberto=gi<2;   // "últimos 2 meses" = os dois meses mais recentes com lançamento
+      const somaG=g.itens.reduce((a,x)=>a+(+x.valor||0),0);
+      const rotG=g.k?MESES[+g.k.slice(5,7)-1]+' de '+g.k.slice(0,4):'Sem data';
+      const trg=document.createElement('tr');
+      trg.style.cursor='pointer'; trg.style.background='var(--bg)';
+      trg.innerHTML=`<td colspan="4" style="padding:10px"><b style="font-size:14px">${rotG}</b>
+          <span class="setaM" style="color:var(--suave);font-weight:400;font-size:11.5px;margin-left:7px">${aberto?'▾':'▸'} ${g.itens.length} lançamento(s)</span></td>
+        <td style="padding:10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">${brl(somaG)}</td>
+        <td style="padding:10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${totLanc?(somaG/totLanc*100).toFixed(1)+'%':''}</td>
+        <td></td>`;
+      tb2.appendChild(trg);
+      const filhasM=[];
+      g.itens.forEach(x=>{
+        const tr=document.createElement('tr'); tr.style.cursor='pointer';
+        if(!aberto) tr.style.display='none';
+        tr.innerHTML=`<td style="padding:9px 10px;white-space:nowrap;font-variant-numeric:tabular-nums">${fmtDataAno(x.data)}</td>
+          <td style="padding:9px 10px;white-space:nowrap">${avatar(x.empresa||'—',20)}<b>${esc(x.empresa||'—')}</b></td>
+          <td style="padding:9px 10px;color:var(--suave)">${esc(x.instituicao||'—')}</td>
+          <td style="padding:9px 10px">${esc(x.tipo||'—')}${flagsLan(x)}</td>
+          <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${brl(+x.valor||0)}</td>
+          <td style="padding:9px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${totLanc?((+x.valor||0)/totLanc*100).toFixed(1)+'%':'—'}</td>
+          <td style="padding:9px 10px;color:var(--suave);font-size:12.5px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.obs||'')}</td>`;
+        tr.onclick=()=>modalRendimento(x);
+        tb2.appendChild(tr); filhasM.push(tr);
+      });
+      trg.onclick=()=>{
+        const fechado=filhasM[0].style.display==='none';
+        filhasM.forEach(f=>f.style.display=fechado?'':'none');
+        trg.querySelector('.setaM').textContent=(fechado?'▾ ':'▸ ')+filhasM.length+' lançamento(s)';
+      };
     });
     t2.appendChild(tb2);
     const tf2=document.createElement('tfoot');
@@ -2532,7 +2664,7 @@ function vRendimentos(m){
   const pe2=el('<div style="padding:0 17px 15px"></div>');
   const bt2=el('<button class="mais">+ Novo lançamento</button>'); bt2.onclick=novoRend;
   pe2.appendChild(bt2); lc2.appendChild(pe2);
-  m.appendChild(bloco('rd-lanc','Lançamentos de '+ano,doAno.length+' lançamento(s) — clique para corrigir e anexar comprovante',lc2));
+  m.appendChild(bloco('rd-lanc','Lançamentos de '+ano,doAno.length+' lançamento(s) — os 2 últimos meses vêm abertos; clique no mês para abrir os outros, e na linha para corrigir',lc2));
 }
 
 function modalRendimento(x,novo){
@@ -2542,8 +2674,14 @@ function modalRendimento(x,novo){
     s1.appendChild(campos(x,[
       {k:'data',t:'Data',tipo:'date'},
       {k:'empresa',t:'Empresa / de onde veio',tipo:'select',opcoes:CFG('empresas')},
-      {k:'tipo',t:'Tipo',ph:'ex.: Pró-labore, Lucro, CDB'},
-      {k:'instituicao',t:'Instituição',tipo:'select',opcoes:['',...CFG('instituicoes')]},
+      {k:'tipo',t:'Tipo',tipo:'sugestao',ph:'ex.: Pró-labore, Lucro, CDB',
+        opcoes:maisUsados(E.rendimentos,'tipo')},
+      {k:'instituicao',t:'Instituição',tipo:'sugestao',ph:'banco ou corretora',
+        opcoes:maisUsados(E.rendimentos,'instituicao',CFG('instituicoes')),
+        // instituição nova digitada aqui entra na lista de opções para sempre
+        aoGravar:v=>{const q=String(v||'').trim();
+          if(q&&!CFG('instituicoes').some(o=>normaliza(o)===normaliza(q))){
+            E.config.instituicoes=[...CFG('instituicoes'),q].sort((a,b)=>a.localeCompare(b));}}},
       {k:'valor',t:'Valor',tipo:'moeda'},
       {k:'obs',t:'Observação',tipo:'textarea',full:true},
     ]));
@@ -2688,7 +2826,7 @@ function baixarBlob(blob, nome) {
 
 /* ---- Rendimentos: baixar em Excel (.xlsx) e em PDF ---- */
 function dadosRendimentos() {
-  const H = E.rendHist, anos = H.anos || [];
+  const H = histVivo(), anos = H.anos || [];
   const emp = Object.entries(H.empresas || {})
     .map(([nome, vals]) => ({ nome, vals, tot: vals.reduce((a, b) => a + b, 0) }))
     .sort((a, b) => b.tot - a.tot);
@@ -2698,6 +2836,7 @@ function dadosRendimentos() {
 
 function baixarRendimentosExcel() {
   const { H, anos, emp, totalGeral } = dadosRendimentos();
+  const HR = H._raw || H;
   const N = 1, M = 2, NM = 3;   // estilos: negrito, moeda, negrito+moeda
 
   /* 1. Resumo por ano */
@@ -2765,16 +2904,16 @@ function baixarRendimentosExcel() {
   /* 4c. Conferência — o lançado bate com o histórico? */
   const aConf=[[{v:'Conferência — lançado x histórico',s:5}],[],
     [{v:'Ano',s:N},{v:'Empresa',s:N},{v:'Lançamentos',s:N},{v:'Somam',s:N},{v:'Histórico',s:N},{v:'Diferença',s:N}]];
-  const anosCf=[...new Set([...anos.map(String),...E.rendimentos.map(x=>String(x.data||'').slice(0,4))])]
+  const anosCf=[...new Set([...(HR.anos||[]).map(String),...E.rendimentos.map(x=>String(x.data||'').slice(0,4))])]
     .filter(a2=>/^\d{4}$/.test(a2)).sort();
   anosCf.forEach(a2=>{
-    const i2=anos.indexOf(+a2);
-    const nomesC=[...new Set([...Object.keys(H.empresas||{}),
+    const i2=(HR.anos||[]).indexOf(+a2);
+    const nomesC=[...new Set([...Object.keys(HR.empresas||{}),
       ...E.rendimentos.filter(x=>String(x.data||'').startsWith(a2)).map(x=>x.empresa)])].filter(Boolean);
     nomesC.forEach(nm=>{
       const ls=E.rendimentos.filter(x=>String(x.data||'').startsWith(a2)&&x.empresa===nm);
       const soma=+ls.reduce((s2,x)=>s2+(+x.valor||0),0).toFixed(2);
-      const hist=+((i2>=0?(((H.empresas||{})[nm]||[])[i2]||0):0)).toFixed(2);
+      const hist=+((i2>=0?(((HR.empresas||{})[nm]||[])[i2]||0):0)).toFixed(2);
       if(!ls.length&&!hist) return;
       const dif=+(soma-hist).toFixed(2);
       aConf.push([+a2,nm,ls.length,{v:soma,s:M},{v:hist,s:M},
@@ -2803,6 +2942,7 @@ function baixarRendimentosExcel() {
 
 function baixarRendimentosPDF() {
   const { H, anos, emp, totalGeral } = dadosRendimentos();
+  const HR = H._raw || H;
   const w = window.open('', '_blank');
   if (!w) { alert('Libere o pop-up para gerar o PDF.'); return }
   const linhasAno = anos.map((a, i) => {
@@ -2849,10 +2989,10 @@ function baixarRendimentosPDF() {
 
   <h2>Conferência — lançado x histórico</h2>
   <table><thead><tr><th>Ano</th><th class="n">Lançamentos</th><th class="n">Somam</th><th class="n">Histórico</th><th class="n">Diferença</th></tr></thead><tbody>
-  ${[...new Set([...anos.map(String),...E.rendimentos.map(x=>String(x.data||'').slice(0,4))])]
-    .filter(a2=>/^\d{4}$/.test(a2)).sort().map(a2=>{const i2=anos.indexOf(+a2);
+  ${[...new Set([...(HR.anos||[]).map(String),...E.rendimentos.map(x=>String(x.data||'').slice(0,4))])]
+    .filter(a2=>/^\d{4}$/.test(a2)).sort().map(a2=>{const i2=(HR.anos||[]).indexOf(+a2);
     const ls=E.rendimentos.filter(x=>String(x.data||'').startsWith(a2));
-    const soma=ls.reduce((s2,x)=>s2+(+x.valor||0),0), hist=i2>=0?(H.totalAno[i2]||0):0, dif=soma-hist;
+    const soma=ls.reduce((s2,x)=>s2+(+x.valor||0),0), hist=i2>=0?(HR.totalAno[i2]||0):0, dif=soma-hist;
     return `<tr><td>${a2}</td><td class="n">${ls.length}</td><td class="n">${brl2(soma)}</td><td class="n">${brl2(hist)}</td>
       <td class="n" style="color:${Math.abs(dif)>1?'#b3261e':'#1b7a4b'}">${Math.abs(dif)>1?brl2(dif):'✓ confere'}</td></tr>`}).join('')}
   </tbody></table>
@@ -3032,12 +3172,19 @@ function vGastos(m){
       v=>{filtro.gastosMes=v;r()}),
     acao('+ Novo lançamento',()=>{E.gastos.push({id:uid(),...novoLanc()});salvar();r()}),'|'));
 
-  m.appendChild(el(`<div class="grade">
-    ${kpi(todos?'Saída total':'Saída do mês',brl(tot),'variável + fixo','r')}
-    ${kpi('Variável',brl(varTot),doMes.length+' lançamento(s)')}
-    ${kpi('Fixo',brl2(fixo)+'/mês',FIXOS().reduce((s,f)=>s+f.lista.length,0)+' cadastros','a')}
-    ${kpi('Ganho',brl(rendMes),'de Rendimentos','v')}
-    ${kpi('Sobrou',brl(sobra),sobra>=0?'no azul':'no vermelho',sobra>=0?'v':'r')}</div>`));
+  m.appendChild(ligaKpis(el(`<div class="grade">
+    ${kpi(todos?'Saída total':'Saída do mês',brl(tot),'variável + fixo · ver para onde vai','r','classe')}
+    ${kpi('Variável',brl(varTot),doMes.length+' lançamento(s)',null,'lanc')}
+    ${kpi('Fixo',brl2(fixo)+'/mês',FIXOS().reduce((s,f)=>s+f.lista.length,0)+' cadastros','a','fixo')}
+    ${kpi('Ganho',brl(rendMes),'de Rendimentos','v','rend')}
+    ${kpi('Sobrou',brl(sobra),sobra>=0?'no azul':'no vermelho',sobra>=0?'v':'r','classe')}</div>`),{
+    classe:()=>{abreBloco('gt-classe');r()},
+    lanc:()=>{abreBloco('gt-lista');r()},
+    fixo:()=>{abreBloco('gt-casa');r()},
+    // o "Ganho" vem da outra tela: leva para lá já no recorte certo
+    rend:()=>{filtro.rendAno=todos?anoHoje:+mes.slice(0,4);filtro.rendVisao=todos?'Anual':'Mensal';
+      filtro.rendEmp='Todas';abreBloco(todos?'rd-dash':'rd-mes');irTela('rendimentos')},
+  }));
 
   /* ================= PARA ONDE VAI O DINHEIRO (classificação) ================= */
   // as classes dos cadastros fixos entram sempre, mesmo que a config salva seja antiga —
@@ -4109,6 +4256,53 @@ async function vConfig(m){
 
   GRUPOS_CFG.forEach(g=>m.appendChild(bloco('cf-'+g.k,g.ic+' '+g.t,g.d,editorLista(g.k,r))));
 
+  /* O nome da empresa é a chave em toda parte: lançamentos, histórico da
+     planilha, marca (cor/logo), lista de opções e cadastro de PJ. Trocar em um
+     só lugar deixaria lançamento órfão — então as duas funções abaixo mexem em
+     todos de uma vez. */
+  function renomeiaEmpresa(de,para){
+    de=String(de);para=String(para||'').trim();
+    if(!para||para===de) return false;
+    if(!E.config)E.config={};
+    E.config.empresas=[...new Set((CFG('empresas')||[]).map(x=>x===de?para:x))];
+    (E.rendimentos||[]).forEach(x=>{if(x.empresa===de)x.empresa=para});
+    (E.empresasPJ||[]).forEach(x=>{if(x.nome===de)x.nome=para});
+    if(E.marcas&&E.marcas[de]){E.marcas[para]={...(E.marcas[para]||{}),...E.marcas[de]};delete E.marcas[de]}
+    const R=E.rendHist||{};
+    if(R.empresas&&R.empresas[de]){
+      const antigo=R.empresas[de],destino=R.empresas[para];
+      R.empresas[para]=destino?destino.map((v,i)=>(+v||0)+(+antigo[i]||0)):antigo;
+      delete R.empresas[de];
+    }
+    Object.keys(R.detalhe||{}).forEach(a=>{const d=R.detalhe[a];
+      if(d&&d[de]){d[para]=[...(d[para]||[]),...d[de]];delete d[de]}});
+    salvar();return true;
+  }
+  function apagaEmpresa(nm){
+    const lans=(E.rendimentos||[]).filter(x=>x.empresa===nm);
+    const soma=lans.reduce((a,x)=>a+(+x.valor||0),0);
+    const aviso=lans.length
+      ? 'Apagar "'+nm+'" também APAGA '+lans.length+' lançamento(s), somando '+brl(soma)+
+        ', e o histórico dela na planilha.\n\nIsso não tem volta. Continuar?'
+      : 'Apagar "'+nm+'" da lista de empresas? (ela não tem nenhum lançamento)';
+    if(!confirm(aviso))return false;
+    if(lans.length&&!confirm('Confirma mesmo? '+lans.length+' lançamento(s) de "'+nm+'" serão apagados.'))return false;
+    E.rendimentos=(E.rendimentos||[]).filter(x=>x.empresa!==nm);
+    E.empresasPJ=(E.empresasPJ||[]).filter(x=>x.nome!==nm);
+    E.config.empresas=(CFG('empresas')||[]).filter(x=>x!==nm);
+    if(E.marcas)delete E.marcas[nm];
+    const R=E.rendHist||{};
+    if(R.empresas&&R.empresas[nm]){
+      // tira a fatia dela do total de cada ano, senão a planilha para de fechar
+      const linha=R.empresas[nm];
+      if(Array.isArray(R.totalAno)) R.totalAno=R.totalAno.map((v,i)=>+(((+v||0)-(+linha[i]||0)).toFixed(2)));
+      delete R.empresas[nm];
+      R.totalGeral=(R.totalAno||[]).reduce((a,v)=>a+(+v||0),0);
+    }
+    Object.keys(R.detalhe||{}).forEach(a=>{if(R.detalhe[a])delete R.detalhe[a][nm]});
+    salvar();return true;
+  }
+
   /* ---- as bolinhas: cor fixa e logo por empresa ---- */
   const mcx=el('<div class="corpo"></div>');
   const nomesM=[...new Set([...Object.keys((E.rendHist&&E.rendHist.empresas)||{}),
@@ -4117,13 +4311,31 @@ async function vConfig(m){
   if(!nomesM.length) mcx.appendChild(el('<div class="vazio">Cadastre empresas em Rendimentos para configurar as marcas.</div>'));
   nomesM.forEach(nm=>{
     // as duas acoes ficam SEMPRE visiveis; apagar so habilita quando ha logo
+    const nLan=(E.rendimentos||[]).filter(x=>x.empresa===nm).length;
     const linha=el(`<div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--linha);flex-wrap:wrap">
-      <span class="prevAv">${avatar(nm,32)}</span><b style="flex:1;min-width:120px">${esc(nm)}</b>
+      <span class="prevAv">${avatar(nm,32)}</span>
+      <input class="bNome" value="${esc(nm)}" title="clique para corrigir o nome — muda em todos os lançamentos"
+        style="flex:1;min-width:130px;font-weight:700;font-size:14px;border:1px solid transparent;background:none;padding:5px 7px;border-radius:8px;color:inherit">
+      <span style="font-size:11.5px;color:var(--suave);white-space:nowrap">${nLan} lanç.</span>
       <input type="color" value="${marcaDe(nm).cor}" title="cor da bolinha" style="width:36px;height:30px;border:1px solid var(--linha);border-radius:8px;background:none;padding:2px;cursor:pointer">
       <button class="btn ghost mini bLogo"></button>
       <button class="btn ghost mini bDel" style="color:var(--vermelho)">✕ apagar logo</button>
+      <button class="btn ghost mini bDelEmp" style="color:var(--vermelho)" title="apagar a empresa inteira">🗑 empresa</button>
     </div>`);
     const bLogo=linha.querySelector('.bLogo'), bDel=linha.querySelector('.bDel');
+    const iNome=linha.querySelector('.bNome');
+    iNome.onfocus=()=>{iNome.style.borderColor='var(--linha)';iNome.style.background='var(--card)'};
+    iNome.onblur=()=>{iNome.style.borderColor='transparent';iNome.style.background='none'};
+    iNome.onkeydown=ev=>{if(ev.key==='Enter')iNome.blur();if(ev.key==='Escape'){iNome.value=nm;iNome.blur()}};
+    iNome.onchange=()=>{
+      const novo=iNome.value.trim();
+      if(!novo||novo===nm){iNome.value=nm;return}
+      const jaTem=nomesM.some(o=>o!==nm&&normaliza(o)===normaliza(novo));
+      if(jaTem&&!confirm('Já existe "'+novo+'". Juntar "'+nm+'" com ela? Os lançamentos dos dois passam a ser da mesma empresa.')){
+        iNome.value=nm;return}
+      if(renomeiaEmpresa(nm,novo))r();
+    };
+    linha.querySelector('.bDelEmp').onclick=()=>{if(apagaEmpresa(nm))r()};
     const pinta=()=>{
       const tem=!!(E.marcas[nm]&&E.marcas[nm].logo);
       linha.querySelector('.prevAv').innerHTML=avatar(nm,32);
@@ -4132,7 +4344,8 @@ async function vConfig(m){
       bDel.title=tem?'remover o logo desta empresa':'esta empresa ainda nao tem logo';
     };
     pinta();
-    linha.querySelector('input').onchange=ev=>{
+    // pelo tipo, não pela ordem: o primeiro input da linha agora é o nome
+    linha.querySelector('input[type=color]').onchange=ev=>{
       E.marcas[nm]={...(E.marcas[nm]||{}),cor:ev.target.value};salvar();pinta()};
     bLogo.onclick=()=>pedirArquivo(f=>lerLogo(f,uri=>{
       E.marcas[nm]={...(E.marcas[nm]||{}),logo:uri};salvar();pinta()}),'image/*');
