@@ -29,14 +29,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const JWT_SECRET = Deno.env.get("EQUIPE_JWT_SECRET") ?? "";
 const LEO_SECRET = Deno.env.get("LEO_SESSION_SECRET") ?? "";
-// tokens de sistema — usados UMA vez, para importar as contas que já existem
-const TOKEN_SIS: Record<string, string> = {
-  brief: Deno.env.get("BRIEF_TOKEN") ?? "",
-  pcp: Deno.env.get("PCP_TOKEN") ?? "",
-};
-
 const DIAS = 30;
-const SISTEMAS = ["brief", "pcp"] as const;
+const SISTEMAS = ["brief", "pcp", "compras"] as const;
 type Sistema = typeof SISTEMAS[number];
 
 // Papéis de cada sistema, com quem administra. Lista fechada: papel digitado
@@ -47,6 +41,9 @@ const PAPEIS: Record<Sistema, { todos: string[]; admin: string[] }> = {
     todos: ["admin", "pcp", "montagem", "operacao", "comercial"],
     admin: ["admin"],
   },
+  // Compras (03/08/2026): admin aprova e configura; comprador cota e emite OC;
+  // solicitante pede material e registra recebimento.
+  compras: { todos: ["admin", "comprador", "solicitante"], admin: ["admin"] },
 };
 
 const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
@@ -199,9 +196,16 @@ async function registrar(sistema: string, usuario: string, acao: string, por: st
 // ativo) segue dentro da configuração que os aparelhos baixam — mas SEM SENHA
 // NENHUMA, que é o que vazava. Esta função reescreve esse elenco a cada mudança,
 // para as duas listas nunca discordarem.
-const TAB_CFG: Record<Sistema, string> = { brief: "brief_config_global", pcp: "pcp_config_global" };
+const TAB_CFG: Record<Sistema, string> = {
+  brief: "brief_config_global",
+  pcp: "pcp_config_global",
+  compras: "compras_config_global",
+};
 
 async function espelharElenco(sistema: Sistema) {
+  // Sistema sem tabela de configuração mapeada não tem elenco para espelhar —
+  // e não pode derrubar a criação da conta por causa disso.
+  if (!TAB_CFG[sistema]) return "";
   const { data: contas } = await sb.from("equipe_contas")
     .select("usuario, nome, papel, ativo").eq("sistema", sistema).order("usuario");
   const { data: linha } = await sb.from(TAB_CFG[sistema]).select("config").eq("id", true).maybeSingle();
@@ -379,10 +383,13 @@ Deno.serve(async (req: Request) => {
       // Autorizada pelo token DAQUELE sistema (ou pela Central) e só cria o que
       // ainda não existe: rodar duas vezes não estraga senha de ninguém.
       case "importar": {
+        // SÓ A CENTRAL. Esta ação já aceitou o token do sistema como
+        // autorização, e isso era um buraco: esse token vai no JavaScript
+        // público do site (brief-medicao/config.js:5), então qualquer visitante
+        // podia mandar {acao:"importar", papel:"admin"} e criar um admin com a
+        // senha que quisesse. Token que vive num bundle não autoriza nada.
         const q = await quemPede(req, sistema);
-        const tokenSis = req.headers.get("x-token") ?? "";
-        const autorizado = q.central || (!!TOKEN_SIS[sistema] && igual(tokenSis, TOKEN_SIS[sistema]));
-        if (!autorizado) return json({ erro: "Não autorizado." }, 401);
+        if (!q.central) return json({ erro: "Não autorizado." }, 401);
         const lista = Array.isArray(body.contas) ? body.contas : [];
         if (!lista.length) return json({ erro: "Nada para importar." }, 400);
         const { data: jaTem } = await sb.from("equipe_contas").select("usuario").eq("sistema", sistema);
