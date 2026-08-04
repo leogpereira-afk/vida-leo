@@ -2590,6 +2590,81 @@ function telaAcessos(){
     outros.appendChild(a);
   });
   cx.appendChild(outros);
+  cx.appendChild(blocoHistorico());
+  return cx;
+}
+
+/* ---- HISTÓRICO DE ACESSOS (todos os sistemas, um lugar só) ----
+   O log sempre foi gravado, mas não havia por onde ler: 13 linhas escritas e
+   invisíveis. Aqui a Central mostra tudo -- quem entrou, quem tentou e errou,
+   quem trocou senha, quem criou ou removeu acesso. */
+const ACOES_HIST={
+  'entrou':        {t:'entrou',              ic:'✅', cor:'var(--ok, #17a673)'},
+  'login-falhou':  {t:'errou a senha',       ic:'⚠️', cor:'var(--alerta, #b97a08)'},
+  'login-barrado': {t:'barrado (desativado)',ic:'⛔', cor:'var(--perigo, #d43d51)'},
+  'trocou-senha':  {t:'trocou a senha',      ic:'🔑', cor:'var(--suave)'},
+  'criou':         {t:'acesso criado',       ic:'➕', cor:'var(--suave)'},
+  'editou':        {t:'acesso editado',      ic:'✏️', cor:'var(--suave)'},
+  'salvou':        {t:'acesso salvo',        ic:'💾', cor:'var(--suave)'},
+  'removeu':       {t:'acesso removido',     ic:'🗑️', cor:'var(--perigo, #d43d51)'},
+  'importou':      {t:'contas importadas',   ic:'📥', cor:'var(--suave)'},
+};
+function quandoRelativo(iso){
+  const d=new Date(iso); if(isNaN(d))return '';
+  const min=Math.round((Date.now()-d.getTime())/60000);
+  if(min<1)return 'agora';
+  if(min<60)return min+' min atrás';
+  const h=Math.round(min/60);
+  if(h<24)return h+'h atrás';
+  return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+function blocoHistorico(){
+  const cx=el('<div style="margin-top:22px"></div>');
+  cx.appendChild(el('<div style="font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--suave);margin-bottom:4px">Histórico de acessos</div>'));
+  cx.appendChild(el('<div style="font-size:12.5px;color:var(--suave);margin-bottom:10px">Todos os sistemas. Quem entrou, quem errou a senha, quem trocou, quem mexeu em acesso.</div>'));
+  const filtros=el('<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>');
+  const lista=el('<div></div>');
+  let so='';   // '' = tudo
+  const botoes=[['','tudo'],['entrou','entradas'],['login-falhou','erros de senha'],['trocou-senha','trocas de senha']];
+  const pintarFiltros=()=>{
+    filtros.innerHTML='';
+    botoes.forEach(([k,rot])=>{
+      const b=el('<button style="border:1px solid var(--linha);background:'+(so===k?'var(--txt)':'var(--card)')+
+        ';color:'+(so===k?'var(--card)':'inherit')+';border-radius:999px;padding:6px 12px;font:inherit;font-size:12.5px;cursor:pointer">'+rot+'</button>');
+      b.onclick=()=>{so=k;pintarFiltros();carregarHist()};
+      filtros.appendChild(b);
+    });
+  };
+  async function carregarHist(){
+    lista.innerHTML='<div style="font-size:13px;color:var(--suave);padding:8px 0">carregando…</div>';
+    let d;
+    try{ d=await apiEquipe('historico',{sistema:'*',limite:200,...(so?{acao:so}:{})}); }
+    catch(e){ lista.innerHTML='<div class="aviso">'+esc(e.erro||'não consegui carregar o histórico')+'</div>'; return; }
+    const linhas=d.linhas||[];
+    if(!linhas.length){ lista.innerHTML='<div style="font-size:13px;color:var(--suave);padding:8px 0">nada registrado ainda.</div>'; return; }
+    // nome do sistema pelo registro que a própria Central já tem
+    const nomeSis={};SISTEMAS_ACESSO.forEach(x=>nomeSis[x.k]=x.nome);
+    lista.innerHTML='';
+    linhas.forEach(l=>{
+      const a=ACOES_HIST[l.acao]||{t:l.acao,ic:'•',cor:'var(--suave)'};
+      // "por" só interessa quando foi OUTRA pessoa que mexeu na conta
+      const porOutro=l.por&&l.por!=='-'&&!String(l.por).endsWith(':'+l.usuario);
+      lista.appendChild(el('<div style="display:flex;gap:10px;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--linha)">'+
+        '<span style="font-size:14px">'+a.ic+'</span>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:13.5px"><b>'+esc(l.usuario||'—')+'</b> '+esc(a.t)+
+            ' <span style="color:var(--suave)">· '+esc(nomeSis[l.sistema]||l.sistema)+'</span></div>'+
+          (l.detalhe||porOutro?'<div style="font-size:12px;color:var(--suave)">'+
+            esc([l.detalhe,porOutro?'por '+String(l.por).replace(/^[^:]*:/,''):''].filter(Boolean).join(' · '))+'</div>':'')+
+        '</div>'+
+        '<span style="font-size:12px;color:var(--suave);white-space:nowrap">'+esc(quandoRelativo(l.em))+'</span>'+
+      '</div>'));
+    });
+  }
+  pintarFiltros();
+  cx.appendChild(filtros);
+  cx.appendChild(lista);
+  carregarHist();
   return cx;
 }
 

@@ -334,7 +334,14 @@ async function rhRemover(body: Record<string, any>) {
 }
 
 async function registrar(sistema: string, usuario: string, acao: string, por: string, detalhe = "") {
-  await sb.from("equipe_acessos_log").insert({ sistema, usuario, acao, por, detalhe });
+  // O histórico é TESTEMUNHA, não dono da operação: se a gravação falhar, a
+  // troca de senha (ou o login) tem que acontecer do mesmo jeito. Sem este
+  // try, um problema na tabela de log tirava o sistema inteiro do ar.
+  try {
+    await sb.from("equipe_acessos_log").insert({ sistema, usuario, acao, por, detalhe });
+  } catch (e) {
+    console.warn("[equipe-auth] log falhou:", (e as Error)?.message);
+  }
 }
 
 // ---------------------------------------------------------------- elenco
@@ -405,7 +412,10 @@ Deno.serve(async (req: Request) => {
 
   const acao = String(body.acao ?? body.action ?? "");
   const sistema = String(body.sistema ?? "") as Sistema;
-  const precisaSistema = acao !== "eu";
+  // "historico" com sistema "*" é a visão da Central (todos os sistemas de uma
+  // vez) -- por isso ela escapa da lista fechada aqui; quem barra é a checagem
+  // de Central lá dentro.
+  const precisaSistema = acao !== "eu" && !(acao === "historico" && sistema === "*");
   if (precisaSistema && !SISTEMAS.includes(sistema)) {
     return json({ erro: `sistema inválido (use ${SISTEMAS.join(" ou ")})` }, 400);
   }
@@ -424,9 +434,20 @@ Deno.serve(async (req: Request) => {
           .eq("sistema", sistema).eq("usuario", usuario).maybeSingle();
         // Conta inexistente e senha errada precisam ser indistinguíveis, senão
         // dá para descobrir quem tem acesso só tentando nomes.
-        if (!conta || !(await conferirSenha(senha, conta))) { await freia(); return json({ erro: ERRO_LOGIN }, 401); }
-        if (conta.ativo === false) return json({ erro: "Este acesso está desativado. Fale com a gestão." }, 403);
+        if (!conta || !(await conferirSenha(senha, conta))) {
+          await freia();
+          // Tentativa que falhou também é histórico: é assim que se percebe
+          // alguém tentando entrar na conta de outro (ou alguém travado na
+          // senha errada, que é o caso comum e merece ajuda).
+          await registrar(sistema, usuario, "login-falhou", "-", conta ? "senha errada" : "usuário não existe");
+          return json({ erro: ERRO_LOGIN }, 401);
+        }
+        if (conta.ativo === false) {
+          await registrar(sistema, usuario, "login-barrado", "-", "conta desativada");
+          return json({ erro: "Este acesso está desativado. Fale com a gestão." }, 403);
+        }
         const token = await assinarCracha({ sis: sistema, sub: conta.usuario, nome: conta.nome || conta.usuario, papel: conta.papel });
+        await registrar(sistema, conta.usuario, "entrou", `${sistema}:${conta.usuario}`);
         return json({
           token, usuario: conta.usuario, nome: conta.nome || conta.usuario,
           papel: conta.papel, trocarSenha: !!conta.trocar_senha, dias: DIAS,
@@ -473,6 +494,33 @@ Deno.serve(async (req: Request) => {
           .eq("sistema", sistema).order("usuario");
         if (error) throw new Error(error.message);
         return json({ contas: (data ?? []).map(publica), papeis: PAPEIS[sistema].todos });
+      }
+
+      // ------------------------------------------------------------ histórico
+      // O log já era gravado desde sempre — mas não havia por onde LER, então
+      // ninguém nunca viu. Esta é a porta: quem administra o sistema vê o
+      // histórico DELE; a Central vê o de todos (sistema: "*").
+      case "historico": {
+        const todos = String(body.sistema ?? "") === "*";
+        let q: { central: boolean; admin: boolean; quem: string };
+        if (todos) {
+          const central = await ehCentral(bearer(req));
+          if (!central) return json({ erro: "Apenas a Central." }, 403);
+          q = { central: true, admin: true, quem: "central" };
+        } else {
+          q = await quemPede(req, sistema);
+          if (!q.admin) return json({ erro: "Apenas a gestão." }, 403);
+        }
+        const limite = Math.min(Number(body.limite ?? 200), 500);
+        let sel = sb.from("equipe_acessos_log")
+          .select("em, sistema, usuario, acao, por, detalhe")
+          .order("em", { ascending: false }).limit(limite);
+        if (!todos) sel = sel.eq("sistema", sistema);
+        if (body.usuario) sel = sel.eq("usuario", normalizarUsuario(body.usuario));
+        if (body.acao) sel = sel.eq("acao", String(body.acao));
+        const { data, error } = await sel;
+        if (error) throw new Error(error.message);
+        return json({ linhas: data ?? [] });
       }
 
       case "salvarConta": {
