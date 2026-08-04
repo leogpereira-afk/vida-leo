@@ -44,7 +44,13 @@ h1,h2,h3,.serif{font-family:Fraunces,Georgia,serif;font-weight:600;letter-spacin
 .nav button.on{background:var(--verde-cl);color:var(--verde);font-weight:600}
 .nav .ic{width:20px;text-align:center;font-size:15px}
 .nav .sep{margin:12px 10px 6px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--suave);opacity:.75}
-.rodape{margin-top:18px;padding:12px 10px 0;border-top:1px solid var(--linha);display:flex;gap:8px;flex-wrap:wrap}
+.ponte{display:flex;align-items:center;gap:10px;margin:14px 6px 0;padding:9px 10px;
+  border:1px dashed var(--linha);border-radius:10px;text-decoration:none;color:var(--suave);
+  font:500 13px Inter;transition:color .12s,border-color .12s,background .12s}
+.ponte:hover{color:var(--tinta);border-color:var(--suave);background:var(--card)}
+.ponte .ic{font-size:16px;flex:0 0 auto}
+.ponte .fora{margin-left:auto;font-size:12px;opacity:.7}
+.rodape{margin-top:14px;padding:12px 10px 0;border-top:1px solid var(--linha);display:flex;gap:8px;flex-wrap:wrap}
 .rodape button{border:1px solid var(--linha);background:var(--card);color:var(--suave);
   border-radius:8px;padding:5px 9px;font:500 11.5px Inter;cursor:pointer}
 .rodape button:hover{color:var(--tinta);border-color:var(--suave)}
@@ -189,6 +195,7 @@ tr:hover .lixo{opacity:1}
   .nav{flex-direction:row;overflow-x:auto;gap:5px;padding-bottom:4px}
   .nav button{white-space:nowrap;padding:8px 12px;font-size:13px}
   .nav .sep{display:none} .nav .ic{font-size:15px}
+  .ponte .tx,.ponte .fora{display:none} .ponte{justify-content:center;padding:9px 4px}
   .main{padding:20px 15px 60px}
 }
 </style>
@@ -201,6 +208,12 @@ tr:hover .lixo{opacity:1}
       <rect x="23" y="26" width="37" height="12"/><rect x="47" y="26" width="13" height="34"/>
       <rect x="30" y="47" width="17" height="13"/></g></svg><div><b>LEONARDO</b><small style="letter-spacing:.18em">GONÇALVES</small></div></div>
     <nav class="nav" id="nav"></nav>
+    <!-- A ponte para o lado da empresa. Fica aqui, e não no rodapé de ações,
+         porque é navegação: o rodapé é para o que MEXE nos dados. -->
+    <a class="ponte" href="https://impresilk.com.br/painel" target="_blank" rel="noopener"
+       title="abre em outra aba — o painel da Impresilk tem login próprio">
+      <span class="ic">📊</span><span class="tx">Painel da Impresilk</span><span class="fora">↗</span>
+    </a>
     <div class="rodape">
       <button onclick="sincronizarAgora()">☁ Sincronizar</button>
       <button onclick="salvarPDF()">🖨 PDF</button>
