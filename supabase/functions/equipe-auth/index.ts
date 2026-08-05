@@ -36,7 +36,10 @@ type Sistema = typeof SISTEMAS[number];
 // Papéis de cada sistema, com quem administra. Lista fechada: papel digitado
 // errado vira gente sem acesso a nada (ou com acesso demais).
 const PAPEIS: Record<Sistema, { todos: string[]; admin: string[] }> = {
-  brief: { todos: ["vendedor", "designer", "admin"], admin: ["admin"] },
+  // medidor (05/08/2026): quem vai à rua medir. Vê só o que foi DIRECIONADO a
+  // ele e só a parte de campo do briefing (da etapa 4 em diante). Não cria
+  // briefing, não vê preço nem O.S. -- o trabalho dele é medir e fotografar.
+  brief: { todos: ["vendedor", "designer", "medidor", "admin"], admin: ["admin"] },
   pcp: {
     todos: ["admin", "pcp", "montagem", "operacao", "comercial"],
     admin: ["admin"],
