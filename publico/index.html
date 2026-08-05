@@ -195,6 +195,9 @@ tr:hover .lixo{opacity:1}
   .nav{flex-direction:row;overflow-x:auto;gap:5px;padding-bottom:4px}
   .nav button{white-space:nowrap;padding:8px 12px;font-size:13px}
   .nav .sep{display:none} .nav .ic{font-size:15px}
+  /* objetivo e ações lado a lado só cabem na tela grande; no celular empilham */
+  .objGrade{grid-template-columns:1fr !important}
+  .objEsq{border-right:none !important;border-bottom:1px solid var(--linha)}
   .ponte .tx,.ponte .fora{display:none} .ponte{justify-content:center;padding:9px 4px}
   .main{padding:20px 15px 60px}
 }
@@ -396,6 +399,7 @@ const SEED={
   norte:{proposito:'',valores:'',legado:''},
   roda:{},rituais:[],instrucoes:[],protecao:[],planoAno:[],pdi:[],livros:[],bancos:[],empresasPJ:[],patrimonio:[],
   oportunidades:[],
+  estrategia:{},
   comportamento:{temperamentos:{},disc:{},discAdaptado:{},big5:{},valores:{},lideranca:{},
     tipoJung:'',tracoPrincipal:'',motivadorPrincipal:'',motivadorSecundario:'',medos:'',
     positividade:'',estima:'',flexibilidade:'',fonteLaudo:'',eneagramaTipo:'',comoDecido:'',oQueMeMove:'',comoMeRecarrego:'',meusPontosCegos:'',comoMeAjudar:'',numerologia:'',perfilDisc:'',eneagrama:'',bigfive:''},
@@ -459,6 +463,7 @@ function carregar(){
   });
   if(!d.colapso)d.colapso={};
   if(!d.marcas||typeof d.marcas!=='object'||Array.isArray(d.marcas))d.marcas={};
+  if(!d.estrategia||typeof d.estrategia!=='object'||Array.isArray(d.estrategia))d.estrategia={};
   // objetos únicos: garante que existam mesmo em backup antigo
   for(const k of ['sos','norte','roda','perfil','comportamento']) d[k]={...structuredClone(SEED[k]),...(d[k]||{})};
   for(const k of ['vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','seguros','planos','casa','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades']) if(!Array.isArray(d[k])) d[k]=[];
@@ -823,6 +828,7 @@ const MODS=[
   {id:'agenda',ic:'📅',nome:'Agenda',grupo:'',render:vAgenda},
   {id:'demandas',ic:'✅',nome:'Demandas',grupo:'',render:vDemandas},
   {id:'saude',ic:'🩺',nome:'Saúde',grupo:'',render:vSaude},
+  {id:'estrategia',ic:'♟️',nome:'Gestão estratégica',grupo:'Empresa',render:vEstrategia},
   {id:'oportunidades',ic:'💡',nome:'Oportunidades',grupo:'Extra',render:vOportunidades},
   {id:'documentos',ic:'🪪',nome:'Documentos',grupo:'',render:vDocumentos},
   {id:'guia',ic:'🧭',nome:'Guia de vida',grupo:'',render:vGuia},
@@ -2089,6 +2095,409 @@ function imprimirSOS() {
   ${S.obs ? `<h2>Observações</h2><div class="l">${esc(S.obs)}</div>` : ''}
   <div style="margin-top:26px;color:#999;font-size:12px">Gerado em ${new Date().toLocaleDateString('pt-BR')}</div>`);
   w.document.close(); w.print();
+}
+
+/* ===================== GESTÃO ESTRATÉGICA =====================
+   Três camadas, na ordem em que uma sustenta a outra:
+
+   1. QUEM SOMOS   — missão, visão e valores. Serve para decidir quando não há
+                     regra: é o que sobra quando o manual não cobre o caso.
+   2. PARA ONDE    — objetivos, e ao lado de cada um as AÇÕES. Objetivo sem ação
+                     é desejo; ação sem objetivo é agitação.
+   3. COM QUEM     — o campo tático. NÃO é organograma: organograma responde
+                     "quem manda em quem", e essa não é a pergunta de quem está
+                     montando um time. As perguntas aqui são: que frentes eu
+                     tenho, quem está em cada uma, quem é insubstituível, e onde
+                     está o buraco. As peças se movem entre as frentes até a
+                     formação fazer sentido. */
+
+const ZONAS_PADRAO=[
+  {id:'z1',nome:'Frente de ataque',dica:'quem traz cliente e receita'},
+  {id:'z2',nome:'Entrega',dica:'quem faz o que foi vendido'},
+  {id:'z3',nome:'Retaguarda',dica:'financeiro, compras, administrativo'},
+  {id:'z4',nome:'Reserva',dica:'quem pode entrar, quem está em formação'},
+];
+const STATUS_ACAO=['A fazer','Fazendo','Feita','Travada'];
+
+const empAtivas=()=>(E.empresasPJ||[]).filter(x=>x.status!=='Baixada'&&String(x.nome||'').trim());
+function estrDe(nome){
+  if(!E.estrategia[nome]) E.estrategia[nome]={missao:'',visao:'',valores:[],objetivos:[],
+    zonas:structuredClone(ZONAS_PADRAO),pecas:[]};
+  const e=E.estrategia[nome];
+  if(!Array.isArray(e.valores))e.valores=[];
+  if(!Array.isArray(e.objetivos))e.objetivos=[];
+  if(!Array.isArray(e.zonas)||!e.zonas.length)e.zonas=structuredClone(ZONAS_PADRAO);
+  if(!Array.isArray(e.pecas))e.pecas=[];
+  e.objetivos.forEach(o=>{if(!Array.isArray(o.acoes))o.acoes=[]});
+  return e;
+}
+
+let _pecaNaMao=null;   // peça "pegada" para mover — funciona no dedo e no mouse
+
+function vEstrategia(m){
+  const r=rr('estrategia');
+  const ativas=empAtivas();
+  m.appendChild(cab('Gestão estratégica','Quem somos, para onde vamos e com quem — empresa por empresa.'));
+
+  if(!ativas.length){
+    m.appendChild(el(`<div class="aviso">🏢 <b>Nenhuma empresa ativa cadastrada ainda.</b>
+      Cadastre em <b>Guia de vida → Minhas empresas</b> (nome, CNPJ, regime, sócios e banco) —
+      esta tela monta o resto em cima de lá, para o dado não morar em dois lugares.</div>`));
+    return;
+  }
+  if(filtro.estrEmp==null||!ativas.some(x=>x.nome===filtro.estrEmp)) filtro.estrEmp=ativas[0].nome;
+  const emp=ativas.find(x=>x.nome===filtro.estrEmp);
+  const est=estrDe(emp.nome);
+
+  m.appendChild(painel('Empresa',
+    seletor(filtro.estrEmp,ativas.map(x=>[x.nome,x.nome]),v=>{filtro.estrEmp=v;r()}),'|'));
+
+  /* ---- 1. a empresa: dados e bancos, lidos de onde já moram ---- */
+  const objetivos=est.objetivos||[];
+  const acoesTodas=objetivos.flatMap(o=>o.acoes||[]);
+  const abertas=acoesTodas.filter(a=>a.status!=='Feita');
+  const travadas=acoesTodas.filter(a=>a.status==='Travada');
+  const atrasadas=abertas.filter(a=>a.ate&&a.ate<hoje());
+  const chaves=(est.pecas||[]).filter(p=>p.chave);
+  const semSubstituto=chaves.filter(p=>!String(p.substituto||'').trim());
+
+  m.appendChild(ligaKpis(el(`<div class="grade">
+    ${kpi('Objetivos',objetivos.length,objetivos.length?'no plano':'nenhum ainda',null,'plano')}
+    ${kpi('Ações abertas',abertas.length,atrasadas.length?atrasadas.length+' passaram do prazo':'nada atrasado',atrasadas.length?'r':'v','plano')}
+    ${kpi('Travadas',travadas.length,travadas.length?'esperando alguma coisa':'nenhuma travada',travadas.length?'a':'','plano')}
+    ${kpi('Peças no campo',(est.pecas||[]).length,(est.zonas||[]).length+' frentes',null,'campo')}
+    ${kpi('Sem substituto',semSubstituto.length,semSubstituto.length?'peça-chave que ninguém cobre':'toda peça-chave tem quem cubra',semSubstituto.length?'r':'v','campo')}</div>`),{
+    plano:()=>{abreBloco('es-plano');r()},
+    campo:()=>{abreBloco('es-campo');r()},
+  }));
+
+  if(semSubstituto.length) m.appendChild(el(`<div class="aviso" style="background:var(--vermelho-cl);border-color:var(--vermelho)">
+    ⚠️ <b>${semSubstituto.length} peça-chave sem ninguém que cubra:</b> ${semSubstituto.map(p=>esc(p.nome)).join(', ')}.
+    Se qualquer uma sair de cena amanhã — doença, proposta melhor, briga — a frente dela para.
+    Formar substituto é trabalho de tempo de paz.</div>`));
+
+  const vazias=(est.zonas||[]).filter(z=>!(est.pecas||[]).some(p=>p.zona===z.id));
+  if(vazias.length) m.appendChild(el(`<div class="aviso">🕳️ <b>Frente sem ninguém:</b>
+    ${vazias.map(z=>esc(z.nome)).join(', ')}. Ou alguém está fazendo isso sem estar escrito
+    (e sem tempo reservado), ou não está sendo feito.</div>`));
+
+  const dx=el('<div class="corpo"></div>');
+  dx.appendChild(el(`<div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+    ${[['CNPJ',emp.cnpj],['Regime',emp.regime],['Sócios',emp.socios],['Contabilidade',emp.contador],['Banco principal',emp.banco],['Situação',emp.status]]
+      .map(([r2,v])=>`<div style="border:1px solid var(--linha);border-radius:var(--r);padding:11px 13px;background:var(--card)">
+        <div style="font-size:11px;color:var(--suave);text-transform:uppercase;letter-spacing:.05em">${r2}</div>
+        <div style="font-size:14px;font-weight:600;margin-top:3px">${esc(v||'—')}</div></div>`).join('')}
+  </div>`));
+  const contas=(E.bancos||[]).filter(b=>normaliza(b.titular||'').includes(normaliza(emp.nome))
+    ||normaliza(emp.banco||'').includes(normaliza(b.banco||''))&&String(b.banco||'').trim());
+  if(contas.length){
+    const rol=el('<div class="rolagem" style="margin-top:12px"></div>');
+    rol.innerHTML='<table><thead><tr><th>Banco</th><th>Titular</th><th>Tipo</th><th>Agência</th><th>Conta</th><th>PIX</th><th>Gerente</th></tr></thead><tbody>'
+      +contas.map(b=>`<tr><td style="padding:9px 10px"><b>${esc(b.banco||'—')}</b></td>
+        <td style="padding:9px 10px;color:var(--suave)">${esc(b.titular||'—')}</td>
+        <td style="padding:9px 10px;color:var(--suave)">${esc(b.tipo||'—')}</td>
+        <td style="padding:9px 10px;font-variant-numeric:tabular-nums">${esc(b.agencia||'—')}</td>
+        <td style="padding:9px 10px;font-variant-numeric:tabular-nums">${esc(b.conta||'—')}</td>
+        <td style="padding:9px 10px;color:var(--suave)">${esc(b.pix||'—')}</td>
+        <td style="padding:9px 10px;color:var(--suave)">${esc(b.gerente||'—')}</td></tr>`).join('')
+      +'</tbody></table>';
+    dx.appendChild(rol);
+  } else dx.appendChild(el('<div class="vazio" style="margin-top:12px">Nenhuma conta ligada a esta empresa em Guia de vida → Bancos e PIX.</div>'));
+  m.appendChild(bloco('es-dados','🏢 '+esc(emp.nome),'dados e contas — vêm do Guia de vida, não se digita duas vezes',dx));
+
+  /* ---- 2. quem somos ---- */
+  const ix=el('<div class="corpo"></div>');
+  ix.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin:0 0 10px">
+    Isto não é enfeite de parede: é o que decide por você quando aparecer um caso que o manual não cobre.
+    Escreva curto o bastante para alguém repetir de cabeça.</p>`));
+  ix.appendChild(campos(est,[
+    {k:'missao',t:'Missão — por que existimos',tipo:'textarea',full:true,ph:'o problema que resolvemos, para quem'},
+    {k:'visao',t:'Visão — onde queremos chegar',tipo:'textarea',full:true,ph:'como a empresa é daqui a 3 ou 5 anos'},
+  ],()=>salvar()));
+  const vl=el('<div style="margin-top:12px"></div>');
+  const pintaValores=()=>{
+    vl.innerHTML='<div style="font-size:13px;font-weight:600;margin-bottom:7px">Valores — o que não se negocia</div>';
+    (est.valores||[]).forEach((v,i)=>{
+      const li=el(`<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--linha)">
+        <b style="color:var(--suave);font-size:12px;min-width:18px">${i+1}.</b>
+        <div style="flex:1"><b style="font-size:13.5px">${esc(v.titulo||'—')}</b>
+          ${v.oque?`<div style="font-size:12px;color:var(--suave)">${esc(v.oque)}</div>`:''}</div>
+        <button class="btn ghost mini" style="color:var(--vermelho)">✕</button></div>`);
+      li.querySelector('button').onclick=()=>{est.valores.splice(i,1);salvar();pintaValores()};
+      vl.appendChild(li);
+    });
+    if(!(est.valores||[]).length) vl.appendChild(el('<div class="vazio">Nenhum valor escrito ainda.</div>'));
+    const novo={titulo:'',oque:''};
+    vl.appendChild(campos(novo,[
+      {k:'titulo',t:'Valor',ph:'ex.: Prazo combinado é prazo cumprido'},
+      {k:'oque',t:'O que isso significa na prática',ph:'como se reconhece quem vive isso'},
+    ]));
+    const b=el('<button class="btn mini">+ Guardar valor</button>');
+    b.onclick=()=>{if(!String(novo.titulo||'').trim()){alert('Escreva o valor.');return}
+      est.valores=[...(est.valores||[]),{titulo:novo.titulo.trim(),oque:String(novo.oque||'').trim()}];
+      salvar();pintaValores()};
+    vl.appendChild(b);
+  };
+  pintaValores();
+  ix.appendChild(vl);
+  m.appendChild(bloco('es-identidade','🧭 Missão, visão e valores','o que decide quando não há regra',ix));
+
+  /* ---- 3. plano: objetivo à esquerda, ações à direita ---- */
+  const px=el('<div class="corpo"></div>');
+  const pintaPlano=()=>{
+    px.innerHTML='';
+    if(!objetivos.length) px.appendChild(el('<div class="vazio">Nenhum objetivo ainda. Um objetivo é o que muda se der certo — não a tarefa.</div>'));
+    objetivos.forEach((o,io)=>{
+      const feitas=(o.acoes||[]).filter(a=>a.status==='Feita').length;
+      const pct=(o.acoes||[]).length?Math.round(feitas/o.acoes.length*100):0;
+      const cx2=el(`<div style="border:1px solid var(--linha);border-radius:var(--r);margin-bottom:12px;background:var(--card);overflow:hidden">
+        <div style="display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,1.4fr);gap:0;align-items:stretch" class="objGrade">
+          <div style="padding:14px 15px;border-right:1px solid var(--linha)" class="objEsq">
+            <div style="font-size:11px;color:var(--suave);text-transform:uppercase;letter-spacing:.05em">Objetivo ${io+1}</div>
+            <b style="font-size:15px;display:block;margin-top:3px">${esc(o.titulo||'(sem título)')}</b>
+            ${o.porque?`<div style="font-size:12.5px;color:var(--suave);margin-top:5px">${esc(o.porque)}</div>`:''}
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;font-size:12px;color:var(--suave)">
+              ${o.indicador?`<span>📏 ${esc(o.indicador)}</span>`:''}
+              ${o.ate?`<span>🗓 até ${fmtDataAno(o.ate)}${o.ate<hoje()?' <b style="color:var(--vermelho)">(passou)</b>':''}</span>`:''}
+            </div>
+            <div class="barra" style="margin-top:10px"><i style="width:${pct}%;background:${pct===100?'var(--verde)':'var(--areia)'}"></i></div>
+            <div style="font-size:11.5px;color:var(--suave);margin-top:4px">${feitas} de ${(o.acoes||[]).length} ação(ões) feita(s)</div>
+            <div style="display:flex;gap:6px;margin-top:10px"><button class="btn ghost mini bEd">✎ editar</button>
+              <button class="btn ghost mini bDelO" style="color:var(--vermelho)">🗑</button></div>
+          </div>
+          <div style="padding:14px 15px" class="objDir">
+            <div style="font-size:11px;color:var(--suave);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Ações</div>
+            <div class="acoes"></div>
+          </div>
+        </div></div>`);
+      const box=cx2.querySelector('.acoes');
+      const pintaAcoes=()=>{
+        box.innerHTML='';
+        (o.acoes||[]).forEach((a,ia)=>{
+          const li=el(`<div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--linha)">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:13.5px;${a.status==='Feita'?'text-decoration:line-through;color:var(--suave)':''}">${esc(a.oque||'—')}</div>
+              <div style="font-size:11.5px;color:var(--suave);margin-top:2px">
+                ${a.quem?esc(a.quem):'<b style="color:var(--vermelho)">sem responsável</b>'}${a.ate?' · até '+fmtDataAno(a.ate):''}
+                ${a.ate&&a.ate<hoje()&&a.status!=='Feita'?' <b style="color:var(--vermelho)">(atrasada)</b>':''}
+                ${a.status==='Travada'&&a.travaPor?' · 🚧 '+esc(a.travaPor):''}</div>
+            </div>
+            <select class="selSt" style="font-size:11.5px;padding:3px 5px">${STATUS_ACAO.map(x=>`<option${x===(a.status||'A fazer')?' selected':''}>${x}</option>`).join('')}</select>
+            <button class="btn ghost mini bDelA" style="color:var(--vermelho)">✕</button></div>`);
+          li.querySelector('.selSt').onchange=ev=>{
+            a.status=ev.target.value;
+            if(a.status==='Travada'){const q=prompt('Travada esperando o quê ou quem?',a.travaPor||'');if(q!=null)a.travaPor=q}
+            else a.travaPor='';
+            salvar();
+            // redesenha a tela inteira: mudar status mexe nos contadores lá em
+            // cima, e contador errado é pior que contador nenhum. O abreBloco
+            // traz a rolagem de volta para cá.
+            abreBloco('es-plano');r();
+          };
+          li.querySelector('.bDelA').onclick=()=>{o.acoes.splice(ia,1);salvar();abreBloco('es-plano');r()};
+          box.appendChild(li);
+        });
+        if(!(o.acoes||[]).length) box.appendChild(el('<div class="vazio">Objetivo sem ação é desejo. Escreva a primeira.</div>'));
+        const nova={oque:'',quem:'',ate:''};
+        box.appendChild(campos(nova,[
+          {k:'oque',t:'O que fazer',ph:'uma coisa concreta',full:true},
+          {k:'quem',t:'Quem',tipo:'sugestao',ph:'nome',opcoes:[...new Set((est.pecas||[]).map(p=>p.nome).filter(Boolean))]},
+          {k:'ate',t:'Até',tipo:'date'},
+        ]));
+        const b=el('<button class="btn mini">+ Ação</button>');
+        b.onclick=()=>{if(!String(nova.oque||'').trim()){alert('Escreva a ação.');return}
+          o.acoes=[...(o.acoes||[]),{id:uid(),oque:nova.oque.trim(),quem:String(nova.quem||'').trim(),
+            ate:nova.ate||'',status:'A fazer',travaPor:''}];
+          salvar();pintaAcoes()};
+        box.appendChild(b);
+      };
+      pintaAcoes();
+      cx2.querySelector('.bEd').onclick=()=>modalObjetivo(o,()=>{salvar();pintaPlano()});
+      cx2.querySelector('.bDelO').onclick=()=>{
+        if(!confirm('Apagar o objetivo "'+(o.titulo||'sem título')+'" e as '+(o.acoes||[]).length+' ação(ões) dele?'))return;
+        est.objetivos.splice(io,1);salvar();pintaPlano()};
+      px.appendChild(cx2);
+    });
+    const bNovo=el('<button class="mais">+ Novo objetivo</button>');
+    bNovo.onclick=()=>{const o={id:uid(),titulo:'',porque:'',indicador:'',ate:'',acoes:[]};
+      est.objetivos.push(o);salvar();modalObjetivo(o,()=>{salvar();pintaPlano()},true)};
+    px.appendChild(bNovo);
+  };
+  pintaPlano();
+  m.appendChild(bloco('es-plano','🎯 Planejamento estratégico','objetivo de um lado, ações do outro',px));
+
+  /* ---- 4. o campo tático ---- */
+  m.appendChild(bloco('es-campo','♟️ Campo tático','as frentes, as peças e os buracos — clique numa peça e depois na frente para movê-la',campoTatico(est,r)));
+}
+
+/* O CAMPO. Mover é em dois toques (pegar / soltar) de propósito: arrastar não
+   funciona no celular, e metade das vezes que você vai olhar isso é no celular. */
+function campoTatico(est,r){
+  const cx=el('<div class="corpo"></div>');
+  const grade=el('<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))"></div>');
+
+  const pinta=()=>{
+    grade.innerHTML='';
+    (est.zonas||[]).forEach(z=>{
+      const dentro=(est.pecas||[]).filter(p=>p.zona===z.id);
+      const zEl=el(`<div class="zonaT" style="border:1px solid var(--linha);border-radius:var(--r);background:var(--card);display:flex;flex-direction:column;min-height:150px">
+        <div style="padding:11px 13px;border-bottom:1px solid var(--linha);background:var(--bg);border-radius:var(--r) var(--r) 0 0">
+          <div style="display:flex;align-items:center;gap:6px">
+            <b style="font-size:14px;flex:1">${esc(z.nome)}</b>
+            <span style="font-size:11.5px;color:var(--suave)">${dentro.length}</span>
+            <button class="btn ghost mini bZed" title="renomear ou apagar a frente">⋯</button>
+          </div>
+          ${z.dica?`<div style="font-size:11.5px;color:var(--suave);margin-top:2px">${esc(z.dica)}</div>`:''}
+        </div>
+        <div class="dentro" style="padding:10px 11px;display:flex;flex-direction:column;gap:8px;flex:1"></div>
+      </div>`);
+      const box=zEl.querySelector('.dentro');
+      dentro.forEach(p=>{
+        const naMao=_pecaNaMao===p.id;
+        const pe=el(`<div class="pecaT" style="border:1px solid ${naMao?'var(--tinta)':'var(--linha)'};border-radius:10px;padding:9px 11px;cursor:pointer;background:${naMao?'var(--bg)':'transparent'};box-shadow:${naMao?'0 0 0 2px var(--tinta)':'none'}">
+          <div style="display:flex;align-items:center;gap:7px">
+            ${avatar(p.nome||'?',26)}
+            <div style="flex:1;min-width:0">
+              <b style="font-size:13.5px">${esc(p.nome||'(sem nome)')}</b>
+              <div style="font-size:11.5px;color:var(--suave)">${esc(p.funcao||'sem função definida')}</div>
+            </div>
+            ${p.chave?'<span title="peça-chave" style="font-size:14px">⭐</span>':''}
+          </div>
+          ${p.chave?`<div style="font-size:11px;margin-top:6px;color:${String(p.substituto||'').trim()?'var(--suave)':'var(--vermelho)'}">
+            ${String(p.substituto||'').trim()?'cobertura: '+esc(p.substituto):'⚠ ninguém cobre'}</div>`:''}
+        </div>`);
+        pe.onclick=ev=>{ev.stopPropagation();
+          if(_pecaNaMao===p.id){_pecaNaMao=null;pinta();return}
+          if(_pecaNaMao){_pecaNaMao=null;pinta();return}
+          _pecaNaMao=p.id;pinta();
+        };
+        pe.ondblclick=ev=>{ev.stopPropagation();_pecaNaMao=null;modalPeca(est,p,()=>{salvar();pinta()})};
+        box.appendChild(pe);
+      });
+      if(!dentro.length) box.appendChild(el('<div class="vazio" style="padding:14px 4px;font-size:12px">Ninguém nesta frente.</div>'));
+      // soltar aqui
+      zEl.onclick=()=>{
+        if(!_pecaNaMao)return;
+        const p=(est.pecas||[]).find(x=>x.id===_pecaNaMao);
+        if(p&&p.zona!==z.id){p.zona=z.id;salvar()}
+        _pecaNaMao=null;pinta();
+      };
+      zEl.querySelector('.bZed').onclick=ev=>{ev.stopPropagation();
+        const nome=prompt('Nome da frente:',z.nome);
+        if(nome==null)return;
+        if(!String(nome).trim()){
+          const dentro2=(est.pecas||[]).filter(x=>x.zona===z.id);
+          if(dentro2.length){alert('Tire as '+dentro2.length+' peça(s) daqui antes de apagar a frente.');return}
+          if(!confirm('Apagar a frente "'+z.nome+'"?'))return;
+          est.zonas=est.zonas.filter(x=>x.id!==z.id);salvar();pinta();return;
+        }
+        z.nome=String(nome).trim();
+        const dica=prompt('Uma linha explicando o que é essa frente:',z.dica||'');
+        if(dica!=null)z.dica=String(dica).trim();
+        salvar();pinta();
+      };
+      grade.appendChild(zEl);
+    });
+    // frente nova
+    const add=el(`<button style="border:1px dashed var(--linha);border-radius:var(--r);background:none;color:var(--suave);
+      min-height:150px;cursor:pointer;font:500 13px Inter">+ Nova frente</button>`);
+    add.onclick=()=>{const nome=prompt('Nome da frente nova:','');
+      if(nome==null||!String(nome).trim())return;
+      const dica=prompt('Uma linha explicando o que é essa frente:','')||'';
+      est.zonas=[...(est.zonas||[]),{id:uid(),nome:String(nome).trim(),dica:String(dica).trim()}];
+      salvar();pinta()};
+    grade.appendChild(add);
+  };
+  pinta();
+
+  cx.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin:0 0 11px">
+    Clique numa peça para <b>pegar</b> e depois na frente para <b>soltar</b>. Clique duplo abre a ficha dela.
+    ⭐ marca quem é peça-chave — e a ficha pergunta <b>quem cobre</b>, que é a pergunta que ninguém faz antes de precisar.</p>`));
+  cx.appendChild(grade);
+  const bp=el('<button class="mais">+ Nova peça</button>');
+  bp.onclick=()=>{
+    const p={id:uid(),nome:'',funcao:'',zona:(est.zonas[0]||{}).id,chave:false,substituto:'',obs:''};
+    est.pecas.push(p);salvar();modalPeca(est,p,()=>{salvar();pinta()},true);
+  };
+  cx.appendChild(bp);
+  return cx;
+}
+
+function modalObjetivo(o,aoSalvar,novo){
+  abrirModal(esc(o.titulo||'Novo objetivo'),'o que muda se der certo',(c,fechar)=>{
+    const s1=el('<div class="secao"></div>');
+    s1.appendChild(campos(o,[
+      {k:'titulo',t:'Objetivo',full:true,ph:'ex.: dobrar a venda de fachadas até dezembro'},
+      {k:'porque',t:'Por que este e não outro',tipo:'textarea',full:true,ph:'o que ele destrava'},
+      {k:'indicador',t:'Como vou saber que chegou',ph:'ex.: 40 fachadas/mês'},
+      {k:'ate',t:'Até quando',tipo:'date'},
+    ],aoSalvar));
+    c.appendChild(s1);
+    const s2=el('<div class="secao" style="display:flex;gap:9px"></div>');
+    const ok=el('<button class="btn">Pronto</button>');ok.onclick=fechar;
+    s2.appendChild(el('<span class="cresce"></span>'));s2.appendChild(ok);
+    c.appendChild(s2);
+  },()=>{
+    if(novo&&!String(o.titulo||'').trim()){
+      const est=E.estrategia[filtro.estrEmp];
+      if(est)est.objetivos=est.objetivos.filter(x=>x.id!==o.id);
+      salvar();
+    }
+    aoSalvar&&aoSalvar();
+  });
+}
+
+function modalPeca(est,p,aoSalvar,novo){
+  abrirModal((p.nome?avatar(p.nome,26):'')+esc(p.nome||'Nova peça'),esc(p.funcao||''),(c,fechar)=>{
+    const s1=el('<div class="secao"></div>');
+    s1.appendChild(campos(p,[
+      {k:'nome',t:'Quem',ph:'nome da pessoa',full:true},
+      {k:'funcao',t:'O que essa peça faz',ph:'ex.: fecha venda e cuida do cliente grande',full:true},
+      {k:'zona',t:'Em que frente',tipo:'select',opcoes:(est.zonas||[]).map(z=>z.nome)},
+    ],()=>{
+      // o select guarda o NOME da frente; aqui volta para o id
+      const z=(est.zonas||[]).find(x=>x.nome===p.zona);
+      if(z)p.zona=z.id;
+      aoSalvar&&aoSalvar();
+    }));
+    c.appendChild(s1);
+
+    const s2=el('<div class="secao"><h4>Se esta peça sair de cena</h4></div>');
+    s2.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin:-4px 0 9px">
+      Doença, proposta melhor, briga. A hora de responder isso é agora, não no dia.</p>`));
+    const chk=el(`<label style="display:flex;gap:9px;align-items:center;padding:8px 0;cursor:pointer">
+      <input type="checkbox" ${p.chave?'checked':''} style="width:17px;height:17px;accent-color:var(--tinta)">
+      <span style="font-size:13.5px"><b>⭐ É peça-chave</b> — sem ela a frente para</span></label>`);
+    const sub=el('<div></div>');
+    const pintaSub=()=>{
+      sub.innerHTML='';
+      if(!p.chave)return;
+      sub.appendChild(campos(p,[
+        {k:'substituto',t:'Quem cobre se ela faltar',ph:'nome — ou "ninguém", se for a verdade',full:true},
+      ],aoSalvar));
+      if(!String(p.substituto||'').trim())
+        sub.appendChild(el('<div class="aviso" style="background:var(--vermelho-cl);border-color:var(--vermelho)">⚠ Sem cobertura: essa é a peça que pode te parar.</div>'));
+    };
+    chk.querySelector('input').onchange=ev=>{p.chave=ev.target.checked;salvar();pintaSub();aoSalvar&&aoSalvar()};
+    pintaSub();
+    s2.appendChild(chk);s2.appendChild(sub);
+    c.appendChild(s2);
+
+    const s3=el('<div class="secao"></div>');
+    s3.appendChild(campos(p,[{k:'obs',t:'Anotações',tipo:'textarea',full:true,ph:'pontos fortes, o que precisa desenvolver, combinados'}],aoSalvar));
+    c.appendChild(s3);
+
+    const s4=el('<div class="secao" style="display:flex;gap:9px"></div>');
+    const del=el('<button class="btn ghost" style="color:var(--vermelho)">Tirar do campo</button>');
+    del.onclick=()=>{if(!confirm('Tirar "'+(p.nome||'esta peça')+'" do campo?'))return;
+      est.pecas=est.pecas.filter(x=>x.id!==p.id);salvar();fechar()};
+    s4.appendChild(del);s4.appendChild(el('<span class="cresce"></span>'));
+    const ok=el('<button class="btn">Pronto</button>');ok.onclick=fechar;s4.appendChild(ok);
+    c.appendChild(s4);
+  },()=>{
+    if(novo&&!String(p.nome||'').trim()){est.pecas=est.pecas.filter(x=>x.id!==p.id);salvar()}
+    aoSalvar&&aoSalvar();
+  });
 }
 
 /* ===================== OPORTUNIDADES =====================
