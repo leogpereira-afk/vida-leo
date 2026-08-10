@@ -1481,15 +1481,109 @@ function modalViagem(v){
    para o lugar certo. Duas cópias do mesmo fato divergem em uma semana. */
 
 const FONTES_AGENDA=[
-  {k:'compromissos',rot:'Compromissos',ic:'📅'},
-  {k:'documentos',  rot:'Documentos vencendo',ic:'🪪'},
-  {k:'viagens',     rot:'Viagens',ic:'✈️'},
-  {k:'aniversarios',rot:'Aniversários',ic:'🎂'},
-  {k:'acoes',       rot:'Ações do plano',ic:'🎯'},
-  {k:'oportunidades',rot:'Oportunidades',ic:'💡'},
-  {k:'demandas',    rot:'Demandas',ic:'✅'},
-  {k:'seguros',     rot:'Seguros renovando',ic:'🛡️'},
+  {k:'compromissos',rot:'Compromissos',ic:'📅',cor:'#1f2b4d'},
+  {k:'documentos',  rot:'Documentos vencendo',ic:'🪪',cor:'#e8590c'},
+  {k:'viagens',     rot:'Viagens',ic:'✈️',cor:'#1c7ed6'},
+  {k:'aniversarios',rot:'Aniversários',ic:'🎂',cor:'#d6336c'},
+  {k:'acoes',       rot:'Ações do plano',ic:'🎯',cor:'#2b8a3e'},
+  {k:'oportunidades',rot:'Oportunidades',ic:'💡',cor:'#b8860b'},
+  {k:'demandas',    rot:'Demandas',ic:'✅',cor:'#0ca678'},
+  {k:'seguros',     rot:'Seguros renovando',ic:'🛡️',cor:'#c92a2a'},
 ];
+const corFonte=k=>(FONTES_AGENDA.find(f=>f.k===k)||{}).cor||'var(--suave)';
+// MESES é abreviado (cabe em gráfico); no calendário o mês vai por extenso
+const MESES_LONGO=['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+/* A GRADE DO MÊS. A lista responde "o que vem agora"; a grade responde "como
+   está o mês" — dá para ver a semana cheia e a semana vazia de um golpe de
+   vista, que é o que faz decidir onde encaixar mais uma coisa. */
+function gradeMes(eventos,r){
+  const cx=el('<div class="corpo"></div>');
+  const h=hoje();
+  if(!filtro.agMes) filtro.agMes=h.slice(0,7);
+  const [ay,am]=filtro.agMes.split('-').map(Number);
+
+  // cabeçalho: ‹ mês ›  hoje
+  const topo=el(`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+    <button class="btn ghost mini bAnt">‹</button>
+    <b style="font-family:Fraunces,serif;font-size:20px;min-width:190px">${MESES_LONGO[am-1]} ${ay}</b>
+    <button class="btn ghost mini bProx">›</button>
+    <button class="btn ghost mini bHoje">Hoje</button></div>`);
+  const passo=d=>{const x=new Date(ay,am-1+d,1);filtro.agMes=x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0');r()};
+  topo.querySelector('.bAnt').onclick=()=>passo(-1);
+  topo.querySelector('.bProx').onclick=()=>passo(1);
+  topo.querySelector('.bHoje').onclick=()=>{filtro.agMes=hoje().slice(0,7);r()};
+  cx.appendChild(topo);
+
+  // a semana começa no domingo, como no calendário do RH
+  const primeiro=new Date(ay,am-1,1);
+  const inicio=new Date(primeiro); inicio.setDate(1-primeiro.getDay());
+  const porDia={};
+  eventos.forEach(e=>{(porDia[e.data]=porDia[e.data]||[]).push(e)});
+
+  const g=el(`<div style="border:1px solid var(--linha);border-radius:var(--r);overflow:hidden;background:var(--card)">
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);background:var(--bg);border-bottom:1px solid var(--linha)">
+      ${['dom','seg','ter','qua','qui','sex','sáb'].map(d=>`<div style="padding:9px 6px;text-align:center;font-size:11px;
+        color:var(--suave);text-transform:uppercase;letter-spacing:.06em">${d}</div>`).join('')}
+    </div>
+    <div class="celulas" style="display:grid;grid-template-columns:repeat(7,1fr)"></div></div>`);
+  const cel=g.querySelector('.celulas');
+
+  for(let i=0;i<42;i++){
+    const dt=new Date(inicio); dt.setDate(inicio.getDate()+i);
+    const iso=dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');
+    const doMes=dt.getMonth()===am-1;
+    const ehHoje=iso===h;
+    if(i>=35&&!doMes&&!Object.keys(porDia).some(k=>k>=iso))break;   // 6ª linha só se precisar
+    const doDia=(porDia[iso]||[]);
+    const cl=el(`<div class="diaCel" style="min-height:96px;border-right:1px solid var(--linha);border-bottom:1px solid var(--linha);
+      padding:6px;display:flex;flex-direction:column;gap:3px;cursor:${doDia.length?'pointer':'default'};
+      background:${ehHoje?'var(--bg)':'transparent'};opacity:${doMes?'1':'.45'}">
+      <div style="font-size:12.5px;font-weight:${ehHoje?'700':'500'};color:${ehHoje?'var(--tinta)':'var(--suave)'};
+        ${ehHoje?'background:var(--tinta);color:#fff;border-radius:999px;width:22px;height:22px;display:flex;align-items:center;justify-content:center':''}">${dt.getDate()}</div>
+    </div>`);
+    doDia.slice(0,3).forEach(e=>{
+      cl.appendChild(el(`<div title="${esc(e.titulo)}" style="background:${corFonte(e.fonte)};color:#fff;border-radius:5px;
+        padding:2px 6px;font-size:11px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.titulo)}</div>`));
+    });
+    if(doDia.length>3) cl.appendChild(el(`<div style="font-size:10.5px;color:var(--suave);padding-left:3px">+${doDia.length-3} mais</div>`));
+    if(doDia.length) cl.onclick=()=>modalDia(iso,doDia);
+    cel.appendChild(cl);
+  }
+  cx.appendChild(g);
+  return cx;
+}
+
+// o dia aberto: aqui cabe o detalhe que não cabe na célula
+function modalDia(iso,eventos){
+  const d=new Date(iso+'T12:00');
+  abrirModal(fmtDataAno(iso),['domingo','segunda','terça','quarta','quinta','sexta','sábado'][d.getDay()]+
+    ' · '+eventos.length+(eventos.length===1?' coisa':' coisas'),(c,fechar)=>{
+    const lista=el('<div class="secao"></div>');
+    eventos.forEach(e=>{
+      const li=el(`<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--linha);cursor:pointer">
+        <span style="width:4px;align-self:stretch;border-radius:3px;background:${corFonte(e.fonte)};flex:none"></span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600">${e.ic} ${esc(e.titulo)}${e.hora?' <span style="font-weight:400;color:var(--suave)">· '+esc(e.hora)+'</span>':''}</div>
+          ${e.sub?`<div style="font-size:12px;color:var(--suave);margin-top:1px">${esc(e.sub)}</div>`:''}
+          <div style="font-size:11px;color:var(--suave);opacity:.75;margin-top:3px">${esc((FONTES_AGENDA.find(f=>f.k===e.fonte)||{}).rot||'')}</div>
+        </div>
+        ${e.proprio||e.ir?'<span style="color:var(--suave)">›</span>':''}</div>`);
+      if(e.proprio) li.onclick=()=>{fechar();abreBloco('ag-lista');rr('agenda')()};
+      else if(e.ir) li.onclick=()=>{fechar();irTela(e.ir)};
+      lista.appendChild(li);
+    });
+    c.appendChild(lista);
+    const fim=el('<div class="secao" style="display:flex;gap:9px"></div>');
+    const bNovo=el('<button class="btn ghost">+ Compromisso neste dia</button>');
+    bNovo.onclick=()=>{E.agenda.push({id:uid(),data:iso,hora:'',titulo:'',local:'',
+      tipo:CFG('tiposCompromisso')[0],obs:''});salvar();fechar();abreBloco('ag-lista');rr('agenda')()};
+    fim.appendChild(bNovo);fim.appendChild(el('<span class="cresce"></span>'));
+    const ok=el('<button class="btn">Fechar</button>');ok.onclick=fechar;fim.appendChild(ok);
+    c.appendChild(fim);
+  });
+}
 
 // aniversário do ano corrente (e do próximo, se o deste ano já passou)
 function proximoAniversario(nascISO){
@@ -1570,11 +1664,8 @@ function vAgenda(m){
   const nova=()=>{E.agenda.push({id:uid(),data:hoje(),hora:'',titulo:'',local:'',tipo:CFG('tiposCompromisso')[0],obs:''});salvar();r()};
   m.appendChild(cab('Agenda','Tudo que tem data nesta Central, num lugar só.'));
   if(!filtro.agFontes)filtro.agFontes={};
-  if(filtro.agJanela==null)filtro.agJanela='90';
   const cont=t=>E.agenda.filter(a=>a.tipo===t).length;
-  m.appendChild(painel('Período',
-    seletor(filtro.agJanela,[['30','Próximos 30 dias'],['90','Próximos 90 dias'],
-      ['365','Próximo ano'],['tudo','Tudo, inclusive o que passou']],v=>{filtro.agJanela=v;r()}),
+  m.appendChild(painel('Agenda',
     acao('+ Novo compromisso',nova),
     acao('⬇ Exportar .ics',exportarIcs,'ghost'),
     acao('⬆ Importar .ics',()=>pedirArquivo(importarIcs,'.ics'),'ghost'),'|'));
@@ -1585,55 +1676,56 @@ function vAgenda(m){
   FONTES_AGENDA.forEach(f=>{
     const lig=filtro.agFontes[f.k]!==false;
     const qtd=todosEv.filter(e=>e.fonte===f.k).length;
-    const b=el(`<button class="btn mini ${lig?'':'ghost'}" style="${lig?'':'opacity:.55'}">${f.ic} ${f.rot}${lig?' ('+qtd+')':''}</button>`);
+    const b=el(`<button class="btn mini ${lig?'':'ghost'}" style="${lig?'background:'+f.cor+';border-color:'+f.cor+';color:#fff':'opacity:.55'}">${f.ic} ${f.rot}${lig?' ('+qtd+')':''}</button>`);
     b.onclick=()=>{filtro.agFontes[f.k]=!lig;r()};
     chips.appendChild(b);
   });
   m.appendChild(chips);
 
-  /* ---- a lista de verdade: tudo junto, agrupado por mês ---- */
+  // A grade é o retrato do mês; a lista logo abaixo é o mesmo mês escrito, em
+  // ordem de data — dá para ler o detalhe que não cabe na célula.
+  m.appendChild(bloco('ag-mes','🗓 Calendário','clique num dia para abrir o que tem nele',
+    gradeMes(todosEv,r)));
+
+  /* ---- a lista: o mesmo mês da grade, escrito, em ordem de data ---- */
   const h=hoje();
-  const limite=filtro.agJanela==='tudo'?'9999-12-31'
-    :(()=>{const d=new Date(h+'T12:00');d.setDate(d.getDate()+ +filtro.agJanela);return d.toISOString().slice(0,10)})();
-  const dentro=todosEv.filter(e=>filtro.agJanela==='tudo'||(e.data>=h&&e.data<=limite));
+  const mesVisto=filtro.agMes||h.slice(0,7);
+  const doMes=todosEv.filter(e=>e.data.startsWith(mesVisto));
+  // o que já passou e ainda não foi resolvido segue cobrando, seja de que mês for
   const vencidos=todosEv.filter(e=>e.data<h&&e.fonte!=='compromissos'&&e.fonte!=='aniversarios');
 
   const cx=el('<div class="corpo"></div>');
   if(vencidos.length) cx.appendChild(el(`<div class="aviso" style="background:var(--vermelho-cl);border-color:var(--vermelho)">
     ⏰ <b>${vencidos.length} ${vencidos.length===1?'coisa passou':'coisas passaram'} da data:</b>
     ${vencidos.slice(0,6).map(e=>esc(e.titulo)+' ('+fmtDataAno(e.data)+')').join('; ')}${vencidos.length>6?'…':''}</div>`));
-  if(!dentro.length) cx.appendChild(el('<div class="vazio">Nada com data neste período.</div>'));
-  let mesAtualG='';
-  dentro.forEach(e=>{
-    const mk=e.data.slice(0,7);
-    if(mk!==mesAtualG){
-      mesAtualG=mk;
-      cx.appendChild(el(`<div style="font-size:12px;color:var(--suave);text-transform:uppercase;letter-spacing:.06em;
-        margin:16px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--linha)">${MESES[+mk.slice(5,7)-1]} de ${mk.slice(0,4)}</div>`));
-    }
+  if(!doMes.length) cx.appendChild(el('<div class="vazio">Nada com data neste mês.</div>'));
+
+  const ABREV=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  doMes.forEach(e=>{
+    const cor=corFonte(e.fonte);
     const dias=Math.round((new Date(e.data+'T12:00')-new Date(h+'T12:00'))/864e5);
-    const quando=dias===0?'hoje':dias===1?'amanhã':dias<0?Math.abs(dias)+' dias atrás':'em '+dias+' dias';
-    const li=el(`<div style="display:flex;align-items:flex-start;gap:11px;padding:10px 2px;border-bottom:1px solid var(--linha);cursor:${e.proprio||e.ir?'pointer':'default'}">
-      <div style="text-align:center;min-width:44px">
-        <div style="font-family:Fraunces,serif;font-size:19px;font-weight:600;line-height:1">${e.data.slice(8,10)}</div>
-        <div style="font-size:10px;color:var(--suave);text-transform:uppercase">${['dom','seg','ter','qua','qui','sex','sáb'][new Date(e.data+'T12:00').getDay()]}</div>
+    const quando=dias===0?'hoje':dias===1?'amanhã':dias===-1?'ontem':dias<0?Math.abs(dias)+' dias atrás':'em '+dias+' dias';
+    const rot=(FONTES_AGENDA.find(f=>f.k===e.fonte)||{}).rot||'';
+    const li=el(`<div style="display:flex;align-items:center;gap:13px;padding:11px 13px;margin-bottom:8px;
+      border:1px solid var(--linha);border-radius:var(--r);background:var(--card);
+      cursor:${e.proprio||e.ir?'pointer':'default'}">
+      <div style="background:${cor};color:#fff;border-radius:10px;width:46px;flex:none;text-align:center;padding:6px 0">
+        <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;opacity:.85">${ABREV[+e.data.slice(5,7)-1]}</div>
+        <div style="font-family:Fraunces,serif;font-size:19px;font-weight:600;line-height:1.05">${+e.data.slice(8,10)}</div>
       </div>
+      <span style="font-size:17px;flex:none">${e.ic}</span>
       <div style="flex:1;min-width:0">
-        <div style="font-size:14px;font-weight:600">${e.ic} ${esc(e.titulo)}${e.hora?' <span style="font-weight:400;color:var(--suave)">· '+esc(e.hora)+'</span>':''}</div>
-        ${e.sub?`<div style="font-size:12px;color:var(--suave);margin-top:1px">${esc(e.sub)}</div>`:''}
+        <div style="font-size:14.5px;font-weight:600">${esc(e.titulo)}${e.hora?' <span style="font-weight:400;color:var(--suave)">· '+esc(e.hora)+'</span>':''}</div>
+        <div style="font-size:12.5px;color:var(--suave);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(rot)}${e.sub?' · '+esc(e.sub):''}</div>
       </div>
-      <div style="text-align:right;white-space:nowrap">
-        <div style="font-size:11.5px;color:${dias<0?'var(--vermelho)':dias<=7?'var(--areia)':'var(--suave)'}">${quando}</div>
-        ${e.proprio?'':`<div style="font-size:10.5px;color:var(--suave);opacity:.7">vem de ${esc((FONTES_AGENDA.find(f=>f.k===e.fonte)||{}).rot||'')}</div>`}
-      </div>
+      <div style="font-size:11.5px;white-space:nowrap;color:${dias<0?'var(--vermelho)':dias<=7?'var(--areia)':'var(--suave)'}">${quando}</div>
     </div>`);
     if(e.proprio) li.onclick=()=>{abreBloco('ag-lista');r()};
     else if(e.ir) li.onclick=()=>irTela(e.ir);
     cx.appendChild(li);
   });
-  m.appendChild(bloco('ag-tudo','🗓 O que vem pela frente',
-    dentro.length+' com data'+(filtro.agJanela==='tudo'?'':' nos próximos '+filtro.agJanela+' dias')+
-    ' — o que vem de outra tela leva até ela',cx));
+  m.appendChild(bloco('ag-tudo','📋 Tudo de '+MESES_LONGO[+mesVisto.slice(5,7)-1],
+    'lista completa do mês, em ordem de data — o que vem de outra tela leva até ela',cx));
 
   const lista=E.agenda.slice();
   m.appendChild(tabelaBloco('ag-lista','Meus compromissos','os que você digita aqui — o resto vem das outras telas',lista,[
