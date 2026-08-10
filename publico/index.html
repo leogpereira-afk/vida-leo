@@ -1536,8 +1536,22 @@ function gradeMes(eventos,r){
   // a semana começa no domingo, como no calendário do RH
   const primeiro=new Date(ay,am-1,1);
   const inicio=new Date(primeiro); inicio.setDate(1-primeiro.getDay());
+  /* Evento com "ate" entra em TODOS os dias do intervalo, marcado com onde
+     começa e onde termina — é isso que permite desenhar a faixa contínua.
+     As faixas vêm primeiro em cada dia para se alinharem de célula em célula. */
   const porDia={};
-  eventos.forEach(e=>{(porDia[e.data]=porDia[e.data]||[]).push(e)});
+  const põe=(iso,e)=>{(porDia[iso]=porDia[iso]||[]).push(e)};
+  eventos.forEach(e=>{
+    if(!e.ate||e.ate<=e.data){põe(e.data,e);return}
+    const d=new Date(e.data+'T12:00'), fim=new Date(e.ate+'T12:00');
+    let guarda=0;
+    while(d<=fim&&guarda++<400){
+      const iso=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      põe(iso,{...e,_faixa:true,_ini:iso===e.data,_fim:iso===e.ate,_dia:iso});
+      d.setDate(d.getDate()+1);
+    }
+  });
+  Object.values(porDia).forEach(l=>l.sort((a,b)=>(b._faixa?1:0)-(a._faixa?1:0)));
 
   const g=el(`<div style="border:1px solid var(--linha);border-radius:var(--r);overflow:hidden;background:var(--card)">
     <div style="display:grid;grid-template-columns:repeat(7,1fr);background:var(--bg);border-bottom:1px solid var(--linha)">
@@ -1561,6 +1575,19 @@ function gradeMes(eventos,r){
         ${ehHoje?'background:var(--tinta);color:#fff;border-radius:999px;width:22px;height:22px;display:flex;align-items:center;justify-content:center':''}">${dt.getDate()}</div>
     </div>`);
     doDia.slice(0,3).forEach(e=>{
+      if(e._faixa){
+        // as margens negativas anulam o respiro da célula: as faixas de dias
+        // vizinhos se encostam e viram uma linha só ao longo da semana
+        const dom=dt.getDay()===0;   // recomeço de linha: vale repetir o nome
+        const cantos=(e._ini?'5px':'0')+' '+(e._fim?'5px':'0')+' '+(e._fim?'5px':'0')+' '+(e._ini?'5px':'0');
+        // fim antes de domingo: dia que é as duas coisas tem que dizer que acaba ali
+        const rot=e._ini?e.ic+' '+esc(e.titulo):e._fim?'volta':dom?'↪ '+esc(e.titulo):'&nbsp;';
+        cl.appendChild(el(`<div title="${esc(e.titulo)} — ${fmtDataAno(e.data)} a ${fmtDataAno(e.ate)}"
+          style="background:${corFonte(e.fonte)};color:#fff;border-radius:${cantos};margin-left:-6px;margin-right:-6px;
+          padding:2px 6px;font-size:11px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+          ${e._fim?'text-align:right;opacity:.9':''}">${rot}</div>`));
+        return;
+      }
       cl.appendChild(el(`<div title="${esc(e.titulo)}" style="background:${corFonte(e.fonte)};color:#fff;border-radius:5px;
         padding:2px 6px;font-size:11px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.titulo)}</div>`));
     });
@@ -1582,8 +1609,10 @@ function modalDia(iso,eventos){
       const li=el(`<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--linha);cursor:pointer">
         <span style="width:4px;align-self:stretch;border-radius:3px;background:${corFonte(e.fonte)};flex:none"></span>
         <div style="flex:1;min-width:0">
-          <div style="font-size:14px;font-weight:600">${e.ic} ${esc(e.titulo)}${e.hora?' <span style="font-weight:400;color:var(--suave)">· '+esc(e.hora)+'</span>':''}</div>
+          <div style="font-size:14px;font-weight:600">${e.ic} ${esc(e.titulo)}${e.hora?' <span style="font-weight:400;color:var(--suave)">· '+esc(e.hora)+'</span>':''}
+            ${e._faixa?'<span style="font-weight:400;color:var(--suave);font-size:12px">· '+(e._ini?'dia da ida':e._fim?'dia da volta':'em viagem')+'</span>':''}</div>
           ${e.sub?`<div style="font-size:12px;color:var(--suave);margin-top:1px">${esc(e.sub)}</div>`:''}
+          ${e.ate?`<div style="font-size:12px;color:var(--suave)">${fmtDataAno(e.data)} a ${fmtDataAno(e.ate)}</div>`:''}
           <div style="font-size:11px;color:var(--suave);opacity:.75;margin-top:3px">${esc((FONTES_AGENDA.find(f=>f.k===e.fonte)||{}).rot||'')}</div>
         </div>
         ${e.proprio||e.ir?'<span style="color:var(--suave)">›</span>':''}</div>`);
@@ -1628,10 +1657,18 @@ function eventosDoEcossistema(){
     data:d.validade,hora:'',titulo:(d.nome||'Documento')+' vence',
     sub:'de '+(d.dono||'Léo')+(d.numero?' · '+d.numero:''),fonte:'documentos',ic:'🪪',ir:'documentos'});});
 
+  // A viagem é um PERÍODO, não dois pontos soltos: sai um evento só, com começo
+  // e fim, e o calendário pinta a faixa de ponta a ponta. Ver "ida dia 12" e
+  // "volta dia 16" em cantos opostos do mês não mostra que você passa cinco
+  // dias fora — e é justamente isso que decide se cabe mais alguma coisa ali.
   if(on('viagens')) (E.viagens||[]).forEach(v=>{
     const nome=[v.evento,v.cidade].filter(Boolean).join(' · ')||'Viagem';
-    if(v.ida)ev.push({data:v.ida,hora:'',titulo:'Ida — '+nome,sub:v.status||'',fonte:'viagens',ic:'✈️',ir:'viagens'});
-    if(v.volta)ev.push({data:v.volta,hora:'',titulo:'Volta — '+nome,sub:v.status||'',fonte:'viagens',ic:'🛬',ir:'viagens'});
+    if(!v.ida&&!v.volta)return;
+    const de=v.ida||v.volta, ate=v.volta||v.ida;
+    const dias=Math.round((new Date(ate+'T12:00')-new Date(de+'T12:00'))/864e5)+1;
+    ev.push({data:de,ate:ate>de?ate:'',hora:'',titulo:nome,
+      sub:[v.status,dias>1?dias+' dias fora':''].filter(Boolean).join(' · '),
+      fonte:'viagens',ic:'✈️',ir:'viagens'});
   });
 
   if(on('aniversarios')){
@@ -1749,7 +1786,8 @@ function vAgenda(m){
       </div>
       <span style="font-size:17px;flex:none">${e.ic}</span>
       <div style="flex:1;min-width:0">
-        <div style="font-size:14.5px;font-weight:600">${esc(e.titulo)}${e.hora?' <span style="font-weight:400;color:var(--suave)">· '+esc(e.hora)+'</span>':''}</div>
+        <div style="font-size:14.5px;font-weight:600">${esc(e.titulo)}${e.hora?' <span style="font-weight:400;color:var(--suave)">· '+esc(e.hora)+'</span>':''}
+          ${e.ate?'<span style="font-weight:400;color:var(--suave);font-size:12.5px">· '+fmtDataAno(e.data)+' a '+fmtDataAno(e.ate)+'</span>':''}</div>
         <div style="font-size:12.5px;color:var(--suave);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(rot)}${e.sub?' · '+esc(e.sub):''}</div>
       </div>
       <div style="font-size:11.5px;white-space:nowrap;color:${dias<0?'var(--vermelho)':dias<=7?'var(--areia)':'var(--suave)'}">${quando}</div>
