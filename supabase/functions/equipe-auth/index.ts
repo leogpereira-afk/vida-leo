@@ -458,9 +458,14 @@ Deno.serve(async (req: Request) => {
       }
 
       // ------------------------------------------------------------- crachá
+      // O crachá é emitido POR SISTEMA (claim `sis`), e todas as ações conferem
+      // isso -- menos esta, que não conferia. O efeito era concreto: o app do
+      // DRE só desloga quem recebe 401, então um crachá do Brief passava aqui,
+      // voltava 200 e a TELA do DRE abria para quem nunca teve acesso a ela.
+      // Dos dez acessos do Brief, nenhum deveria ver o resultado financeiro.
       case "eu": {
         const c = await lerCracha(bearer(req));
-        if (!c) return json({ erro: "Sessão inválida ou expirada." }, 401);
+        if (!c || c.sis !== sistema) return json({ erro: "Sessão inválida ou expirada." }, 401);
         return json({ sistema: c.sis, usuario: c.sub, nome: c.nome, papel: c.papel, exp: c.exp });
       }
 
