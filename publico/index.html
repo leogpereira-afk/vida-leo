@@ -1504,16 +1504,33 @@ function gradeMes(eventos,r){
   if(!filtro.agMes) filtro.agMes=h.slice(0,7);
   const [ay,am]=filtro.agMes.split('-').map(Number);
 
-  // cabeçalho: ‹ mês ›  hoje
-  const topo=el(`<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
-    <button class="btn ghost mini bAnt">‹</button>
-    <b style="font-family:Fraunces,serif;font-size:20px;min-width:190px">${MESES_LONGO[am-1]} ${ay}</b>
-    <button class="btn ghost mini bProx">›</button>
-    <button class="btn ghost mini bHoje">Hoje</button></div>`);
+  /* Cabeçalho: ‹ [mês] [ano] › Hoje.
+     As setas servem para andar de um em um; os seletores servem para pular.
+     Só seta obrigaria a sete cliques para chegar em março do ano que vem. */
   const passo=d=>{const x=new Date(ay,am-1+d,1);filtro.agMes=x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0');r()};
-  topo.querySelector('.bAnt').onclick=()=>passo(-1);
-  topo.querySelector('.bProx').onclick=()=>passo(1);
-  topo.querySelector('.bHoje').onclick=()=>{filtro.agMes=hoje().slice(0,7);r()};
+  const irPara=(y,mo)=>{filtro.agMes=y+'-'+String(mo).padStart(2,'0');r()};
+  // os anos oferecidos: os que têm alguma coisa marcada, mais uma folga para
+  // frente e para trás — poder marcar o ano que vem sem depender de já ter algo
+  const anosEv=[...new Set(eventos.map(e=>+e.data.slice(0,4)).filter(Boolean))];
+  const anoH=+h.slice(0,4);
+  const minA=Math.min(anoH-2,ay,...(anosEv.length?anosEv:[anoH]));
+  const maxA=Math.max(anoH+3,ay,...(anosEv.length?anosEv:[anoH]));
+  const anos=[];for(let y=minA;y<=maxA;y++)anos.push(y);
+
+  const topo=el('<div style="display:flex;align-items:center;gap:9px;margin-bottom:12px;flex-wrap:wrap"></div>');
+  const bAnt=el('<button class="btn ghost mini" title="mês anterior">‹</button>');
+  bAnt.onclick=()=>passo(-1);
+  topo.appendChild(bAnt);
+  topo.appendChild(seletor(String(am),MESES_LONGO.map((nm,i)=>[String(i+1),nm]),v=>irPara(ay,+v)));
+  topo.appendChild(seletor(String(ay),anos.map(y=>[String(y),String(y)]),v=>irPara(+v,am)));
+  const bProx=el('<button class="btn ghost mini" title="próximo mês">›</button>');
+  bProx.onclick=()=>passo(1);
+  topo.appendChild(bProx);
+  const bHoje=el('<button class="btn ghost mini">Hoje</button>');
+  bHoje.onclick=()=>{filtro.agMes=hoje().slice(0,7);r()};
+  topo.appendChild(bHoje);
+  if(filtro.agMes!==h.slice(0,7))
+    topo.appendChild(el('<span style="font-size:12px;color:var(--suave)">você não está no mês atual</span>'));
   cx.appendChild(topo);
 
   // a semana começa no domingo, como no calendário do RH
