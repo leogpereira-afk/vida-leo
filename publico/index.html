@@ -1599,7 +1599,9 @@ function proximoAniversario(nascISO){
 function eventosDoEcossistema(){
   const ev=[];
   const h=hoje();
-  const on=k=>!filtro.agFontes||filtro.agFontes[k]!==false;
+  // devolve tudo: quem escolhe o que mostrar é a tela, e as contagens dos chips
+  // precisam do número REAL de cada categoria, não do que sobrou de um filtro
+  const on=()=>true;
 
   if(on('compromissos')) (E.agenda||[]).forEach(a=>{if(a.data)ev.push({
     data:a.data,hora:a.hora||'',titulo:a.titulo||'(sem título)',
@@ -1663,36 +1665,51 @@ function vAgenda(m){
   const fut=E.agenda.filter(a=>a.data>=hoje()).length;
   const nova=()=>{E.agenda.push({id:uid(),data:hoje(),hora:'',titulo:'',local:'',tipo:CFG('tiposCompromisso')[0],obs:''});salvar();r()};
   m.appendChild(cab('Agenda','Tudo que tem data nesta Central, num lugar só.'));
-  if(!filtro.agFontes)filtro.agFontes={};
+  if(filtro.agSo===undefined)filtro.agSo=null;
   const cont=t=>E.agenda.filter(a=>a.tipo===t).length;
   m.appendChild(painel('Agenda',
     acao('+ Novo compromisso',nova),
     acao('⬇ Exportar .ics',exportarIcs,'ghost'),
     acao('⬆ Importar .ics',()=>pedirArquivo(importarIcs,'.ics'),'ghost'),'|'));
 
-  /* ---- o que entra na agenda ---- */
+  /* ---- as categorias: clicar numa MOSTRA só ela ----
+     Antes cada chip desligava a sua categoria, e para ver só os aniversários
+     era preciso desligar as outras sete. Agora clicar isola; clicar de novo na
+     mesma volta para tudo. É o gesto que a pessoa faz esperando ver, não sumir. */
   const todosEv=eventosDoEcossistema();
-  const chips=el('<div style="display:flex;gap:7px;flex-wrap:wrap;margin:0 0 14px"></div>');
+  const mesChip=filtro.agMes||hoje().slice(0,7);
+  const noMes=todosEv.filter(e=>e.data.startsWith(mesChip));
+  const so=filtro.agSo||null;
+
+  const chips=el('<div style="display:flex;gap:7px;flex-wrap:wrap;margin:0 0 14px;align-items:center"></div>');
+  const bTudo=el(`<button class="btn mini ${so?'ghost':''}">${so?'↺ Ver tudo':'Tudo ('+noMes.length+')'}</button>`);
+  bTudo.onclick=()=>{filtro.agSo=null;r()};
+  chips.appendChild(bTudo);
   FONTES_AGENDA.forEach(f=>{
-    const lig=filtro.agFontes[f.k]!==false;
-    const qtd=todosEv.filter(e=>e.fonte===f.k).length;
-    const b=el(`<button class="btn mini ${lig?'':'ghost'}" style="${lig?'background:'+f.cor+';border-color:'+f.cor+';color:#fff':'opacity:.55'}">${f.ic} ${f.rot}${lig?' ('+qtd+')':''}</button>`);
-    b.onclick=()=>{filtro.agFontes[f.k]=!lig;r()};
+    const qtd=noMes.filter(e=>e.fonte===f.k).length;
+    const aceso=!so||so===f.k;
+    const vazio=!qtd;
+    const b=el(`<button class="btn mini ${aceso?'':'ghost'}" title="${so===f.k?'clique para ver tudo de novo':'clique para ver só isto'}"
+      style="${aceso&&!vazio?'background:'+f.cor+';border-color:'+f.cor+';color:#fff':'opacity:'+(vazio?'.4':'.55')}">${f.ic} ${f.rot} (${qtd})</button>`);
+    b.onclick=()=>{filtro.agSo=(so===f.k?null:f.k);r()};
     chips.appendChild(b);
   });
   m.appendChild(chips);
+  if(so) m.appendChild(el(`<div style="font-size:12.5px;color:var(--suave);margin:-6px 0 12px">
+    Vendo só <b>${esc((FONTES_AGENDA.find(f=>f.k===so)||{}).rot||'')}</b> — clique no chip de novo, ou em "Ver tudo", para voltar.</div>`));
 
   // A grade é o retrato do mês; a lista logo abaixo é o mesmo mês escrito, em
   // ordem de data — dá para ler o detalhe que não cabe na célula.
+  const visiveis=so?todosEv.filter(e=>e.fonte===so):todosEv;
   m.appendChild(bloco('ag-mes','🗓 Calendário','clique num dia para abrir o que tem nele',
-    gradeMes(todosEv,r)));
+    gradeMes(visiveis,r)));
 
   /* ---- a lista: o mesmo mês da grade, escrito, em ordem de data ---- */
   const h=hoje();
   const mesVisto=filtro.agMes||h.slice(0,7);
-  const doMes=todosEv.filter(e=>e.data.startsWith(mesVisto));
+  const doMes=visiveis.filter(e=>e.data.startsWith(mesVisto));
   // o que já passou e ainda não foi resolvido segue cobrando, seja de que mês for
-  const vencidos=todosEv.filter(e=>e.data<h&&e.fonte!=='compromissos'&&e.fonte!=='aniversarios');
+  const vencidos=visiveis.filter(e=>e.data<h&&e.fonte!=='compromissos'&&e.fonte!=='aniversarios');
 
   const cx=el('<div class="corpo"></div>');
   if(vencidos.length) cx.appendChild(el(`<div class="aviso" style="background:var(--vermelho-cl);border-color:var(--vermelho)">
