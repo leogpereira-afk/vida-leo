@@ -1470,22 +1470,173 @@ function modalViagem(v){
 }
 
 /* ===================== AGENDA ===================== */
+/* A AGENDA COMO ECOSSISTEMA
+   O compromisso digitado à mão é só uma das coisas que têm data nesta Central.
+   Passaporte vence, viagem tem ida e volta, filho faz aniversário, ação do
+   plano tem prazo, seguro renova. Tudo isso já estava guardado — só não estava
+   junto, e por isso não avisava ninguém.
+
+   Aqui eles são LIDOS de onde moram, nunca copiados: se a validade do documento
+   mudar lá, muda aqui. O que vem de fora não se edita nesta tela — clicar leva
+   para o lugar certo. Duas cópias do mesmo fato divergem em uma semana. */
+
+const FONTES_AGENDA=[
+  {k:'compromissos',rot:'Compromissos',ic:'📅'},
+  {k:'documentos',  rot:'Documentos vencendo',ic:'🪪'},
+  {k:'viagens',     rot:'Viagens',ic:'✈️'},
+  {k:'aniversarios',rot:'Aniversários',ic:'🎂'},
+  {k:'acoes',       rot:'Ações do plano',ic:'🎯'},
+  {k:'oportunidades',rot:'Oportunidades',ic:'💡'},
+  {k:'demandas',    rot:'Demandas',ic:'✅'},
+  {k:'seguros',     rot:'Seguros renovando',ic:'🛡️'},
+];
+
+// aniversário do ano corrente (e do próximo, se o deste ano já passou)
+function proximoAniversario(nascISO){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(nascISO||'')))return '';
+  const md=String(nascISO).slice(5);
+  const h=hoje(), ano=+h.slice(0,4);
+  const esteAno=ano+'-'+md;
+  return esteAno>=h?esteAno:(ano+1)+'-'+md;
+}
+
+/* Junta tudo que tem data. Cada item: {data, hora, titulo, sub, fonte, ic, ir}
+   O campo 'ir' é para onde o clique leva — o dono do dado. */
+function eventosDoEcossistema(){
+  const ev=[];
+  const h=hoje();
+  const on=k=>!filtro.agFontes||filtro.agFontes[k]!==false;
+
+  if(on('compromissos')) (E.agenda||[]).forEach(a=>{if(a.data)ev.push({
+    data:a.data,hora:a.hora||'',titulo:a.titulo||'(sem título)',
+    sub:[a.local,a.tipo].filter(Boolean).join(' · '),fonte:'compromissos',ic:'📅',proprio:true,ref:a});});
+
+  if(on('documentos')) (E.documentos||[]).forEach(d=>{if(d.validade)ev.push({
+    data:d.validade,hora:'',titulo:(d.nome||'Documento')+' vence',
+    sub:'de '+(d.dono||'Léo')+(d.numero?' · '+d.numero:''),fonte:'documentos',ic:'🪪',ir:'documentos'});});
+
+  if(on('viagens')) (E.viagens||[]).forEach(v=>{
+    const nome=[v.evento,v.cidade].filter(Boolean).join(' · ')||'Viagem';
+    if(v.ida)ev.push({data:v.ida,hora:'',titulo:'Ida — '+nome,sub:v.status||'',fonte:'viagens',ic:'✈️',ir:'viagens'});
+    if(v.volta)ev.push({data:v.volta,hora:'',titulo:'Volta — '+nome,sub:v.status||'',fonte:'viagens',ic:'🛬',ir:'viagens'});
+  });
+
+  if(on('aniversarios')){
+    const todos=[...(E.pessoas||[]).map(p=>({nome:p.nome,nasc:p.nascimento,rel:p.relacao})),
+      ...(E.perfil&&E.perfil.nascimento?[{nome:'Você',nasc:E.perfil.nascimento,rel:''}]:[])];
+    todos.forEach(p=>{
+      const d=proximoAniversario(p.nasc);
+      if(!d||!String(p.nome||'').trim())return;
+      const idade=+d.slice(0,4)-+String(p.nasc).slice(0,4);
+      ev.push({data:d,hora:'',titulo:p.nome,
+        sub:'faz '+idade+' ano'+(idade===1?'':'s')+(p.rel?' · '+p.rel:''),fonte:'aniversarios',ic:'🎂',ir:'guia'});
+    });
+  }
+
+  if(on('acoes')) Object.entries(E.estrategia||{}).forEach(([emp,est])=>{
+    (est.objetivos||[]).forEach(o=>(o.acoes||[]).forEach(a=>{
+      if(a.ate&&a.status!=='Feita')ev.push({data:a.ate,hora:'',titulo:a.oque||'Ação',
+        sub:emp+' · '+(o.titulo||'')+(a.quem?' · '+a.quem:'')+(a.status==='Travada'?' · 🚧 travada':''),
+        fonte:'acoes',ic:'🎯',ir:'estrategia'});
+    }));
+  });
+
+  if(on('oportunidades')) (E.oportunidades||[]).forEach(o=>{
+    if(o.ate&&o.estagio!=='Arquivada'&&String(o.proximoPasso||'').trim())
+      ev.push({data:o.ate,hora:'',titulo:o.proximoPasso,sub:'💡 '+(o.titulo||''),
+        fonte:'oportunidades',ic:'💡',ir:'oportunidades'});
+  });
+
+  if(on('demandas')) (E.demandas||[]).forEach(d=>{
+    if(d.prazo&&d.status!=='Concluída')ev.push({data:d.prazo,hora:'',titulo:d.titulo||'Demanda',
+      sub:[d.area,d.prioridade&&'prioridade '+d.prioridade,d.status].filter(Boolean).join(' · '),
+      fonte:'demandas',ic:'✅',ir:'demandas'});
+  });
+
+  if(on('seguros')) (E.seguros||[]).forEach(g=>{
+    if(g.renova&&g.status!=='Cancelado')ev.push({data:g.renova,hora:'',
+      titulo:'Renovar '+(g.tipo||'seguro')+(g.item?' — '+g.item:''),
+      sub:[g.seguradora,g.apolice&&'apólice '+g.apolice].filter(Boolean).join(' · '),
+      fonte:'seguros',ic:'🛡️',ir:'gastos'});
+  });
+
+  return ev.sort((a,b)=>(a.data+(a.hora||'')).localeCompare(b.data+(b.hora||'')));
+}
+
 function vAgenda(m){
   const r=rr('agenda');
   E.agenda.sort((a,b)=>(a.data||'').localeCompare(b.data||''));
   const fut=E.agenda.filter(a=>a.data>=hoje()).length;
   const nova=()=>{E.agenda.push({id:uid(),data:hoje(),hora:'',titulo:'',local:'',tipo:CFG('tiposCompromisso')[0],obs:''});salvar();r()};
-  m.appendChild(cab('Agenda pessoal','Troca com o Google Agenda por arquivo .ics — nos dois sentidos.'));
+  m.appendChild(cab('Agenda','Tudo que tem data nesta Central, num lugar só.'));
+  if(!filtro.agFontes)filtro.agFontes={};
+  if(filtro.agJanela==null)filtro.agJanela='90';
   const cont=t=>E.agenda.filter(a=>a.tipo===t).length;
-  m.appendChild(painel('Mostrar',
-    seletor(filtro.agenda||'Todas',[['Todas','Todas ('+E.agenda.length+')'],
-      ...CFG('tiposCompromisso').map(t=>[t,t+' ('+cont(t)+')'])],v=>{filtro.agenda=v;r()}),
+  m.appendChild(painel('Período',
+    seletor(filtro.agJanela,[['30','Próximos 30 dias'],['90','Próximos 90 dias'],
+      ['365','Próximo ano'],['tudo','Tudo, inclusive o que passou']],v=>{filtro.agJanela=v;r()}),
     acao('+ Novo compromisso',nova),
     acao('⬇ Exportar .ics',exportarIcs,'ghost'),
     acao('⬆ Importar .ics',()=>pedirArquivo(importarIcs,'.ics'),'ghost'),'|'));
 
-  const lista=E.agenda.filter(a=>!filtro.agenda||filtro.agenda==='Todas'||a.tipo===filtro.agenda);
-  m.appendChild(tabelaBloco('ag-lista','Compromissos','em ordem de data — os passados ficam apagados',lista,[
+  /* ---- o que entra na agenda ---- */
+  const todosEv=eventosDoEcossistema();
+  const chips=el('<div style="display:flex;gap:7px;flex-wrap:wrap;margin:0 0 14px"></div>');
+  FONTES_AGENDA.forEach(f=>{
+    const lig=filtro.agFontes[f.k]!==false;
+    const qtd=todosEv.filter(e=>e.fonte===f.k).length;
+    const b=el(`<button class="btn mini ${lig?'':'ghost'}" style="${lig?'':'opacity:.55'}">${f.ic} ${f.rot}${lig?' ('+qtd+')':''}</button>`);
+    b.onclick=()=>{filtro.agFontes[f.k]=!lig;r()};
+    chips.appendChild(b);
+  });
+  m.appendChild(chips);
+
+  /* ---- a lista de verdade: tudo junto, agrupado por mês ---- */
+  const h=hoje();
+  const limite=filtro.agJanela==='tudo'?'9999-12-31'
+    :(()=>{const d=new Date(h+'T12:00');d.setDate(d.getDate()+ +filtro.agJanela);return d.toISOString().slice(0,10)})();
+  const dentro=todosEv.filter(e=>filtro.agJanela==='tudo'||(e.data>=h&&e.data<=limite));
+  const vencidos=todosEv.filter(e=>e.data<h&&e.fonte!=='compromissos'&&e.fonte!=='aniversarios');
+
+  const cx=el('<div class="corpo"></div>');
+  if(vencidos.length) cx.appendChild(el(`<div class="aviso" style="background:var(--vermelho-cl);border-color:var(--vermelho)">
+    ⏰ <b>${vencidos.length} ${vencidos.length===1?'coisa passou':'coisas passaram'} da data:</b>
+    ${vencidos.slice(0,6).map(e=>esc(e.titulo)+' ('+fmtDataAno(e.data)+')').join('; ')}${vencidos.length>6?'…':''}</div>`));
+  if(!dentro.length) cx.appendChild(el('<div class="vazio">Nada com data neste período.</div>'));
+  let mesAtualG='';
+  dentro.forEach(e=>{
+    const mk=e.data.slice(0,7);
+    if(mk!==mesAtualG){
+      mesAtualG=mk;
+      cx.appendChild(el(`<div style="font-size:12px;color:var(--suave);text-transform:uppercase;letter-spacing:.06em;
+        margin:16px 0 8px;padding-bottom:5px;border-bottom:1px solid var(--linha)">${MESES[+mk.slice(5,7)-1]} de ${mk.slice(0,4)}</div>`));
+    }
+    const dias=Math.round((new Date(e.data+'T12:00')-new Date(h+'T12:00'))/864e5);
+    const quando=dias===0?'hoje':dias===1?'amanhã':dias<0?Math.abs(dias)+' dias atrás':'em '+dias+' dias';
+    const li=el(`<div style="display:flex;align-items:flex-start;gap:11px;padding:10px 2px;border-bottom:1px solid var(--linha);cursor:${e.proprio||e.ir?'pointer':'default'}">
+      <div style="text-align:center;min-width:44px">
+        <div style="font-family:Fraunces,serif;font-size:19px;font-weight:600;line-height:1">${e.data.slice(8,10)}</div>
+        <div style="font-size:10px;color:var(--suave);text-transform:uppercase">${['dom','seg','ter','qua','qui','sex','sáb'][new Date(e.data+'T12:00').getDay()]}</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600">${e.ic} ${esc(e.titulo)}${e.hora?' <span style="font-weight:400;color:var(--suave)">· '+esc(e.hora)+'</span>':''}</div>
+        ${e.sub?`<div style="font-size:12px;color:var(--suave);margin-top:1px">${esc(e.sub)}</div>`:''}
+      </div>
+      <div style="text-align:right;white-space:nowrap">
+        <div style="font-size:11.5px;color:${dias<0?'var(--vermelho)':dias<=7?'var(--areia)':'var(--suave)'}">${quando}</div>
+        ${e.proprio?'':`<div style="font-size:10.5px;color:var(--suave);opacity:.7">vem de ${esc((FONTES_AGENDA.find(f=>f.k===e.fonte)||{}).rot||'')}</div>`}
+      </div>
+    </div>`);
+    if(e.proprio) li.onclick=()=>{abreBloco('ag-lista');r()};
+    else if(e.ir) li.onclick=()=>irTela(e.ir);
+    cx.appendChild(li);
+  });
+  m.appendChild(bloco('ag-tudo','🗓 O que vem pela frente',
+    dentro.length+' com data'+(filtro.agJanela==='tudo'?'':' nos próximos '+filtro.agJanela+' dias')+
+    ' — o que vem de outra tela leva até ela',cx));
+
+  const lista=E.agenda.slice();
+  m.appendChild(tabelaBloco('ag-lista','Meus compromissos','os que você digita aqui — o resto vem das outras telas',lista,[
     {k:'data',t:'Data',tipo:'date'},{k:'hora',t:'Hora',tipo:'time',w:100},
     {k:'titulo',t:'O quê',ph:'ex.: Jantar com a Pya'},{k:'local',t:'Onde',ph:'—'},
     {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposCompromisso')},
@@ -3406,6 +3557,65 @@ function vRendimentos(m){
       ${nd?`⚠️ <b style="color:var(--vermelho)">${nd} lançamento(s)</b> parecem duplicados (mesma empresa, mesmo valor, poucos dias de distância) — estão etiquetados nas listas. `:'Sem duplicata aparente. '}
       ${semD?semD+' sem data real (estão em 31/12 do ano). ':''}
       ${najus?najus+' ajuste(s) de fechamento do histórico.':''}</div>`));
+    /* A planilha de origem é um retrato de quando os dados foram importados.
+       Todo lançamento novo abre uma diferença contra ela — e diferença que nunca
+       fecha vira ruído: em duas semanas você para de olhar o vermelho, e aí ele
+       deixa de servir para avisar do erro de verdade.
+
+       Este botão diz "os lançamentos estão certos": ele reescreve o retrato a
+       partir deles. A conferência volta a ✓ e só fica vermelha de novo quando
+       aparecer uma divergência NOVA — que é para isso que ela existe. */
+    const difs=(()=>{
+      const HR2=H._raw||H;
+      const anosT=[...new Set([...(HR2.anos||[]),...E.rendimentos.map(y=>+String(y.data||'').slice(0,4))])]
+        .filter(Boolean).sort((a,b)=>a-b);
+      return anosT.map(a2=>{
+        const i2=(HR2.anos||[]).indexOf(a2);
+        const soma=E.rendimentos.filter(y=>String(y.data||'').startsWith(String(a2))).reduce((s2,y)=>s2+(+y.valor||0),0);
+        return {ano:a2,soma,hist:i2>=0?(HR2.totalAno[i2]||0):0};
+      }).filter(x=>Math.abs(x.soma-x.hist)>1);
+    })();
+    if(difs.length){
+      const cxB=el('<div style="padding:0 17px 14px"></div>');
+      const total=difs.reduce((a,x)=>a+(x.soma-x.hist),0);
+      cxB.appendChild(el(`<div class="aviso" style="margin-bottom:10px">
+        📌 <b>${difs.length} ano(s) com diferença${total?', somando '+brl(total):''}.</b>
+        Se os lançamentos estão certos — e eles é que mandam nos números do painel —
+        feche a conferência: o retrato passa a ser o que você lançou, e o vermelho
+        volta a significar "olha aqui" em vez de virar paisagem.</div>`));
+      const bF=el('<button class="btn">✓ Os lançamentos estão certos — atualizar o histórico</button>');
+      bF.onclick=()=>{
+        const linhas=difs.map(x=>'  '+x.ano+': '+brl(x.hist)+'  →  '+brl(x.soma)).join('\n');
+        if(!confirm('Reescrever a planilha de origem a partir dos lançamentos:\n\n'+linhas+
+          '\n\nOs lançamentos não mudam — muda só o retrato com que eles são comparados.\nPode desfazer restaurando um backup.'))return;
+        const R=E.rendHist||(E.rendHist={});
+        const L=E.rendimentos||[];
+        const anosT=[...new Set([...(R.anos||[]),...L.map(y=>+String(y.data||'').slice(0,4))])].filter(Boolean).sort((a,b)=>a-b);
+        const nomes=[...new Set([...Object.keys(R.empresas||{}),...L.map(y=>y.empresa)])].filter(Boolean);
+        const temL={};L.forEach(y=>{const a2=+String(y.data||'').slice(0,4);if(a2)temL[a2]=true});
+        const iAntigo=a2=>(R.anos||[]).indexOf(a2);
+        // ano SEM lançamento nenhum mantém o que a planilha dizia: apagar seria
+        // inventar um zero que nunca foi verdade
+        const totalAno=anosT.map(a2=>temL[a2]
+          ? +L.filter(y=>String(y.data||'').startsWith(String(a2))).reduce((s2,y)=>s2+(+y.valor||0),0).toFixed(2)
+          : (iAntigo(a2)>=0?(R.totalAno[iAntigo(a2)]||0):0));
+        const empresas={};
+        nomes.forEach(nm=>{empresas[nm]=anosT.map(a2=>temL[a2]
+          ? +L.filter(y=>String(y.data||'').startsWith(String(a2))&&y.empresa===nm).reduce((s2,y)=>s2+(+y.valor||0),0).toFixed(2)
+          : (iAntigo(a2)>=0?(((R.empresas||{})[nm]||[])[iAntigo(a2)]||0):0))});
+        E.rendHist={...R,anos:anosT,totalAno,empresas,
+          totalGeral:+totalAno.reduce((a,v)=>a+v,0).toFixed(2),
+          fechadoEm:hoje()};
+        salvar();
+        alert('Pronto. A conferência agora fecha, e volta a apitar só quando aparecer diferença nova.');
+        abreBloco('rd-conf');r();
+      };
+      cxB.appendChild(bF);
+      cfx.appendChild(cxB);
+    } else if((H._raw||{}).fechadoEm){
+      cfx.appendChild(el(`<div style="padding:0 17px 14px;font-size:12.5px;color:var(--suave)">
+        ✓ Tudo confere. Último fechamento em ${fmtDataAno(H._raw.fechadoEm)}.</div>`));
+    }
     rolC.querySelectorAll('[data-cfemp]').forEach(tr2=>tr2.onclick=()=>{filtro.rendEmp=tr2.dataset.cfemp;r()});
     rolC.querySelectorAll('[data-cfano]').forEach(tr2=>tr2.onclick=()=>{filtro.rendAno=+tr2.dataset.cfano;filtro.rendEmp='Todas';filtro.rendAnoSel=-1;r()});
   }
