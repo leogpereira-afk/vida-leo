@@ -34,7 +34,41 @@ const DIAS = 180;
    copiado do navegador é risco de outra ordem. */
 const HORAS_ADMIN = 12;
 
+// Chave publica, para CONFERIR senha no Supabase Auth (signInWithPassword nao
+// aceita a de servico). O prefixo SUPABASE_ e reservado pela plataforma, por
+// isso o nome proprio.
+const ANON_KEY = Deno.env.get("ANON_KEY_IMPRESILK") ?? "";
+// De quem e este app. A senha dele passa a ser a MESMA da pessoa nos sistemas.
+const DONO = (Deno.env.get("LEO_USUARIO") ?? "leonardo").toLowerCase();
+
 const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+
+/* UMA SENHA SO.
+   Este app tinha senha propria (LEO_APP_SENHA, depois um PBKDF2 em leo_config),
+   separada da que o Leo usa nos sistemas. Duas senhas para a mesma pessoa e uma
+   que envelhece: troca-se uma, esquece-se a outra, e a mais velha continua
+   valendo em algum lugar.
+   Agora a senha dos sistemas abre aqui tambem: a conta dele em `acesso_conta`
+   aponta para uma identidade do Supabase Auth, e e ela que confere.
+   A senha antiga continua aceita como segunda tentativa -- tirar a saida de
+   emergencia de um app pessoal, no mesmo dia em que se muda o login dele, e
+   pedir para ficar do lado de fora. */
+async function senhaDosSistemas(senha: string): Promise<boolean> {
+  if (!ANON_KEY || !senha) return false;
+  try {
+    const { data: conta } = await sb.from("acesso_conta")
+      .select("auth_user_id, ativo").eq("usuario", DONO).maybeSingle();
+    if (!conta?.auth_user_id || conta.ativo === false) return false;
+    const { data: u } = await sb.auth.admin.getUserById(conta.auth_user_id);
+    const email = u?.user?.email;
+    if (!email) return false;
+    const cliente = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false } });
+    const { data, error } = await cliente.auth.signInWithPassword({ email, password: senha });
+    return !error && !!data?.session;
+  } catch {
+    return false;
+  }
+}
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -136,9 +170,12 @@ Deno.serve(async (req: Request) => {
     }
 
     if (acao === "login") {
+      const digitada = String(senha ?? "");
+      // A senha dos sistemas primeiro; a antiga deste app como segunda porta.
+      if (await senhaDosSistemas(digitada)) return json({ token: await novoToken() });
       const reg = await senhaDoBanco();
       if (!reg && !APP_SENHA) return json({ erro: "senha não configurada" }, 500);
-      if (!(await senhaConfere(String(senha ?? ""), reg))) { await freia(); return json({ erro: "Senha incorreta" }, 401); }
+      if (!(await senhaConfere(digitada, reg))) { await freia(); return json({ erro: "Senha incorreta" }, 401); }
       return json({ token: await novoToken() });
     }
 
