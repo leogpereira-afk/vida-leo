@@ -63,8 +63,18 @@ const PAPEIS: Record<Sistema, { todos: string[]; admin: string[] }> = {
 
 // Sistemas com mecanismo próprio: a Central administra, mas o login é lá.
 const EXTERNOS = new Set(["painel", "rh"]);
-const MODULOS_PAINEL = ["contas-atrasadas", "fluxo-caixa", "produtos", "orcamentos",
-  "bancos", "marketing", "licitacoes", "configuracoes"];
+// TERCEIRA copia desta lista (as outras: painel/supabase/functions/painel-auth
+// e painel/src/lib/modulos.js). Ela estava CINCO modulos atrasada -- gestao,
+// glossario, compromissos, manutencoes e patrimonio -- e o filtro abaixo
+// descartava esses ids sem dizer nada: a direcao marcava a caixa, recebia
+// {ok:true} e a pessoa nao ganhava acesso nenhum.
+//
+// Nao da para importar de outro repo aqui, entao a defesa e o `descartados` da
+// resposta: id que nao existir volta na resposta e a tela reclama. Modulo novo
+// entra nos TRES lugares.
+const MODULOS_PAINEL = ["gestao", "contas-atrasadas", "fluxo-caixa", "produtos", "orcamentos",
+  "bancos", "marketing", "licitacoes", "glossario", "compromissos", "manutencoes",
+  "patrimonio", "configuracoes"];
 // Calculado na hora de usar, não na carga do módulo: normalizarUsuario é um
 // const declarado mais abaixo, e chamá-lo aqui derruba a function inteira.
 const masterPainel = () => normalizarUsuario(Deno.env.get("PAINEL_AUTH_MASTER_USUARIO") || "leonardo");
@@ -240,15 +250,19 @@ async function painelSalvar(body: Record<string, any>) {
   if (senha && senha.length < 6) return json({ erro: "A senha precisa ter ao menos 6 caracteres." }, 400);
   const reg = senha ? await hashSenha(senha) : { hash: atual!.hash, salt: atual!.salt, iter: atual!.iter };
   // "tudo" = curinga; qualquer outra coisa vira a lista de módulos informada
+  const pedidos: string[] = Array.isArray(body.permissoes) ? body.permissoes : [];
   const permissoes = body.papel === "tudo" ? ["*"]
-    : (Array.isArray(body.permissoes) ? body.permissoes.filter((p: string) => MODULOS_PAINEL.includes(p))
+    : (Array.isArray(body.permissoes) ? pedidos.filter((p: string) => MODULOS_PAINEL.includes(p))
       : (atual?.permissoes ?? []));
+  // O que foi pedido e nao existe aqui. Vai na resposta para a tela reclamar --
+  // silencio aqui e concessao que nunca aconteceu, e ninguem descobre.
+  const descartados = pedidos.filter((p: string) => !MODULOS_PAINEL.includes(p) && p !== "*");
   const { error } = await sb.from("painel_contas").upsert({
     usuario, nome: String(body.nome ?? "").trim() || usuario, permissoes,
     vendedor_id: atual?.vendedor_id ?? "", ...reg, atualizado_em: new Date().toISOString(),
   }, { onConflict: "usuario" });
   if (error) throw new Error(error.message);
-  return json({ ok: true, temporaria: false });
+  return json({ ok: true, temporaria: false, descartados: descartados.length ? descartados : undefined });
 }
 
 async function painelRemover(body: Record<string, any>) {
