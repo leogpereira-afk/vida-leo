@@ -24,7 +24,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const APP_SENHA = Deno.env.get("LEO_APP_SENHA") ?? "";
 const SESSION_SECRET = Deno.env.get("LEO_SESSION_SECRET") ?? "";
 const DIAS = 180;
 /* Crachá CURTO, só para administrar os sistemas da empresa.
@@ -53,22 +52,6 @@ const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: fal
    A senha antiga continua aceita como segunda tentativa -- tirar a saida de
    emergencia de um app pessoal, no mesmo dia em que se muda o login dele, e
    pedir para ficar do lado de fora. */
-async function senhaDosSistemas(senha: string): Promise<boolean> {
-  if (!ANON_KEY || !senha) return false;
-  try {
-    const { data: conta } = await sb.from("acesso_conta")
-      .select("auth_user_id, ativo").eq("usuario", DONO).maybeSingle();
-    if (!conta?.auth_user_id || conta.ativo === false) return false;
-    const { data: u } = await sb.auth.admin.getUserById(conta.auth_user_id);
-    const email = u?.user?.email;
-    if (!email) return false;
-    const cliente = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false } });
-    const { data, error } = await cliente.auth.signInWithPassword({ email, password: senha });
-    return !error && !!data?.session;
-  } catch {
-    return false;
-  }
-}
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -99,11 +82,6 @@ function igual(a: string, b: string): boolean {
   for (let i = 0; i < a.length; i++) dif |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return dif === 0;
 }
-
-const novoToken = async () => {
-  const exp = Date.now() + DIAS * 864e5;
-  return exp + "." + (await assina(exp));
-};
 
 /* Crachá CURTO, para administrar os sistemas da empresa.
    O de 180 dias continua servindo à sessão deste app pessoal — é conforto, e o
@@ -153,40 +131,20 @@ async function crachaOk(token: string): Promise<boolean> {
   }
 }
 
+/* SÓ O CRACHÁ (11/08/2026).
+   A sessão desta Central era um HMAC próprio, de formato diferente do dos
+   outros sete. Ela virou um sistema como os demais: entra pela entrada única e
+   guarda o crachá padrão. O formato antigo saiu -- deixar as duas portas
+   abertas é manter viva justamente a diferença que a virada existiu para
+   acabar. Quem tiver sessão velha no navegador cai na tela de login e entra com
+   a senha de sempre. */
 async function tokenOk(t: string | null): Promise<boolean> {
   if (!t) return false;
-  // Cracha (tres partes) ou o HMAC antigo (duas). Os dois valem.
-  if (t.split(".").length === 3) return await crachaOk(t);
-  const [expS, mac] = String(t).split(".");
-  const exp = Number(expS);
-  if (!exp || exp < Date.now() || !mac) return false;
-  return igual(mac, await assina(exp));
+  return await crachaOk(t);
 }
 
 // ---------------------------------------------------------------- senha
 // PBKDF2-SHA256; o registro no banco guarda { salt, iter, hash } em hex.
-
-type RegSenha = { salt: string; iter: number; hash: string };
-
-async function pbkdf2(senha: string, saltHex: string, iter: number): Promise<string> {
-  const chave = await crypto.subtle.importKey("raw", enc.encode(senha), "PBKDF2", false, ["deriveBits"]);
-  const salt = new Uint8Array((saltHex.match(/../g) ?? []).map((h) => parseInt(h, 16)));
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt, iterations: iter }, chave, 256);
-  return [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function senhaDoBanco(): Promise<RegSenha | null> {
-  const { data } = await sb.from("leo_config").select("valor").eq("chave", "senha").maybeSingle();
-  const v = data?.valor as RegSenha | undefined;
-  return v && v.salt && v.iter && v.hash ? v : null;
-}
-
-async function senhaConfere(senha: string, reg: RegSenha | null): Promise<boolean> {
-  if (reg) return igual(await pbkdf2(senha, reg.salt, reg.iter), reg.hash);
-  if (!APP_SENHA) return false;
-  return igual(senha, APP_SENHA);
-}
 
 // senha errada espera um pouco: força-bruta fica cara sem atrapalhar quem digita
 const freia = () => new Promise((r) => setTimeout(r, 400));
@@ -208,31 +166,30 @@ Deno.serve(async (req: Request) => {
       return json({ token: await novoTokenAdmin() });
     }
 
+    /* A SENHA DESTE APP MORREU JUNTO COM A SESSÃO PRÓPRIA.
+       Quem entra aqui entra pela entrada única, com o mesmo usuário e a mesma
+       senha dos outros sistemas -- e a tela desta Central já faz isso sozinha
+       antes de chegar aqui. Este `login` sobrou como porta de servidor e não
+       emite mais nada: duas senhas para a mesma pessoa é uma que envelhece. */
     if (acao === "login") {
-      const digitada = String(senha ?? "");
-      // A senha dos sistemas primeiro; a antiga deste app como segunda porta.
-      if (await senhaDosSistemas(digitada)) return json({ token: await novoToken() });
-      const reg = await senhaDoBanco();
-      if (!reg && !APP_SENHA) return json({ erro: "senha não configurada" }, 500);
-      if (!(await senhaConfere(digitada, reg))) { await freia(); return json({ erro: "Senha incorreta" }, 401); }
-      return json({ token: await novoToken() });
+      await freia();
+      return json({
+        erro: "Entre pelo seu usuário e senha, os mesmos dos outros sistemas.",
+        usarEntradaUnica: true,
+      }, 401);
     }
 
+    /* TROCAR A SENHA NÃO É MAIS AQUI.
+       Esta ação gravava um hash em `leo_config` -- e essa senha, depois da
+       unificação, não abre mais nada: quem confere a entrada é o Supabase Auth.
+       Mantê-la seria pior que removê-la: a tela diria "senha alterada" e nada
+       teria mudado. A senha da casa se troca no Painel, num lugar só, e vale
+       para os oito sistemas. */
     if (acao === "trocar") {
-      // decisão do dono: basta a sessão válida — a senha antiga não é exigida.
-      // (o custo assumido: um aparelho logado consegue definir senha nova)
-      const t = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-      if (!(await tokenOk(t))) return json({ erro: "Não autorizado" }, 401);
-      const nova = String(senhaNova ?? "");
-      if (nova.length < 6) return json({ erro: "A senha nova precisa de pelo menos 6 caracteres" }, 400);
-      const salt = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
-      const iter = 120000;
-      const hash = await pbkdf2(nova, salt, iter);
-      const { error } = await sb.from("leo_config").upsert(
-        { chave: "senha", valor: { salt, iter, hash }, atualizado_em: new Date().toISOString() },
-        { onConflict: "chave" });
-      if (error) return json({ erro: error.message }, 500);
-      return json({ ok: true });
+      return json({
+        erro: "A senha agora é a mesma dos outros sistemas. Troque no Painel, em Acessos → Minha senha.",
+        trocarNoPainel: true,
+      }, 400);
     }
 
     return json({ erro: "ação inválida" }, 400);

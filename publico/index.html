@@ -6154,13 +6154,10 @@ function telaLogin(){
         if(e.ok){const d=await e.json();token=d?.crachas?.central?.token||null;}
       }catch(_){/* rede: cai na porta antiga */}
 
-      if(!token){
-        const r=await fetch(API_SYNC,{method:'POST',headers:{'content-type':'application/json'},
-          body:JSON.stringify({acao:'login',senha:senha.value})});
-        if(r.status===401){erroEl.textContent='Usuário ou senha incorretos.';return}
-        if(!r.ok)throw new Error('HTTP '+r.status);
-        token=(await r.json()).token;
-      }
+      // Sem segunda porta: a Central entra pela entrada única, como os outros
+      // sete. A senha própria deste app foi removida do servidor -- manter o
+      // caminho aqui só produziria um erro confuso.
+      if(!token){erroEl.textContent='Usuário ou senha incorretos.';return}
       (manter.checked?localStorage:sessionStorage).setItem(T_CHAVE,token);
       f.remove();document.querySelector('.app').style.display='';
       menu();tela();puxarNuvem().then(()=>tela());
