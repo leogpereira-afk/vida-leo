@@ -72,7 +72,8 @@ const EXTERNOS = new Set(["painel", "rh"]);
 // Nao da para importar de outro repo aqui, entao a defesa e o `descartados` da
 // resposta: id que nao existir volta na resposta e a tela reclama. Modulo novo
 // entra nos TRES lugares.
-const MODULOS_PAINEL = ["gestao", "contas-atrasadas", "fluxo-caixa", "produtos", "orcamentos",
+// fluxo-caixa e produtos sairam: as telas nao existem mais no painel.
+const MODULOS_PAINEL = ["gestao", "contas-atrasadas", "orcamentos",
   "bancos", "marketing", "licitacoes", "glossario", "compromissos", "manutencoes",
   "patrimonio", "configuracoes"];
 // Calculado na hora de usar, não na carga do módulo: normalizarUsuario é um
