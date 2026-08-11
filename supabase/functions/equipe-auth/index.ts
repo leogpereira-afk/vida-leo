@@ -175,11 +175,25 @@ async function lerCracha(token: string): Promise<Record<string, any> | null> {
 // Crachá da Central do Léo: "<expira_ms>.<hmac hex>" assinado com LEO_SESSION_SECRET.
 // É o mesmo formato da leo-sync — reaproveitado para a Central não precisar de
 // mais um segredo só para administrar acessos.
+/* O CRACHÁ DA CENTRAL ABRE OS SETE SISTEMAS. Ele é emitido pelo app pessoal do
+   Léo (leo-sync) depois do login dele, e aqui vale como "admin de tudo": criar,
+   trocar senha e remover acesso em qualquer sistema.
+
+   O da leo-sync vale 180 DIAS, porque lá ele é sessão de um app pessoal. Aceitar
+   180 dias AQUI é outra coisa: um crachá copiado do navegador dele — ou deixado
+   num computador — administra a empresa inteira por meio ano.
+
+   Então a validade é conferida DUAS vezes: não pode estar vencido, e não pode
+   ter nascido para durar mais que TETO_CENTRAL. Sessão longa continua servindo
+   para o app pessoal; para mandar nos sistemas, tem de ser recente. */
+const TETO_CENTRAL_MS = 12 * 60 * 60 * 1000;
+
 async function ehCentral(token: string): Promise<boolean> {
   if (!LEO_SECRET || !token) return false;
   const [expS, mac] = String(token).split(".");
   const exp = Number(expS);
   if (!exp || exp < Date.now() || !mac || mac.length !== 64) return false;
+  if (exp > Date.now() + TETO_CENTRAL_MS) return false;
   const chave = await crypto.subtle.importKey("raw", enc.encode(LEO_SECRET),
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const calc = hex(new Uint8Array(await crypto.subtle.sign("HMAC", chave, enc.encode(String(exp)))));

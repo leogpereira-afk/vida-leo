@@ -27,6 +27,12 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const APP_SENHA = Deno.env.get("LEO_APP_SENHA") ?? "";
 const SESSION_SECRET = Deno.env.get("LEO_SESSION_SECRET") ?? "";
 const DIAS = 180;
+/* Crachá CURTO, só para administrar os sistemas da empresa.
+   O de 180 dias continua existindo para a sessão do app pessoal (é conforto, e
+   o app é só do Léo). Mas a equipe-auth passou a recusar crachá que nasça para
+   durar mais de 12h: administrar a empresa inteira com um token de meio ano
+   copiado do navegador é risco de outra ordem. */
+const HORAS_ADMIN = 12;
 
 const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
 
@@ -62,6 +68,17 @@ function igual(a: string, b: string): boolean {
 
 const novoToken = async () => {
   const exp = Date.now() + DIAS * 864e5;
+  return exp + "." + (await assina(exp));
+};
+
+/* Crachá CURTO, para administrar os sistemas da empresa.
+   O de 180 dias continua servindo à sessão deste app pessoal — é conforto, e o
+   app é só do Léo. Mas a equipe-auth passou a RECUSAR crachá que nasça para
+   durar mais que 12h: administrar os sete sistemas com um token de meio ano
+   copiado de um navegador é risco de outra ordem. Este aqui é pedido na hora,
+   com a sessão longa como prova de que a pessoa já entrou. */
+const novoTokenAdmin = async () => {
+  const exp = Date.now() + HORAS_ADMIN * 3600e3;
   return exp + "." + (await assina(exp));
 };
 
@@ -110,6 +127,13 @@ Deno.serve(async (req: Request) => {
 
   if (req.method === "POST") {
     const { acao, senha, senhaAtual, senhaNova } = await req.json().catch(() => ({}));
+
+    // Troca a sessao longa por um cracha curto de administracao.
+    if (acao === "crachaAdmin") {
+      const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+      if (!(await tokenOk(t))) return json({ erro: "sessão inválida" }, 401);
+      return json({ token: await novoTokenAdmin() });
+    }
 
     if (acao === "login") {
       const reg = await senhaDoBanco();

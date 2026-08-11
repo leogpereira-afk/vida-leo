@@ -3154,9 +3154,25 @@ const SISTEMAS_ACESSO=[
 ];
 const SO_ATALHO=[];
 
+/* A equipe-auth nao aceita mais a sessao longa deste app como cracha de
+   administracao: ela recusa qualquer cracha que nasca para durar mais de 12h.
+   Entao, antes de administrar, a sessao longa e trocada por um cracha curto.
+   Guardado em memoria enquanto vale -- some quando a aba fecha. */
+let _crachaAdmin=null, _crachaAdminAte=0;
+async function crachaAdmin(){
+  if(_crachaAdmin && Date.now() < _crachaAdminAte - 60000) return _crachaAdmin;
+  const r=await fetch(API_SYNC,{method:'POST',
+    headers:{'content-type':'application/json',authorization:'Bearer '+pegaToken()},
+    body:JSON.stringify({acao:'crachaAdmin'})});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||!d.token) throw new Error(d.erro||'Entre de novo para administrar acessos.');
+  _crachaAdmin=d.token; _crachaAdminAte=Number(String(d.token).split('.')[0])||0;
+  return _crachaAdmin;
+}
+
 async function apiEquipe(acao,corpo){
   const r=await fetch(API_EQUIPE,{method:'POST',
-    headers:{'content-type':'application/json',authorization:'Bearer '+pegaToken()},
+    headers:{'content-type':'application/json',authorization:'Bearer '+(await crachaAdmin())},
     body:JSON.stringify({acao,...corpo})});
   let d={};try{d=await r.json()}catch(_){}
   if(!r.ok)throw Object.assign(new Error(d.erro||('HTTP '+r.status)),{status:r.status,erro:d.erro});
