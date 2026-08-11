@@ -304,9 +304,13 @@ async function rhSalvar(body: Record<string, any>) {
   // pessoa que não existe na ficha de ninguém.
   let colaboradorId = existente?.colaborador_id ?? "";
   if (!existente) {
-    const { data: regs } = await sb.from("registros").select("id, dados").eq("colecao", "colaboradores");
+    // A coluna e `registro`, nao `dados` (conferido no banco). Com o nome
+    // errado, `r.dados` era sempre undefined, NENHUM colaborador batia e criar
+    // conta de RH respondia "nao achei fulano entre os colaboradores" para
+    // todo mundo -- ou seja, nunca deu para criar conta de RH por aqui.
+    const { data: regs } = await sb.from("registros").select("id, registro").eq("colecao", "colaboradores");
     const achado = (regs ?? []).find((r: any) =>
-      normalizarUsuario((r.dados ?? {}).nome) === usuario);
+      normalizarUsuario((r.registro ?? {}).nome) === usuario);
     if (!achado) {
       return json({ erro: `Não achei "${body.usuario}" entre os colaboradores do RH. Cadastre a pessoa no RH primeiro — o acesso se liga à ficha dela.` }, 400);
     }
