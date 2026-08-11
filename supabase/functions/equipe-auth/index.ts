@@ -30,7 +30,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const JWT_SECRET = Deno.env.get("EQUIPE_JWT_SECRET") ?? "";
 const LEO_SECRET = Deno.env.get("LEO_SESSION_SECRET") ?? "";
 const DIAS = 30;
-const SISTEMAS = ["brief", "pcp", "compras", "dre", "painel", "rh", "pops"] as const;
+const SISTEMAS = ["brief", "pcp", "compras", "dre", "painel", "rh", "pops", "central"] as const;
 type Sistema = typeof SISTEMAS[number];
 
 // Papéis de cada sistema, com quem administra. Lista fechada: papel digitado
@@ -56,6 +56,10 @@ const PAPEIS: Record<Sistema, { todos: string[]; admin: string[] }> = {
   // esta função neles, e ninguém administra a partir de dentro deles aqui.
   painel: { todos: ["tudo"], admin: [] },
   rh: { todos: ["ADMIN_RH", "GESTOR", "COLABORADOR"], admin: [] },
+  // A Central do Léo (11/08/2026): app pessoal, uma pessoa só. Entra no quadro
+  // para deixar de ser um caso à parte -- mesma tabela, mesmo crachá, mesma
+  // senha. `admin: []` porque nao se administra acesso de dentro dela.
+  central: { todos: ["dono"], admin: [] },
   // Pops & Fabricação (03/08/2026): admin edita tudo e vê o mapa de treinamento;
   // gestor edita os POPs do(s) setor(es) dele; equipe lê e registra leitura.
   pops: { todos: ["admin", "gestor", "equipe"], admin: ["admin"] },

@@ -6043,6 +6043,10 @@ function sairApp(){
 // gravar. O nome leva prefixo porque o projeto e compartilhado com os sistemas
 // da empresa: uma function chamada "sync" seria a do RH.
 const API_SYNC='https://heveemylixartyijxewh.supabase.co/functions/v1/leo-sync';
+// A entrada única da casa: mesmo usuário e mesma senha dos outros seis.
+// Sem chave nenhuma no bundle: a function responde sem apikey (verify_jwt=false,
+// e quem autoriza é ela mesma).
+const API_BASE_ACESSO='https://heveemylixartyijxewh.supabase.co/functions/v1/acesso-entrar';
 
 async function apiSync(metodo,corpo){
   const r=await fetch(API_SYNC,{method:metodo,
@@ -6127,21 +6131,36 @@ function telaLogin(){
         <rect x="30" y="47" width="17" height="13"/></g></svg>
       <h2 style="font-size:19px">LEONARDO</h2>
       <div style="letter-spacing:.22em;font-size:12px;color:var(--suave);margin-bottom:18px">GONÇALVES</div>
+      <input type="text" class="usr" placeholder="Usuário" autocomplete="username" value="leonardo" style="width:100%;border:1px solid var(--linha);background:var(--bg);color:inherit;font:inherit;padding:11px 13px;border-radius:10px;text-align:center;margin-bottom:9px">
       <input type="password" placeholder="Senha" autocomplete="current-password" style="width:100%;border:1px solid var(--linha);background:var(--bg);color:inherit;font:inherit;padding:11px 13px;border-radius:10px;text-align:center">
       <label style="display:flex;gap:8px;align-items:center;justify-content:center;font-size:12.5px;color:var(--suave);margin:13px 0">
         <input type="checkbox" checked style="accent-color:var(--verde)"> Manter conectado neste aparelho</label>
       <button class="btn" style="width:100%">Entrar</button>
       <div class="erro" style="color:var(--vermelho);font-size:12.5px;margin-top:10px;min-height:16px"></div>
     </form></div>`);
-  const senha=f.querySelector('input[type=password]'),manter=f.querySelector('input[type=checkbox]'),erroEl=f.querySelector('.erro');
+  const usr=f.querySelector('.usr'),senha=f.querySelector('input[type=password]'),manter=f.querySelector('input[type=checkbox]'),erroEl=f.querySelector('.erro');
   f.querySelector('form').onsubmit=async ev=>{
     ev.preventDefault();erroEl.textContent='';
     try{
-      const r=await fetch(API_SYNC,{method:'POST',headers:{'content-type':'application/json'},
-        body:JSON.stringify({acao:'login',senha:senha.value})});
-      if(r.status===401){erroEl.textContent='Senha incorreta.';return}
-      if(!r.ok)throw new Error('HTTP '+r.status);
-      const {token}=await r.json();
+      /* ENTRADA PADRÃO PRIMEIRO: usuário + senha, a mesma dos outros sistemas.
+         A Central era o único app com senha própria e sem usuário — ser
+         diferente era o problema. A porta antiga (só senha) fica como segunda
+         via enquanto a virada assenta. */
+      let token=null;
+      try{
+        const e=await fetch(API_BASE_ACESSO,{method:'POST',
+          headers:{'content-type':'application/json'},
+          body:JSON.stringify({action:'entrar',usuario:usr.value.trim(),senha:senha.value})});
+        if(e.ok){const d=await e.json();token=d?.crachas?.central?.token||null;}
+      }catch(_){/* rede: cai na porta antiga */}
+
+      if(!token){
+        const r=await fetch(API_SYNC,{method:'POST',headers:{'content-type':'application/json'},
+          body:JSON.stringify({acao:'login',senha:senha.value})});
+        if(r.status===401){erroEl.textContent='Usuário ou senha incorretos.';return}
+        if(!r.ok)throw new Error('HTTP '+r.status);
+        token=(await r.json()).token;
+      }
       (manter.checked?localStorage:sessionStorage).setItem(T_CHAVE,token);
       f.remove();document.querySelector('.app').style.display='';
       menu();tela();puxarNuvem().then(()=>tela());

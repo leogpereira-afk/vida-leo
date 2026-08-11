@@ -116,8 +116,47 @@ const novoTokenAdmin = async () => {
   return exp + "." + (await assina(exp));
 };
 
+/* A CENTRAL VIROU UM SISTEMA COMO OS OUTROS (11/08/2026).
+   Ela tinha sessao propria (um HMAC `<expira>.<hmac>`), diferente do cracha que
+   os outros seis usam. Ser diferente era o problema: senha propria, entrada
+   propria, e ela de fora da entrada unica.
+   Agora ela tambem aceita o CRACHA -- mesmo formato, mesmo segredo, com
+   `sis === "central"`. Assim entrar no Painel ja abre a Central, e a senha e a
+   mesma. O HMAC antigo continua valendo enquanto a virada assenta. */
+const JWT_EQUIPE = Deno.env.get("EQUIPE_JWT_SECRET") ?? "";
+
+async function crachaOk(token: string): Promise<boolean> {
+  if (!JWT_EQUIPE || !token) return false;
+  const partes = token.split(".");
+  if (partes.length !== 3) return false;
+  try {
+    const chave = await crypto.subtle.importKey(
+      "raw", new TextEncoder().encode(JWT_EQUIPE),
+      { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+    const b64url = (t: string) => {
+      t = t.replace(/-/g, "+").replace(/_/g, "/");
+      while (t.length % 4) t += "=";
+      const bin = atob(t);
+      const out = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+      return out;
+    };
+    const ok = await crypto.subtle.verify(
+      "HMAC", chave, b64url(partes[2]),
+      new TextEncoder().encode(`${partes[0]}.${partes[1]}`));
+    if (!ok) return false;
+    const p = JSON.parse(new TextDecoder().decode(b64url(partes[1])));
+    if (typeof p.exp === "number" && p.exp < Math.floor(Date.now() / 1000)) return false;
+    return p.sis === "central";
+  } catch {
+    return false;
+  }
+}
+
 async function tokenOk(t: string | null): Promise<boolean> {
   if (!t) return false;
+  // Cracha (tres partes) ou o HMAC antigo (duas). Os dois valem.
+  if (t.split(".").length === 3) return await crachaOk(t);
   const [expS, mac] = String(t).split(".");
   const exp = Number(expS);
   if (!exp || exp < Date.now() || !mac) return false;
