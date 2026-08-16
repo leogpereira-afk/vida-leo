@@ -449,6 +449,7 @@ function carregar(){
   for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades'])
     (d[k]||[]).forEach(x=>{if(!x.id)x.id=uid()});
   d.viagens.forEach(v=>{if(!Array.isArray(v.custos))v.custos=[];
+    if(!Array.isArray(v.passagens))v.passagens=[];
     if(!Array.isArray(v.viajantes))v.viajantes=[];
     if(!Array.isArray(v.roteiro))v.roteiro=[];
     if(!Array.isArray(v.lugares))v.lugares=[];
@@ -1037,7 +1038,7 @@ function vViagens(m) {
   const semHotel = E.viagens.filter(v => v.ida >= hoje() && v.status !== 'Cancelado' && !String(v.hotel || '').trim()).length;
   const futIntl = E.viagens.filter(v => v.ida >= hoje() && v.status !== 'Cancelado' && ehInternacional(v));
   const comProblema = futIntl.filter(v => !docsViagem(v).ok);
-  const novaViagem = () => { const v = { id: uid(), ida: hoje(), volta: hoje(), evento: '', cidade: '', hotel: '', transporte: '', gastos: 0, status: 'Em Planejamento', obs: '', custos: [], viajantes: [], tipo: 'Trabalho', planejar: false, roteiro: [], lugares: [], carro: {} }; E.viagens.push(v); salvar(); modalViagem(v) };
+  const novaViagem = () => { const v = { id: uid(), ida: hoje(), volta: hoje(), evento: '', cidade: '', hotel: '', transporte: '', gastos: 0, status: 'Em Planejamento', obs: '', custos: [], passagens: [], viajantes: [], tipo: 'Trabalho', planejar: false, roteiro: [], lugares: [], carro: {} }; E.viagens.push(v); salvar(); modalViagem(v) };
 
   m.appendChild(cab('Viagens', 'Verde = pronta para embarcar. Vermelha = ainda falta resolver. Clique para abrir.'));
   // anos com viagem + o ano vigente sempre presente
@@ -1232,6 +1233,63 @@ function modalViagem(v){
       {k:'obs',t:'Observações',tipo:'textarea',full:true},
     ]));
     c.appendChild(s1);
+
+    /* ---- PASSAGENS ----
+       Cada trecho é uma linha: viagem de verdade tem conexão, e guardar só
+       "ida" e "volta" obrigaria a escrever a escala na observação, que é onde
+       a informação vai morrer. O que resolve no aeroporto é hora, portão de
+       saída e localizador — o resto é enfeite. */
+    const spass=el('<div class="secao"><h4>Passagens</h4></div>');
+    spass.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin:-4px 0 10px">
+      Hora, aeroporto e localizador. É o que você procura correndo no dia — e o que
+      alimenta o aviso de "sai daqui a 3 horas" na Agenda.</p>`));
+    const listaP=el('<div></div>');
+    const pintaPassagens=()=>{
+      listaP.innerHTML='';
+      const ord=[...(v.passagens||[])].sort((a,b)=>((a.data||'')+(a.hora||'')).localeCompare((b.data||'')+(b.hora||'')));
+      ord.forEach(p=>{
+        const li=el(`<div style="border:1px solid var(--linha);border-radius:var(--r);padding:11px 13px;margin-bottom:9px;background:var(--card)">
+          <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:8px">
+            <b style="font-size:13.5px">${p.sentido==='Volta'?'🛬':p.sentido==='Conexão'?'🔁':'✈️'} ${esc(p.sentido||'Ida')}</b>
+            ${p.de||p.para?`<span style="font-size:14px;font-weight:600">${esc(p.de||'?')} → ${esc(p.para||'?')}</span>`:''}
+            ${p.data?`<span style="font-size:12.5px;color:var(--suave)">${fmtDataAno(p.data)}${p.hora?' às '+esc(p.hora):''}</span>`:''}
+            <button class="btn ghost mini bX" style="margin-left:auto;color:var(--vermelho)">✕</button>
+          </div>
+          <div class="campos"></div></div>`);
+        li.querySelector('.campos').appendChild(campos(p,[
+          {k:'sentido',t:'Trecho',tipo:'select',opcoes:['Ida','Conexão','Volta']},
+          {k:'data',t:'Data',tipo:'date'},
+          {k:'hora',t:'Hora de partida',tipo:'time'},
+          {k:'de',t:'Sai de (aeroporto)',ph:'ex.: CNF · Confins'},
+          {k:'para',t:'Chega em (aeroporto)',ph:'ex.: GRU · Guarulhos'},
+          {k:'chegada',t:'Hora de chegada',tipo:'time'},
+          {k:'cia',t:'Companhia',tipo:'sugestao',ph:'ex.: LATAM',
+            opcoes:maisUsados((E.viagens||[]).flatMap(x=>x.passagens||[]),'cia')},
+          {k:'voo',t:'Voo',ph:'ex.: LA3204'},
+          {k:'localizador',t:'Localizador',ph:'código da reserva'},
+          {k:'assento',t:'Assento',ph:'ex.: 12A',w:110},
+        ],()=>{salvar();}));
+        li.querySelector('.bX').onclick=()=>{
+          if(!confirm('Apagar este trecho?'))return;
+          v.passagens=v.passagens.filter(x=>x.id!==p.id);salvar();pintaPassagens();
+        };
+        listaP.appendChild(li);
+      });
+      if(!(v.passagens||[]).length) listaP.appendChild(el('<div class="vazio">Nenhuma passagem lançada.</div>'));
+    };
+    pintaPassagens();
+    spass.appendChild(listaP);
+    const bP=el('<button class="btn mini">+ Trecho</button>');
+    bP.onclick=()=>{
+      // o primeiro trecho nasce como Ida na data da ida; o segundo, como Volta
+      const jaTem=(v.passagens||[]).length;
+      v.passagens=[...(v.passagens||[]),{id:uid(),
+        sentido:jaTem?'Volta':'Ida',data:jaTem?(v.volta||''):(v.ida||''),
+        hora:'',de:'',para:'',chegada:'',cia:'',voo:'',localizador:'',assento:''}];
+      salvar();pintaPassagens();
+    };
+    spass.appendChild(bP);
+    c.appendChild(spass);
 
     // ---- quem vai + internacional ----
     const sq=el('<div class="secao"><h4>Quem vai</h4></div>');
@@ -1666,8 +1724,13 @@ function eventosDoEcossistema(){
     if(!v.ida&&!v.volta)return;
     const de=v.ida||v.volta, ate=v.volta||v.ida;
     const dias=Math.round((new Date(ate+'T12:00')-new Date(de+'T12:00'))/864e5)+1;
-    ev.push({data:de,ate:ate>de?ate:'',hora:'',titulo:nome,
-      sub:[v.status,dias>1?dias+' dias fora':''].filter(Boolean).join(' · '),
+    // o voo da ida é o que dá a hora: é ele que decide a que horas você sai de casa
+    const voos=[...(v.passagens||[])].sort((a,b)=>((a.data||'')+(a.hora||'')).localeCompare((b.data||'')+(b.hora||'')));
+    const ida1=voos.find(p=>p.sentido!=='Volta'&&(p.hora||p.de))||voos[0];
+    const trecho=ida1&&(ida1.de||ida1.para)?ida1.de+' → '+ida1.para:'';
+    ev.push({data:de,ate:ate>de?ate:'',hora:(ida1&&ida1.hora)||'',titulo:nome,
+      sub:[trecho,ida1&&ida1.voo?ida1.cia+' '+ida1.voo:'',v.status,dias>1?dias+' dias fora':'']
+        .filter(Boolean).join(' · '),
       fonte:'viagens',ic:'✈️',ir:'viagens'});
   });
 
