@@ -419,6 +419,7 @@ const SEED={
     areasDemanda:['Pessoal','Trabalho','Família','Outro'],
     tiposCompromisso:['Pessoal','Trabalho','Família','Saúde','Outro'],
     tipoOportunidade:['Negócio','Investimento','Imóvel','Parceria','Estudo','Ferramenta','Viagem','Pessoal','Outro'],
+    tiposTicket:['Parque','Show','Museu','Jogo','Passeio','Teatro','Restaurante','Transfer','Outro'],
     tiposDoc:['Passaporte','CNH','RG','CPF','Certidão de nascimento','Certidão de casamento','Registro de arma (CR/CRAF)','CRLV / documento do veículo','Visto','Apólice de seguro','Escritura / imóvel','Contrato','Outro'],
     areasMeta:['Saúde','Dinheiro','Família','Negócios','Pessoal','Viagem'],
     areasPDI:['Liderança','Gestão','Finanças','Negociação','Comunicação','Técnico','Idiomas','Saúde','Pessoal'],
@@ -451,6 +452,7 @@ function carregar(){
   d.viagens.forEach(v=>{if(!Array.isArray(v.custos))v.custos=[];
     if(!Array.isArray(v.passagens))v.passagens=[];
     if(!Array.isArray(v.hoteis))v.hoteis=[];
+    if(!Array.isArray(v.tickets))v.tickets=[];
     // o campo antigo "hotel" (texto) vira o primeiro registro da lista, uma vez
     if(!v.hoteis.length&&String(v.hotel||'').trim())
       v.hoteis=[{id:uid(),nome:String(v.hotel).trim(),reserva:'',endereco:'',entrada:'',
@@ -1043,7 +1045,7 @@ function vViagens(m) {
   const semHotel = E.viagens.filter(v => v.ida >= hoje() && v.status !== 'Cancelado' && !String(v.hotel || '').trim()).length;
   const futIntl = E.viagens.filter(v => v.ida >= hoje() && v.status !== 'Cancelado' && ehInternacional(v));
   const comProblema = futIntl.filter(v => !docsViagem(v).ok);
-  const novaViagem = () => { const v = { id: uid(), ida: hoje(), volta: hoje(), evento: '', cidade: '', hotel: '', transporte: '', gastos: 0, status: 'Em Planejamento', obs: '', custos: [], passagens: [], hoteis: [], viajantes: [], tipo: 'Trabalho', planejar: false, roteiro: [], lugares: [], carro: {} }; E.viagens.push(v); salvar(); modalViagem(v) };
+  const novaViagem = () => { const v = { id: uid(), ida: hoje(), volta: hoje(), evento: '', cidade: '', hotel: '', transporte: '', gastos: 0, status: 'Em Planejamento', obs: '', custos: [], passagens: [], hoteis: [], tickets: [], viajantes: [], tipo: 'Trabalho', planejar: false, roteiro: [], lugares: [], carro: {} }; E.viagens.push(v); salvar(); modalViagem(v) };
 
   m.appendChild(cab('Viagens', 'Verde = pronta para embarcar. Vermelha = ainda falta resolver. Clique para abrir.'));
   // o Gmail entra como PROPOSTA: acha as passagens e você decide o que grava
@@ -1192,6 +1194,16 @@ function imprimirViagem(v) {
       <td>${esc(p.chegada || '—')}</td>
       <td>${esc(p.localizador || '—')}</td></tr>`).join('')}</tbody></table>` : '';
 
+  const ingr = (v.tickets || []).length ? `<h2>Ingressos</h2><table>
+    <thead><tr><th>O quê</th><th>Quando</th><th>Onde</th><th class="n">Qtd</th><th class="n">Valor</th><th>Código</th></tr></thead><tbody>
+    ${[...v.tickets].sort((a,b)=>((a.data||'')+(a.hora||'')).localeCompare((b.data||'')+(b.hora||'')))
+      .map(k => `<tr><td><b>${esc(k.nome || '')}</b>${k.tipo ? ' · ' + esc(k.tipo) : ''}</td>
+      <td>${k.data ? fmtDataAno(k.data) + (k.hora ? ' ' + esc(k.hora) : '') : '—'}</td>
+      <td>${esc(k.local || '—')}</td>
+      <td class="n">${+k.quantos || '—'}</td>
+      <td class="n">${+k.valor ? brl(+k.valor) : '—'}</td>
+      <td>${esc(k.codigo || '—')}</td></tr>`).join('')}</tbody></table>` : '';
+
   const c = v.carro || {};
   const carro = (c.locadora || c.reserva || c.modelo) ? `<h2>Carro alugado</h2>
     <div class="l"><b>Locadora</b> ${esc(c.locadora || '—')}${c.reserva ? ' · reserva ' + esc(c.reserva) : ''}</div>
@@ -1246,6 +1258,7 @@ function imprimirViagem(v) {
   ${passag}
   ${hosp}
   ${carro}
+  ${ingr}
   ${docs}
   ${gastos}
   ${v.obs ? `<h2>Observações</h2><div>${esc(v.obs)}</div>` : ''}
@@ -1325,7 +1338,7 @@ function modalViagem(v){
        Ficava escondido atrás de "montar o roteiro": viagem de trabalho com
        carro alugado não tinha onde registrar. Agora é seção própria, sempre
        visível — reserva de hotel e locadora não são assunto de roteiro. */
-    const shosp=el('<div class="secao"><h4>Hotel e carro</h4></div>');
+    const shosp=el('<div class="secao"><h4>Reservas</h4></div>');
     const listaH=el('<div></div>');
     const resumoHoteis=()=>{v.hotel=(v.hoteis||[]).map(h=>h.nome).filter(Boolean).join(' · ')};
     const pintaHoteis=()=>{
@@ -1366,31 +1379,32 @@ function modalViagem(v){
     };
     pintaHoteis();
     shosp.appendChild(listaH);
-    const bH=el('<button class="btn mini">+ Hospedagem</button>');
+    const bH=el('<button class="btn mini ghost">🏨 Hospedagem</button>');
     bH.onclick=()=>{
       v.hoteis=[...(v.hoteis||[]),{id:uid(),nome:'',reserva:'',endereco:'',
         entrada:v.ida||'',horaEnt:'',saida:v.volta||'',horaSai:'',valor:0,telefone:'',cafe:'',obs:''}];
       salvar();pintaHoteis();
     };
-    shosp.appendChild(bH);
-
     /* o carro sai de dentro do roteiro e vem para cá */
     v.carro=v.carro||{};
     const caId='carro-'+v.id;
     shosp.appendChild(el('<div style="height:14px"></div>'));
     const temCarro=()=>String(v.carro.locadora||'').trim()||String(v.carro.reserva||'').trim();
     const caixaCarro=el('<div></div>');
-    let _abrirCarro=false;   // só abre quando você clicar em "+ Carro alugado"
+    let _abrirCarro=false, _barraReservas=null;
     const pintaCarro=()=>{
       caixaCarro.innerHTML='';
-      // sem carro na viagem, não fica formulário vazio ocupando a tela: fica um
-      // convite. A maioria das viagens não aluga carro.
+      // sem carro na viagem, não fica formulário vazio ocupando a tela: o convite
+      // vai para a barra junto dos outros. A maioria das viagens não aluga carro.
       if(!temCarro()&&!_abrirCarro){
-        const b=el('<button class="btn mini ghost">+ Carro alugado</button>');
-        b.onclick=()=>{_abrirCarro=true;_emEdicao.add(caId);pintaCarro()};
-        caixaCarro.appendChild(b);
+        if(_barraReservas&&!_barraReservas.querySelector('.bCarro')){
+          const b=el('<button class="btn mini ghost bCarro">🚗 Carro</button>');
+          b.onclick=()=>{_abrirCarro=true;_emEdicao.add(caId);pintaCarro()};
+          _barraReservas.appendChild(b);
+        }
         return;
       }
+      if(_barraReservas){const vb=_barraReservas.querySelector('.bCarro');if(vb)vb.remove()}
       caixaCarro.appendChild(blocoTravado({id:caId,novo:()=>_abrirCarro&&!temCarro(),alvo:v.carro,
         aoApagar:temCarro()||_abrirCarro?()=>{
           if(temCarro()&&!confirm('Apagar os dados do carro alugado?'))return;
@@ -1434,6 +1448,59 @@ function modalViagem(v){
     };
     pintaCarro();
     shosp.appendChild(caixaCarro);
+
+    /* ---- INGRESSOS ----
+       Parque, show, museu, jogo. Vale o mesmo motivo do resto: o que decide no
+       dia é hora, local e o código que o portão pede — e isso costuma acabar
+       perdido no e-mail. */
+    const listaT=el('<div></div>');
+    const pintaTickets=()=>{
+      listaT.innerHTML='';
+      const ord=[...(v.tickets||[])].sort((a,b)=>((a.data||'')+(a.hora||'')).localeCompare((b.data||'')+(b.hora||'')));
+      ord.forEach(k=>{
+        listaT.appendChild(blocoTravado({id:k.id,novo:()=>!String(k.nome||'').trim(),alvo:k,
+          resumo:()=>{
+            const l2=[
+              k.data?fmtDataAno(k.data)+(k.hora?' às '+esc(k.hora):''):'',
+              +k.quantos?k.quantos+(k.quantos>1?' ingressos':' ingresso'):'',
+              +k.valor?brl(+k.valor):'',
+              k.codigo?'cód. '+esc(k.codigo):'',
+            ].filter(Boolean).join(' · ');
+            return `<b style="font-size:13.5px">🎟️ ${esc(k.nome||'(sem nome)')}${k.tipo?` <span style="font-weight:400;color:var(--suave);font-size:12px">· ${esc(k.tipo)}</span>`:''}</b>
+              ${l2?`<div style="font-size:12.5px;color:var(--suave);margin-top:2px">${l2}</div>`:''}
+              ${k.local?`<div style="font-size:12px;color:var(--suave);margin-top:1px">📍 ${esc(k.local)}</div>`:''}`;
+          },
+          aoApagar:()=>{ if(!confirm('Apagar este ingresso?'))return;
+            v.tickets=v.tickets.filter(x=>x.id!==k.id);_emEdicao.delete(k.id);salvar();pintaTickets(); },
+          campos:[
+            {k:'nome',t:'O que é',ph:'ex.: Disney — Magic Kingdom',full:true},
+            {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposTicket')},
+            {k:'data',t:'Dia',tipo:'date'},
+            {k:'hora',t:'Hora',tipo:'time'},
+            {k:'local',t:'Onde',full:true,ph:'endereço, portão, setor'},
+            {k:'quantos',t:'Quantos',tipo:'number',num:1,w:110},
+            {k:'valor',t:'Valor total',tipo:'moeda'},
+            {k:'codigo',t:'Código / localizador',ph:'o que o portão pede'},
+            {k:'obs',t:'Observações',tipo:'textarea',full:true,ph:'fila prioritária, precisa imprimir, até que horas entra'},
+          ]}));
+      });
+    };
+    pintaTickets();
+    shosp.appendChild(listaT);
+
+    /* os três botões, pequenos e juntos: é o que resta quando nada foi lançado */
+    const bT=el('<button class="btn mini ghost">🎟️ Ingresso</button>');
+    bT.onclick=()=>{
+      v.tickets=[...(v.tickets||[]),{id:uid(),nome:'',tipo:CFG('tiposTicket')[0],
+        data:v.ida||'',hora:'',local:'',quantos:(v.viajantes||[]).length||1,valor:0,codigo:'',obs:''}];
+      salvar();pintaTickets();
+    };
+    const barra=el('<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px"></div>');
+    barra.appendChild(bH);barra.appendChild(bT);
+    shosp.appendChild(barra);
+    // o botão do carro entra na mesma barra quando não há carro lançado
+    _barraReservas=barra;
+    pintaCarro();
     c.appendChild(shosp);
 
     // ---- quem vai + internacional ----
