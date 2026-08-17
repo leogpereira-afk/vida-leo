@@ -65,8 +65,25 @@ const PAPEIS: Record<Sistema, { todos: string[]; admin: string[] }> = {
   pops: { todos: ["admin", "gestor", "equipe"], admin: ["admin"] },
 };
 
-// Sistemas com mecanismo próprio: a Central administra, mas o login é lá.
-const EXTERNOS = new Set(["painel", "rh"]);
+/* Sistemas com mecanismo próprio: a Central administra, mas o login é lá.
+   O `login` é recusado para eles, e `salvarConta`/`removerConta` caem em
+   handlers que escrevem na tabela de VERDADE de cada um (painel_contas, perfis
+   + Auth) — nunca em `equipe_contas`.
+
+   `central` entrou em 16/08/2026, e a falta dela era um buraco silencioso: a
+   Central do Léo autentica pela leo-sync (LEO_SESSION_SECRET) e não tem linha
+   em `equipe_contas`. Sem estar aqui, um `salvarConta` para sistema `central`
+   caía no ramo genérico e CRIAVA essa linha, com senha PBKDF2 — uma segunda
+   senha, válida, para o app pessoal do dono, nascida de um clique em "Criar a
+   conta lá" na tela de Acessos. E `login` responderia 200 com ela.
+
+   Diferente de painel e rh, `central` não tem handler próprio: não se
+   administra de lugar nenhum. Ela aparece na tela de Acessos só como registro
+   de quem a abre. */
+const EXTERNOS = new Set(["painel", "rh", "central"]);
+// Dos EXTERNOS, os que a Central sabe administrar. `central` fica de fora de
+// propósito — ver acima.
+const ADMINISTRAVEIS = new Set(["painel", "rh"]);
 // TERCEIRA copia desta lista (as outras: painel/supabase/functions/painel-auth
 // e painel/src/lib/modulos.js). Ela estava CINCO modulos atrasada -- gestao,
 // glossario, compromissos, manutencoes e patrimonio -- e o filtro abaixo
@@ -276,9 +293,18 @@ async function painelSalvar(body: Record<string, any>) {
   // O que foi pedido e nao existe aqui. Vai na resposta para a tela reclamar --
   // silencio aqui e concessao que nunca aconteceu, e ninguem descobre.
   const descartados = pedidos.filter((p: string) => !MODULOS_PAINEL.includes(p) && p !== "*");
+  /* O VÍNCULO COM O VENDEDOR passa a poder ser gravado daqui. Antes esta linha
+     era `atual?.vendedor_id ?? ""` sem alternativa: preservava, e só. Como a
+     tela de Acessos escreve o Painel por esta função, NÃO HAVIA CAMINHO NENHUM
+     para ligar alguém a um vendedor — a Michelle ficou 149 orçamentos sem o
+     dela, abrindo a mesa do time inteiro em vez da própria fila, e sem aviso.
+     Ausente continua preservando (é o que a maioria das gravações quer). */
   const { error } = await sb.from("painel_contas").upsert({
     usuario, nome: String(body.nome ?? "").trim() || usuario, permissoes,
-    vendedor_id: atual?.vendedor_id ?? "", ...reg, atualizado_em: new Date().toISOString(),
+    vendedor_id: body.vendedorId === undefined
+      ? (atual?.vendedor_id ?? "")
+      : String(body.vendedorId ?? "").replace(/\s+/g, " ").trim(),
+    ...reg, atualizado_em: new Date().toISOString(),
   }, { onConflict: "usuario" });
   if (error) throw new Error(error.message);
   return json({ ok: true, temporaria: false, descartados: descartados.length ? descartados : undefined });
@@ -571,6 +597,13 @@ Deno.serve(async (req: Request) => {
       case "salvarConta": {
         const q = await quemPede(req, sistema);
         if (!q.admin) return json({ erro: "Apenas a gestão." }, 403);
+        /* `central` é EXTERNO e NÃO é administrável: sem esta linha, cairia no
+           ramo genérico lá embaixo e criaria em `equipe_contas` uma segunda
+           senha, válida, para o app pessoal do dono. Recusar aqui é o que
+           impede isso de nascer de um clique. */
+        if (EXTERNOS.has(sistema) && !ADMINISTRAVEIS.has(sistema)) {
+          return json({ erro: `O ${sistema} tem porta própria e não se administra por aqui.` }, 400);
+        }
         if (sistema === "painel") { const r = await painelSalvar(body); await registrar(sistema, normalizarUsuario(body.usuario), "salvou", q.quem); return r; }
         if (sistema === "rh") { const r = await rhSalvar(body); await registrar(sistema, normalizarUsuario(body.usuario), "salvou", q.quem); return r; }
         const usuario = normalizarUsuario(body.usuario);
@@ -609,6 +642,9 @@ Deno.serve(async (req: Request) => {
       case "removerConta": {
         const q = await quemPede(req, sistema);
         if (!q.admin) return json({ erro: "Apenas a gestão." }, 403);
+        if (EXTERNOS.has(sistema) && !ADMINISTRAVEIS.has(sistema)) {
+          return json({ erro: `O ${sistema} tem porta própria e não se administra por aqui.` }, 400);
+        }
         if (sistema === "painel") { const r = await painelRemover(body); await registrar(sistema, normalizarUsuario(body.usuario), "removeu", q.quem); return r; }
         if (sistema === "rh") { const r = await rhRemover(body); await registrar(sistema, normalizarUsuario(body.usuario), "removeu", q.quem); return r; }
         const usuario = normalizarUsuario(body.usuario);
