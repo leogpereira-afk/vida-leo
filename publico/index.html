@@ -1041,6 +1041,15 @@ function vViagens(m) {
   const novaViagem = () => { const v = { id: uid(), ida: hoje(), volta: hoje(), evento: '', cidade: '', hotel: '', transporte: '', gastos: 0, status: 'Em Planejamento', obs: '', custos: [], passagens: [], viajantes: [], tipo: 'Trabalho', planejar: false, roteiro: [], lugares: [], carro: {} }; E.viagens.push(v); salvar(); modalViagem(v) };
 
   m.appendChild(cab('Viagens', 'Verde = pronta para embarcar. Vermelha = ainda falta resolver. Clique para abrir.'));
+  // o Gmail entra como PROPOSTA: acha as passagens e você decide o que grava
+  {
+    const bg=el('<button class="btn mini ghost">📧 Buscar passagens no Gmail</button>');
+    bg.onclick=()=>buscarPassagensGmail(bg);
+    const cxg=el('<div style="margin:0 0 14px"></div>');
+    cxg.appendChild(bg);
+    cxg.appendChild(el('<span style="font-size:12px;color:var(--suave);margin-left:10px">só leitura · nada é gravado sem você confirmar</span>'));
+    m.appendChild(cxg);
+  }
   // anos com viagem + o ano vigente sempre presente
   // o painel começa em 2026 — o que é mais antigo que isso não interessa mais
   const ANO_MIN = 2026;
@@ -2473,6 +2482,301 @@ function imprimirSOS() {
   ${S.obs ? `<h2>Observações</h2><div class="l">${esc(S.obs)}</div>` : ''}
   <div style="margin-top:26px;color:#999;font-size:12px">Gerado em ${new Date().toLocaleDateString('pt-BR')}</div>`);
   w.document.close(); w.print();
+}
+
+/* ===================== PASSAGENS PELO GMAIL =====================
+   Lê os e-mails de companhia aérea e PROPÕE viagens — nunca grava sozinho.
+
+   Por que propor e não gravar: e-mail de passagem varia demais entre
+   companhias, e remarcação gera e-mail novo com o mesmo localizador. Um
+   importador que grava sozinho cria viagem duplicada e troca horário errado —
+   e você descobre no aeroporto. A tela de confirmação é o que impede isso.
+
+   O ID do cliente aparece aqui em texto puro DE PROPÓSITO: no OAuth de
+   navegador ele é público (vai no código-fonte de qualquer site com login
+   Google). Quem autoriza é a sua conta, não ele. A chave secreta do cliente
+   NÃO é usada neste fluxo e não deve estar em lugar nenhum daqui.
+
+   O escopo é só-leitura: este código não consegue enviar nem apagar e-mail.
+   O token de acesso fica só em memória — token de uma hora não merece disco. */
+
+const GMAIL_CLIENT_ID='41350662840-21p2a062djc5du99idb12akjv2lq5gnj.apps.googleusercontent.com';
+const GMAIL_ESCOPO='https://www.googleapis.com/auth/gmail.readonly';
+let _gmailToken='';
+
+// A busca não varre a caixa: procura marcas de passagem e remetentes de
+// companhia, no último ano. Caixa inteira seria lento e indiscreto.
+const CONSULTA_GMAIL=
+  '(localizador OR "código da reserva" OR "codigo da reserva" OR "cartão de embarque" OR '+
+  '"boarding pass" OR "e-ticket" OR "bilhete eletrônico" OR "confirmação de reserva" OR '+
+  '"reserva confirmada" OR "seu voo" OR itinerário OR itinerario) newer_than:1y';
+
+function carregarGis(){
+  return new Promise((ok,erro)=>{
+    if(window.google&&window.google.accounts&&google.accounts.oauth2)return ok();
+    const sc=document.createElement('script');
+    sc.src='https://accounts.google.com/gsi/client';sc.async=true;sc.defer=true;
+    sc.onload=()=>ok();
+    sc.onerror=()=>erro(new Error('Não consegui carregar o login do Google — sem internet?'));
+    document.head.appendChild(sc);
+  });
+}
+
+async function pedirTokenGmail(forcar){
+  await carregarGis();
+  return new Promise((ok,erro)=>{
+    const tc=google.accounts.oauth2.initTokenClient({
+      client_id:GMAIL_CLIENT_ID, scope:GMAIL_ESCOPO,
+      callback:resp=>{
+        if(resp.error)return erro(new Error(resp.error_description||resp.error));
+        _gmailToken=resp.access_token; ok(resp.access_token);
+      },
+      error_callback:e=>erro(new Error(e&&e.type==='popup_closed'
+        ? 'Você fechou a janela do Google antes de autorizar.'
+        : 'O Google não autorizou. Confira se o seu e-mail está como usuário de teste no projeto.')),
+    });
+    tc.requestAccessToken({prompt:forcar?'consent':''});
+  });
+}
+
+async function gmailApi(caminho){
+  const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/'+caminho,
+    {headers:{authorization:'Bearer '+_gmailToken}});
+  if(r.status===401){_gmailToken='';throw Object.assign(new Error('A autorização do Google venceu — clique de novo para renovar.'),{status:401})}
+  if(r.status===403)throw new Error('O Google recusou o acesso. Confira se a API do Gmail está ativada e se você está como usuário de teste.');
+  if(!r.ok)throw new Error('O Gmail respondeu '+r.status+'.');
+  return r.json();
+}
+
+// base64url do Gmail, com acento preservado
+const deB64=x=>{try{
+  const b=String(x||'').replace(/-/g,'+').replace(/_/g,'/');
+  return new TextDecoder().decode(Uint8Array.from(atob(b),c=>c.charCodeAt(0)));
+}catch(e){return ''}};
+
+function corpoDoEmail(payload){
+  let txt='',html='';
+  const anda=(p,nivel)=>{
+    if(!p||nivel>12)return;
+    const d=p.body&&p.body.data;
+    if(d&&p.mimeType==='text/plain')txt+=deB64(d)+'\n';
+    if(d&&p.mimeType==='text/html')html+=deB64(d)+'\n';
+    (p.parts||[]).forEach(x=>anda(x,nivel+1));
+  };
+  anda(payload,0);
+  return {txt,html};
+}
+
+/* A leitura EXATA: várias companhias mandam os dados do voo estruturados
+   dentro do e-mail (é o que faz o Google Agenda criar o voo sozinho). Quando
+   isso existe, não há adivinhação nenhuma. */
+function voosEstruturados(html){
+  const out=[];
+  const re=/<script[^>]+application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi;
+  let m,voltas=0;
+  while((m=re.exec(html))&&voltas++<40){
+    let d; try{d=JSON.parse(m[1].trim())}catch(e){continue}
+    const fila=Array.isArray(d)?d.slice():[d];
+    let guarda=0;
+    while(fila.length&&guarda++<200){
+      const x=fila.shift();
+      if(!x||typeof x!=='object')continue;
+      if(Array.isArray(x['@graph']))fila.push(...x['@graph']);
+      if(Array.isArray(x.subReservation))fila.push(...x.subReservation);
+      const tipo=String(x['@type']||'');
+      if(tipo.includes('FlightReservation')&&x.reservationFor){
+        const fs2=Array.isArray(x.reservationFor)?x.reservationFor:[x.reservationFor];
+        fs2.forEach(f=>{
+          if(!f||typeof f!=='object')return;
+          out.push({
+            localizador:String(x.reservationNumber||''),
+            voo:String(f.flightNumber||''),
+            cia:String((f.airline&&(f.airline.name||f.airline.iataCode))||''),
+            de:String((f.departureAirport&&(f.departureAirport.iataCode||f.departureAirport.name))||''),
+            para:String((f.arrivalAirport&&(f.arrivalAirport.iataCode||f.arrivalAirport.name))||''),
+            partida:String(f.departureTime||''),
+            chegada:String(f.arrivalTime||''),
+            exato:true,
+          });
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/* A leitura por PADRÃO, quando não vem estruturado. Acerta menos — por isso
+   sai marcada como "conferir", e a tela mostra isso. */
+function voosPorPadrao(txt){
+  const out=[];
+  const loc=(txt.match(/(?:localizador|c[óo]digo da reserva|c[óo]digo de reserva|PNR)[^A-Z0-9]{0,12}([A-Z0-9]{5,7})\b/i)||[])[1]||'';
+  const re=/\b([A-Z]{2})\s?(\d{3,4})\b[\s\S]{0,180}?\b([A-Z]{3})\b[\s\S]{0,60}?\b([A-Z]{3})\b/g;
+  let m,guarda=0;
+  while((m=re.exec(txt))&&guarda++<12){
+    if(m[3]===m[4])continue;
+    const perto=txt.slice(m.index,m.index+300);
+    const hora=(perto.match(/\b([0-2]\d:[0-5]\d)\b/)||[])[1]||'';
+    const data=(perto.match(/\b(\d{2})\/(\d{2})\/(\d{4})\b/)||null);
+    out.push({localizador:loc,voo:m[1]+m[2],cia:'',de:m[3],para:m[4],
+      partida:data?(data[3]+'-'+data[2]+'-'+data[1]+(hora?'T'+hora:'')):'',
+      chegada:'',exato:false});
+  }
+  return out;
+}
+
+const soData=x=>String(x||'').slice(0,10);
+const soHora=x=>{const m=String(x||'').match(/T(\d{2}:\d{2})/);return m?m[1]:''};
+
+/* Agrupa os trechos achados em VIAGENS: mesmo localizador = mesma viagem.
+   Sem localizador, agrupa por proximidade de data (até 30 dias). */
+function agruparEmViagens(trechos){
+  const grupos=[];
+  trechos.forEach(v=>{
+    if(!soData(v.partida))return;
+    let g=v.localizador
+      ? grupos.find(x=>x.localizador&&x.localizador===v.localizador)
+      : grupos.find(x=>!x.localizador&&Math.abs(new Date(soData(v.partida))-new Date(x.ida))<30*864e5);
+    if(!g){g={localizador:v.localizador||'',trechos:[],ida:soData(v.partida),volta:soData(v.partida)};grupos.push(g)}
+    // trecho repetido (o mesmo voo em dois e-mails) entra uma vez só
+    if(g.trechos.some(x=>x.voo===v.voo&&soData(x.partida)===soData(v.partida)))return;
+    g.trechos.push(v);
+    if(soData(v.partida)<g.ida)g.ida=soData(v.partida);
+    const fim=soData(v.chegada)||soData(v.partida);
+    if(fim>g.volta)g.volta=fim;
+  });
+  grupos.forEach(g=>{
+    g.trechos.sort((a,b)=>String(a.partida).localeCompare(String(b.partida)));
+    /* O DESTINO não é o primeiro pouso — esse costuma ser a conexão.
+       Ida com escala (CNF→GRU→CAN): o destino é o último pouso.
+       Ida e volta (…→CAN→…→CNF): o destino é onde você FICOU, ou seja, o pouso
+       com o maior intervalo até o voo seguinte. */
+    const n2=g.trechos.length, pri=g.trechos[0], ult=g.trechos[n2-1];
+    g.iDest=0;
+    if(!n2) g.destino='';
+    else if(n2===1||!ult.para||!pri.de||ult.para!==pri.de){g.destino=ult.para||'';g.iDest=n2-1}
+    else{
+      let melhor=0,maior=-1;
+      for(let i=0;i<n2-1;i++){
+        const fim=new Date(g.trechos[i].chegada||g.trechos[i].partida);
+        const prox=new Date(g.trechos[i+1].partida);
+        const gap=prox-fim;
+        if(gap>maior){maior=gap;melhor=i}
+      }
+      g.destino=g.trechos[melhor].para||'';g.iDest=melhor;
+    }
+    g.exato=g.trechos.every(x=>x.exato);
+    // já existe viagem com esse localizador? então é atualização, não viagem nova
+    g.jaExiste=g.localizador
+      ? (E.viagens||[]).find(v2=>(v2.passagens||[]).some(p=>p.localizador&&p.localizador===g.localizador))
+      : null;
+  });
+  return grupos.sort((a,b)=>a.ida.localeCompare(b.ida));
+}
+
+async function buscarPassagensGmail(botao){
+  const rot=botao?botao.textContent:'';
+  const diz=x=>{if(botao){botao.disabled=true;botao.textContent=x}};
+  try{
+    diz('Conectando…');
+    if(!_gmailToken)await pedirTokenGmail(true);
+    diz('Procurando…');
+    const lista=await gmailApi('messages?maxResults=30&q='+encodeURIComponent(CONSULTA_GMAIL));
+    const ids=(lista.messages||[]).map(x=>x.id);
+    if(!ids.length){alert('Não achei e-mail de passagem no último ano.');return}
+    const trechos=[];
+    for(let i=0;i<ids.length;i++){
+      diz('Lendo '+(i+1)+' de '+ids.length+'…');
+      let msg; try{ msg=await gmailApi('messages/'+ids[i]+'?format=full') }catch(e){continue}
+      const {txt,html}=corpoDoEmail(msg.payload);
+      const exatos=voosEstruturados(html);
+      (exatos.length?exatos:voosPorPadrao(txt||html.replace(/<[^>]+>/g,' '))).forEach(v=>trechos.push(v));
+    }
+    const grupos=agruparEmViagens(trechos);
+    if(!grupos.length){
+      alert('Li '+ids.length+' e-mail(s) e não consegui extrair voo de nenhum.\n\n'+
+        'Isso acontece quando a companhia manda só imagem ou PDF. Nesses casos, o anexo .ics do e-mail resolve: Agenda → Importar .ics.');
+      return;
+    }
+    modalPassagensGmail(grupos);
+  }catch(e){
+    alert(e.message||'Não consegui buscar agora.');
+  }finally{
+    if(botao){botao.disabled=false;botao.textContent=rot}
+  }
+}
+
+function modalPassagensGmail(grupos){
+  const escolha={};
+  grupos.forEach(g=>escolha[g.ida+(g.localizador||'')]=true);
+  abrirModal('Passagens encontradas no Gmail',
+    grupos.length+(grupos.length===1?' viagem':' viagens')+' — confira antes de gravar',(c,fechar)=>{
+    c.appendChild(el(`<div class="secao"><p style="font-size:12.5px;color:var(--suave);margin:0">
+      Nada entra sozinho. O que estiver marcado vira viagem quando você clicar em gravar.
+      <b>Conferir</b> quer dizer que a companhia não mandou os dados estruturados e eu li por padrão —
+      olhe hora e aeroporto antes de confiar.</p></div>`));
+    grupos.forEach(g=>{
+      const ch=g.ida+(g.localizador||'');
+      const box=el(`<div class="secao" style="border:1px solid var(--linha);border-radius:var(--r);padding:13px 15px;margin-bottom:11px">
+        <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+          <input type="checkbox" checked style="width:17px;height:17px;margin-top:2px;accent-color:var(--tinta)">
+          <div style="flex:1">
+            <b style="font-size:15px">${esc(g.destino||'Viagem')}</b>
+            ${g.exato?'':'<span style="font-size:10.5px;font-weight:700;background:var(--areia-cl);color:var(--areia);border-radius:999px;padding:2px 7px;margin-left:6px">CONFERIR</span>'}
+            ${g.jaExiste?'<span style="font-size:10.5px;font-weight:700;background:var(--azul-cl);color:var(--azul);border-radius:999px;padding:2px 7px;margin-left:6px">ATUALIZA A EXISTENTE</span>':''}
+            <div style="font-size:12.5px;color:var(--suave);margin-top:2px">
+              ${fmtDataAno(g.ida)} a ${fmtDataAno(g.volta)}${g.localizador?' · localizador '+esc(g.localizador):''}
+              ${g.jaExiste?' · vai atualizar "'+esc(g.jaExiste.evento||g.jaExiste.cidade||'viagem')+'"':''}</div>
+            <div class="trechos" style="margin-top:9px"></div>
+          </div></label></div>`);
+      const tl=box.querySelector('.trechos');
+      g.trechos.forEach(v=>{
+        tl.appendChild(el(`<div style="font-size:12.5px;padding:5px 0;border-top:1px solid var(--linha)">
+          <b>${esc(v.de||'?')} → ${esc(v.para||'?')}</b>
+          <span style="color:var(--suave)"> · ${fmtDataAno(soData(v.partida))}${soHora(v.partida)?' às '+soHora(v.partida):' · sem hora'}
+          ${v.cia||v.voo?' · '+esc([v.cia,v.voo].filter(Boolean).join(' ')):''}</span></div>`));
+      });
+      box.querySelector('input').onchange=ev=>{escolha[ch]=ev.target.checked};
+      c.appendChild(box);
+    });
+    const fim=el('<div class="secao" style="display:flex;gap:9px"></div>');
+    const bOk=el('<button class="btn">Gravar as marcadas</button>');
+    bOk.onclick=()=>{
+      let novas=0,atualizadas=0;
+      grupos.forEach(g=>{
+        if(!escolha[g.ida+(g.localizador||'')])return;
+        /* O rótulo segue o DESTINO, não a posição: numa ida com escala o
+           último trecho é conexão, não volta. Volta é o primeiro trecho DEPOIS
+           de chegar ao destino. */
+        const iD=g.iDest==null?g.trechos.length-1:g.iDest;
+        const passagens=g.trechos.map((v,i)=>({id:uid(),
+          sentido:i===0?'Ida':(i===iD+1?'Volta':'Conexão'),
+          data:soData(v.partida),hora:soHora(v.partida),de:v.de,para:v.para,
+          chegada:soHora(v.chegada),cia:v.cia,voo:v.voo,
+          localizador:g.localizador,assento:''}));
+        if(g.jaExiste){
+          // remarcação: os trechos do mesmo localizador são substituídos
+          const v2=g.jaExiste;
+          v2.passagens=[...(v2.passagens||[]).filter(p=>p.localizador!==g.localizador),...passagens];
+          v2.ida=g.ida;v2.volta=g.volta;
+          atualizadas++;
+        }else{
+          E.viagens.push({id:uid(),ida:g.ida,volta:g.volta,evento:'',cidade:g.destino||'',
+            hotel:'',transporte:'Avião',gastos:0,status:'Confirmado',
+            obs:'Importada do Gmail em '+fmtDataAno(hoje())+(g.exato?'':' — dados lidos por padrão, confira'),
+            custos:[],passagens,viajantes:[],tipo:'Trabalho',planejar:false,
+            roteiro:[],lugares:[],carro:{}});
+          novas++;
+        }
+      });
+      salvar();fechar();
+      alert(novas+' viagem(ns) criada(s), '+atualizadas+' atualizada(s).'+
+        (novas?'\n\nAbra cada uma para dar nome ao evento e conferir.':''));
+      rr('viagens')();
+    };
+    fim.appendChild(bOk);fim.appendChild(el('<span class="cresce"></span>'));
+    const bNao=el('<button class="btn ghost">Agora não</button>');bNao.onclick=fechar;fim.appendChild(bNao);
+    c.appendChild(fim);
+  });
 }
 
 /* ===================== GESTÃO ESTRATÉGICA =====================
