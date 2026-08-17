@@ -496,6 +496,22 @@ Deno.serve(async (req: Request) => {
         const usuario = normalizarUsuario(body.usuario);
         const senha = String(body.senha ?? "");
         if (!usuario || !senha) return json({ erro: "Informe usuário e senha." }, 400);
+        /* FREIO. O `freia()` de 400ms daqui embaixo nunca foi freio: ele nao
+           serializa, entao 20 tentativas em paralelo voltavam em 2,33s (medido
+           em 17/08/2026). A contagem mora no banco (public.porta_travada), a
+           mesma que as outras quatro portas de senha usam -- e conta o que ja
+           esta no equipe_acessos_log, sem tabela nova.
+           Oito falhas em 15 min tranca por 15 min: quem so esqueceu a senha erra
+           duas ou tres vezes; oito e quem esta adivinhando. */
+        const { data: travado } = await sb.rpc("porta_travada", {
+          p_sistema: sistema, p_usuario: usuario,
+        });
+        if (travado === true) {
+          await registrar(sistema, usuario, "login-barrado", "-", "porta travada por tentativas");
+          return json({
+            erro: "Muitas tentativas seguidas. Espere 15 minutos ou peça uma senha nova à gestão.",
+          }, 429);
+        }
         const { data: conta } = await sb.from("equipe_contas").select("*")
           .eq("sistema", sistema).eq("usuario", usuario).maybeSingle();
         // Conta inexistente e senha errada precisam ser indistinguíveis, senão
