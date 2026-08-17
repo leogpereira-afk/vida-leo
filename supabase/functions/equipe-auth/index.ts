@@ -562,13 +562,65 @@ Deno.serve(async (req: Request) => {
           const atual = String(body.senhaAtual ?? "");
           if (!(await conferirSenha(atual, conta))) { await freia(); return json({ erro: "Senha atual incorreta." }, 401); }
         }
+        /* A SENHA VAI PARA TODOS OS LUGARES ONDE ELA MORA, e nao so para a
+           linha deste sistema.
+
+           A casa tem 64 lugares guardando senha para ~14 pessoas: uma linha por
+           pessoa POR SISTEMA em equipe_contas, mais painel_contas, mais o
+           Supabase Auth (que e o que a ENTRADA UNICA confere), mais os hashes
+           antigos de acesso_senha_legado. Ate 17/08/2026 este botao escrevia
+           UMA dessas: a pessoa trocava a senha dentro do Brief, achava que
+           tinha trocado, e continuava entrando no POPs e no Painel com a velha
+           -- e a entrada unica, que e a porta que ela usa todo dia, nem ficava
+           sabendo.
+
+           Agora: todas as linhas dela em equipe_contas, a do painel_contas se
+           houver, o Supabase Auth se ela ja migrou, e os hashes antigos sao
+           SUBSTITUIDOS por um so -- o novo. Carimbar os antigos como "usados"
+           nao adianta: a acesso-entrar aceita qualquer linha da tabela, sem
+           olhar o carimbo.
+
+           O que falhar vira AVISO, nao excecao: a senha deste sistema ja foi
+           gravada quando o resto roda, e abortar deixaria a pessoa com senhas
+           diferentes e sem saber quais. */
         const reg = await hashSenha(nova);
+        const avisos: string[] = [];
+
+        // 1) todas as contas dela nos sistemas de equipe_contas
         const { error } = await sb.from("equipe_contas").update({
           ...reg, trocar_senha: false, atualizado_em: new Date().toISOString(),
-        }).eq("sistema", sistema).eq("usuario", c.sub);
+        }).eq("usuario", c.sub);
         if (error) throw new Error(error.message);
-        await registrar(sistema, String(c.sub), "trocou-senha", `${sistema}:${c.sub}`);
-        return json({ ok: true });
+
+        // 2) o Painel, que tem tabela propria e o MESMO formato de hash
+        const { data: noPainel } = await sb.from("painel_contas")
+          .select("usuario").eq("usuario", c.sub).maybeSingle();
+        if (noPainel) {
+          const { error: e2 } = await sb.from("painel_contas")
+            .update({ ...reg, atualizado_em: new Date().toISOString() }).eq("usuario", c.sub);
+          if (e2) avisos.push("painel: " + e2.message);
+        }
+
+        // 3) a IDENTIDADE (Supabase Auth) e os hashes antigos -- e o que a
+        //    entrada unica confere. Sem isto, a senha velha continua abrindo a
+        //    porta da frente para sempre.
+        const { data: pessoa } = await sb.from("acesso_conta")
+          .select("id, auth_user_id").eq("usuario", c.sub).maybeSingle();
+        if (pessoa) {
+          if (pessoa.auth_user_id) {
+            const { error: e3 } = await sb.auth.admin.updateUserById(pessoa.auth_user_id, { password: nova });
+            if (e3) avisos.push("entrada unica: " + e3.message);
+          }
+          await sb.from("acesso_senha_legado").delete().eq("conta_id", pessoa.id);
+          const { error: e4 } = await sb.from("acesso_senha_legado").insert({
+            conta_id: pessoa.id, origem: "propria", hash: reg.hash, salt: reg.salt, iter: reg.iter,
+          });
+          if (e4) avisos.push("guarda da entrada unica: " + e4.message);
+        }
+
+        await registrar(sistema, String(c.sub), "trocou-senha", `${sistema}:${c.sub}`,
+          avisos.length ? avisos.join(" · ") : "valeu em todos os sistemas");
+        return json({ ok: true, avisos: avisos.length ? avisos : undefined });
       }
 
       // --------------------------------------------------------- administrar
