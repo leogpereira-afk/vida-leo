@@ -1282,7 +1282,7 @@ function modalViagem(v){
       listaP.innerHTML='';
       const ord=[...(v.passagens||[])].sort((a,b)=>((a.data||'')+(a.hora||'')).localeCompare((b.data||'')+(b.hora||'')));
       ord.forEach(p=>{
-        const li=blocoTravado({id:p.id,novo:!p.de&&!p.para&&!p.hora,alvo:p,
+        const li=blocoTravado({id:p.id,novo:()=>!p.de&&!p.para&&!p.hora,alvo:p,
           resumo:()=>`<b style="font-size:13.5px">${p.sentido==='Volta'?'🛬':p.sentido==='Conexão'?'🔁':'✈️'} ${esc(p.sentido||'Ida')}</b>
             ${p.de||p.para?`<span style="font-size:14px;font-weight:600;margin-left:7px">${esc(p.de||'?')} → ${esc(p.para||'?')}</span>`:''}
             ${p.data?`<span style="font-size:12.5px;color:var(--suave);margin-left:7px">${fmtDataAno(p.data)}${p.hora?' às '+esc(p.hora):''}</span>`:''}
@@ -1331,11 +1331,19 @@ function modalViagem(v){
     const pintaHoteis=()=>{
       listaH.innerHTML='';
       (v.hoteis||[]).forEach(h=>{
-        listaH.appendChild(blocoTravado({id:h.id,novo:!String(h.nome||'').trim(),alvo:h,
-          resumo:()=>`<b style="font-size:13.5px">🏨 ${esc(h.nome||'(sem nome)')}</b>
-            ${h.entrada||h.saida?`<span style="font-size:12.5px;color:var(--suave);margin-left:7px">${h.entrada?fmtDataAno(h.entrada):'?'} a ${h.saida?fmtDataAno(h.saida):'?'}</span>`:''}
-            ${h.reserva?`<span style="font-size:12px;color:var(--suave);margin-left:7px">· reserva ${esc(h.reserva)}</span>`:''}
-            ${+h.valor?`<span style="font-size:12.5px;color:var(--suave);margin-left:7px">· ${brl(+h.valor)}</span>`:''}`,
+        listaH.appendChild(blocoTravado({id:h.id,novo:()=>!String(h.nome||'').trim(),alvo:h,
+          resumo:()=>{
+            const l2=[
+              h.entrada?fmtDataAno(h.entrada)+(h.horaEnt?' '+esc(h.horaEnt):'')+' → '+(h.saida?fmtDataAno(h.saida):'?')+(h.horaSai?' '+esc(h.horaSai):''):'',
+              h.reserva?'reserva '+esc(h.reserva):'',
+              +h.valor?brl(+h.valor):'',
+              h.cafe?esc(h.cafe==='Incluso'?'café incluso':h.cafe.toLowerCase()):'',
+              h.telefone?'☎ '+esc(h.telefone):'',
+            ].filter(Boolean).join(' · ');
+            return `<b style="font-size:13.5px">🏨 ${esc(h.nome||'(sem nome)')}</b>
+              ${l2?`<div style="font-size:12.5px;color:var(--suave);margin-top:2px">${l2}</div>`:''}
+              ${h.endereco?`<div style="font-size:12px;color:var(--suave);margin-top:1px">📍 ${esc(h.endereco)}</div>`:''}`;
+          },
           aoMudar:resumoHoteis,
           aoApagar:()=>{ if(!confirm('Apagar esta hospedagem?'))return;
             v.hoteis=v.hoteis.filter(x=>x.id!==h.id);_emEdicao.delete(h.id);resumoHoteis();salvar();pintaHoteis(); },
@@ -1353,7 +1361,8 @@ function modalViagem(v){
             {k:'obs',t:'Observações',tipo:'textarea',full:true,ph:'estacionamento, cancelamento até quando, quarto'},
           ]}));
       });
-      if(!(v.hoteis||[]).length) listaH.appendChild(el('<div class="vazio">Nenhuma hospedagem lançada.</div>'));
+      // sem hospedagem, o botão logo abaixo já diz o que fazer — a linha de
+      // "nenhuma" só ocupava espaço
     };
     pintaHoteis();
     shosp.appendChild(listaH);
@@ -1371,14 +1380,36 @@ function modalViagem(v){
     shosp.appendChild(el('<div style="height:14px"></div>'));
     const temCarro=()=>String(v.carro.locadora||'').trim()||String(v.carro.reserva||'').trim();
     const caixaCarro=el('<div></div>');
+    let _abrirCarro=false;   // só abre quando você clicar em "+ Carro alugado"
     const pintaCarro=()=>{
       caixaCarro.innerHTML='';
-      caixaCarro.appendChild(blocoTravado({id:caId,novo:!temCarro(),alvo:v.carro,
-        resumo:()=>`<b style="font-size:13.5px">🚗 ${esc(v.carro.locadora||'Carro alugado')}</b>
-          ${v.carro.modelo?`<span style="font-size:12.5px;color:var(--suave);margin-left:7px">${esc(v.carro.modelo)}</span>`:''}
-          ${v.carro.retirada||v.carro.devolucao?`<span style="font-size:12.5px;color:var(--suave);margin-left:7px">${v.carro.retirada?fmtDataAno(v.carro.retirada):'?'} a ${v.carro.devolucao?fmtDataAno(v.carro.devolucao):'?'}</span>`:''}
-          ${v.carro.reserva?`<span style="font-size:12px;color:var(--suave);margin-left:7px">· reserva ${esc(v.carro.reserva)}</span>`:''}
-          ${+v.carro.valor?`<span style="font-size:12.5px;color:var(--suave);margin-left:7px">· ${brl(+v.carro.valor)}</span>`:''}`,
+      // sem carro na viagem, não fica formulário vazio ocupando a tela: fica um
+      // convite. A maioria das viagens não aluga carro.
+      if(!temCarro()&&!_abrirCarro){
+        const b=el('<button class="btn mini ghost">+ Carro alugado</button>');
+        b.onclick=()=>{_abrirCarro=true;_emEdicao.add(caId);pintaCarro()};
+        caixaCarro.appendChild(b);
+        return;
+      }
+      caixaCarro.appendChild(blocoTravado({id:caId,novo:()=>_abrirCarro&&!temCarro(),alvo:v.carro,
+        aoApagar:temCarro()||_abrirCarro?()=>{
+          if(temCarro()&&!confirm('Apagar os dados do carro alugado?'))return;
+          v.carro={};_abrirCarro=false;_emEdicao.delete(caId);salvar();pintaCarro();
+        }:null,
+        resumo:()=>{
+          const l2=[
+            v.carro.modelo?esc(v.carro.modelo):'',
+            v.carro.reserva?'reserva '+esc(v.carro.reserva):'',
+            +v.carro.valor?brl(+v.carro.valor):'',
+          ].filter(Boolean).join(' · ');
+          const l3=[
+            v.carro.retirada?'retira '+fmtDataAno(v.carro.retirada)+(v.carro.horaRet?' '+esc(v.carro.horaRet):'')+(v.carro.localRet?' · '+esc(v.carro.localRet):''):'',
+            v.carro.devolucao?'devolve '+fmtDataAno(v.carro.devolucao)+(v.carro.horaDev?' '+esc(v.carro.horaDev):'')+(v.carro.localDev?' · '+esc(v.carro.localDev):''):'',
+          ].filter(Boolean).join('  →  ');
+          return `<b style="font-size:13.5px">🚗 ${esc(v.carro.locadora||'Carro alugado')}</b>
+            ${l2?`<div style="font-size:12.5px;color:var(--suave);margin-top:2px">${l2}</div>`:''}
+            ${l3?`<div style="font-size:12px;color:var(--suave);margin-top:1px">${l3}</div>`:''}`;
+        },
         campos:[
           {k:'locadora',t:'Locadora',ph:'ex.: Localiza, Hertz'},
           {k:'reserva',t:'Nº da reserva'},
@@ -2593,9 +2624,13 @@ const _emEdicao=new Set();
 
 function blocoTravado({id,resumo,campos:defs,alvo,aoMudar,aoApagar,novo}){
   const cx=el(`<div style="border:1px solid var(--linha);border-radius:var(--r);padding:11px 13px;margin-bottom:9px;background:var(--card)"></div>`);
+  // "novo" é AVALIADO a cada desenho, não capturado uma vez: um bloco criado
+  // vazio deixa de ser novo assim que você preenche, e aí "Pronto" trava de
+  // verdade. Congelado, ele ficava aberto para sempre.
+  const ehNovo=()=>typeof novo==='function'?!!novo():!!novo;
   const pinta=()=>{
     cx.innerHTML='';
-    const editando=_emEdicao.has(id)||novo;
+    const editando=_emEdicao.has(id)||ehNovo();
     const topo=el(`<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;${editando?'margin-bottom:8px':''}">
       <div style="flex:1;min-width:0">${resumo()}</div></div>`);
     const bEd=el(`<button class="btn ghost mini">${editando?'✓ Pronto':'✎ Editar'}</button>`);
