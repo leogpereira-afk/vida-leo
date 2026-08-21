@@ -101,6 +101,12 @@ const MODULOS_PAINEL = ["gestao", "contas-atrasadas", "orcamentos",
   // caixa marcada, e ninguem ganhou acesso. Dois dias procurando o defeito na
   // tela de Permutas, que estava certa -- o buraco era esta lista.
   "permutas",
+  // E ACONTECEU DE NOVO em 20/08/2026, com `campanhas`. Do mesmo jeito: o Leo
+  // marcou a caixa, viu marcada, e ninguem ganhou acesso. Eu conferi as duas
+  // listas do repo do painel (13/13, "sem divergencia") e nao rodei o
+  // `conferir-sistemas.mjs`, que le esta aqui e teria acusado na hora.
+  // O script agora roda no deploy do painel -- ver .github/workflows/pages.yml.
+  "campanhas",
   "patrimonio", "configuracoes"];
 // Calculado na hora de usar, não na carga do módulo: normalizarUsuario é um
 // const declarado mais abaixo, e chamá-lo aqui derruba a function inteira.
