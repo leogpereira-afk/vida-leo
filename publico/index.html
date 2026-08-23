@@ -3129,52 +3129,73 @@ async function vFortemais(m){
   }
   const R=resumo||{};
   const contas=E.obras.map(o=>({o,r:R[o.id]||null,c:contasObra(o,R[o.id])}));
-  const som=k=>contas.reduce((s,x)=>s+(x.c[k]||0),0);
-  const vendidas=contas.filter(x=>x.c.venda>0);
-  const lucroTot=vendidas.reduce((s,x)=>s+x.c.lucro,0);
-  const vendaTot=vendidas.reduce((s,x)=>s+x.c.venda,0);
 
-  m.appendChild(ligaKpis(el(`<div class="grade">
-    ${kpi('Obras',E.obras.length,contas.filter(x=>x.o.status!=='Vendida').length+' em andamento','','fm-obras')}
-    ${kpi('Custo lançado',brl(som('custo')),(Object.values(R).reduce((s,x)=>s+(x.n||0),0))+' lançamentos','','fm-obras')}
-    ${kpi('Aportes',brl(som('aporte')),'dinheiro posto na obra — não é venda','a','fm-aportes')}
-    ${kpi('Vendido',brl(vendaTot),vendidas.length+' obra(s) vendida(s)','','fm-obras')}
-    ${kpi('Lucro',brl(lucroTot),vendaTot?(lucroTot/vendaTot*100).toFixed(1)+'% de margem':'nada vendido ainda',lucroTot<0?'v':'p','fm-obras')}
-  </div>`),{'fm-obras':'fm-obras','fm-aportes':'fm-obras'}));
+  /* O ANO da obra é o ano em que o dinheiro TERMINOU de entrar — regra do dono
+     ("vamos considerar o ano pela finalização do recebimento"). Enquanto o
+     recebimento não acaba, a obra fica em "Em aberto". */
+  const anoDe=o=>String(o.recebidoEm||o.vendaData||'').slice(0,4);
+  const anos=[...new Set(contas.map(x=>anoDe(x.o)).filter(Boolean))].sort().reverse();
+  const temAberta=contas.some(x=>!anoDe(x.o));
+  if(!filtro.fmAno)filtro.fmAno='todas';
+  if(filtro.fmAno!=='todas'&&filtro.fmAno!=='aberto'&&!anos.includes(filtro.fmAno))filtro.fmAno='todas';
 
-  /* ---- as obras ---- */
-  const oc=el('<div class="corpo"></div>');
-  if(!E.obras.length){
-    oc.appendChild(el('<div class="vazio">Nenhuma obra ainda. Crie uma, ou traga direto do seu ERP no bloco abaixo.</div>'));
-  }
-  contas.forEach(({o,r:rr2,c})=>{
-    const cor=c.venda?(c.lucro>=0?'var(--verde)':'var(--vermelho)'):'var(--suave)';
-    const card=el(`<div style="border:1px solid var(--linha);border-radius:var(--r);padding:13px 15px;margin-bottom:10px;background:var(--card);cursor:pointer">
-      <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
-        <b style="font-size:15px">${esc(o.nome||'Obra sem nome')}</b>
-        <span class="tag">${esc(o.status||'—')}</span>
-        ${o.tipo?`<span class="tag">${esc(o.tipo)}</span>`:''}
-        ${c.area?`<span style="color:var(--suave);font-size:12.5px">${c.area} m²</span>`:''}
-        <span class="cresce"></span>
-        ${c.meses?`<span style="color:var(--suave);font-size:12.5px">${c.meses} meses</span>`:''}
-      </div>
-      <div class="grade" style="margin-top:10px;gap:8px">
-        ${kpi('Custo',brl(c.custo),c.porM2?brl(c.porM2)+'/m² sem o terreno':(rr2?rr2.n+' lanç.':'sem lançamento'))}
-        ${kpi('Aporte',brl(c.aporte),c.proprio>0?brl(c.proprio)+' do seu bolso':'','a')}
-        ${kpi('Venda',c.venda?brl(c.venda):'—',c.venda?'líquido '+brl(c.liquido):'não vendida')}
-        ${kpi('Lucro',c.venda?brl(c.lucro):'—',c.venda?c.margem.toFixed(1)+'%'+(c.meses?' · '+brl(c.porMes)+'/mês':''):'',c.venda?(c.lucro>=0?'p':'v'):'')}
-      </div></div>`);
-    card.onclick=()=>modalObra(o);
-    oc.appendChild(card);
-  });
-  const bn=el('<button class="mais">+ Nova obra</button>');
-  bn.onclick=()=>{const o={id:uid(),nome:'',empresa:'Fortemais',tipo:CFG('tiposObra')[0],
-    status:'Em obra',endereco:'',area:0,areaTerreno:0,inicio:hoje(),fim:'',
-    vendaValor:0,vendaData:'',comprador:'',impostoPct:0,impostoValor:0,
+  const novaObra=()=>{const o={id:uid(),nome:'',empresa:'Fortemais',tipo:CFG('tiposObra')[0],
+    status:'Vendida',endereco:'',area:0,areaTerreno:0,inicio:'',fim:'',
+    vendaValor:0,vendaData:'',recebidoEm:'',comprador:'',impostoPct:0,impostoValor:0,
     comissaoPct:0,comissaoValor:0,outrasDeducoes:0,obs:''};
-    E.obras.push(o);salvar();modalObra(o)};
-  oc.appendChild(bn);
-  m.appendChild(bloco('fm-obras','🏗️ Obras','clique numa obra para abrir a ficha inteira',oc));
+    E.obras.push(o);salvar();filtro.fmAberta=o.id;r()};
+
+  m.appendChild(painel('Ano',
+    seletor(filtro.fmAno,[['todas','Todas'],...(temAberta?[['aberto','Em aberto']]:[]),...anos.map(a2=>[a2,a2])],
+      v=>{filtro.fmAno=v;r()}),
+    acao('+ Nova obra',novaObra),'|'));
+
+  const visiveis=contas.filter(x=>{
+    const an=anoDe(x.o);
+    if(filtro.fmAno==='todas')return true;
+    if(filtro.fmAno==='aberto')return !an;
+    return an===filtro.fmAno;
+  });
+
+  const oc=el('<div class="corpo" style="padding-top:2px"></div>');
+  if(!E.obras.length){
+    oc.appendChild(el('<div class="vazio">Nenhuma obra ainda. Quando terminar uma, lance aqui — ou traga o export do ERP no bloco abaixo.</div>'));
+  } else if(!visiveis.length){
+    oc.appendChild(el('<div class="vazio">Nenhuma obra neste ano.</div>'));
+  }
+  visiveis.forEach(({o,c})=>{
+    const aberta=filtro.fmAberta===o.id;
+    const an=anoDe(o);
+    const cont=el('<div style="border-bottom:1px solid var(--linha)"></div>');
+    const linha=el(`<div style="display:flex;align-items:center;gap:10px;padding:12px 6px;cursor:pointer;flex-wrap:wrap">
+      <b>${esc(o.nome||'Obra sem nome')}</b>
+      ${an?`<span class="tag">${an}</span>`:'<span class="tag">em aberto</span>'}
+      <span class="cresce"></span>
+      <span style="font-size:11px;color:var(--suave)">custo</span>
+      <span style="color:var(--vermelho);font-variant-numeric:tabular-nums;font-weight:600">${brl(c.custo)}</span>
+      <span style="font-size:11px;color:var(--suave)">lucro</span>
+      <span style="color:${c.venda?(c.lucro>=0?'var(--verde)':'var(--vermelho)'):'var(--suave)'};font-variant-numeric:tabular-nums;font-weight:600;min-width:104px;text-align:right">${c.venda?brl(c.lucro):'—'}</span>
+      <span class="seta" style="transform:rotate(${aberta?0:-90}deg);transition:transform .15s">▼</span>
+    </div>`);
+    linha.onclick=()=>{filtro.fmAberta=aberta?null:o.id;r()};
+    cont.appendChild(linha);
+    if(aberta){
+      const det=el('<div style="padding:2px 6px 18px"></div>');
+      det.appendChild(el('<div class="vazio" style="padding:14px">Abrindo…</div>'));
+      cont.appendChild(det);
+      fichaObraEm(det,o,()=>{filtro.fmAberta=null;r()}).then(()=>{det.firstElementChild&&det.firstElementChild.classList&&det.firstElementChild.remove()});
+    }
+    oc.appendChild(cont);
+  });
+  if(visiveis.length){
+    const totC=visiveis.reduce((s2,x)=>s2+x.c.custo,0);
+    const vend=visiveis.filter(x=>x.c.venda>0);
+    const totL=vend.reduce((s2,x)=>s2+x.c.lucro,0);
+    oc.appendChild(el(`<div style="display:flex;gap:10px;justify-content:flex-end;padding:11px 6px 2px;font-size:12.5px;color:var(--suave)">
+      ${visiveis.length} obra(s) · custo <b style="color:var(--vermelho)">${brl(totC)}</b>
+      ${vend.length?` · lucro <b style="color:${totL>=0?'var(--verde)':'var(--vermelho)'}">${brl(totL)}</b>`:''}</div>`));
+  }
+  m.appendChild(bloco('fm-obras','🏗️ Obras','uma linha por obra — clique para expandir',oc));
 
   /* ---- comparar obras: é onde o dinheiro vaza ---- */
   if(contas.filter(x=>x.c.custo>0).length>1){
@@ -3209,8 +3230,9 @@ async function vFortemais(m){
 
 
 /* ---------------- a ficha de uma obra ---------------- */
-function modalObra(o){
-  abrirModal(esc(o.nome||'Obra'),esc([o.tipo,o.endereco].filter(Boolean).join(' · ')),async(c,fechar)=>{
+/* A ficha desenha DENTRO da linha expandida — o dono pediu lista enxuta,
+   não modal: "na obra essa ser só uma linha que quando eu abrir ela expandir". */
+async function fichaObraEm(c,o,fechar){
     const R=(await fmResumo())||{};
     const rr2=R[o.id]||null;
     const cx=contasObra(o,rr2);
@@ -3376,6 +3398,7 @@ function modalObra(o){
     s7.appendChild(campos(o,[
       {k:'vendaValor',t:'Valor da venda',tipo:'moeda'},
       {k:'vendaData',t:'Data da venda',tipo:'date'},
+      {k:'recebidoEm',t:'Recebimento concluído em — define o ano da obra',tipo:'date'},
       {k:'comprador',t:'Comprador'},
       {k:'impostoPct',t:'Imposto (%)',tipo:'number',ph:'ex.: 5,93'},
       {k:'impostoValor',t:'ou imposto em R$ (se preenchido, manda)',tipo:'moeda'},
@@ -3410,7 +3433,6 @@ function modalObra(o){
     c.appendChild(s9);
     };
     montar();
-  });
 }
 
 
