@@ -6920,37 +6920,41 @@ async function vConfig(m){
     O logo é reduzido para 64px e sincroniza com a nuvem — aparece em todos os aparelhos.</p>`));
   m.appendChild(bloco('cf-marcas','🎨 Logos e cores das empresas','a bolinha de cada empresa — cor fixa e logo',mcx));
 
-  /* ---- 🔒 senha de entrada — trocável daqui, sem mexer em servidor ---- */
+  /* ---- 🔒 senha de entrada ----
+     ISTO ERA UM FORMULÁRIO QUE NÃO FUNCIONAVA. Ele mandava a ação "trocar"
+     para a leo-sync, e a leo-sync passou a recusar: depois da unificação, a
+     senha que abre esta Central é a MESMA dos sistemas da Impresilk, conferida
+     no Supabase Auth -- o hash que este formulário gravava não abria mais nada.
+     Tela que diz "senha trocada" sem trocar senha nenhuma é pior que tela que
+     não existe. Agora ela diz onde a senha mora de verdade.
+
+     Por que o Painel e não aqui: a troca de lá escreve nos QUATRO lugares na
+     mesma operação -- Supabase Auth, painel_contas, equipe_contas e a guarda da
+     entrada única. Repetir isso aqui seria um quinto lugar para desencontrar.
+     (Conferido no código do painel-auth em 23/08/2026.)
+
+     O link vai para a CAPA do Painel, não para /painel/acessos: o site é uma
+     página só servida pelo GitHub Pages, e endereço com rota dentro dá 404. */
   const sx=el('<div class="corpo"></div>');
-  const sform={nova:'',rep:''};
-  sx.appendChild(campos(sform,[
-    {k:'nova',t:'Senha nova (mínimo 6)',tipo:'password'},
-    {k:'rep',t:'Repita a senha nova',tipo:'password'},
-  ],()=>{}));
-  const bs=el('<button class="btn" style="margin-top:12px">Trocar a senha</button>');
-  bs.onclick=async()=>{
-    if((sform.nova||'').length<6){alert('A senha nova precisa de pelo menos 6 caracteres.');return}
-    if(sform.nova!==sform.rep){alert('A confirmação não bate com a senha nova.');return}
-    if(DEV){alert('Em modo local não há senha para trocar.');return}
-    bs.disabled=true;bs.textContent='Trocando…';
-    try{
-      // chamada própria: aqui um 401 significa "senha atual errada", não sessão caída
-      const r2=await fetch(API_SYNC,{method:'POST',
-        headers:{'content-type':'application/json',authorization:'Bearer '+pegaToken()},
-        body:JSON.stringify({acao:'trocar',senhaNova:sform.nova})});
-      const j=await r2.json().catch(()=>({}));
-      if(r2.ok&&j.ok){
-        alert('Senha trocada. Vale a partir do próximo login — a sessão deste aparelho continua aberta.');
-        sform.atual=sform.nova=sform.rep='';r();
-      } else alert(j.erro||('Não deu certo (HTTP '+r2.status+').'));
-    }catch(e2){alert('Sem conexão — tente de novo.')}
-    bs.disabled=false;bs.textContent='Trocar a senha';
-  };
-  sx.appendChild(bs);
-  sx.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin-top:10px">
-    A troca vale para todos os aparelhos no próximo login. Quem já está logado continua
-    logado — a sessão não cai. A senha é conferida e guardada só no servidor, embaralhada.</p>`));
-  m.appendChild(bloco('cf-senha','🔒 Senha de entrada','defina uma senha nova — sem pedir a antiga',sx));
+  sx.appendChild(el(`<p style="font-size:13px;margin:0 0 4px">
+    A senha que abre esta Central é a <b>mesma</b> que abre o Painel de Gestão, o RH,
+    o Brief, o PCP, o Compras e o DRE. É uma só, de propósito: duas senhas para a
+    mesma pessoa viram uma que envelhece sem ninguém perceber.</p>`));
+  sx.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin:0 0 12px">
+    Por isso ela não se troca aqui dentro — se trocasse, mudaria só num canto.
+    No Painel a troca vale para todos de uma vez, na mesma hora.</p>`));
+  const cxs=el('<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"></div>');
+  cxs.appendChild(el(`<a class="btn" target="_blank" rel="noopener"
+    style="text-decoration:none;display:inline-block"
+    href="https://impresilk.com.br/painel">📊 Abrir o Painel</a>`));
+  cxs.appendChild(el(`<span style="font-size:12.5px;color:var(--suave)">
+    lá dentro: menu <b>Acessos</b> → <b>Minha senha</b></span>`));
+  sx.appendChild(cxs);
+  sx.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin-top:12px">
+    Você entra como direção, então lá dá para definir a senha nova
+    <b>sem digitar a antiga</b>. A sessão deste aparelho não cai: a senha nova
+    vale a partir do próximo login.</p>`));
+  m.appendChild(bloco('cf-senha','🔒 Senha de entrada','é a mesma dos sistemas da Impresilk — troca-se no Painel',sx));
 
   /* ---- Central de Acessos: quem entra em cada sistema da empresa ----
      O crachá desta Central é o mesmo que a equipe-auth aceita como "a direção"
