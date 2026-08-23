@@ -157,7 +157,8 @@ Deno.serve(async (req: Request) => {
   if (!SESSION_SECRET) return json({ erro: "LEO_SESSION_SECRET ausente" }, 500);
 
   if (req.method === "POST") {
-    const { acao, senha, senhaAtual, senhaNova, id: corpoId } = await req.json().catch(() => ({}));
+    const corpo = await req.json().catch(() => ({}));
+    const { acao, senha, senhaAtual, senhaNova, id: corpoId } = corpo;
 
     // Troca a sessao longa por um cracha curto de administracao.
     if (acao === "crachaAdmin") {
@@ -185,6 +186,95 @@ Deno.serve(async (req: Request) => {
        Mantê-la seria pior que removê-la: a tela diria "senha alterada" e nada
        teria mudado. A senha da casa se troca no Painel, num lugar só, e vale
        para os oito sistemas. */
+
+    /* ---- ANEXOS (23/08/2026) ------------------------------------------
+       Os anexos moravam só no IndexedDB do navegador: presos ao aparelho E ao
+       endereço do site. Trocar de celular perdia tudo, e o backup diário nunca
+       os levou -- ele copia leo_estado, que só tem texto. Agora o arquivo vai
+       para o bucket privado `leo-arquivos` e o índice para `leo_arquivos`.
+
+       O ARQUIVO NÃO PASSA POR AQUI. Uma Edge Function carregando 25 MB de PDF
+       na memória para repassar é desperdício e trava. O que se emite é uma
+       URL assinada de curta duração; o navegador fala direto com o Storage.
+
+       ORDEM DE PROPÓSITO: sobe primeiro, indexa depois. Se a subida falhar,
+       sobra um blob órfão -- bytes invisíveis. Se fosse ao contrário, sobraria
+       uma linha no índice apontando para nada: a tela mostraria um anexo que
+       não abre. Órfão silencioso é melhor que mentira visível. */
+    if (acao === "arqListar" || acao === "arqSubirUrl" || acao === "arqIndexar" ||
+        acao === "arqUrl" || acao === "arqApagar") {
+      const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+      if (!(await tokenOk(t))) return json({ erro: "Não autorizado" }, 401);
+      const balde = sb.storage.from("leo-arquivos");
+
+      if (acao === "arqListar") {
+        // sem `refs` = o índice inteiro (a tela precisa saber quem tem anexo)
+        let q = sb.from("leo_arquivos").select("id, ref, nome, tipo, tam, em");
+        const refs = Array.isArray(corpo.refs) ? corpo.refs.map(String) : null;
+        if (refs) {
+          if (!refs.length) return json({ arquivos: [] });
+          q = q.in("ref", refs);
+        }
+        const { data, error } = await q.order("criado_em", { ascending: true });
+        if (error) return json({ erro: error.message }, 500);
+        return json({ arquivos: data ?? [] });
+      }
+
+      if (acao === "arqSubirUrl") {
+        const id = String(corpo.id ?? "").trim();
+        const ref = String(corpo.ref ?? "").trim();
+        if (!id || !ref) return json({ erro: "sem id ou ref" }, 400);
+        // O nome do arquivo fica no ÍNDICE, não no caminho: caminho com nome de
+        // usuário dentro vira problema de acento, barra e maiúscula.
+        const caminho = ref + "/" + id;
+        const { data, error } = await balde.createSignedUploadUrl(caminho, { upsert: true });
+        if (error) return json({ erro: error.message }, 500);
+        return json({ caminho, url: data.signedUrl });
+      }
+
+      if (acao === "arqIndexar") {
+        const id = String(corpo.id ?? "").trim();
+        const ref = String(corpo.ref ?? "").trim();
+        const caminho = String(corpo.caminho ?? "").trim();
+        if (!id || !ref || !caminho) return json({ erro: "faltou id, ref ou caminho" }, 400);
+        const { error } = await sb.from("leo_arquivos").upsert({
+          id, ref, caminho,
+          nome: String(corpo.nome ?? "arquivo"),
+          tipo: String(corpo.tipo ?? ""),
+          tam: Number(corpo.tam ?? 0) || 0,
+          em: String(corpo.em ?? "").slice(0, 10) || null,
+        });
+        if (error) return json({ erro: error.message }, 500);
+        return json({ ok: true });
+      }
+
+      if (acao === "arqUrl") {
+        const id = String(corpo.id ?? "").trim();
+        if (!id) return json({ erro: "sem id" }, 400);
+        const { data: reg, error: e1 } = await sb.from("leo_arquivos")
+          .select("caminho, nome, tipo").eq("id", id).maybeSingle();
+        if (e1) return json({ erro: e1.message }, 500);
+        if (!reg) return json({ erro: "anexo não encontrado" }, 404);
+        // 5 minutos: tempo de abrir ou baixar, não de virar link compartilhável
+        const baixar = corpo.baixar ? { download: reg.nome } : undefined;
+        const { data, error } = await balde.createSignedUrl(reg.caminho, 300, baixar);
+        if (error) return json({ erro: error.message }, 500);
+        return json({ url: data.signedUrl, nome: reg.nome, tipo: reg.tipo });
+      }
+
+      // arqApagar: o blob sai primeiro; se o índice não sair, a tela ainda
+      // mostraria o anexo -- e tentar abrir daria erro. Por isso o índice é o
+      // último a cair, e o erro dele é reportado.
+      const id = String(corpo.id ?? "").trim();
+      if (!id) return json({ erro: "sem id" }, 400);
+      const { data: reg } = await sb.from("leo_arquivos")
+        .select("caminho").eq("id", id).maybeSingle();
+      if (reg?.caminho) await balde.remove([reg.caminho]);
+      const { error } = await sb.from("leo_arquivos").delete().eq("id", id);
+      if (error) return json({ erro: error.message }, 500);
+      return json({ ok: true });
+    }
+
     /* CÓPIAS DE SEGURANÇA (23/08/2026).
        Um backup que não dá para consultar nem restaurar é fé, não seguro. O
        banco tira uma cópia por dia (leo_backup_diario) e guarda 90 dias, só

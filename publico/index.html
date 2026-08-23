@@ -159,6 +159,7 @@ tr:hover .lixo{opacity:1}
 .arq a{color:var(--verde);text-decoration:none;font-weight:600;font-size:12px}
 .solta{border:1.5px dashed var(--linha);border-radius:11px;padding:16px;text-align:center;color:var(--suave);
   font-size:13px;cursor:pointer;transition:.15s}
+.solta.ocupado{opacity:.55;pointer-events:none}
 .solta:hover,.solta.sobre{border-color:var(--verde);color:var(--verde);background:var(--verde-cl)}
 
 /* checklist */
@@ -273,24 +274,167 @@ function maisUsados(lista,campo,extras){
 }
 const tamanho=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(0)+' KB':(b/1048576).toFixed(1)+' MB';
 
-/* ---------------- arquivos (IndexedDB) ---------------- */
+/* ================== ARQUIVOS ==================================
+   Até 23/08/2026 os anexos moravam SÓ no IndexedDB: presos ao aparelho e ao
+   endereço do site. Trocar de celular perdia tudo, e o backup diário nunca os
+   levou — ele copia texto. Agora o lugar de verdade é o bucket privado
+   `leo-arquivos` no servidor; o IndexedDB virou duas coisas menores:
+     · fila de quem ainda não subiu (anexado sem internet), e
+     · caixa dos arquivos antigos, que sobem sozinhos no primeiro login.
+
+   Quem chama de fora continua vendo as mesmas quatro funções de sempre —
+   arqPor, arqAdd, arqDel, arqTotal. O que mudou é onde o arquivo dorme. */
 let _dbp;
 function db(){return _dbp||(_dbp=new Promise((ok,err)=>{
   const r=indexedDB.open('centralLeoArquivos',1);
   r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('arq')){
     const s=d.createObjectStore('arq',{keyPath:'id'});s.createIndex('ref','ref');}};
   r.onsuccess=()=>ok(r.result);r.onerror=()=>err(r.error);}))}
-async function arqPor(ref){const d=await db();return new Promise((ok,err)=>{
+async function arqLocaisPor(ref){const d=await db();return new Promise((ok,err)=>{
   const t=d.transaction('arq');const req=t.objectStore('arq').index('ref').getAll(ref);
   req.onsuccess=()=>ok(req.result||[]);req.onerror=()=>err(req.error)})}
-async function arqAdd(ref,file){const d=await db();const reg={id:uid(),ref,nome:file.name,tipo:file.type,tam:file.size,blob:file,em:hoje()};
-  return new Promise((ok,err)=>{const t=d.transaction('arq','readwrite');t.objectStore('arq').put(reg);
-    t.oncomplete=()=>ok(reg);t.onerror=()=>err(t.error)})}
-async function arqDel(id){const d=await db();return new Promise((ok,err)=>{
+async function arqPorLocal(id){const d=await db();return new Promise(ok=>{
+  const req=d.transaction('arq').objectStore('arq').get(id);
+  req.onsuccess=()=>ok(req.result||null);req.onerror=()=>ok(null)})}
+async function arqGravarLocal(reg){const d=await db();return new Promise((ok,err)=>{
+  const t=d.transaction('arq','readwrite');t.objectStore('arq').put(reg);
+  t.oncomplete=()=>ok(reg);t.onerror=()=>err(t.error)})}
+async function arqApagarLocal(id){const d=await db();return new Promise((ok,err)=>{
   const t=d.transaction('arq','readwrite');t.objectStore('arq').delete(id);t.oncomplete=()=>ok();t.onerror=()=>err(t.error)})}
-async function arqTotal(){const d=await db();return new Promise(ok=>{let n=0,b=0;
-  const t=d.transaction('arq');const c=t.objectStore('arq').openCursor();
-  c.onsuccess=e=>{const cur=e.target.result;if(cur){n++;b+=cur.value.tam||0;cur.continue()}else ok({n,b})}})}
+
+/* índice do servidor, carregado uma vez por sessão e invalidado a cada mexida */
+let _arqIdx=null,_arqIdxP=null,_arqGer=0;
+const naNuvem=()=>!DEV&&!!pegaToken();
+function arqEsquecerIndice(){_arqGer++;_arqIdx=null;_arqIdxP=null}
+function arqIndice(){
+  if(_arqIdx)return Promise.resolve(_arqIdx);
+  if(!naNuvem())return Promise.resolve(null);
+  if(!_arqIdxP){
+    // A geração impede o clássico "anexei e não apareceu": uma listagem pedida
+    // ANTES do envio pode chegar DEPOIS dele e virar verdade sem o arquivo novo.
+    const g=_arqGer;
+    _arqIdxP=apiSync('POST',{acao:'arqListar'}).then(d=>{
+      if(g!==_arqGer)return arqIndice();       // envelheceu no caminho: pergunta de novo
+      const m=new Map();
+      (d.arquivos||[]).forEach(x=>{if(!m.has(x.ref))m.set(x.ref,[]);m.get(x.ref).push({...x,nuvem:true})});
+      _arqIdx=m;return m;
+    }).catch(()=>{if(g===_arqGer)_arqIdxP=null;return null});   // sem internet: só o que é local
+  }
+  return _arqIdxP;
+}
+
+// O que existe para este registro: o que está no servidor mais o que ainda não
+// subiu daqui. Um id que exista dos dois lados conta UMA vez (o local é cópia).
+async function arqPor(ref){
+  const [locais,idx]=await Promise.all([arqLocaisPor(ref),arqIndice()]);
+  const nuvem=(idx&&idx.get(ref))||[];
+  const vistos=new Set(nuvem.map(x=>x.id));
+  const porId=new Map(locais.map(x=>[x.id,x]));
+  return nuvem.map(x=>({...x,blob:porId.get(x.id)?.blob}))
+    .concat(locais.filter(x=>!vistos.has(x.id)).map(x=>({...x,pendente:true})));
+}
+
+/* Sobe primeiro, indexa depois. Ao contrário, uma subida falha deixaria no
+   índice um anexo que a tela mostra e que não abre — mentira visível é pior
+   que byte órfão. Sem internet, fica na fila local e sobe depois. */
+async function arqSubir(reg,file){
+  const s=await apiSync('POST',{acao:'arqSubirUrl',id:reg.id,ref:reg.ref});
+  const r=await fetch(s.url,{method:'PUT',
+    headers:{'content-type':file.type||'application/octet-stream'},body:file});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  await apiSync('POST',{acao:'arqIndexar',id:reg.id,ref:reg.ref,nome:reg.nome,
+    tipo:reg.tipo,tam:reg.tam,em:reg.em,caminho:s.caminho});
+  arqEsquecerIndice();
+}
+const LIMITE_ARQ=25*1024*1024;
+async function arqAdd(ref,file){
+  if(file.size>LIMITE_ARQ)
+    throw new Error(file.name+' tem '+tamanho(file.size)+' — o limite é 25 MB por arquivo.');
+  const reg={id:uid(),ref,nome:file.name,tipo:file.type,tam:file.size,em:hoje()};
+  if(naNuvem()){
+    try{ await arqSubir(reg,file); return reg }
+    catch(e){
+      // Recusa ENTENDIDA pelo servidor não vira fila: ficaria tentando para
+      // sempre, calado. Só falha de rede é que espera a internet voltar.
+      const c=+((/HTTP (\d+)/.exec(e.message||'')||[])[1]||0);
+      if(c>=400&&c<500&&c!==408&&c!==429)
+        throw new Error(file.name+': o servidor recusou (HTTP '+c+').');
+    }
+  }
+  await arqGravarLocal({...reg,blob:file});
+  return reg;
+}
+async function arqDel(id){
+  const local=await arqPorLocal(id);
+  const idx=await arqIndice();
+  const estaNaNuvem=idx&&[...idx.values()].some(l=>l.some(x=>x.id===id));
+  // Nem no aparelho nem no índice que eu consegui ler: quase sempre é o índice
+  // que não chegou. Repintar como se tivesse apagado seria mentira.
+  if(!local&&!estaNaNuvem&&!idx)throw new Error('sem conexão com o servidor');
+  if(estaNaNuvem){
+    // se o servidor não apagar, apagar só aqui faria o anexo "voltar" no
+    // próximo carregamento — melhor recusar e dizer
+    await apiSync('POST',{acao:'arqApagar',id});
+    arqEsquecerIndice();
+  }
+  if(local)await arqApagarLocal(id);
+}
+async function arqUrlDe(id,baixar){
+  const local=await arqPorLocal(id);
+  if(local&&local.blob)return URL.createObjectURL(local.blob);
+  const d=await apiSync('POST',{acao:'arqUrl',id,baixar:!!baixar});
+  return d.url;
+}
+// Configurações espera por isto para desenhar: uma promessa que não resolve
+// deixaria a tela inteira em branco. Por isso todo caminho de erro devolve zero.
+async function arqTotal(){
+  let n=0,b=0;const vistos=new Set();
+  try{
+    const idx=await arqIndice();
+    if(idx)for(const l of idx.values())for(const x of l){vistos.add(x.id);n++;b+=x.tam||0}
+  }catch(e){}
+  let fila={q:0,z:0};
+  try{
+    const d=await db();
+    fila=await new Promise(ok=>{let q=0,z=0;
+      const t=d.transaction('arq');const c=t.objectStore('arq').openCursor();
+      c.onsuccess=e=>{const cur=e.target.result;
+        if(cur){if(!vistos.has(cur.value.id)){q++;z+=cur.value.tam||0}cur.continue()}else ok({q,z})};
+      c.onerror=()=>ok({q,z});t.onabort=()=>ok({q,z})});
+  }catch(e){}
+  return {n:n+fila.q,b:b+fila.z,fila:fila.q};
+}
+
+/* A MUDANÇA DE CASA. Tudo que está no IndexedDB deste aparelho — os anexos de
+   antes e os que ficaram na fila por falta de sinal — sobe e sai daqui. Roda
+   sozinho ao abrir, quieto; e tem botão em Configurações para ver o resultado. */
+let _subindo=false;
+async function arqSubirPendentes(avisar){
+  if(_subindo){if(avisar)alert('Já estou enviando — aguarde.');return{subiu:0,falhou:0}}
+  if(!naNuvem()){if(avisar)alert('Sem conexão com o servidor agora.');return{subiu:0,falhou:0}}
+  _subindo=true;
+  try{
+    const d=await db();
+    const todos=await new Promise(ok=>{const out=[];
+      const t=d.transaction('arq');const c=t.objectStore('arq').openCursor();
+      c.onsuccess=e=>{const cur=e.target.result;if(cur){out.push(cur.value);cur.continue()}else ok(out)};
+      c.onerror=()=>ok(out);t.onabort=()=>ok(out)});
+    if(!todos.length){if(avisar)alert('Nada para subir — todos os anexos já estão no servidor.');return{subiu:0,falhou:0}}
+    const idx=await arqIndice();
+    const laDentro=new Set();
+    if(idx)for(const l of idx.values())for(const x of l)laDentro.add(x.id);
+    let subiu=0,falhou=0;
+    for(const r of todos){
+      if(laDentro.has(r.id)){await arqApagarLocal(r.id);continue}  // já estava lá: só a cópia sai
+      try{ await arqSubir({id:r.id,ref:r.ref,nome:r.nome,tipo:r.tipo,tam:r.tam,em:r.em||hoje()},r.blob);
+           await arqApagarLocal(r.id);subiu++ }
+      catch(e){ falhou++ }
+    }
+    arqEsquecerIndice();
+    if(avisar)alert(subiu+' anexo(s) enviados ao servidor.'+(falhou?'\n⚠️ '+falhou+' não foram — tente de novo.':''));
+    return{subiu,falhou};
+  } finally { _subindo=false }
+}
 
 /* ============================================================
    Levar os anexos de um endereço para outro.
@@ -307,8 +451,28 @@ async function todosArquivos() {
 }
 
 async function exportarArquivos() {
-  const regs = await todosArquivos();
-  if (!regs.length) { alert('Não há anexo guardado neste endereço.'); return }
+  // Antes isto lia só o IndexedDB. Com os anexos no servidor, ler só o aparelho
+  // devolveria um zip vazio e diria "não há anexo" — mentira. Agora baixa o que
+  // está no servidor e junta com o que ainda não subiu daqui.
+  const locais = await todosArquivos();
+  const regs = locais.slice();
+  const vistos = new Set(locais.map(x => x.id));
+  const idx = await arqIndice();
+  if (idx) {
+    const naNuvemLista = [...idx.values()].flat().filter(x => !vistos.has(x.id));
+    for (let i = 0; i < naNuvemLista.length; i++) {
+      const x = naNuvemLista[i];
+      try {
+        const u = await arqUrlDe(x.id, false);
+        const b = await fetch(u).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob() });
+        regs.push({ ...x, blob: b });
+      } catch (e) { /* um que não veio não pode derrubar o resto */ }
+    }
+    if (naNuvemLista.length && regs.length - locais.length < naNuvemLista.length)
+      alert('⚠️ ' + (naNuvemLista.length - (regs.length - locais.length)) +
+        ' anexo(s) não vieram do servidor. O zip sai com o resto.');
+  }
+  if (!regs.length) { alert('Não há nenhum anexo guardado.'); return }
   const usados = {};                       // nome de arquivo repetido vira nome-2, nome-3…
   const entradas = [];
   const indice = [];
@@ -381,6 +545,8 @@ async function importarArquivos(f) {
       });
       novos++;
     }
+    // o que entrou fica na fila local; daqui sobe para o servidor
+    if (novos) await arqSubirPendentes(false);
     tela();
     alert('Arquivos restaurados: ' + novos + '.'
       + (repetidos ? '\n' + repetidos + ' já estavam aqui (não dupliquei).' : '')
@@ -799,6 +965,19 @@ function campos(obj,defs,aoMudar){
   });
   return c;
 }
+
+/* Apagar o registro leva os anexos junto. Se o servidor recusar, o certo é
+   PARAR: apagar a ficha e deixar os arquivos no bucket cria lixo que ninguém
+   mais alcança — não sobra ficha apontando para eles. */
+async function apagarAnexosDe(ref){
+  try{
+    const todos = await arqPor(ref);
+    for (const x of todos) await arqDel(x.id);
+    return true;
+  }catch(e){ alert('Não consegui apagar os anexos no servidor: '+(e.message||e)+
+    '\n\nNada foi apagado. Tente de novo quando a conexão voltar.'); return false }
+}
+
 /* área de arquivos de um registro */
 function areaArquivos(ref,dica){
   const c=el(`<div><div class="arqs" style="margin-bottom:9px"></div>
@@ -806,20 +985,47 @@ function areaArquivos(ref,dica){
     <input type="file" multiple hidden></div>`);
   const lista=c.querySelector('.arqs'),solta=c.querySelector('.solta'),inp=c.querySelector('input');
   const pintar=async()=>{
-    const as=await arqPor(ref);
+    lista.innerHTML='<div style="color:var(--suave);font-size:12.5px">Carregando…</div>';
+    let as=[];
+    try{ as=await arqPor(ref) }
+    catch(e){ lista.innerHTML='<div style="color:var(--suave);font-size:12.5px">Não consegui ler os anexos.</div>';return }
     lista.innerHTML=as.length?'':'<div style="color:var(--suave);font-size:12.5px">Nenhum arquivo ainda.</div>';
     as.forEach(a=>{
-      const url=URL.createObjectURL(a.blob);
       const it=el(`<div class="arq"><span>${/pdf/.test(a.tipo)?'📄':/image/.test(a.tipo)?'🖼️':'📎'}</span>
         <span class="nome">${esc(a.nome)}</span><span class="tam">${tamanho(a.tam)}</span>
-        <a href="${url}" target="_blank" rel="noopener">abrir</a>
-        <a href="${url}" download="${esc(a.nome)}">baixar</a>
+        ${a.pendente?'<span class="tam" title="ainda não subiu — sobe sozinho quando houver internet">⏳ neste aparelho</span>':''}
+        <a href="#" class="abrir">abrir</a>
+        <a href="#" class="baixar">baixar</a>
         <button class="lixo">✕</button></div>`);
-      it.querySelector('.lixo').onclick=async()=>{await arqDel(a.id);pintar()};
+      // A janela é aberta ANTES do await: depois de uma espera o navegador
+      // trata window.open como pop-up e bloqueia.
+      it.querySelector('.abrir').onclick=async e=>{
+        e.preventDefault();
+        const j=window.open('','_blank');
+        try{ const u=await arqUrlDe(a.id,false); if(j)j.location=u; else location.href=u }
+        catch(err){ if(j)j.close(); alert('Não consegui abrir: '+(err.message||err)) }
+      };
+      it.querySelector('.baixar').onclick=async e=>{
+        e.preventDefault();
+        try{ const u=await arqUrlDe(a.id,true);
+             const l=document.createElement('a');l.href=u;l.download=a.nome;
+             document.body.appendChild(l);l.click();l.remove() }
+        catch(err){ alert('Não consegui baixar: '+(err.message||err)) }
+      };
+      it.querySelector('.lixo').onclick=async()=>{
+        try{ await arqDel(a.id);pintar() }
+        catch(err){ alert('Não consegui apagar no servidor: '+(err.message||err)+'\nO anexo continua lá.') }
+      };
       lista.appendChild(it);
     });
   };
-  const receber=async fs=>{for(const f of fs) await arqAdd(ref,f); pintar()};
+  const receber=async fs=>{
+    solta.classList.add('ocupado');const antes=solta.textContent;solta.textContent='Enviando…';
+    const ruins=[];
+    for(const f of fs){ try{ await arqAdd(ref,f) }catch(e){ ruins.push(e.message||String(e)) } }
+    solta.classList.remove('ocupado');solta.textContent=antes;pintar();
+    if(ruins.length)alert('Não subiu:\n\n· '+ruins.join('\n· '));
+  };
   solta.onclick=()=>inp.click();
   inp.onchange=()=>{receber([...inp.files]);inp.value=''};
   solta.addEventListener('dragover',e=>{e.preventDefault();solta.classList.add('sobre')});
@@ -1713,7 +1919,7 @@ function modalViagem(v){
     s4.appendChild(imp);
     const del=el('<button class="btn ghost" style="color:var(--vermelho)">Apagar viagem</button>');
     del.onclick=async()=>{if(!confirm('Apagar esta viagem e seus arquivos?'))return;
-      for(const a of await arqPor('viagem:'+v.id)) await arqDel(a.id);
+      if(!await apagarAnexosDe('viagem:'+v.id))return;
       E.viagens=E.viagens.filter(x=>x.id!==v.id);salvar();fechar()};
     s4.appendChild(del);s4.appendChild(el('<span class="cresce"></span>'));
     const ok=el('<button class="btn">Pronto</button>');ok.onclick=fechar;s4.appendChild(ok);
@@ -2207,7 +2413,7 @@ function modalDemanda(d){
     const s3=el('<div class="secao" style="display:flex;gap:9px;align-items:center"></div>');
     const del=el('<button class="btn ghost" style="color:var(--vermelho)">Apagar</button>');
     del.onclick=async()=>{if(!confirm('Apagar esta demanda e seus arquivos?'))return;
-      for(const a of await arqPor('demanda:'+d.id))await arqDel(a.id);
+      if(!await apagarAnexosDe('demanda:'+d.id))return;
       E.demandas=E.demandas.filter(x=>x.id!==d.id);salvar();fechar()};
     s3.appendChild(del);s3.appendChild(el('<span class="cresce"></span>'));
     if(d.status!=='Concluída'){
@@ -2576,7 +2782,7 @@ function modalExame(x) {
     const del = el('<button class="btn ghost" style="color:var(--vermelho)">Apagar</button>');
     del.onclick = async () => {
       if (!confirm('Apagar este exame?')) return;
-      for (const a of await arqPor('exame:' + x.id)) await arqDel(a.id);
+      if(!await apagarAnexosDe('exame:' + x.id))return;
       E.exames = E.exames.filter(y => y.id !== x.id); salvar(); fechar();
     };
     s3.appendChild(del); s3.appendChild(el('<span class="cresce"></span>'));
@@ -2669,6 +2875,35 @@ function imprimirSOS() {
   w.document.close(); w.print();
 }
 
+
+
+/* ---- Onde os anexos moram ----
+   Vale mostrar isso: até 23/08/2026 eles ficavam presos ao navegador deste
+   aparelho, e nada avisava. Trocar de celular perdia tudo em silêncio. */
+function blocoAnexos(t){
+  const cx=el('<div class="corpo"></div>');
+  if(DEV){cx.appendChild(el('<div class="aviso">Rodando local: os anexos ficam só neste navegador.</div>'));return cx}
+  cx.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:0 0 11px">'+
+    'Os anexos ficam num espaço <b>privado</b> no servidor — nenhum endereço deles abre sem '+
+    'uma assinatura de 5 minutos que só este painel sabe pedir. Cabem 25 MB por arquivo. '+
+    'Anexar sem internet funciona: o arquivo espera aqui e sobe sozinho no próximo acesso.</p>'));
+  const linha=el('<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"></div>');
+  if(t.fila){
+    cx.appendChild(el('<div class="aviso">⏳ <b>'+t.fila+' anexo(s)</b> ainda estão só neste aparelho. '+
+      'Enquanto não subirem, eles não aparecem em outro celular nem entram no backup.</div>'));
+    const b=el('<button class="btn">⬆ Enviar agora</button>');
+    b.onclick=async()=>{b.disabled=true;b.textContent='Enviando…';
+      await arqSubirPendentes(true);arqEsquecerIndice();tela()};
+    linha.appendChild(b);
+  } else {
+    linha.appendChild(el('<span style="font-size:12.5px;color:var(--verde)">✓ Tudo no servidor.</span>'));
+  }
+  const c=el('<button class="btn ghost">⬇ Baixar tudo (.zip)</button>');
+  c.onclick=()=>exportarArquivos();
+  linha.appendChild(c);
+  cx.appendChild(linha);
+  return cx;
+}
 
 /* ---- Cópias de segurança: o servidor guarda, aqui se traz de volta ----
    O botão ⬇ Backup depende de você lembrar. Isto não depende: o banco tira
@@ -3914,7 +4149,7 @@ function modalOport(o,novoReg){
     const del=el('<button class="btn ghost" style="color:var(--vermelho)">Apagar</button>');
     del.onclick=async()=>{
       if(!confirm('Apagar esta oportunidade e seus arquivos? Arquivar guarda o motivo; apagar não deixa rastro.'))return;
-      for(const a of await arqPor('oportunidade:'+o.id))await arqDel(a.id);
+      if(!await apagarAnexosDe('oportunidade:'+o.id))return;
       E.oportunidades=E.oportunidades.filter(x=>x.id!==o.id);salvar();fechar();
     };
     s7.appendChild(del);
@@ -4942,7 +5177,7 @@ function modalRendimento(x,novo){
     const s3=el('<div class="secao" style="display:flex;gap:9px"></div>');
     const del=el('<button class="btn ghost" style="color:var(--vermelho)">Apagar</button>');
     del.onclick=async()=>{if(!confirm('Apagar este lançamento e seus arquivos?'))return;
-      for(const a of await arqPor('rendimento:'+x.id))await arqDel(a.id);
+      if(!await apagarAnexosDe('rendimento:'+x.id))return;
       E.rendimentos=E.rendimentos.filter(y=>y.id!==x.id);salvar();fechar()};
     s3.appendChild(del);
     // pró-labore e rendimento repetem: um clique cria o do mês seguinte já preenchido
@@ -5359,7 +5594,7 @@ function modalBem(x){
     const s3=el('<div class="secao" style="display:flex;gap:9px"></div>');
     const del=el('<button class="btn ghost" style="color:var(--vermelho)">Apagar</button>');
     del.onclick=async()=>{if(!confirm('Apagar este bem e seus arquivos?'))return;
-      for(const a of await arqPor('bem:'+x.id))await arqDel(a.id);
+      if(!await apagarAnexosDe('bem:'+x.id))return;
       E.patrimonio=E.patrimonio.filter(y=>y.id!==x.id);salvar();fechar()};
     s3.appendChild(del);s3.appendChild(el('<span class="cresce"></span>'));
     const ok=el('<button class="btn">Pronto</button>');ok.onclick=fechar;s3.appendChild(ok);
@@ -5762,7 +5997,7 @@ function modalDoc(d){
     const s3=el('<div class="secao" style="display:flex;gap:9px"></div>');
     const del=el('<button class="btn ghost" style="color:var(--vermelho)">Apagar</button>');
     del.onclick=async()=>{if(!confirm('Apagar este documento e seus arquivos?'))return;
-      for(const a of await arqPor('documento:'+d.id))await arqDel(a.id);
+      if(!await apagarAnexosDe('documento:'+d.id))return;
       E.documentos=E.documentos.filter(x=>x.id!==d.id);salvar();fechar()};
     s3.appendChild(del);s3.appendChild(el('<span class="cresce"></span>'));
     const ok=el('<button class="btn">Pronto</button>');ok.onclick=fechar;s3.appendChild(ok);
@@ -6329,7 +6564,7 @@ function modalPessoa(p) {
     const del = el('<button class="btn ghost" style="color:var(--vermelho)">Apagar</button>');
     del.onclick = async () => {
       if (!confirm('Apagar esta pessoa e seus arquivos?')) return;
-      for (const a of await arqPor('pessoa:' + p.id)) await arqDel(a.id);
+      if(!await apagarAnexosDe('pessoa:' + p.id))return;
       E.pessoas = E.pessoas.filter(y => y.id !== p.id); salvar(); fechar();
     };
     s3.appendChild(del); s3.appendChild(el('<span class="cresce"></span>'));
@@ -6531,7 +6766,7 @@ async function vConfig(m){
   m.appendChild(el(`<div class="grade">
     ${kpi('Listas',GRUPOS_CFG.length,'configuráveis')}
     ${kpi('Opções',GRUPOS_CFG.reduce((s,g)=>s+CFG(g.k).length,0),'no total')}
-    ${kpi('Arquivos guardados',t.n,tamanho(t.b),'a')}
+    ${kpi('Arquivos guardados',t.n,t.fila?tamanho(t.b)+' · '+t.fila+' só neste aparelho':tamanho(t.b)+' no servidor','a')}
     ${kpi('Registros',['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles'].reduce((s,k)=>s+(E[k]||[]).length,0),'no painel')}</div>`));
   // perfil: a data de nascimento alimenta os rastreios de saúde
   const pf=el('<div class="corpo"></div>');
@@ -6810,6 +7045,7 @@ async function vConfig(m){
     <b>mas não os arquivos</b>, que são grandes demais. Guarde os originais importantes fora daqui também.</p>`));
   m.appendChild(bloco('cf-dados','💾 Dados e backup','exportar, restaurar ou zerar',d));
   m.appendChild(bloco('cf-copias','🛟 Cópias de segurança','uma por dia, guardadas 90 dias no servidor',blocoCopias()));
+  m.appendChild(bloco('cf-anexos','📎 Anexos','onde os arquivos moram e o que ainda não subiu',blocoAnexos(t)));
 
   // restaurar padrões
   const p=el('<div class="corpo"></div>');
@@ -6964,7 +7200,7 @@ function telaLogin(){
       if(!token){erroEl.textContent='Usuário ou senha incorretos.';return}
       (manter.checked?localStorage:sessionStorage).setItem(T_CHAVE,token);
       f.remove();document.querySelector('.app').style.display='';
-      menu();tela();puxarNuvem().then(()=>tela());
+      menu();tela();puxarNuvem().then(()=>{tela();arqSubirPendentes().then(r=>{if(r.subiu)tela()})});
     }catch(e){erroEl.textContent='Não consegui falar com o servidor. Tente de novo.'}
   };
   document.body.appendChild(f);
@@ -6981,7 +7217,7 @@ document.addEventListener('keydown',ev=>{
   ev.preventDefault();abrirBusca();
 });
 
-if(temSessao()){menu();tela();puxarNuvem().then(()=>tela());}
+if(temSessao()){menu();tela();puxarNuvem().then(()=>{tela();arqSubirPendentes().then(r=>{if(r.subiu)tela()})});}
 else telaLogin();
 </script>
 </body>
