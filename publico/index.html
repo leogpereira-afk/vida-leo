@@ -632,10 +632,19 @@ function carregar(){
     if(!v.carro||typeof v.carro!=='object')v.carro={};});
   // internacional: deixa indefinido de propósito — a cidade decide sozinha (ehInternacional)
   d.metas.forEach(m=>{if(!Array.isArray(m.passos))m.passos=[]});
-  // gasto antigo tinha 'categoria' e usava 'obs' como descrição — vira 'classe' + 'oque'
+  /* MIGRAÇÃO DE UMA VEZ SÓ, NÃO DE TODA VEZ.
+     O lançamento antigo tinha 'categoria' e usava 'obs' como descrição; viraram
+     'classe' e 'oque'. Só que este trecho rodava em TODO carregamento e o
+     `delete g.obs` era incondicional -- e 'obs' hoje é campo vivo: é o "Anotações"
+     que modalItemGasto grava. Resultado: escrever uma anotação num lançamento,
+     recarregar a página e ela sumia, calada, também da nuvem.
+     A marca de lançamento ANTIGO é ter 'categoria'. Sem ela, não há o que migrar.
+     (Conferido em 23/08/2026: nenhuma anotação foi perdida — não havia lançamento
+     nenhum ainda. Era mina, não estrago.) */
   d.gastos.forEach(g=>{
-    if(g.classe==null&&g.categoria!=null)g.classe=g.categoria;
-    if(g.oque==null&&g.obs!=null)g.oque=g.obs;
+    if(g.categoria==null)return;
+    if(g.classe==null)g.classe=g.categoria;
+    if(g.oque==null||g.oque==='')g.oque=g.obs||'';
     delete g.categoria;delete g.obs;
   });
   if(!d.colapso)d.colapso={};
@@ -2896,12 +2905,21 @@ function blocoAnexos(t){
       await arqSubirPendentes(true);arqEsquecerIndice();tela()};
     linha.appendChild(b);
   } else {
-    linha.appendChild(el('<span style="font-size:12.5px;color:var(--verde)">✓ Tudo no servidor.</span>'));
+    /* NÃO DIZER "✓ Tudo no servidor". Esta tela só enxerga a fila DESTE aparelho.
+       Um anexo que ficou preso no celular antigo continua preso, e aqui apareceria
+       um visto verde afirmando o contrário -- exatamente o tipo de mentira que o
+       resto deste painel evita. */
+    linha.appendChild(el('<span style="font-size:12.5px;color:var(--verde)">✓ Nada preso <b>neste</b> aparelho.</span>'));
   }
   const c=el('<button class="btn ghost">⬇ Baixar tudo (.zip)</button>');
   c.onclick=()=>exportarArquivos();
   linha.appendChild(c);
   cx.appendChild(linha);
+  cx.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:12px 0 0;line-height:1.5">'+
+    '<b>Só dá para ver a fila do aparelho em que você está.</b> Se você já anexou alguma coisa '+
+    'em outro celular ou navegador — e ainda mais se foi antes de 23/08, quando os anexos passaram '+
+    'a subir —, abra o painel <b>naquele</b> aparelho uma vez, com internet, e volte aqui. '+
+    'O que estiver parado sobe sozinho; se não subir, o botão aparece.</p>'));
   return cx;
 }
 
@@ -2938,9 +2956,14 @@ function blocoCopias(){
         '<td style="padding:9px 10px;text-align:right"></td>';
       const bt=el('<button class="btn ghost mini">↩ Restaurar</button>');
       bt.onclick=async()=>{
+        // Os ANEXOS não voltam no tempo: quem apagou uma ficha levou os arquivos
+        // dela junto, e nenhuma cópia traz arquivo de volta. Dizer isso antes é o
+        // mínimo -- senão a ficha reaparece vazia e parece que a cópia veio torta.
         if(!confirm('Trazer a cópia de '+fmtDataAno(b.em.slice(0,10))+'?\n\n'+
           'Tudo que você lançou DEPOIS dela sai de cena. O estado de agora fica guardado '+
-          'em Configurações → Versão descartada, então dá para voltar atrás.'))return;
+          'em Configurações → Versão descartada, então dá para voltar atrás.\n\n'+
+          'Atenção: os ARQUIVOS anexados ficam como estão hoje — eles não voltam no tempo. '+
+          'Uma ficha que você apagou volta sem os anexos dela.'))return;
         bt.disabled=true;bt.textContent='Trazendo…';
         try{
           const r2=await apiSync('POST',{acao:'backupPegar',id:b.id});
@@ -6933,8 +6956,13 @@ async function vConfig(m){
      entrada única. Repetir isso aqui seria um quinto lugar para desencontrar.
      (Conferido no código do painel-auth em 23/08/2026.)
 
-     O link vai para a CAPA do Painel, não para /painel/acessos: o site é uma
-     página só servida pelo GitHub Pages, e endereço com rota dentro dá 404. */
+     O link vai DIRETO para a tela Acessos. A versão anterior deste comentário
+     dizia que rota interna "dá 404" -- e dava mesmo, mas 404 ali não é quebra:
+     o Painel é um SPA e o build dele copia o index.html para 404.html, então o
+     GitHub Pages devolve o app inteiro com esse código e o React Router abre a
+     tela. Conferido no navegador em 23/08/2026: a URL sobrevive e o app monta.
+     O que ainda não funciona é o ATALHO impresilk.com.br/painel/acessos --
+     veja o comentário no href abaixo. */
   const sx=el('<div class="corpo"></div>');
   sx.appendChild(el(`<p style="font-size:13px;margin:0 0 4px">
     A senha que abre esta Central é a <b>mesma</b> que abre o Painel de Gestão, o RH,
@@ -6944,11 +6972,22 @@ async function vConfig(m){
     Por isso ela não se troca aqui dentro — se trocasse, mudaria só num canto.
     No Painel a troca vale para todos de uma vez, na mesma hora.</p>`));
   const cxs=el('<div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap"></div>');
+  // ABRE DIRETO NA TELA ACESSOS, e nao na capa. O endereco e o do GitHub Pages
+  // (e nao o atalho impresilk.com.br/painel/acessos) porque o atalho ainda cai
+  // num circulo de dois 301: /painel/ e uma pasta de verdade no servidor, mas
+  // nada abaixo dela repassa o caminho -- o WordPress poe a barra final e a
+  // regra da raiz tira, sem fim. O conserto e um painel/.htaccess na Locaweb,
+  // pronto em Dre/atalhos-htaccess/painel.htaccess.
+  // QUANDO O .HTACCESS SUBIR e este comando responder 404 (o 404 do Pages e
+  // normal: e o 404.html com o app dentro) em vez de 301:
+  //   curl -sL -o /dev/null -w "%{http_code} %{url_effective}\n" https://impresilk.com.br/painel/acessos
+  // trocar o href abaixo por  https://impresilk.com.br/painel/acessos  e voltar
+  // a usar o atalho, como o resto do arquivo faz.
   cxs.appendChild(el(`<a class="btn" target="_blank" rel="noopener"
     style="text-decoration:none;display:inline-block"
-    href="https://impresilk.com.br/painel">📊 Abrir o Painel</a>`));
+    href="https://leogpereira-afk.github.io/painel-impresilk/acessos">📊 Abrir Acessos no Painel</a>`));
   cxs.appendChild(el(`<span style="font-size:12.5px;color:var(--suave)">
-    lá dentro: menu <b>Acessos</b> → <b>Minha senha</b></span>`));
+    abre direto na tela <b>Acessos</b> — lá, <b>Minha senha</b></span>`));
   sx.appendChild(cxs);
   sx.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin-top:12px">
     Você entra como direção, então lá dá para definir a senha nova
@@ -7035,18 +7074,38 @@ async function vConfig(m){
   const linha=el('<div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:11px"></div>');
   linha.appendChild(acao('⬇ Exportar backup (JSON)',exportar));
   linha.appendChild(acao('⬆ Restaurar backup',()=>pedirArquivo(restaurarBackup,'.json'),'ghost'));
+  /* ESTE BOTÃO ERA CARA OU COROA.
+     Ele apagava o localStorage e parava aí. Sem envio, o que acontecia dependia
+     do que você fizesse a seguir: recarregar trazia tudo de volta da nuvem (o
+     botão não fez nada), mas tocar em qualquer coisa antes disso rodava salvar()
+     com _mt de agora e empurrava o estado VAZIO por cima da nuvem (o botão
+     apagou tudo, em todos os aparelhos). Duas consequências opostas, nenhuma
+     anunciada, e o mesmo "Tudo apagado." nas duas.
+     Agora é determinístico: apaga aqui e na nuvem, de uma vez, e diz os dois
+     caminhos de volta. Os ANEXOS ficam onde estão de propósito -- eles não
+     entram nas cópias de segurança, então apagá-los aqui seria a única perda
+     sem retorno da tela inteira. */
   const zerar=acao('Apagar tudo e recomeçar',async()=>{
-    if(!confirm('Isso apaga TODOS os dados e arquivos deste navegador. Tem certeza?'))return;
-    if(!confirm('Última confirmação: não dá para desfazer. Apagar mesmo?'))return;
+    if(!confirm('Isso apaga todos os seus lançamentos, fichas e cadastros — aqui E na nuvem, '+
+      'em todos os aparelhos.\n\nOs arquivos anexados NÃO são apagados: eles continuam no '+
+      'servidor.\n\nTem certeza?'))return;
+    if(!confirm('Última confirmação.\n\nDá para voltar por Configurações → Cópias de segurança '+
+      '(90 dias) ou → Versão descartada. Apagar mesmo?'))return;
+    guardaDescartado();
     const dd=await db();await new Promise(ok=>{const tx=dd.transaction('arq','readwrite');tx.objectStore('arq').clear();tx.oncomplete=ok});
-    localStorage.removeItem(CHAVE);E=carregar();tela();alert('Tudo apagado.');
+    localStorage.removeItem(CHAVE);
+    E=carregar();salvar();
+    await enviarNuvem();
+    arqEsquecerIndice();tela();
+    alert('Apagado aqui e na nuvem.\n\nPara voltar atrás: Configurações → Cópias de segurança.');
   },'ghost');
   zerar.style.color='var(--vermelho)';
   linha.appendChild(zerar);
   d.appendChild(linha);
   d.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);line-height:1.5">
-    Os dados ficam neste navegador (localStorage) e os arquivos no IndexedDB. O backup em JSON leva os dados —
-    <b>mas não os arquivos</b>, que são grandes demais. Guarde os originais importantes fora daqui também.</p>`));
+    Tudo que você digita fica no servidor e volta em qualquer aparelho; este navegador guarda só uma cópia
+    para funcionar sem internet. O backup em JSON leva os dados — <b>mas não os arquivos anexados</b>.
+    Para eles, use <b>⬇ Baixar tudo (.zip)</b> em 📎 Anexos.</p>`));
   m.appendChild(bloco('cf-dados','💾 Dados e backup','exportar, restaurar ou zerar',d));
   m.appendChild(bloco('cf-copias','🛟 Cópias de segurança','uma por dia, guardadas 90 dias no servidor',blocoCopias()));
   m.appendChild(bloco('cf-anexos','📎 Anexos','onde os arquivos moram e o que ainda não subiu',blocoAnexos(t)));
@@ -7067,9 +7126,26 @@ function baixar(blob,nome){const a=document.createElement('a');a.href=URL.create
 function exportar(){baixar(new Blob([JSON.stringify(E,null,1)],{type:'application/json'}),'central-leo-'+hoje()+'.json')}
 function pedirArquivo(cb,accept){const i=document.createElement('input');i.type='file';if(accept)i.accept=accept;
   i.onchange=()=>{if(i.files[0])cb(i.files[0])};i.click()}
+/* RESTAURAR TEM DE CHEGAR NA NUVEM.
+   Isto gravava só no localStorage e dizia "Backup restaurado". O arquivo trazia
+   o _mt antigo, então uma de duas coisas acontecia, e nenhuma era o esperado:
+   ou o próximo carregamento via a nuvem mais nova e DESFAZIA a restauração em
+   silêncio, ou a primeira edição empurrava os dados velhos por cima da nuvem.
+   Agora grava pelo caminho normal (salvar + envio com a trava de concorrência),
+   e o estado de antes fica em "Versão descartada". */
 async function restaurarBackup(f){
-  try{const j=JSON.parse(await f.text());if(!j.viagens)throw new Error('não parece um backup daqui');
-    localStorage.setItem(CHAVE,JSON.stringify(j));E=carregar();tela();alert('Backup restaurado.')}
+  try{
+    const j=JSON.parse(await f.text());
+    if(!j.viagens)throw new Error('não parece um backup daqui');
+    if(!confirm('Trazer este arquivo?\n\nEle substitui o que está no painel AGORA, em todos os '+
+      'aparelhos. O estado atual fica guardado em Configurações → Versão descartada.'))return;
+    guardaDescartado();
+    localStorage.setItem(CHAVE,JSON.stringify(j));
+    E=carregar();salvar();
+    await enviarNuvem();
+    tela();
+    alert('Backup restaurado — e enviado para a nuvem.');
+  }
   catch(e){alert('Não consegui ler: '+e.message)}
 }
 
