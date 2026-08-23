@@ -157,7 +157,7 @@ Deno.serve(async (req: Request) => {
   if (!SESSION_SECRET) return json({ erro: "LEO_SESSION_SECRET ausente" }, 500);
 
   if (req.method === "POST") {
-    const { acao, senha, senhaAtual, senhaNova } = await req.json().catch(() => ({}));
+    const { acao, senha, senhaAtual, senhaNova, id: corpoId } = await req.json().catch(() => ({}));
 
     // Troca a sessao longa por um cracha curto de administracao.
     if (acao === "crachaAdmin") {
@@ -185,6 +185,34 @@ Deno.serve(async (req: Request) => {
        Mantê-la seria pior que removê-la: a tela diria "senha alterada" e nada
        teria mudado. A senha da casa se troca no Painel, num lugar só, e vale
        para os oito sistemas. */
+    /* CÓPIAS DE SEGURANÇA (23/08/2026).
+       Um backup que não dá para consultar nem restaurar é fé, não seguro. O
+       banco tira uma cópia por dia (leo_backup_diario) e guarda 90 dias, só
+       quando algo mudou. Estas duas ações são a porta para ver e trazer de
+       volta -- restaurar NÃO é feito aqui: a ação devolve os dados, a tela
+       mostra o que veio e quem grava é o caminho normal, com a mesma trava de
+       concorrência. Restaurar direto no servidor pularia essa trava. */
+    if (acao === "backups") {
+      const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+      if (!(await tokenOk(t))) return json({ erro: "Não autorizado" }, 401);
+      const { data, error } = await sb.from("leo_backups")
+        .select("id, em, mt").order("em", { ascending: false }).limit(90);
+      if (error) return json({ erro: error.message }, 500);
+      return json({ backups: data ?? [] });
+    }
+
+    if (acao === "backupPegar") {
+      const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+      if (!(await tokenOk(t))) return json({ erro: "Não autorizado" }, 401);
+      const id = Number(corpoId);
+      if (!id) return json({ erro: "sem id" }, 400);
+      const { data, error } = await sb.from("leo_backups")
+        .select("id, em, mt, dados").eq("id", id).maybeSingle();
+      if (error) return json({ erro: error.message }, 500);
+      if (!data) return json({ erro: "cópia não encontrada" }, 404);
+      return json(data);
+    }
+
     if (acao === "trocar") {
       return json({
         erro: "A senha agora é a mesma dos outros sistemas. Troque no Painel, em Acessos → Minha senha.",

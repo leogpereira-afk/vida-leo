@@ -2669,6 +2669,64 @@ function imprimirSOS() {
   w.document.close(); w.print();
 }
 
+
+/* ---- Cópias de segurança: o servidor guarda, aqui se traz de volta ----
+   O botão ⬇ Backup depende de você lembrar. Isto não depende: o banco tira
+   uma cópia por dia, só quando algo mudou, e guarda 90 dias. Restaurar passa
+   pelo caminho normal de gravação — mesma trava de concorrência do resto. */
+function blocoCopias(){
+  const cx=el('<div class="corpo"></div>');
+  if(DEV){cx.appendChild(el('<div class="aviso">Rodando local: as cópias só aparecem no site de verdade.</div>'));return cx}
+  cx.appendChild(el('<div class="vazio">Carregando…</div>'));
+  (async()=>{
+    let d;
+    try{ d=await apiSync('POST',{acao:'backups'}); }
+    catch(e){ cx.innerHTML='';cx.appendChild(el('<div class="aviso">Não consegui ler as cópias: '+esc(e.message)+'</div>'));return }
+    const lista=d.backups||[];
+    cx.innerHTML='';
+    cx.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:0 0 11px">'+
+      'O servidor guarda uma cópia por dia, e só quando alguma coisa mudou — 90 dias de histórico. '+
+      'Restaurar traz a cópia para este aparelho e a envia como uma gravação comum: '+
+      '<b>nada é apagado no servidor sem passar pela conferência de sempre</b>.</p>'));
+    if(!lista.length){cx.appendChild(el('<div class="vazio">Nenhuma cópia ainda — a primeira sai amanhã de manhã.</div>'));return}
+    const rol=el('<div class="rolagem"></div>');
+    const tb=document.createElement('table');
+    tb.innerHTML='<thead><tr><th>Quando</th><th>Há quanto tempo</th><th></th></tr></thead>';
+    const corpo=document.createElement('tbody');
+    lista.forEach(b=>{
+      const dt=new Date(b.em);
+      const dias=Math.round((Date.now()-dt.getTime())/864e5);
+      const tr=document.createElement('tr');
+      tr.innerHTML='<td style="padding:9px 10px"><b>'+fmtDataAno(b.em.slice(0,10))+'</b>'+
+        '<span style="color:var(--suave);font-size:12px"> '+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0')+'</span></td>'+
+        '<td style="padding:9px 10px;color:var(--suave)">'+(dias===0?'hoje':dias===1?'ontem':'há '+dias+' dias')+'</td>'+
+        '<td style="padding:9px 10px;text-align:right"></td>';
+      const bt=el('<button class="btn ghost mini">↩ Restaurar</button>');
+      bt.onclick=async()=>{
+        if(!confirm('Trazer a cópia de '+fmtDataAno(b.em.slice(0,10))+'?\n\n'+
+          'Tudo que você lançou DEPOIS dela sai de cena. O estado de agora fica guardado '+
+          'em Configurações → Versão descartada, então dá para voltar atrás.'))return;
+        bt.disabled=true;bt.textContent='Trazendo…';
+        try{
+          const r2=await apiSync('POST',{acao:'backupPegar',id:b.id});
+          if(!r2||!r2.dados)throw new Error('cópia vazia');
+          guardaDescartado();                    // o estado de agora fica de lado
+          localStorage.setItem(CHAVE,JSON.stringify(r2.dados));
+          E=carregar();
+          salvar();                              // marca _mt e agenda o envio
+          await enviarNuvem();                   // sobe pelo caminho normal (CAS)
+          tela();                                // recarregar mataria o envio agendado
+          alert('Cópia de '+fmtDataAno(b.em.slice(0,10))+' aplicada.');
+        }catch(e){bt.disabled=false;bt.textContent='↩ Restaurar';alert('Não consegui restaurar: '+(e.message||e))}
+      };
+      tr.lastElementChild.appendChild(bt);
+      corpo.appendChild(tr);
+    });
+    tb.appendChild(corpo);rol.appendChild(tb);cx.appendChild(rol);
+  })();
+  return cx;
+}
+
 /* ===================== BUSCA EM TUDO =====================
    Treze telas e quarenta coleções depois, lembrar EM QUAL tela uma coisa foi
    guardada virou trabalho. Aqui se digita o que se lembra — "apólice",
@@ -6751,6 +6809,7 @@ async function vConfig(m){
     Os dados ficam neste navegador (localStorage) e os arquivos no IndexedDB. O backup em JSON leva os dados —
     <b>mas não os arquivos</b>, que são grandes demais. Guarde os originais importantes fora daqui também.</p>`));
   m.appendChild(bloco('cf-dados','💾 Dados e backup','exportar, restaurar ou zerar',d));
+  m.appendChild(bloco('cf-copias','🛟 Cópias de segurança','uma por dia, guardadas 90 dias no servidor',blocoCopias()));
 
   // restaurar padrões
   const p=el('<div class="corpo"></div>');
