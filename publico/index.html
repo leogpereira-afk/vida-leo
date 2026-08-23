@@ -3323,7 +3323,7 @@ function modalObra(o){
           <td class="num" style="padding:8px 10px;color:var(--suave)">${v.n}</td><td></td>`);
         /* A lista de especialidades se edita em Configurações, mas ninguém sai
            da ficha para cadastrar uma palavra: a última opção cria na hora.
-           "Waguinho é mão de obra" não é Hidráulica nem Pintura -- é o
+           "Fulano é mão de obra" não é Hidráulica nem Pintura -- é o
            empreiteiro geral, e a especialidade dele o dono cadastra aqui. */
         const NOVA='＋ cadastrar nova…';
         tr.lastElementChild.appendChild(seletor(E.obraFornecedores[nome]||'',['',...CFG('especialidades'),NOVA],val=>{
