@@ -3101,8 +3101,15 @@ function contasObra(o,r){
   const margem=venda?lucro/venda*100:0;
   const area=+o.area||0;
   const meses=(r&&r.de&&r.ate)?Math.max(1,Math.round((new Date(r.ate)-new Date(r.de))/2629800000)):0;
-  return {custo,aporte,venda,imposto,comissao,outras,liquido,lucro,margem,area,meses,
-    porM2:area?custo/area:0, vendaM2:area&&venda?venda/area:0,
+  /* O custo/m² NÃO leva o terreno: é o número que compara uma obra com a
+     outra, e o preço do lote varia com a esquina, não com a construção.
+     Somar o terreno faria a mesma casa parecer cara num bairro e barata
+     noutro -- e esconderia justamente o que se quer ver. */
+  const terreno=r?Object.entries(r.centros||{}).filter(([k])=>naturezaCentro(k)==='Terreno')
+    .reduce((s,[,v])=>s+v.total,0):0;
+  const custoObra=custo-terreno;
+  return {custo,aporte,venda,imposto,comissao,outras,liquido,lucro,margem,area,meses,terreno,custoObra,
+    porM2:area?custoObra/area:0, vendaM2:area&&venda?venda/area:0,
     // quanto do custo NÃO veio de aporte de sócio: saiu do caixa do dono
     proprio:custo-aporte,
     // lucro por mês de obra: 20% em 8 meses vale mais que 30% em 3 anos
@@ -3152,7 +3159,7 @@ async function vFortemais(m){
         ${c.meses?`<span style="color:var(--suave);font-size:12.5px">${c.meses} meses</span>`:''}
       </div>
       <div class="grade" style="margin-top:10px;gap:8px">
-        ${kpi('Custo',brl(c.custo),c.porM2?brl(c.porM2)+'/m²':(rr2?rr2.n+' lanç.':'sem lançamento'))}
+        ${kpi('Custo',brl(c.custo),c.porM2?brl(c.porM2)+'/m² sem o terreno':(rr2?rr2.n+' lanç.':'sem lançamento'))}
         ${kpi('Aporte',brl(c.aporte),c.proprio>0?brl(c.proprio)+' do seu bolso':'','a')}
         ${kpi('Venda',c.venda?brl(c.venda):'—',c.venda?'líquido '+brl(c.liquido):'não vendida')}
         ${kpi('Lucro',c.venda?brl(c.lucro):'—',c.venda?c.margem.toFixed(1)+'%'+(c.meses?' · '+brl(c.porMes)+'/mês':''):'',c.venda?(c.lucro>=0?'p':'v'):'')}
@@ -3176,7 +3183,7 @@ async function vFortemais(m){
     const comp=contas.filter(x=>x.c.custo>0);
     const rol=el('<div class="rolagem"></div>');
     const t=document.createElement('table');
-    t.innerHTML='<thead><tr><th>Obra</th><th style="text-align:right">Custo</th><th style="text-align:right">R$/m²</th>'
+    t.innerHTML='<thead><tr><th>Obra</th><th style="text-align:right">Custo</th><th style="text-align:right">R$/m² s/ terreno</th>'
       +'<th style="text-align:right">Venda</th><th style="text-align:right">Lucro</th><th style="text-align:right">Margem</th><th style="text-align:right">Meses</th></tr></thead>';
     const tb=document.createElement('tbody');
     comp.forEach(({o,c})=>{
@@ -3215,7 +3222,7 @@ function modalObra(o){
 
     /* --- o resultado, sempre à vista --- */
     c.appendChild(el(`<div class="grade" style="gap:8px;margin-bottom:4px">
-      ${kpi('Custo',brl(cc.custo),cc.porM2?brl(cc.porM2)+'/m²':'')}
+      ${kpi('Custo',brl(cc.custo),cc.porM2?brl(cc.porM2)+'/m² sem o terreno':'')}
       ${kpi('Aportes',brl(cc.aporte),cc.proprio>0?brl(cc.proprio)+' do seu bolso':'','a')}
       ${kpi('Venda líquida',cc.venda?brl(cc.liquido):'—',cc.venda?'venda '+brl(cc.venda)+' − imposto '+brl(cc.imposto)+' − comissão '+brl(cc.comissao):'')}
       ${kpi('Lucro',cc.venda?brl(cc.lucro):'—',cc.venda?cc.margem.toFixed(1)+'%'+(cc.aporte?' · '+cc.retorno.toFixed(0)+'% sobre o aporte':''):'ainda não vendida',cc.venda?(cc.lucro>=0?'p':'v'):'')}
@@ -3484,6 +3491,18 @@ function blocoImportarObra(){
       const pega=(l,c)=>{const k=g(c);return k?String(l[k]??'').trim():''};
       const num=v=>{const x=+String(v).replace(',','.');return isNaN(x)?0:x};
 
+      /* O SINAL IMPORTA. No export do ERP, despesa vem NEGATIVA; um estorno
+         (devolução) vem POSITIVO. Math.abs transformaria a devolução em custo
+         -- erro de duas vezes o valor, calado. A convenção do arquivo é
+         descoberta pela MAIORIA dos sinais das despesas, porque uma planilha
+         feita à mão costuma vir com custo positivo. */
+      let negs=0,poss=0;
+      for(const l of linhas.slice(1)){
+        if(pega(l,'Tipo')!=='Despesa')continue;
+        const v0=num(pega(l,'Valor parcela'));
+        if(v0<0)negs++;else if(v0>0)poss++;
+      }
+      const despesaEhNegativa=negs>=poss;
       // uma obra por valor distinto de "Projeto"
       const porProjeto={};
       for(const l of linhas.slice(1)){
@@ -3522,10 +3541,12 @@ function blocoImportarObra(){
             continue;
           }
           if(tipo==='Receita'){receitas.push({obra:o.nome,nome:pega(l,'Nome'),valor});continue}
+          // custo positivo; estorno vira NEGATIVO e abate a soma, como deve
+          const custo=despesaEhNegativa?-valor:valor;
           lote.push({id,obra:o.id,data:dataPlan(pega(l,'Data de competência')),
             nome:pega(l,'Nome'),centro,fornecedor:pega(l,'Fornecedor'),
-            valor:Math.abs(valor),forma:pega(l,'Forma de pagamento parcela'),
-            conta:pega(l,'Conta bancária')});
+            valor:custo,forma:pega(l,'Forma de pagamento parcela'),
+            conta:pega(l,'Conta bancária'),valor_original:valor,origem:f.name});
           // centro novo entra na lista editável, nunca é descartado calado
           if(centro&&!CFG('centrosObra').includes(centro)){
             if(!E.config.centrosObra)E.config.centrosObra=[...SEED.config.centrosObra];

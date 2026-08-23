@@ -266,6 +266,10 @@ Deno.serve(async (req: Request) => {
             valor: Number(l.valor) || 0,
             forma: String(l.forma ?? "").slice(0, 80),
             conta: String(l.conta ?? "").slice(0, 120),
+            // auditoria: o valor COM O SINAL de origem e de que arquivo veio.
+            // Sem isto, um estorno reclassificado não tem como ser conferido.
+            valor_original: l.valor_original === undefined ? null : Number(l.valor_original),
+            origem: String(l.origem ?? "").slice(0, 200) || null,
           })).filter((l) => l.id && l.obra);
           if (!limpas.length) return json({ erro: "toda linha precisa de id e obra" }, 400);
           // upsert: reimportar o mesmo arquivo ATUALIZA, não duplica
