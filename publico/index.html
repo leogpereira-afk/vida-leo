@@ -119,6 +119,7 @@ tr:hover .lixo{opacity:1}
   border-radius:9px;padding:8px 14px;font:500 13px Inter;cursor:pointer}
 .mais:hover{border-color:var(--verde);color:var(--verde)}
 .chip{display:inline-block;padding:2px 9px;border-radius:20px;font:600 11.5px Inter}
+.tag{display:inline-block;padding:2px 9px;border-radius:20px;font:600 11.5px Inter;background:var(--fundo2,rgba(128,128,128,.12));color:var(--suave);border:1px solid var(--linha)}
 .vazio{padding:26px;text-align:center;color:var(--suave);font-size:13.5px}
 .aviso{background:var(--areia-cl);border:1px solid color-mix(in srgb,var(--areia) 30%,transparent);
   border-radius:var(--r);padding:13px 16px;font-size:13.5px;margin-bottom:18px}
@@ -560,6 +561,15 @@ const SEED={
   viagens:[],
   rendHist:{anos:[],empresas:{},totalAno:[],totalGeral:0,mediaAnual:0,parciais:[],aIdentificar:[],aplicPorInst:{},detalhe:{}},
   rendimentos:[],gastos:[],agenda:[],demandas:[],peso:[],exames:[],tratamentos:[],
+  /* Fortemais: as FICHAS das obras e os APORTES moram aqui (são dezenas de linhas,
+     editadas à mão). O livro-caixa de custo NÃO -- uma obra tem ~820 lançamentos e
+     mora em leo_obra_custos, tabela própria, senão o estado inteiro engordaria e
+     subiria por inteiro a cada tecla digitada em qualquer outra tela.
+     obraFornecedores liga um FORNECEDOR a uma ESPECIALIDADE: marcando "FULANO
+     BOMBEIRO = Hidráulica" uma vez, os 21 pagamentos dele viram mão de obra
+     hidráulica -- de uma vez, para trás e para a frente. É a diferença entre
+     classificar 90 fornecedores e classificar 824 lançamentos. */
+  obras:[],obraAportes:[],obraFornecedores:{},
   assinaturas:[],seguros:[],planos:[],casa:[],documentos:[],metas:[],pessoas:[],paraEles:[],colapso:{},
   // saúde ampliada
   vitais:[],vacinas:[],histFamiliar:[],rastreios:[],
@@ -596,7 +606,19 @@ const SEED={
     oQueMeMove:['Construir algo que dure','Ser reconhecido pelo que entrego','Liberdade e autonomia','Segurança da família','Aprender e dominar o assunto','Competir e vencer','Ajudar quem está do meu lado'],
     comoRecarrego:['Sozinho, em silêncio','Treinando / correndo','Com a família','Viajando','Com amigos e conversa','Estudando algo novo','Dormindo e desacelerando'],
     tiposConta:['Conta corrente PF','Conta corrente PJ','Poupança','Investimento','Cartão de crédito','Consórcio','Outro'],
-    regimes:['Simples','Presumido','Real','MEI'],
+    /* O centro de custo NÃO foi inventado por mim: é o do próprio ERP do Léo,
+     lido do export real de uma obra inteira (824 lançamentos). Mexer aqui
+     não quebra nada -- categoria é dado, e o importador cria a que faltar. */
+  centrosObra:['Terreno','Mão de obra','Insumo diversos','Insumo hidráulico','Insumo elétrico',
+    'Aluguel equipamentos','Documentação','Impostos','Condomínio','Copasa','Cemig','Projeto',
+    'Custo administrativo','Frete','Cartório','Outros'],
+  especialidades:['Terreno','Projeto','Documentação','Terraplenagem','Fundação','Estrutura',
+    'Alvenaria','Cobertura','Hidráulica','Elétrica','Gesso','Esquadrias','Marmoraria',
+    'Revestimento','Pintura','Marcenaria','Ar-condicionado','Automação','Paisagismo',
+    'Limpeza','Administrativo','Outros'],
+  tiposObra:['Casa','Sobrado','Lote','Apartamento','Galpão','Reforma','Loteamento'],
+  statusObra:['Planejada','Em obra','À venda','Vendida','Parada'],
+  regimes:['Simples','Presumido','Real','MEI'],
     tiposBem:['Imóvel','Terreno/Lote','Rural','Veículo','Participação societária','Investimento','Outro'],
     tiposParaEles:['Momento junto','Presente','Ensinar','Viagem','Carta/registro','Segurança/futuro'],
     relacoes:['Esposa','Filho','Filha','Pai','Mãe','Irmão','Irmã','Outro'],
@@ -616,7 +638,7 @@ function carregar(){
   const base=structuredClone(SEED);
   const d=(s&&s.viagens)?{...base,...s}:base;
   // migração: todo registro precisa de id estável (arquivos são ligados por ele)
-  for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades'])
+  for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades','obras','obraAportes'])
     (d[k]||[]).forEach(x=>{if(!x.id)x.id=uid()});
   d.viagens.forEach(v=>{if(!Array.isArray(v.custos))v.custos=[];
     if(!Array.isArray(v.passagens))v.passagens=[];
@@ -650,6 +672,7 @@ function carregar(){
   if(!d.colapso)d.colapso={};
   if(!d.marcas||typeof d.marcas!=='object'||Array.isArray(d.marcas))d.marcas={};
   if(!d.estrategia||typeof d.estrategia!=='object'||Array.isArray(d.estrategia))d.estrategia={};
+  if(!d.obraFornecedores||typeof d.obraFornecedores!=='object'||Array.isArray(d.obraFornecedores))d.obraFornecedores={};
   // objetos únicos: garante que existam mesmo em backup antigo
   for(const k of ['sos','norte','roda','perfil','comportamento']) d[k]={...structuredClone(SEED[k]),...(d[k]||{})};
   for(const k of ['vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','seguros','planos','casa','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades']) if(!Array.isArray(d[k])) d[k]=[];
@@ -1055,6 +1078,7 @@ const MODS=[
   {id:'demandas',ic:'✅',nome:'Demandas',grupo:'',render:vDemandas},
   {id:'saude',ic:'🩺',nome:'Saúde',grupo:'',render:vSaude},
   {id:'estrategia',ic:'♟️',nome:'Gestão estratégica',grupo:'Empresa',render:vEstrategia},
+  {id:'fortemais',ic:'🏗️',nome:'Fortemais',grupo:'Projeto especial',render:vFortemais},
   {id:'oportunidades',ic:'💡',nome:'Oportunidades',grupo:'Extra',render:vOportunidades},
   {id:'documentos',ic:'🪪',nome:'Documentos',grupo:'',render:vDocumentos},
   {id:'guia',ic:'🧭',nome:'Guia de vida',grupo:'',render:vGuia},
@@ -2985,6 +3009,556 @@ function blocoCopias(){
   return cx;
 }
 
+
+/* ================================================================
+   FORTEMAIS — obras: o que custou, quem aportou, por quanto saiu.
+
+   O DESENHO EM UMA FRASE: a ficha da obra e os aportes são poucos e
+   editados à mão (moram no estado, sobem com o resto); o livro-caixa é
+   grande e só cresce (mora em leo_obra_custos, tabela própria).
+
+   O QUE ISTO RESPONDE, que a planilha do ERP sozinha não responde:
+   · quanto sobrou de cada obra, depois de imposto e comissão;
+   · quanto custou o m² -- o único número que compara uma obra com outra;
+   · quanto foi de MÃO DE OBRA de hidráulica (o ERP só separa MATERIAL
+     hidráulico; a especialidade da mão de obra está escondida no nome do
+     prestador -- "FULANO BOMBEIRO" é o bombeiro);
+   · quanto do dinheiro é aporte de sócio e quanto saiu do bolso do dono;
+   · o que está escondido dentro de "Insumo diversos", que sozinho é 44%.
+
+   APORTE NÃO É VENDA. No export do ERP o aporte vem com Tipo="Receita",
+   e somá-lo como receita inflaria o resultado da obra em centenas de milhares. Ele
+   é DINHEIRO QUE ENTROU PARA BANCAR A OBRA, não dinheiro ganho.
+   ================================================================ */
+
+
+/* el() não serve para <tr>: innerHTML num <div> descarta linha órfã de tabela
+   e devolve nulo. Linha nasce como linha. */
+const elTr=h=>{const tr=document.createElement('tr');tr.innerHTML=h;return tr};
+const elTfoot=h=>{const tf=document.createElement('tfoot');tf.innerHTML=h;return tf};
+
+/* De que natureza é este centro de custo. Serve para o cruzamento
+   "material × mão de obra" por especialidade. */
+function naturezaCentro(c){
+  const x=String(c||'').toLowerCase();
+  if(x.includes('mão de obra')||x.includes('mao de obra'))return 'Mão de obra';
+  if(x.startsWith('insumo')||x.includes('material'))return 'Material';
+  if(x.includes('aluguel'))return 'Equipamento';
+  if(x==='terreno')return 'Terreno';
+  if(x.includes('imposto')||x.includes('document')||x.includes('cartório')||x.includes('cartorio'))return 'Documentação e taxas';
+  if(x==='projeto')return 'Projeto';
+  return 'Outros';
+}
+/* A especialidade de um lançamento: primeiro o que o dono marcou no
+   FORNECEDOR (uma marcação vale para todos os lançamentos dele), depois o
+   que dá para deduzir do centro. Deduzir é palpite, então só onde é óbvio. */
+function especDoCentro(c){
+  const x=String(c||'').toLowerCase();
+  if(x.includes('hidr'))return 'Hidráulica';
+  if(x.includes('elétr')||x.includes('eletr'))return 'Elétrica';
+  if(x==='terreno')return 'Terreno';
+  if(x==='projeto')return 'Projeto';
+  if(x.includes('document')||x.includes('cartório')||x.includes('cartorio')||x.includes('imposto'))return 'Documentação';
+  if(x.includes('administrativo')||x.includes('condomínio')||x.includes('condominio')||x==='copasa'||x==='cemig')return 'Administrativo';
+  return '';
+}
+const especDe=l=>(E.obraFornecedores[(l.fornecedor||'').trim()]||'')||especDoCentro(l.centro);
+
+/* ---- o livro-caixa: fica no servidor, cache por sessão ---- */
+let _fmResumo=null,_fmResumoP=null,_fmGer=0,_fmCustos={};
+function fmEsquecer(){_fmGer++;_fmResumo=null;_fmResumoP=null;_fmCustos={}}
+function fmResumo(){
+  if(_fmResumo)return Promise.resolve(_fmResumo);
+  if(DEV||!pegaToken())return Promise.resolve({});
+  if(!_fmResumoP){
+    const g=_fmGer;
+    _fmResumoP=apiSync('POST',{acao:'obraResumo'}).then(d=>{
+      if(g!==_fmGer)return fmResumo();
+      _fmResumo=d.resumo||{};return _fmResumo;
+    }).catch(()=>{if(g===_fmGer)_fmResumoP=null;return null});
+  }
+  return _fmResumoP;
+}
+async function fmCustos(obraId){
+  if(_fmCustos[obraId])return _fmCustos[obraId];
+  if(DEV||!pegaToken())return [];
+  const d=await apiSync('POST',{acao:'obraCustos',obra:obraId});
+  return (_fmCustos[obraId]=d.custos||[]);
+}
+
+/* ---- as contas de uma obra ----
+   Uma função só, para os cartões e a ficha nunca discordarem. */
+function contasObra(o,r){
+  const custo=(r&&r.total)||0;
+  const aporte=E.obraAportes.filter(x=>x.obra===o.id).reduce((s,x)=>s+(+x.valor||0),0);
+  const venda=+o.vendaValor||0;
+  // % ou valor: quem preencheu o valor manda; senão aplica o percentual sobre a venda
+  const imposto=+o.impostoValor||(venda*(+o.impostoPct||0)/100);
+  const comissao=+o.comissaoValor||(venda*(+o.comissaoPct||0)/100);
+  const outras=+o.outrasDeducoes||0;
+  const liquido=venda-imposto-comissao-outras;
+  const lucro=venda?liquido-custo:0;
+  const margem=venda?lucro/venda*100:0;
+  const area=+o.area||0;
+  const meses=(r&&r.de&&r.ate)?Math.max(1,Math.round((new Date(r.ate)-new Date(r.de))/2629800000)):0;
+  return {custo,aporte,venda,imposto,comissao,outras,liquido,lucro,margem,area,meses,
+    porM2:area?custo/area:0, vendaM2:area&&venda?venda/area:0,
+    // quanto do custo NÃO veio de aporte de sócio: saiu do caixa do dono
+    proprio:custo-aporte,
+    // lucro por mês de obra: 20% em 8 meses vale mais que 30% em 3 anos
+    porMes:meses?lucro/meses:0,
+    retorno:aporte?lucro/aporte*100:0};
+}
+
+
+/* ---------------- a tela ---------------- */
+async function vFortemais(m){
+  const r=rr('fortemais');
+  m.appendChild(cab('Fortemais','Cada obra: o que custou, quem aportou, por quanto saiu e o que sobrou.'));
+
+  const resumo=await fmResumo();
+  if(resumo===null){
+    m.appendChild(el('<div class="aviso">Não consegui falar com o servidor agora. As fichas aparecem, os custos não.</div>'));
+  }
+  const R=resumo||{};
+  const contas=E.obras.map(o=>({o,r:R[o.id]||null,c:contasObra(o,R[o.id])}));
+  const som=k=>contas.reduce((s,x)=>s+(x.c[k]||0),0);
+  const vendidas=contas.filter(x=>x.c.venda>0);
+  const lucroTot=vendidas.reduce((s,x)=>s+x.c.lucro,0);
+  const vendaTot=vendidas.reduce((s,x)=>s+x.c.venda,0);
+
+  m.appendChild(ligaKpis(el(`<div class="grade">
+    ${kpi('Obras',E.obras.length,contas.filter(x=>x.o.status!=='Vendida').length+' em andamento','','fm-obras')}
+    ${kpi('Custo lançado',brl(som('custo')),(Object.values(R).reduce((s,x)=>s+(x.n||0),0))+' lançamentos','','fm-obras')}
+    ${kpi('Aportes',brl(som('aporte')),'dinheiro posto na obra — não é venda','a','fm-aportes')}
+    ${kpi('Vendido',brl(vendaTot),vendidas.length+' obra(s) vendida(s)','','fm-obras')}
+    ${kpi('Lucro',brl(lucroTot),vendaTot?(lucroTot/vendaTot*100).toFixed(1)+'% de margem':'nada vendido ainda',lucroTot<0?'v':'p','fm-obras')}
+  </div>`),{'fm-obras':'fm-obras','fm-aportes':'fm-obras'}));
+
+  /* ---- as obras ---- */
+  const oc=el('<div class="corpo"></div>');
+  if(!E.obras.length){
+    oc.appendChild(el('<div class="vazio">Nenhuma obra ainda. Crie uma, ou traga direto do seu ERP no bloco abaixo.</div>'));
+  }
+  contas.forEach(({o,r:rr2,c})=>{
+    const cor=c.venda?(c.lucro>=0?'var(--verde)':'var(--vermelho)'):'var(--suave)';
+    const card=el(`<div style="border:1px solid var(--linha);border-radius:var(--r);padding:13px 15px;margin-bottom:10px;background:var(--card);cursor:pointer">
+      <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap">
+        <b style="font-size:15px">${esc(o.nome||'Obra sem nome')}</b>
+        <span class="tag">${esc(o.status||'—')}</span>
+        ${o.tipo?`<span class="tag">${esc(o.tipo)}</span>`:''}
+        ${c.area?`<span style="color:var(--suave);font-size:12.5px">${c.area} m²</span>`:''}
+        <span class="cresce"></span>
+        ${c.meses?`<span style="color:var(--suave);font-size:12.5px">${c.meses} meses</span>`:''}
+      </div>
+      <div class="grade" style="margin-top:10px;gap:8px">
+        ${kpi('Custo',brl(c.custo),c.porM2?brl(c.porM2)+'/m²':(rr2?rr2.n+' lanç.':'sem lançamento'))}
+        ${kpi('Aporte',brl(c.aporte),c.proprio>0?brl(c.proprio)+' do seu bolso':'','a')}
+        ${kpi('Venda',c.venda?brl(c.venda):'—',c.venda?'líquido '+brl(c.liquido):'não vendida')}
+        ${kpi('Lucro',c.venda?brl(c.lucro):'—',c.venda?c.margem.toFixed(1)+'%'+(c.meses?' · '+brl(c.porMes)+'/mês':''):'',c.venda?(c.lucro>=0?'p':'v'):'')}
+      </div></div>`);
+    card.onclick=()=>modalObra(o);
+    oc.appendChild(card);
+  });
+  const bn=el('<button class="mais">+ Nova obra</button>');
+  bn.onclick=()=>{const o={id:uid(),nome:'',empresa:'Fortemais',tipo:CFG('tiposObra')[0],
+    status:'Em obra',endereco:'',area:0,areaTerreno:0,inicio:hoje(),fim:'',
+    vendaValor:0,vendaData:'',comprador:'',impostoPct:0,impostoValor:0,
+    comissaoPct:0,comissaoValor:0,outrasDeducoes:0,obs:''};
+    E.obras.push(o);salvar();modalObra(o)};
+  oc.appendChild(bn);
+  m.appendChild(bloco('fm-obras','🏗️ Obras','clique numa obra para abrir a ficha inteira',oc));
+
+  /* ---- comparar obras: é onde o dinheiro vaza ---- */
+  if(contas.filter(x=>x.c.custo>0).length>1){
+    const cp=el('<div class="corpo"></div>');
+    cp.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:0 0 11px">Mesma conta, obras diferentes. É aqui que aparece o que saiu do lugar — se a hidráulica de uma foi 4% e a de outra 9%, tem motivo.</p>'));
+    const comp=contas.filter(x=>x.c.custo>0);
+    const rol=el('<div class="rolagem"></div>');
+    const t=document.createElement('table');
+    t.innerHTML='<thead><tr><th>Obra</th><th style="text-align:right">Custo</th><th style="text-align:right">R$/m²</th>'
+      +'<th style="text-align:right">Venda</th><th style="text-align:right">Lucro</th><th style="text-align:right">Margem</th><th style="text-align:right">Meses</th></tr></thead>';
+    const tb=document.createElement('tbody');
+    comp.forEach(({o,c})=>{
+      tb.appendChild(elTr(`<td style="padding:8px 10px">${esc(o.nome||'—')}</td>
+        <td class="num" style="padding:8px 10px">${brl(c.custo)}</td>
+        <td class="num" style="padding:8px 10px">${c.porM2?brl(c.porM2):'—'}</td>
+        <td class="num" style="padding:8px 10px">${c.venda?brl(c.venda):'—'}</td>
+        <td class="num" style="padding:8px 10px;color:${c.venda?(c.lucro>=0?'var(--verde)':'var(--vermelho)'):'inherit'}">${c.venda?brl(c.lucro):'—'}</td>
+        <td class="num" style="padding:8px 10px">${c.venda?c.margem.toFixed(1)+'%':'—'}</td>
+        <td class="num" style="padding:8px 10px">${c.meses||'—'}</td>`));
+    });
+    t.appendChild(tb);rol.appendChild(t);cp.appendChild(rol);
+    // custo/m² lado a lado
+    const comM2=comp.filter(x=>x.c.porM2>0);
+    if(comM2.length>1) cp.appendChild(el(`<div style="margin-top:14px">
+      <div style="font-size:12.5px;color:var(--suave);margin-bottom:6px">Custo por m²</div>
+      ${gBarras(comM2.map(x=>({r:x.o.nome||'—',v:x.c.porM2})))}</div>`));
+    m.appendChild(bloco('fm-comparar','📐 Comparar obras','o mesmo número, obra a obra',cp));
+  }
+
+  m.appendChild(bloco('fm-importar','📥 Trazer do ERP','o arquivo que você exporta, do jeito que ele sai',blocoImportarObra()));
+}
+
+
+/* ---------------- a ficha de uma obra ---------------- */
+function modalObra(o){
+  abrirModal(esc(o.nome||'Obra'),esc([o.tipo,o.endereco].filter(Boolean).join(' · ')),async(c,fechar)=>{
+    const R=(await fmResumo())||{};
+    const rr2=R[o.id]||null;
+    const cx=contasObra(o,rr2);
+    const custos=rr2?await fmCustos(o.id):[];
+
+    const pinta=()=>{c.innerHTML='';montar()};
+    const montar=()=>{
+    const cc=contasObra(o,(_fmResumo||{})[o.id]||rr2);
+
+    /* --- o resultado, sempre à vista --- */
+    c.appendChild(el(`<div class="grade" style="gap:8px;margin-bottom:4px">
+      ${kpi('Custo',brl(cc.custo),cc.porM2?brl(cc.porM2)+'/m²':'')}
+      ${kpi('Aportes',brl(cc.aporte),cc.proprio>0?brl(cc.proprio)+' do seu bolso':'','a')}
+      ${kpi('Venda líquida',cc.venda?brl(cc.liquido):'—',cc.venda?'venda '+brl(cc.venda)+' − imposto '+brl(cc.imposto)+' − comissão '+brl(cc.comissao):'')}
+      ${kpi('Lucro',cc.venda?brl(cc.lucro):'—',cc.venda?cc.margem.toFixed(1)+'%'+(cc.aporte?' · '+cc.retorno.toFixed(0)+'% sobre o aporte':''):'ainda não vendida',cc.venda?(cc.lucro>=0?'p':'v'):'')}
+    </div>`));
+
+    /* --- a ficha --- */
+    const s1=el('<div class="secao"><h4>Ficha</h4></div>');
+    s1.appendChild(campos(o,[
+      {k:'nome',t:'Nome da obra',ph:'ex.: Casa Vila Segura 27'},
+      {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposObra')},
+      {k:'status',t:'Status',tipo:'select',opcoes:CFG('statusObra')},
+      {k:'empresa',t:'Por qual empresa correu',tipo:'select',opcoes:[...new Set(['Fortemais',...E.empresasPJ.map(x=>x.nome).filter(Boolean)])]},
+      {k:'endereco',t:'Endereço',full:true},
+      {k:'area',t:'Área construída (m²)',tipo:'number'},
+      {k:'areaTerreno',t:'Área do terreno (m²)',tipo:'number'},
+      {k:'inicio',t:'Início',tipo:'date'},
+      {k:'fim',t:'Fim (ou previsão)',tipo:'date'},
+      {k:'obs',t:'Anotações',tipo:'textarea',full:true},
+    ],()=>{salvar()}));
+    c.appendChild(s1);
+
+    /* --- centro de custo --- */
+    const s2=el('<div class="secao"><h4>Para onde foi o dinheiro</h4></div>');
+    if(!rr2){
+      s2.appendChild(el('<div class="vazio">Nenhum custo lançado. Traga o export do ERP na tela principal, bloco 📥.</div>'));
+    } else {
+      const cents=Object.entries(rr2.centros).sort((x,y)=>y[1].total-x[1].total);
+      const rol=el('<div class="rolagem"></div>');
+      const t=document.createElement('table');
+      t.innerHTML='<thead><tr><th>Centro de custo</th><th style="text-align:right">Valor</th><th style="text-align:right">%</th><th style="text-align:right">Lanç.</th></tr></thead>';
+      const tb=document.createElement('tbody');
+      cents.forEach(([k,v])=>{
+        tb.appendChild(elTr(`<td style="padding:8px 10px">${esc(k)}</td>
+          <td class="num" style="padding:8px 10px">${brl(v.total)}</td>
+          <td class="num" style="padding:8px 10px;color:var(--suave)">${(v.total/rr2.total*100).toFixed(1)}%</td>
+          <td class="num" style="padding:8px 10px;color:var(--suave)">${v.n}</td>`));
+      });
+      t.appendChild(tb);
+      t.appendChild(elTfoot(`<tr class="tfim"><td>Total</td><td class="num">${brl(rr2.total)}</td><td></td><td class="num">${rr2.n}</td></tr>`));
+      rol.appendChild(t);s2.appendChild(rol);
+      s2.appendChild(el(`<div style="margin-top:12px">${gRosca(cents.slice(0,8).map(([k,v])=>({r:k,v:v.total})))}</div>`));
+    }
+    c.appendChild(s2);
+
+    /* --- especialidades: o cruzamento que o ERP não faz --- */
+    if(custos.length){
+      const s3=el('<div class="secao"><h4>Por especialidade — material × mão de obra</h4></div>');
+      const esp={};
+      let semDono=0,semDonoV=0;
+      custos.forEach(l=>{
+        const e2=especDe(l);
+        const nat=naturezaCentro(l.centro);
+        if(!e2){if(nat==='Mão de obra'||nat==='Material'){semDono++;semDonoV+=(+l.valor||0)}return}
+        const r3=esp[e2]??={mat:0,mao:0,outros:0};
+        if(nat==='Material')r3.mat+=(+l.valor||0);
+        else if(nat==='Mão de obra')r3.mao+=(+l.valor||0);
+        else r3.outros+=(+l.valor||0);
+      });
+      const linhas=Object.entries(esp).map(([k,v])=>({k,...v,tot:v.mat+v.mao+v.outros}))
+        .sort((x,y)=>y.tot-x.tot);
+      if(!linhas.length){
+        s3.appendChild(el('<div class="vazio">Marque a especialidade dos fornecedores no bloco abaixo — uma marcação classifica todos os lançamentos daquele fornecedor.</div>'));
+      } else {
+        const rol3=el('<div class="rolagem"></div>');
+        const t3=document.createElement('table');
+        t3.innerHTML='<thead><tr><th>Especialidade</th><th style="text-align:right">Material</th><th style="text-align:right">Mão de obra</th><th style="text-align:right">Outros</th><th style="text-align:right">Total</th></tr></thead>';
+        const tb3=document.createElement('tbody');
+        linhas.forEach(l=>{
+          tb3.appendChild(elTr(`<td style="padding:8px 10px">${esc(l.k)}</td>
+            <td class="num" style="padding:8px 10px">${l.mat?brl(l.mat):'—'}</td>
+            <td class="num" style="padding:8px 10px">${l.mao?brl(l.mao):'—'}</td>
+            <td class="num" style="padding:8px 10px">${l.outros?brl(l.outros):'—'}</td>
+            <td class="num" style="padding:8px 10px"><b>${brl(l.tot)}</b></td>`));
+        });
+        t3.appendChild(tb3);rol3.appendChild(t3);s3.appendChild(rol3);
+        if(semDono)s3.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin-top:9px">
+          ${brl(semDonoV)} em ${semDono} lançamentos ainda sem especialidade — marque os fornecedores logo abaixo.</p>`));
+      }
+      c.appendChild(s3);
+
+      /* --- os fornecedores: onde UMA marcação classifica dezenas de lançamentos --- */
+      const s4=el('<div class="secao"><h4>Fornecedores e prestadores</h4></div>');
+      s4.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:0 0 9px">Diga o que cada um faz, uma vez só: todos os pagamentos a ele — passados e futuros, em todas as obras — entram na especialidade. É assim que "FULANO BOMBEIRO" vira mão de obra de hidráulica.</p>'));
+      const fs=Object.entries(rr2.fornecedores).sort((x,y)=>y[1].total-x[1].total);
+      const rol4=el('<div class="rolagem" style="max-height:340px;overflow-y:auto"></div>');
+      const t4=document.createElement('table');
+      t4.innerHTML='<thead><tr><th>Quem</th><th style="text-align:right">Total</th><th style="text-align:right">Lanç.</th><th>Especialidade</th></tr></thead>';
+      const tb4=document.createElement('tbody');
+      fs.forEach(([nome,v])=>{
+        if(nome==='(sem fornecedor)'){
+          tb4.appendChild(elTr(`<td style="padding:8px 10px;color:var(--suave)">(sem fornecedor)</td>
+            <td class="num" style="padding:8px 10px">${brl(v.total)}</td>
+            <td class="num" style="padding:8px 10px;color:var(--suave)">${v.n}</td><td></td>`));
+          return;
+        }
+        const tr=elTr(`<td style="padding:8px 10px">${esc(nome)}</td>
+          <td class="num" style="padding:8px 10px">${brl(v.total)}</td>
+          <td class="num" style="padding:8px 10px;color:var(--suave)">${v.n}</td><td></td>`);
+        tr.lastElementChild.appendChild(seletor(E.obraFornecedores[nome]||'',['',...CFG('especialidades')],val=>{
+          if(val)E.obraFornecedores[nome]=val;else delete E.obraFornecedores[nome];
+          salvar();pinta();
+        }));
+        tb4.appendChild(tr);
+      });
+      t4.appendChild(tb4);rol4.appendChild(t4);s4.appendChild(rol4);
+      c.appendChild(s4);
+
+      /* --- a curva: custo mês a mês, aporte junto --- */
+      const s5=el('<div class="secao"><h4>A curva da obra</h4></div>');
+      const meses=Object.entries(rr2.meses).sort();
+      const apMes={};
+      E.obraAportes.filter(x=>x.obra===o.id).forEach(x=>{const k=(x.data||'').slice(0,7);if(k)apMes[k]=(apMes[k]||0)+(+x.valor||0)});
+      s5.appendChild(el(`<div style="font-size:12.5px;color:var(--suave);margin-bottom:6px">Custo por mês — os meses com aporte estão marcados embaixo</div>
+        ${gBarras(meses.map(([k,v])=>({r:k.slice(2).split('-').reverse().join('/')+(apMes[k]?' ●':''),v})))}`));
+      c.appendChild(s5);
+    }
+
+    /* --- aportes --- */
+    const s6=el('<div class="secao"><h4>Aportes — dinheiro posto na obra</h4></div>');
+    s6.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:0 0 6px">Aporte não é venda: é o que o sócio (ou você) colocou para bancar a obra. No acerto final, cada um recebe o que pôs mais a parte no lucro.</p>'));
+    const meus=E.obraAportes.filter(x=>x.obra===o.id);
+    s6.appendChild(tabelaBloco('fm-ap-'+o.id,'','',meus,[
+      {k:'data',t:'Data',tipo:'date',w:130},
+      {k:'quem',t:'Quem pôs',ph:'ex.: Rogério, eu'},
+      {k:'valor',t:'Valor',tipo:'moeda',w:150},
+      {k:'obs',t:'Obs',ph:'pix, transferência…'},
+    ],()=>({obra:o.id,data:hoje(),quem:'',valor:0,obs:''}),()=>pinta(),
+      meus.length?`<td>Total</td><td></td><td class="num">${brl(meus.reduce((s2,x)=>s2+(+x.valor||0),0))}</td><td></td>`:null,
+      E.obraAportes));
+    c.appendChild(s6);
+
+    /* --- a venda --- */
+    const s7=el('<div class="secao"><h4>Venda</h4></div>');
+    s7.appendChild(campos(o,[
+      {k:'vendaValor',t:'Valor da venda',tipo:'moeda'},
+      {k:'vendaData',t:'Data da venda',tipo:'date'},
+      {k:'comprador',t:'Comprador'},
+      {k:'impostoPct',t:'Imposto (%)',tipo:'number',ph:'ex.: 5,93'},
+      {k:'impostoValor',t:'ou imposto em R$ (se preenchido, manda)',tipo:'moeda'},
+      {k:'comissaoPct',t:'Comissão (%)',tipo:'number',ph:'ex.: 5'},
+      {k:'comissaoValor',t:'ou comissão em R$ (se preenchido, manda)',tipo:'moeda'},
+      {k:'outrasDeducoes',t:'Outras deduções (R$)',tipo:'moeda'},
+    ],()=>{salvar();pinta()}));
+    s7.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin-top:9px">
+      O imposto de verdade depende do regime da empresa no ano da venda — confirme o percentual com o contador.
+      Recebeu parte em bem (carro, lote)? Lance o valor cheio na venda e anote no campo de observações da ficha.</p>`));
+    c.appendChild(s7);
+
+    /* --- arquivos e apagar --- */
+    const s8=el('<div class="secao"><h4>Arquivos da obra</h4></div>');
+    s8.appendChild(areaArquivos('obra:'+o.id,'Matrícula, alvará, habite-se, contrato de venda, memorial'));
+    c.appendChild(s8);
+    const s9=el('<div class="secao" style="display:flex;gap:9px"></div>');
+    const del=el('<button class="btn ghost" style="color:var(--vermelho)">Apagar obra</button>');
+    del.onclick=async()=>{
+      const temCusto=rr2&&rr2.n;
+      if(!confirm('Apagar esta obra'+(temCusto?' e os '+rr2.n+' lançamentos de custo dela no servidor':'')+'? Os aportes dela também saem.'))return;
+      if(!await apagarAnexosDe('obra:'+o.id))return;
+      if(temCusto){
+        try{ await apiSync('POST',{acao:'obraCustosApagar',obra:o.id});fmEsquecer() }
+        catch(e){ alert('Não consegui apagar os custos no servidor: '+(e.message||e)+'\nNada foi apagado.');return }
+      }
+      E.obraAportes=E.obraAportes.filter(x=>x.obra!==o.id);
+      E.obras=E.obras.filter(x=>x.id!==o.id);salvar();fechar();
+    };
+    s9.appendChild(del);s9.appendChild(el('<span class="cresce"></span>'));
+    const okb=el('<button class="btn">Pronto</button>');okb.onclick=fechar;s9.appendChild(okb);
+    c.appendChild(s9);
+    };
+    montar();
+  });
+}
+
+
+/* ---------------- trazer do ERP ----------------
+   O arquivo "Resultados_....xlsx" que o ERP exporta é um zip com XML dentro.
+   O do ERP vem SEM compressão (o lerZip daqui já abre); se o Léo abrir no
+   Excel e salvar, vira comprimido (deflate) e com strings compartilhadas --
+   os dois caminhos estão cobertos: deflate via DecompressionStream, que é
+   do próprio navegador. Nenhuma biblioteca externa. */
+async function lerZipAuto(u8){
+  const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);
+  let fim=-1;
+  for(let i=u8.length-22;i>=0&&i>u8.length-65558;i--)
+    if(dv.getUint32(i,true)===0x06054b50){fim=i;break}
+  if(fim<0)throw new Error('não parece um arquivo .xlsx');
+  const n=dv.getUint16(fim+10,true);let off=dv.getUint32(fim+16,true);
+  const out={};
+  for(let e=0;e<n;e++){
+    if(dv.getUint32(off,true)!==0x02014b50)break;
+    const metodo=dv.getUint16(off+10,true);
+    const tamComp=dv.getUint32(off+20,true);
+    const nomeLen=dv.getUint16(off+28,true),extraLen=dv.getUint16(off+30,true),comLen=dv.getUint16(off+32,true);
+    const local=dv.getUint32(off+42,true);
+    const nome=new TextDecoder().decode(u8.subarray(off+46,off+46+nomeLen));
+    const ln=dv.getUint16(local+26,true),le=dv.getUint16(local+28,true);
+    const ini=local+30+ln+le;
+    const bruto=u8.subarray(ini,ini+tamComp);
+    if(metodo===0)out[nome]=bruto;
+    else if(metodo===8){
+      const ds=new DecompressionStream('deflate-raw');
+      const r=new Response(new Blob([bruto]).stream().pipeThrough(ds));
+      out[nome]=new Uint8Array(await r.arrayBuffer());
+    }
+    off+=46+nomeLen+extraLen+comLen;
+  }
+  return out;
+}
+function linhasDoXlsx(zip){
+  const dec=b=>new TextDecoder().decode(b);
+  // strings compartilhadas (Excel salva assim; o export do ERP não usa)
+  const comp=[];
+  if(zip['xl/sharedStrings.xml'])
+    for(const m of dec(zip['xl/sharedStrings.xml']).matchAll(/<si>([\s\S]*?)<\/si>/g))
+      comp.push([...m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(x=>x[1]).join(''));
+  const folha=Object.keys(zip).find(k=>/^xl\/worksheets\/sheet1\.xml$/.test(k))||Object.keys(zip).find(k=>/^xl\/worksheets\/.*\.xml$/.test(k));
+  if(!folha)throw new Error('planilha sem aba');
+  const des=t=>t.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&');
+  const linhas=[];
+  for(const mr of dec(zip[folha]).matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)){
+    const cels={};
+    for(const mc of mr[1].matchAll(/<c r="([A-Z]+)\d+"([^>]*)>([\s\S]*?)<\/c>/g)){
+      const col=mc[1],attrs=mc[2],corpo=mc[3];
+      let v='';
+      const t=(attrs.match(/t="(\w+)"/)||[])[1]||'';
+      if(t==='inlineStr'){v=[...corpo.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(x=>x[1]).join('')}
+      else{const mv=corpo.match(/<v>([\s\S]*?)<\/v>/);v=mv?mv[1]:''}
+      if(t==='s')v=comp[+v]??'';
+      cels[col]=des(v);
+    }
+    linhas.push(cels);
+  }
+  return linhas;
+}
+const colLetra=i=>{let s2='';i++;while(i>0){s2=String.fromCharCode(65+(i-1)%26)+s2;i=Math.floor((i-1)/26)}return s2};
+/* data do ERP vem "23/02/2022"; salvo pelo Excel pode virar número de série */
+function dataPlan(v){
+  const t=String(v||'').trim();
+  let m=t.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(m)return m[3]+'-'+m[2]+'-'+m[1];
+  m=t.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m)return m[0].slice(0,10);
+  const n=+t; if(n>25569&&n<73050)return new Date(Math.round((n-25569)*86400000)).toISOString().slice(0,10);
+  return '';
+}
+
+function blocoImportarObra(){
+  const cx=el('<div class="corpo"></div>');
+  cx.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin:0 0 11px">
+    Solte aqui o <b>Resultados_....xlsx</b> exportado do ERP, do jeito que ele sai. Eu leio as colunas
+    dele (Projeto, Centro de custo, Fornecedor, Valor parcela…), crio a obra que ainda não existir,
+    separo os <b>aportes</b> das despesas e gravo tudo no servidor. Trazer o mesmo arquivo duas vezes
+    <b>não duplica</b> — cada parcela tem uma identidade e é atualizada, não repetida.</p>`));
+  const solta=el('<div class="solta">📥 Clique ou arraste o arquivo do ERP aqui</div>');
+  const inp=el('<input type="file" accept=".xlsx" hidden>');
+  const st=el('<div style="font-size:12.5px;color:var(--suave);margin-top:9px"></div>');
+  const receber=async f=>{
+    solta.classList.add('ocupado');st.textContent='Lendo o arquivo…';
+    try{
+      const zip=await lerZipAuto(new Uint8Array(await f.arrayBuffer()));
+      const linhas=linhasDoXlsx(zip);
+      if(linhas.length<2)throw new Error('planilha vazia');
+      // o cabeçalho diz onde cada coisa está — a ORDEM das colunas pode mudar, o NOME não
+      const cab={};Object.entries(linhas[0]).forEach(([c,v])=>cab[String(v).trim()]=c);
+      const need=['ID Parcela','Tipo','Valor parcela'];
+      for(const k of need)if(!cab[k])throw new Error('não achei a coluna "'+k+'" — este arquivo é o export de Resultados?');
+      const g=c=>cab[c]||null;
+      const pega=(l,c)=>{const k=g(c);return k?String(l[k]??'').trim():''};
+      const num=v=>{const x=+String(v).replace(',','.');return isNaN(x)?0:x};
+
+      // uma obra por valor distinto de "Projeto"
+      const porProjeto={};
+      for(const l of linhas.slice(1)){
+        if(!pega(l,'ID Parcela'))continue;
+        const proj=pega(l,'Projeto')||'(sem projeto)';
+        (porProjeto[proj]??=[]).push(l);
+      }
+      const nomes=Object.keys(porProjeto);
+      st.textContent='';
+      let criadas=0,custosTot=0,aportesTot=0,receitas=[];
+      for(const proj of nomes){
+        const ls=porProjeto[proj];
+        // casa com a obra existente pelo nome; senão cria
+        const nomeLimpo=proj.replace(/^obra\s+/i,'').trim();
+        let o=E.obras.find(x=>(x.nome||'').toLowerCase()===nomeLimpo.toLowerCase()||(x.nome||'').toLowerCase()===proj.toLowerCase());
+        if(!o){o={id:uid(),nome:nomeLimpo||proj,empresa:pega(ls[0],'Empresa')||'Fortemais',
+          tipo:CFG('tiposObra')[0],status:'Em obra',endereco:'',area:0,areaTerreno:0,
+          inicio:'',fim:'',vendaValor:0,vendaData:'',comprador:'',impostoPct:0,impostoValor:0,
+          comissaoPct:0,comissaoValor:0,outrasDeducoes:0,obs:''};
+          E.obras.push(o);criadas++}
+        const lote=[];
+        for(const l of ls){
+          const id=pega(l,'ID Parcela');
+          const tipo=pega(l,'Tipo');
+          const centro=pega(l,'Centro de custo')||pega(l,'Categoria financeira');
+          const ehAporte=/aporte/i.test(centro)||/aporte/i.test(pega(l,'Categoria financeira'));
+          const valor=num(pega(l,'Valor parcela'));
+          if(ehAporte){
+            /* APORTE NÃO É CUSTO NEM VENDA: vira linha de aporte na ficha.
+               A identidade do ERP fica guardada para reimportar sem duplicar. */
+            if(!E.obraAportes.some(x=>x.erp===id)){
+              E.obraAportes.push({id:uid(),erp:id,obra:o.id,data:dataPlan(pega(l,'Data de competência')),
+                quem:pega(l,'Cliente')||pega(l,'Nome').replace(/^aporte\s*/i,''),valor:Math.abs(valor),obs:'do ERP'});
+              aportesTot++;
+            }
+            continue;
+          }
+          if(tipo==='Receita'){receitas.push({obra:o.nome,nome:pega(l,'Nome'),valor});continue}
+          lote.push({id,obra:o.id,data:dataPlan(pega(l,'Data de competência')),
+            nome:pega(l,'Nome'),centro,fornecedor:pega(l,'Fornecedor'),
+            valor:Math.abs(valor),forma:pega(l,'Forma de pagamento parcela'),
+            conta:pega(l,'Conta bancária')});
+          // centro novo entra na lista editável, nunca é descartado calado
+          if(centro&&!CFG('centrosObra').includes(centro)){
+            if(!E.config.centrosObra)E.config.centrosObra=[...SEED.config.centrosObra];
+            E.config.centrosObra.push(centro);
+          }
+        }
+        st.textContent='Gravando '+o.nome+' ('+lote.length+' lançamentos)…';
+        for(let i=0;i<lote.length;i+=1000){
+          const d2=await apiSync('POST',{acao:'obraCustosGravar',linhas:lote.slice(i,i+1000)});
+          if(!d2||!d2.ok)throw new Error((d2&&d2.erro)||'falha ao gravar');
+        }
+        custosTot+=lote.length;
+      }
+      salvar();fmEsquecer();
+      st.textContent='';
+      alert('Pronto.\n\n'+
+        '· '+custosTot+' lançamentos de custo gravados no servidor\n'+
+        '· '+aportesTot+' aportes levados para a ficha\n'+
+        (criadas?'· '+criadas+' obra(s) criada(s): confira área (m²) e status na ficha\n':'')+
+        (receitas.length?'\n⚠️ '+receitas.length+' RECEITAS que não são aporte vieram no arquivo (ex.: "'+receitas[0].nome+'"). Receita de venda não entra no custo: lance a venda na ficha da obra.':''));
+      tela();
+    }catch(e){st.textContent='';alert('Não consegui importar: '+(e.message||e))}
+    finally{solta.classList.remove('ocupado')}
+  };
+  solta.onclick=()=>inp.click();
+  inp.onchange=()=>{if(inp.files[0])receber(inp.files[0]);inp.value=''};
+  solta.addEventListener('dragover',e=>{e.preventDefault();solta.classList.add('sobre')});
+  solta.addEventListener('dragleave',()=>solta.classList.remove('sobre'));
+  solta.addEventListener('drop',e=>{e.preventDefault();solta.classList.remove('sobre');if(e.dataTransfer.files[0])receber(e.dataTransfer.files[0])});
+  cx.appendChild(solta);cx.appendChild(inp);cx.appendChild(st);
+  return cx;
+}
+
 /* ===================== BUSCA EM TUDO =====================
    Treze telas e quarenta coleções depois, lembrar EM QUAL tela uma coisa foi
    guardada virou trabalho. Aqui se digita o que se lembra — "apólice",
@@ -2994,6 +3568,10 @@ function blocoCopias(){
    valor exato não precisa de busca, abre a tela. */
 
 const FONTES_BUSCA=[
+  {col:'obras',tela:'fortemais',ic:'🏗️',rot:'Obra',
+   campos:['nome','endereco','comprador','obs','status'],
+   tit:x=>x.nome||'obra',
+   sub:x=>[x.status,x.tipo,+x.vendaValor?('vendida por '+brl(+x.vendaValor)):''].filter(Boolean).join(' · ')},
   {col:'rendimentos',tela:'rendimentos',ic:'📈',rot:'Rendimento',
    campos:['empresa','instituicao','tipo','obs'],
    tit:x=>[x.empresa,x.tipo].filter(Boolean).join(' · ')||'lançamento',
@@ -6715,6 +7293,10 @@ const GRUPOS_CFG=[
   {k:'catGasto',t:'Classificações de gasto',d:'separam para onde vai o dinheiro',ic:'💸'},
   {k:'catCasa',t:'Contas da casa',d:'condomínio, luz, água, internet, IPTU',ic:'🏠'},
   {k:'catCusto',t:'Categorias de custo de viagem',d:'o centro de custo de cada viagem',ic:'✈️'},
+  {k:'centrosObra',t:'Centro de custo das obras',d:'como o gasto da obra é separado',ic:'🏗️'},
+  {k:'especialidades',t:'Especialidades da obra',d:'hidráulica, elétrica, pintura — cruza com o centro',ic:'🔧'},
+  {k:'tiposObra',t:'Tipos de obra',d:'casa, lote, reforma',ic:'🧱'},
+  {k:'statusObra',t:'Status de obra',d:'as etapas de uma obra',ic:'🚧'},
   {k:'formasPagto',t:'Formas de pagamento',d:'usadas em custos, assinaturas e seguros',ic:'💳'},
   {k:'tiposSeguro',t:'Tipos de seguro',d:'auto, vida, residencial, empresarial',ic:'🛡️'},
   {k:'transportes',t:'Meios de transporte',d:'companhias aéreas, carro, ônibus',ic:'🛫'},

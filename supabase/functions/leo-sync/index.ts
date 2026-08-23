@@ -187,6 +187,106 @@ Deno.serve(async (req: Request) => {
        teria mudado. A senha da casa se troca no Painel, num lugar só, e vale
        para os oito sistemas. */
 
+
+    /* ---- OBRAS: o histórico de custo (23/08/2026) -----------------------
+       Por que estes lançamentos NÃO moram no estado geral: uma obra do
+       Léo tem ~820 lançamentos (170 kB). O estado inteiro sobe a cada
+       mudança em qualquer tela; com meia dúzia de obras, digitar uma nota
+       numa viagem passaria a empurrar 1,5 MB pela rede. Livro-caixa é
+       grande e só cresce -- separa. As FICHAS das obras e os APORTES ficam
+       no estado normal: são dezenas de linhas e são editados à mão. */
+    if (acao === "obraResumo" || acao === "obraCustos" ||
+        acao === "obraCustosGravar" || acao === "obraCustosApagar") {
+      const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+      if (!(await tokenOk(t))) return json({ erro: "Não autorizado" }, 401);
+
+      /* O PostgREST devolve no máximo 1000 linhas por padrão, SEM avisar.
+         Com 824 lançamentos hoje isso não apareceria; na segunda obra os
+         totais ficariam errados em silêncio -- que é o pior jeito de errar
+         um número de dinheiro. Por isso a leitura é sempre paginada. */
+      async function todasAsLinhas(obra?: string) {
+        const passo = 1000;
+        const out: Record<string, unknown>[] = [];
+        for (let de = 0; ; de += passo) {
+          let q = sb.from("leo_obra_custos")
+            .select("id, obra, data, nome, centro, fornecedor, valor, forma, conta")
+            .order("data", { ascending: true }).range(de, de + passo - 1);
+          if (obra) q = q.eq("obra", obra);
+          const { data, error } = await q;
+          if (error) throw new Error(error.message);
+          out.push(...(data ?? []));
+          if (!data || data.length < passo) return out;
+        }
+      }
+
+      try {
+        if (acao === "obraCustos") {
+          const obra = String(corpo.obra ?? "").trim();
+          if (!obra) return json({ erro: "sem obra" }, 400);
+          return json({ custos: await todasAsLinhas(obra) });
+        }
+
+        if (acao === "obraResumo") {
+          // O celular não precisa de 8 mil linhas para desenhar cinco cartões:
+          // a soma é feita aqui e desce pronta.
+          const linhas = await todasAsLinhas();
+          const porObra: Record<string, {
+            total: number; n: number; de: string | null; ate: string | null;
+            centros: Record<string, { total: number; n: number }>;
+            meses: Record<string, number>;
+            fornecedores: Record<string, { total: number; n: number }>;
+          }> = {};
+          for (const l of linhas) {
+            const o = String(l.obra);
+            const r = porObra[o] ??= { total: 0, n: 0, de: null, ate: null, centros: {}, meses: {}, fornecedores: {} };
+            const v = Number(l.valor) || 0;
+            r.total += v; r.n++;
+            const d = l.data ? String(l.data) : null;
+            if (d) { if (!r.de || d < r.de) r.de = d; if (!r.ate || d > r.ate) r.ate = d; }
+            const c = String(l.centro || "").trim() || "(sem centro)";
+            (r.centros[c] ??= { total: 0, n: 0 }).total += v; r.centros[c].n++;
+            if (d) r.meses[d.slice(0, 7)] = (r.meses[d.slice(0, 7)] ?? 0) + v;
+            const f = String(l.fornecedor || "").trim() || "(sem fornecedor)";
+            (r.fornecedores[f] ??= { total: 0, n: 0 }).total += v; r.fornecedores[f].n++;
+          }
+          return json({ resumo: porObra });
+        }
+
+        if (acao === "obraCustosGravar") {
+          const linhas = Array.isArray(corpo.linhas) ? corpo.linhas : [];
+          if (!linhas.length) return json({ erro: "nada para gravar" }, 400);
+          if (linhas.length > 5000) return json({ erro: "lote grande demais (máx. 5000)" }, 400);
+          const limpas = linhas.map((l: Record<string, unknown>) => ({
+            id: String(l.id ?? "").trim(),
+            obra: String(l.obra ?? "").trim(),
+            data: String(l.data ?? "").slice(0, 10) || null,
+            nome: String(l.nome ?? "").slice(0, 300),
+            centro: String(l.centro ?? "").slice(0, 120),
+            fornecedor: String(l.fornecedor ?? "").slice(0, 200),
+            valor: Number(l.valor) || 0,
+            forma: String(l.forma ?? "").slice(0, 80),
+            conta: String(l.conta ?? "").slice(0, 120),
+          })).filter((l) => l.id && l.obra);
+          if (!limpas.length) return json({ erro: "toda linha precisa de id e obra" }, 400);
+          // upsert: reimportar o mesmo arquivo ATUALIZA, não duplica
+          const { error } = await sb.from("leo_obra_custos").upsert(limpas, { onConflict: "id" });
+          if (error) return json({ erro: error.message }, 500);
+          return json({ ok: true, gravadas: limpas.length });
+        }
+
+        // obraCustosApagar: a obra inteira, ou uma lista de ids
+        const obra = String(corpo.obra ?? "").trim();
+        const ids = Array.isArray(corpo.ids) ? corpo.ids.map(String) : null;
+        if (!obra && !ids?.length) return json({ erro: "sem obra nem ids" }, 400);
+        const q = sb.from("leo_obra_custos").delete();
+        const { error } = ids?.length ? await q.in("id", ids) : await q.eq("obra", obra);
+        if (error) return json({ erro: error.message }, 500);
+        return json({ ok: true });
+      } catch (e) {
+        return json({ erro: (e as Error).message }, 500);
+      }
+    }
+
     /* ---- ANEXOS (23/08/2026) ------------------------------------------
        Os anexos moravam só no IndexedDB do navegador: presos ao aparelho E ao
        endereço do site. Trocar de celular perdia tudo, e o backup diário nunca
