@@ -612,7 +612,7 @@ const SEED={
   centrosObra:['Terreno','Mão de obra','Insumo diversos','Insumo hidráulico','Insumo elétrico',
     'Aluguel equipamentos','Documentação','Impostos','Condomínio','Copasa','Cemig','Projeto',
     'Custo administrativo','Frete','Cartório','Outros'],
-  especialidades:['Terreno','Projeto','Documentação','Terraplenagem','Fundação','Estrutura',
+  especialidades:['Obra geral','Terreno','Projeto','Documentação','Terraplenagem','Fundação','Estrutura',
     'Alvenaria','Cobertura','Hidráulica','Elétrica','Gesso','Esquadrias','Marmoraria',
     'Revestimento','Pintura','Marcenaria','Ar-condicionado','Automação','Paisagismo',
     'Limpeza','Administrativo','Outros'],
@@ -3321,7 +3321,24 @@ function modalObra(o){
         const tr=elTr(`<td style="padding:8px 10px">${esc(nome)}</td>
           <td class="num" style="padding:8px 10px">${brl(v.total)}</td>
           <td class="num" style="padding:8px 10px;color:var(--suave)">${v.n}</td><td></td>`);
-        tr.lastElementChild.appendChild(seletor(E.obraFornecedores[nome]||'',['',...CFG('especialidades')],val=>{
+        /* A lista de especialidades se edita em Configurações, mas ninguém sai
+           da ficha para cadastrar uma palavra: a última opção cria na hora.
+           "Waguinho é mão de obra" não é Hidráulica nem Pintura -- é o
+           empreiteiro geral, e a especialidade dele o dono cadastra aqui. */
+        const NOVA='＋ cadastrar nova…';
+        tr.lastElementChild.appendChild(seletor(E.obraFornecedores[nome]||'',['',...CFG('especialidades'),NOVA],val=>{
+          if(val===NOVA){
+            const nv=(prompt('Nome da nova especialidade (ex.: Obra geral, Serralheria):')||'').trim();
+            if(!nv){pinta();return}
+            // CFG devolve a lista do SEED quando a do dono não existe — mexer
+            // nela mudaria o padrão de todo mundo; primeiro vira lista própria
+            if(!Array.isArray(E.config.especialidades)||!E.config.especialidades.length)
+              E.config.especialidades=[...SEED.config.especialidades];
+            if(!E.config.especialidades.some(x=>x.toLowerCase()===nv.toLowerCase()))
+              E.config.especialidades.push(nv);
+            E.obraFornecedores[nome]=E.config.especialidades.find(x=>x.toLowerCase()===nv.toLowerCase());
+            salvar();pinta();return;
+          }
           if(val)E.obraFornecedores[nome]=val;else delete E.obraFornecedores[nome];
           salvar();pinta();
         }));
