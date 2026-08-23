@@ -217,6 +217,9 @@ tr:hover .lixo{opacity:1}
        title="abre em outra aba — o painel da Impresilk tem login próprio">
       <span class="ic">📊</span><span class="tx">Painel da Impresilk</span><span class="fora">↗</span>
     </a>
+    <button class="ponte" onclick="abrirBusca()" style="margin-bottom:0" title="buscar em tudo (atalho: /)">
+      <span class="ic">🔎</span><span class="tx">Buscar em tudo</span><span class="fora">/</span>
+    </button>
     <div class="rodape">
       <button onclick="sincronizarAgora()">☁ Sincronizar</button>
       <button onclick="salvarPDF()">🖨 PDF</button>
@@ -2664,6 +2667,164 @@ function imprimirSOS() {
   ${S.obs ? `<h2>Observações</h2><div class="l">${esc(S.obs)}</div>` : ''}
   <div style="margin-top:26px;color:#999;font-size:12px">Gerado em ${new Date().toLocaleDateString('pt-BR')}</div>`);
   w.document.close(); w.print();
+}
+
+/* ===================== BUSCA EM TUDO =====================
+   Treze telas e quarenta coleções depois, lembrar EM QUAL tela uma coisa foi
+   guardada virou trabalho. Aqui se digita o que se lembra — "apólice",
+   "Guangzhou", um localizador — e o resultado diz onde está e leva até lá.
+
+   Procura no TEXTO do registro. Não procura dentro de anexo: quem lembra do
+   valor exato não precisa de busca, abre a tela. */
+
+const FONTES_BUSCA=[
+  {col:'rendimentos',tela:'rendimentos',ic:'📈',rot:'Rendimento',
+   campos:['empresa','instituicao','tipo','obs'],
+   tit:x=>[x.empresa,x.tipo].filter(Boolean).join(' · ')||'lançamento',
+   sub:x=>[x.data?fmtDataAno(x.data):'',+x.valor?brl(+x.valor):'',x.instituicao].filter(Boolean).join(' · ')},
+  {col:'gastos',tela:'gastos',ic:'💸',rot:'Gasto',
+   campos:['oque','classe','categoria','pago'],
+   tit:x=>x.oque||x.classe||'gasto',
+   sub:x=>[x.mes,x.classe,+x.valor?brl(+x.valor):''].filter(Boolean).join(' · ')},
+  {col:'patrimonio',tela:'patrimonio',ic:'🏠',rot:'Patrimônio',
+   campos:['nome','tipo','onde','documento','obs'],
+   tit:x=>x.nome||x.tipo||'bem',
+   sub:x=>[x.tipo,x.onde,+x.valor?brl(+x.valor):''].filter(Boolean).join(' · ')},
+  {col:'viagens',tela:'viagens',ic:'✈️',rot:'Viagem',
+   campos:['evento','cidade','hotel','obs'],
+   tit:x=>[x.evento,x.cidade].filter(Boolean).join(' · ')||'viagem',
+   sub:x=>[x.ida?fmtDataAno(x.ida):'',x.status].filter(Boolean).join(' · ')},
+  {col:'agenda',tela:'agenda',ic:'📅',rot:'Compromisso',
+   campos:['titulo','local','tipo','obs'],
+   tit:x=>x.titulo||'compromisso',
+   sub:x=>[x.data?fmtDataAno(x.data):'',x.hora,x.local].filter(Boolean).join(' · ')},
+  {col:'demandas',tela:'demandas',ic:'✅',rot:'Demanda',
+   campos:['titulo','area','obs'],
+   tit:x=>x.titulo||'demanda',
+   sub:x=>[x.area,x.status,x.prazo?'até '+fmtDataAno(x.prazo):''].filter(Boolean).join(' · ')},
+  {col:'documentos',tela:'documentos',ic:'🪪',rot:'Documento',
+   campos:['nome','dono','numero','onde','obs'],
+   tit:x=>[x.nome,x.dono].filter(Boolean).join(' · ')||'documento',
+   sub:x=>[x.numero,x.validade?'vence '+fmtDataAno(x.validade):'',x.onde].filter(Boolean).join(' · ')},
+  {col:'oportunidades',tela:'oportunidades',ic:'💡',rot:'Oportunidade',
+   campos:['titulo','tipo','porque','proximoPasso','obs'],
+   tit:x=>x.titulo||'oportunidade',
+   sub:x=>[x.tipo,x.estagio,x.proximoPasso].filter(Boolean).join(' · ')},
+  {col:'pessoas',tela:'guia',ic:'👨‍👩‍👧',rot:'Minha gente',
+   campos:['nome','relacao','gosta','obs'],
+   tit:x=>x.nome||'pessoa',sub:x=>[x.relacao,x.nascimento?fmtDataAno(x.nascimento):''].filter(Boolean).join(' · ')},
+  {col:'bancos',tela:'guia',ic:'🏦',rot:'Banco',
+   campos:['banco','titular','tipo','pix','gerente','agencia','conta'],
+   tit:x=>[x.banco,x.titular].filter(Boolean).join(' · ')||'conta',
+   sub:x=>[x.tipo,x.agencia&&'ag. '+x.agencia,x.conta&&'cc. '+x.conta].filter(Boolean).join(' · ')},
+  {col:'empresasPJ',tela:'guia',ic:'🏢',rot:'Empresa',
+   campos:['nome','cnpj','regime','socios','contador','banco'],
+   tit:x=>x.nome||'empresa',sub:x=>[x.cnpj,x.regime,x.status].filter(Boolean).join(' · ')},
+  {col:'seguros',tela:'gastos',ic:'🛡️',rot:'Seguro',
+   campos:['tipo','item','seguradora','apolice','beneficiarios','telefone'],
+   tit:x=>[x.tipo,x.item].filter(Boolean).join(' — ')||'seguro',
+   sub:x=>[x.seguradora,x.apolice&&'apólice '+x.apolice,x.renova?'renova '+fmtDataAno(x.renova):''].filter(Boolean).join(' · ')},
+  {col:'assinaturas',tela:'gastos',ic:'🔄',rot:'Assinatura',
+   campos:['nome','pago','obs'],tit:x=>x.nome||'assinatura',
+   sub:x=>[+x.valor?brl(+x.valor):'',x.ciclo,x.status].filter(Boolean).join(' · ')},
+  {col:'casa',tela:'gastos',ic:'🏠',rot:'Conta da casa',
+   campos:['item','onde','pago'],tit:x=>[x.item,x.onde].filter(Boolean).join(' · ')||'conta',
+   sub:x=>[+x.valor?brl(+x.valor):'',x.ciclo].filter(Boolean).join(' · ')},
+  {col:'planos',tela:'gastos',ic:'🏥',rot:'Plano de saúde',
+   campos:['pessoa','operadora','plano','carteirinha'],
+   tit:x=>[x.pessoa,x.operadora].filter(Boolean).join(' · ')||'plano',
+   sub:x=>[x.plano,x.carteirinha].filter(Boolean).join(' · ')},
+  {col:'exames',tela:'saude',ic:'🩺',rot:'Exame',
+   campos:['marcador','obs'],tit:x=>x.marcador||'exame',
+   sub:x=>[x.data?fmtDataAno(x.data):'',x.valor].filter(Boolean).join(' · ')},
+  {col:'tratamentos',tela:'saude',ic:'💊',rot:'Tratamento',
+   campos:['nome','medico','obs'],tit:x=>x.nome||'tratamento',
+   sub:x=>[x.medico,x.status].filter(Boolean).join(' · ')},
+  {col:'livros',tela:'guia',ic:'📚',rot:'Livro',
+   campos:['titulo','autor','obs'],tit:x=>x.titulo||'livro',
+   sub:x=>[x.autor,x.status].filter(Boolean).join(' · ')},
+];
+
+function buscarEmTudo(q){
+  const alvo=normaliza(q);
+  if(alvo.length<2)return [];
+  const partes=alvo.split(' ').filter(Boolean);
+  const achados=[];
+  FONTES_BUSCA.forEach(f=>{
+    (E[f.col]||[]).forEach(x=>{
+      // o RÓTULO entra na busca: digitar "apólice", "seguro" ou "documento"
+      // é o jeito natural de procurar por categoria, e sem isto não achava —
+      // "apolice" é o nome do campo, o valor é um número que ninguém decora
+      const texto=normaliza([f.rot,...f.campos.map(k=>x[k]??'')].join(' '));
+      // todas as palavras precisam aparecer: "seguro carro" não traz todo seguro
+      if(!partes.every(p=>texto.includes(p)))return;
+      achados.push({f,x,tit:f.tit(x)||'(sem nome)',sub:f.sub(x)||''});
+    });
+  });
+  // passagem, hotel e ingresso moram DENTRO da viagem — sem isto, procurar por
+  // um localizador não acha nada, que é justamente quando se procura
+  (E.viagens||[]).forEach(v=>{
+    const nome=[v.evento,v.cidade].filter(Boolean).join(' · ')||'viagem';
+    const itens=[
+      ...(v.passagens||[]).map(p=>({rot:'Passagem',ic:'🎫',
+        txt:[p.de,p.para,p.cia,p.voo,p.localizador,p.sentido].join(' '),
+        tit:[p.de,p.para].filter(Boolean).join(' → ')||'trecho',
+        sub:[nome,p.data?fmtDataAno(p.data):'',p.localizador].filter(Boolean).join(' · ')})),
+      ...(v.hoteis||[]).map(h=>({rot:'Hospedagem',ic:'🏨',
+        txt:[h.nome,h.reserva,h.endereco,h.telefone].join(' '),
+        tit:h.nome||'hotel',
+        sub:[nome,h.reserva&&'reserva '+h.reserva].filter(Boolean).join(' · ')})),
+      ...(v.tickets||[]).map(k=>({rot:'Ingresso',ic:'🎟️',
+        txt:[k.nome,k.tipo,k.local,k.codigo].join(' '),
+        tit:k.nome||'ingresso',
+        sub:[nome,k.data?fmtDataAno(k.data):'',k.codigo].filter(Boolean).join(' · ')})),
+    ];
+    itens.forEach(it=>{
+      if(!partes.every(p=>normaliza(it.rot+' '+it.txt).includes(p)))return;
+      achados.push({f:{tela:'viagens',ic:it.ic,rot:it.rot},x:v,tit:it.tit,sub:it.sub});
+    });
+  });
+  return achados.slice(0,60);
+}
+
+function abrirBusca(){
+  abrirModal('🔎 Buscar em tudo','o que você lembra — o nome, a cidade, o número',(c,fechar)=>{
+    const s1=el('<div class="secao"></div>');
+    const campo=el('<input type="search" placeholder="seguro, Guangzhou, passaporte, localizador…" style="width:100%;border:1px solid var(--linha);background:var(--bg);color:inherit;font:inherit;padding:12px 14px;border-radius:10px">');
+    const res=el('<div style="margin-top:14px"></div>');
+    const pinta=()=>{
+      const q=campo.value.trim();
+      res.innerHTML='';
+      if(normaliza(q).length<2){
+        res.appendChild(el('<div class="vazio">Digite ao menos duas letras. Ela varre lançamentos, documentos, viagens, contas, pessoas, oportunidades — o texto de tudo.</div>'));
+        return;
+      }
+      const achados=buscarEmTudo(q);
+      if(!achados.length){res.appendChild(el('<div class="vazio">Nada com <b>'+esc(q)+'</b>.</div>'));return}
+      res.appendChild(el('<div style="font-size:12px;color:var(--suave);margin-bottom:8px">'+
+        achados.length+(achados.length===60?'+':'')+' resultado(s)</div>'));
+      let grupo='';
+      achados.forEach(a=>{
+        if(a.f.rot!==grupo){
+          grupo=a.f.rot;
+          res.appendChild(el('<div style="font-size:11px;color:var(--suave);text-transform:uppercase;letter-spacing:.06em;margin:12px 0 5px">'+esc(grupo)+'</div>'));
+        }
+        const li=el('<button style="width:100%;display:flex;align-items:center;gap:11px;padding:9px 11px;margin-bottom:5px;'+
+          'border:1px solid var(--linha);border-radius:10px;background:var(--card);color:inherit;font:inherit;text-align:left;cursor:pointer">'+
+          '<span style="font-size:16px">'+a.f.ic+'</span>'+
+          '<span style="flex:1;min-width:0"><b style="font-size:13.5px;display:block">'+esc(a.tit)+'</b>'+
+          (a.sub?'<span style="font-size:12px;color:var(--suave)">'+esc(a.sub)+'</span>':'')+'</span>'+
+          '<span style="color:var(--suave)">&rsaquo;</span></button>');
+        li.onclick=()=>{fechar();irTela(a.f.tela)};
+        res.appendChild(li);
+      });
+    };
+    campo.addEventListener('input',pinta);
+    s1.appendChild(campo);s1.appendChild(res);
+    c.appendChild(s1);
+    pinta();
+    setTimeout(()=>campo.focus(),60);
+  });
 }
 
 /* ===================== PASSAGENS PELO GMAIL =====================
@@ -6750,6 +6911,17 @@ function telaLogin(){
   document.body.appendChild(f);
   senha.focus();
 }
+/* "/" abre a busca, como em toda ferramenta que se usa o dia inteiro — menos
+   quando você já está escrevendo em algum campo. */
+document.addEventListener('keydown',ev=>{
+  if(ev.key!=='/'||ev.ctrlKey||ev.metaKey||ev.altKey)return;
+  const a=document.activeElement;
+  if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return;
+  if(document.querySelector('.fundo'))return;      // já há modal aberto
+  if(!temSessao())return;
+  ev.preventDefault();abrirBusca();
+});
+
 if(temSessao()){menu();tela();puxarNuvem().then(()=>tela());}
 else telaLogin();
 </script>
