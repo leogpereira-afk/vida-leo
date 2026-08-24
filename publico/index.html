@@ -570,6 +570,10 @@ const SEED={
      hidráulica -- de uma vez, para trás e para a frente. É a diferença entre
      classificar 90 fornecedores e classificar 824 lançamentos. */
   obras:[],obraAportes:[],obraFornecedores:{},
+  /* obraM2Fora: os grupos que o dono TIROU da conta do custo/m² (terreno,
+     comissão…). É UMA escolha para todas as obras, de propósito: se cada obra
+     tivesse a sua, o m² de uma não compararia com o da outra. */
+  obraM2Fora:[],
   assinaturas:[],seguros:[],planos:[],casa:[],documentos:[],metas:[],pessoas:[],paraEles:[],colapso:{},
   // saúde ampliada
   vitais:[],vacinas:[],histFamiliar:[],rastreios:[],
@@ -673,6 +677,7 @@ function carregar(){
   if(!d.marcas||typeof d.marcas!=='object'||Array.isArray(d.marcas))d.marcas={};
   if(!d.estrategia||typeof d.estrategia!=='object'||Array.isArray(d.estrategia))d.estrategia={};
   if(!d.obraFornecedores||typeof d.obraFornecedores!=='object'||Array.isArray(d.obraFornecedores))d.obraFornecedores={};
+  if(!Array.isArray(d.obraM2Fora))d.obraM2Fora=[];
   // objetos únicos: garante que existam mesmo em backup antigo
   for(const k of ['sos','norte','roda','perfil','comportamento']) d[k]={...structuredClone(SEED[k]),...(d[k]||{})};
   for(const k of ['vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','seguros','planos','casa','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades']) if(!Array.isArray(d[k])) d[k]=[];
@@ -3086,6 +3091,21 @@ async function fmCustos(obraId){
   return (_fmCustos[obraId]=d.custos||[]);
 }
 
+
+/* TIR de fluxos datados (o "XIRR" da planilha), por bisseção.
+   Negativo = dinheiro que saiu; positivo = que voltou. Devolve % ao ano,
+   ou null quando não há resposta (tudo saiu e nada voltou, ou vice-versa). */
+function tirAnual(fluxos){
+  const fs=fluxos.filter(f=>f.v&&f.d).map(f=>({t:new Date(f.d+'T12:00').getTime(),v:f.v}));
+  if(fs.length<2||!fs.some(f=>f.v<0)||!fs.some(f=>f.v>0))return null;
+  const t0=Math.min(...fs.map(f=>f.t));
+  const vp=r=>fs.reduce((s2,f)=>s2+f.v/Math.pow(1+r,(f.t-t0)/31557600000),0);
+  let lo=-0.9999,hi=100;
+  if(vp(lo)*vp(hi)>0)return null;
+  for(let i=0;i<200;i++){const m=(lo+hi)/2;(vp(lo)*vp(m)<=0)?hi=m:lo=m}
+  return (lo+hi)/2*100;
+}
+
 /* ---- as contas de uma obra ----
    Uma função só, para os cartões e a ficha nunca discordarem. */
 function contasObra(o,r){
@@ -3103,15 +3123,19 @@ function contasObra(o,r){
   const margem=venda?lucro/venda*100:0;
   const area=+o.area||0;
   const meses=(r&&r.de&&r.ate)?Math.max(1,Math.round((new Date(r.ate)-new Date(r.de))/2629800000)):0;
-  /* O custo/m² NÃO leva o terreno: é o número que compara uma obra com a
-     outra, e o preço do lote varia com a esquina, não com a construção.
-     Somar o terreno faria a mesma casa parecer cara num bairro e barata
-     noutro -- e esconderia justamente o que se quer ver. */
-  const terreno=r?Object.entries(r.centros||{}).filter(([k])=>naturezaCentro(k)==='Terreno')
-    .reduce((s,[,v])=>s+v.total,0):0;
-  const custoObra=custo-terreno;
-  return {custo,aporte,venda,imposto,comissao,outras,liquido,lucro,margem,area,meses,terreno,custoObra,
-    porM2:area?custoObra/area:0, vendaM2:area&&venda?venda/area:0,
+  /* O custo/m² segue a SELEÇÃO do dono (obraM2Fora): ele escolhe se o
+     terreno, os impostos, a documentação e a comissão entram ou não na conta.
+     A escolha é global — o m² de uma obra só compara com o da outra se as
+     duas somarem as mesmas coisas. "Comissão da venda" e "Imposto da venda"
+     são grupos sintéticos: não são lançamentos, vêm da ficha da venda. */
+  const fora=new Set(E.obraM2Fora||[]);
+  let custoSel=0;
+  if(r)for(const [k,v] of Object.entries(r.centros||{}))if(!fora.has(k))custoSel+=v.total;
+  if(!fora.has('Comissão da venda'))custoSel+=comissao;
+  if(!fora.has('Imposto da venda'))custoSel+=imposto;
+  const custoTudo=custo+comissao+imposto;
+  return {custo,aporte,venda,imposto,comissao,outras,liquido,lucro,margem,area,meses,custoSel,custoTudo,
+    porM2:area?custoSel/area:0, porM2Tudo:area?custoTudo/area:0, vendaM2:area&&venda?venda/area:0,
     // quanto do custo NÃO veio de aporte de sócio: saiu do caixa do dono
     proprio:custo-aporte,
     // lucro por mês de obra: 20% em 8 meses vale mais que 30% em 3 anos
@@ -3119,6 +3143,123 @@ function contasObra(o,r){
     retorno:aporte?lucro/aporte*100:0};
 }
 
+
+
+/* ---------------- o dossiê da obra em PDF ----------------
+   Mesmo padrão do roteiro de viagem: janela própria, window.print. Vai TUDO,
+   inclusive o livro-caixa inteiro — é o documento da obra, o papel que se
+   guarda ou se mostra ao sócio, não um recorte de tela. */
+function imprimirObra(o,rr2,custos){
+  const w=window.open('','_blank');
+  if(!w){alert('Libere o pop-up para gerar o PDF.');return}
+  const c=contasObra(o,rr2);
+  const fim=o.recebidoEm||o.vendaData||'';
+  const linhaKV=(k,v)=>v?`<div><span class="rot">${k}</span> ${v}</div>`:'';
+  const cents=rr2?Object.entries(rr2.centros).sort((x,y)=>y[1].total-x[1].total):[];
+
+  // especialidades: a mesma conta da tela
+  const esp={};
+  (custos||[]).forEach(l=>{
+    const e2=especDe(l);if(!e2)return;
+    const nat=naturezaCentro(l.centro);
+    const r3=esp[e2]??={mat:0,mao:0,outros:0};
+    if(nat==='Material')r3.mat+=(+l.valor||0);
+    else if(nat==='Mão de obra')r3.mao+=(+l.valor||0);
+    else r3.outros+=(+l.valor||0);
+  });
+  const espLin=Object.entries(esp).map(([k,v])=>({k,...v,tot:v.mat+v.mao+v.outros})).sort((x,y)=>y.tot-x.tot);
+
+  // retorno por investidor: mesma regra da tela
+  const meus=E.obraAportes.filter(x=>x.obra===o.id);
+  const tFim=fim?new Date(fim+'T12:00').getTime():Date.now();
+  const porQuem={};
+  meus.forEach(x=>{const q=(x.quem||'?').trim()||'?';
+    const r6=porQuem[q]??={total:0,capTempo:0,fluxos:[]};const v6=+x.valor||0;
+    r6.total+=v6;r6.capTempo+=v6*(x.data?Math.max(0,(tFim-new Date(x.data+'T12:00').getTime())/2629800000):0);
+    if(x.data)r6.fluxos.push({d:x.data,v:-v6})});
+  const somaCT=Object.values(porQuem).reduce((s2,x)=>s2+x.capTempo,0);
+  const vendida=c.venda>0&&!!fim;
+
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>${esc(o.nome||'Obra')} — Fortemais</title>
+  <style>
+    body{font:12.5px/1.55 -apple-system,Helvetica,sans-serif;padding:26px;color:#1a1a1a;max-width:860px}
+    h1{font-size:21px;margin:0 0 2px}h2{font-size:14px;margin:22px 0 8px;border-bottom:1px solid #ccc;padding-bottom:4px}
+    .sub{color:#777;margin:0 0 14px}
+    .rot{display:inline-block;min-width:150px;color:#777}
+    table{border-collapse:collapse;width:100%;font-size:12px}
+    th{text-align:left;border-bottom:1.5px solid #333;padding:5px 8px}
+    td{border-bottom:1px solid #e2e2e2;padding:5px 8px}
+    .n{text-align:right;font-variant-numeric:tabular-nums}
+    .verm{color:#a33}.verd{color:#2a7a44}
+    .kpis{display:flex;gap:22px;flex-wrap:wrap;margin:12px 0 4px}
+    .kpis div{min-width:150px}.kpis b{display:block;font-size:17px}
+    @media print{body{padding:0}h2{page-break-after:avoid}tr{page-break-inside:avoid}}
+  </style>
+  <h1>${esc(o.nome||'Obra')}</h1>
+  <p class="sub">Fortemais · ${esc([o.tipo,o.endereco].filter(Boolean).join(' · '))} · gerado em ${fmtDataAno(hoje())}</p>
+
+  <div class="kpis">
+    <div><span class="rot">Custo total</span><b class="verm">${brl(c.custo)}</b></div>
+    <div><span class="rot">Aportes</span><b>${brl(c.aporte)}</b></div>
+    ${c.venda?`<div><span class="rot">Venda líquida</span><b>${brl(c.liquido)}</b></div>
+    <div><span class="rot">Lucro</span><b class="${c.lucro>=0?'verd':'verm'}">${brl(c.lucro)} · ${c.margem.toFixed(1)}%</b></div>`:''}
+    ${c.area?`<div><span class="rot">Custo/m² (grupos escolhidos)</span><b>${brl(c.porM2)}</b></div>`:''}
+  </div>
+
+  <h2>Ficha</h2>
+  ${linhaKV('Área construída',c.area?c.area+' m²':'')}
+  ${linhaKV('Área do terreno',+o.areaTerreno?o.areaTerreno+' m²':'')}
+  ${linhaKV('Período',rr2&&rr2.de?fmtDataAno(rr2.de)+' → '+(rr2.ate?fmtDataAno(rr2.ate):'')+(c.meses?' ('+c.meses+' meses)':''):'')}
+  ${linhaKV('Comprador',esc(o.comprador||''))}
+  ${linhaKV('Venda',c.venda?brl(c.venda)+(o.vendaData?' em '+fmtDataAno(o.vendaData):''):'')}
+  ${linhaKV('Imposto pago',c.imposto?brl(c.imposto):'')}
+  ${linhaKV('Comissão paga',c.comissao?brl(c.comissao):'')}
+  ${linhaKV('Recebimento concluído',fim?fmtDataAno(fim):'')}
+  ${linhaKV('Observações',esc(o.obs||''))}
+
+  ${cents.length?`<h2>Para onde foi o dinheiro</h2><table>
+    <thead><tr><th>Plano de contas</th><th class="n">Valor</th><th class="n">%</th><th class="n">Lanç.</th></tr></thead><tbody>
+    ${cents.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${brl(v.total)}</td>
+      <td class="n">${(v.total/rr2.total*100).toFixed(1)}%</td><td class="n">${v.n}</td></tr>`).join('')}
+    <tr><td><b>Total</b></td><td class="n"><b>${brl(rr2.total)}</b></td><td></td><td class="n"><b>${rr2.n}</b></td></tr></tbody></table>`:''}
+
+  ${espLin.length?`<h2>Por especialidade — material × mão de obra</h2><table>
+    <thead><tr><th>Especialidade</th><th class="n">Material</th><th class="n">Mão de obra</th><th class="n">Outros</th><th class="n">Total</th></tr></thead><tbody>
+    ${espLin.map(l=>`<tr><td>${esc(l.k)}</td><td class="n">${l.mat?brl(l.mat):'—'}</td>
+      <td class="n">${l.mao?brl(l.mao):'—'}</td><td class="n">${l.outros?brl(l.outros):'—'}</td>
+      <td class="n"><b>${brl(l.tot)}</b></td></tr>`).join('')}</tbody></table>`:''}
+
+  ${meus.length?`<h2>Aportes</h2><table>
+    <thead><tr><th>Data</th><th>Quem</th><th class="n">Valor</th><th>Obs</th></tr></thead><tbody>
+    ${meus.slice().sort((x,y)=>(x.data||'').localeCompare(y.data||'')).map(x=>`<tr>
+      <td>${x.data?fmtDataAno(x.data):'—'}</td><td>${esc(x.quem||'')}</td>
+      <td class="n">${brl(+x.valor||0)}</td><td>${esc(x.obs||'')}</td></tr>`).join('')}
+    <tr><td colspan="2"><b>Total</b></td><td class="n"><b>${brl(c.aporte)}</b></td><td></td></tr></tbody></table>
+
+  <h2>Retorno dos aportes ${vendida?'':'(obra ainda em aberto)'}</h2>
+  <table><thead><tr><th>Quem</th><th class="n">Aportou</th><th class="n">Capital × tempo</th>
+    ${vendida?'<th class="n">Lucro que lhe cabe</th><th class="n">Recebe</th><th class="n">Retorno</th>':''}</tr></thead><tbody>
+    ${Object.entries(porQuem).sort((x,y)=>y[1].total-x[1].total).map(([q,r6])=>{
+      const fatia=somaCT?r6.capTempo/somaCT:0;
+      if(!vendida)return `<tr><td>${esc(q)}</td><td class="n">${brl(r6.total)}</td><td class="n">${(fatia*100).toFixed(1)}%</td></tr>`;
+      const parte=c.lucro*fatia,recebe=r6.total+parte;
+      const tir=tirAnual([...r6.fluxos,{d:fim,v:recebe}]);
+      return `<tr><td>${esc(q)}</td><td class="n">${brl(r6.total)}</td><td class="n">${(fatia*100).toFixed(1)}%</td>
+        <td class="n ${parte>=0?'verd':'verm'}">${brl(parte)}</td><td class="n">${brl(recebe)}</td>
+        <td class="n"><b>${tir==null?'—':tir.toFixed(1)+'% a.a.'}</b></td></tr>`;
+    }).join('')}</tbody></table>
+  <p style="font-size:11px;color:#777">Rateio do lucro por capital × tempo${fim?' até '+fmtDataAno(fim):''}; retorno é a TIR anual dos aportes datados. Regra de referência — o acerto combinado entre as partes é o que vale.</p>`:''}
+
+  ${(custos&&custos.length)?`<h2>Livro-caixa — todos os lançamentos (${custos.length})</h2><table>
+    <thead><tr><th>Data</th><th>O que</th><th>Plano</th><th>Fornecedor</th><th class="n">Valor</th></tr></thead><tbody>
+    ${custos.slice().sort((x,y)=>(x.data||'').localeCompare(y.data||'')).map(l=>`<tr>
+      <td>${l.data?fmtDataAno(l.data):'—'}</td><td>${esc(l.nome||'')}</td>
+      <td>${esc(l.centro||'')}</td><td>${esc(l.fornecedor||'')}</td>
+      <td class="n">${brl(l.valor)}</td></tr>`).join('')}</tbody></table>`:''}
+  `);
+  w.document.close();
+  setTimeout(()=>w.print(),400);
+}
 
 /* ---------------- a tela ---------------- */
 async function vFortemais(m){
@@ -3206,7 +3347,7 @@ async function vFortemais(m){
     const comp=contas.filter(x=>x.c.custo>0);
     const rol=el('<div class="rolagem"></div>');
     const t=document.createElement('table');
-    t.innerHTML='<thead><tr><th>Obra</th><th style="text-align:right">Custo</th><th style="text-align:right">R$/m² s/ terreno</th>'
+    t.innerHTML='<thead><tr><th>Obra</th><th style="text-align:right">Custo</th><th style="text-align:right">R$/m² (grupos escolhidos)</th>'
       +'<th style="text-align:right">Venda</th><th style="text-align:right">Lucro</th><th style="text-align:right">Margem</th><th style="text-align:right">Meses</th></tr></thead>';
     const tb=document.createElement('tbody');
     comp.forEach(({o,c})=>{
@@ -3237,6 +3378,8 @@ async function vFortemais(m){
 async function fichaObraEm(c,o,fechar){
     // depois de lançar ou apagar um custo, a ficha se redesenha com dados frescos
     const recarregar=()=>{fmEsquecer();c.innerHTML='<div class="vazio">Atualizando…</div>';fichaObraEm(c,o,fechar)};
+    let planoAberto=null;      // qual plano de contas está expandido (sobrevive ao repintar)
+    let corrigindo=null;       // id do lançamento em correção
     const R=(await fmResumo())||{};
     const rr2=R[o.id]||null;
     const cx=contasObra(o,rr2);
@@ -3248,7 +3391,7 @@ async function fichaObraEm(c,o,fechar){
 
     /* --- o resultado, sempre à vista --- */
     c.appendChild(el(`<div class="grade" style="gap:8px;margin-bottom:4px">
-      ${kpi('Custo',brl(cc.custo),cc.porM2?brl(cc.porM2)+'/m² sem o terreno':'')}
+      ${kpi('Custo',brl(cc.custo),cc.area?brl(cc.porM2)+'/m² nos grupos escolhidos':'')}
       ${kpi('Aportes',brl(cc.aporte),cc.proprio>0?brl(cc.proprio)+' do seu bolso':'','a')}
       ${kpi('Venda líquida',cc.venda?brl(cc.liquido):'—',cc.venda?'venda '+brl(cc.venda)+' − imposto '+brl(cc.imposto)+' − comissão '+brl(cc.comissao):'')}
       ${kpi('Lucro',cc.venda?brl(cc.lucro):'—',cc.venda?cc.margem.toFixed(1)+'%'+(cc.aporte?' · '+cc.retorno.toFixed(0)+'% sobre o aporte':''):'ainda não vendida',cc.venda?(cc.lucro>=0?'p':'v'):'')}
@@ -3275,16 +3418,81 @@ async function fichaObraEm(c,o,fechar){
     if(!rr2){
       s2.appendChild(el('<div class="vazio">Nenhum custo lançado. Traga o export do ERP na tela principal, bloco 📥.</div>'));
     } else {
+      /* Cada plano de contas ABRE: clicar mostra quem está lá dentro,
+         lançamento a lançamento, e o ✎ corrige na hora — inclusive mudando o
+         lançamento de plano, que é a correção mais comum ("isso não era
+         Insumo diversos, era Elétrica"). A correção grava por cima da mesma
+         linha no servidor; reimportar o MESMO arquivo do ERP a desfaz, porque
+         a chave é a do ERP — o certo é corrigir também lá quando der. */
+      s2.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:0 0 9px">Clique num plano para ver quem está dentro — e corrigir o que estiver no lugar errado.</p>'));
       const cents=Object.entries(rr2.centros).sort((x,y)=>y[1].total-x[1].total);
       const rol=el('<div class="rolagem"></div>');
       const t=document.createElement('table');
-      t.innerHTML='<thead><tr><th>Centro de custo</th><th style="text-align:right">Valor</th><th style="text-align:right">%</th><th style="text-align:right">Lanç.</th></tr></thead>';
+      t.innerHTML='<thead><tr><th>Plano de contas</th><th style="text-align:right">Valor</th><th style="text-align:right">%</th><th style="text-align:right">Lanç.</th></tr></thead>';
       const tb=document.createElement('tbody');
       cents.forEach(([k,v])=>{
-        tb.appendChild(elTr(`<td style="padding:8px 10px">${esc(k)}</td>
+        const aberto=planoAberto===k;
+        const tr=elTr(`<td style="padding:8px 10px"><span class="seta" style="display:inline-block;transform:rotate(${aberto?0:-90}deg);font-size:10px;margin-right:5px">▼</span><b>${esc(k)}</b></td>
           <td class="num" style="padding:8px 10px">${brl(v.total)}</td>
           <td class="num" style="padding:8px 10px;color:var(--suave)">${(v.total/rr2.total*100).toFixed(1)}%</td>
-          <td class="num" style="padding:8px 10px;color:var(--suave)">${v.n}</td>`));
+          <td class="num" style="padding:8px 10px;color:var(--suave)">${v.n}</td>`);
+        tr.style.cursor='pointer';
+        tr.onclick=()=>{planoAberto=aberto?null:k;corrigindo=null;pinta()};
+        tb.appendChild(tr);
+        if(aberto){
+          const dentro=custos.filter(l=>((l.centro||'').trim()||'(sem centro)')===k)
+            .slice().sort((x,y)=>(y.data||'').localeCompare(x.data||''));
+          const cel=elTr('<td colspan="4" style="padding:0 0 12px"></td>');
+          const caixa=el('<div style="max-height:340px;overflow-y:auto;border:1px solid var(--linha);border-radius:8px;margin:0 6px"></div>');
+          dentro.forEach(l=>{
+            if(corrigindo===l.id){
+              /* editor da linha: escreve num RASCUNHO, não no registro — quem
+                 grava é o servidor; cancelar não pode deixar sujeira local */
+              const ras={data:l.data||'',nome:l.nome||'',centro:(l.centro||'').trim()||CFG('centrosObra')[0],
+                fornecedor:l.fornecedor||'',valor:+l.valor||0};
+              const ed=el('<div style="padding:10px 12px;border-bottom:1px solid var(--linha);background:color-mix(in srgb,var(--verde) 5%,transparent)"></div>');
+              ed.appendChild(campos(ras,[
+                {k:'data',t:'Data',tipo:'date'},
+                {k:'valor',t:'Valor',tipo:'moeda'},
+                {k:'nome',t:'O que foi'},
+                {k:'centro',t:'Plano de contas',tipo:'select',
+                  opcoes:[...new Set([ras.centro,...CFG('centrosObra')])]},
+                {k:'fornecedor',t:'Fornecedor'},
+              ],()=>{}));
+              const lin2=el('<div style="display:flex;gap:8px;margin-top:9px"></div>');
+              const bs=el('<button class="btn mini">Salvar correção</button>');
+              bs.onclick=async()=>{
+                bs.disabled=true;bs.textContent='Gravando…';
+                try{
+                  const d4=await apiSync('POST',{acao:'obraCustosGravar',linhas:[{
+                    id:l.id,obra:l.obra||o.id,data:ras.data,nome:ras.nome,centro:ras.centro,
+                    fornecedor:ras.fornecedor,valor:+ras.valor,forma:l.forma||'',conta:l.conta||'',
+                    valor_original:l.valor_original===undefined?null:l.valor_original,
+                    origem:l.origem||'correção'}]});
+                  if(!d4||!d4.ok)throw new Error((d4&&d4.erro)||'falha ao gravar');
+                  planoAberto=ras.centro;corrigindo=null;recarregar();
+                }catch(e){bs.disabled=false;bs.textContent='Salvar correção';alert('Não gravou: '+(e.message||e))}
+              };
+              const bc=el('<button class="btn ghost mini">Cancelar</button>');
+              bc.onclick=()=>{corrigindo=null;pinta()};
+              lin2.appendChild(bs);lin2.appendChild(bc);ed.appendChild(lin2);
+              caixa.appendChild(ed);
+              return;
+            }
+            const li2=el(`<div style="display:flex;gap:9px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--linha);font-size:12.5px">
+              <span style="color:var(--suave);white-space:nowrap">${l.data?fmtData(l.data):'—'}</span>
+              <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.nome||'—')}</span>
+              <span style="color:var(--suave);max-width:32%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.fornecedor||'')}</span>
+              <span class="num" style="color:var(--vermelho);font-variant-numeric:tabular-nums;white-space:nowrap">${brl(l.valor)}</span>
+            </div>`);
+            const be=el('<button class="btn ghost mini" title="Corrigir este lançamento">✎</button>');
+            be.onclick=()=>{corrigindo=l.id;pinta()};
+            li2.appendChild(be);
+            caixa.appendChild(li2);
+          });
+          cel.firstElementChild.appendChild(caixa);
+          tb.appendChild(cel);
+        }
       });
       t.appendChild(tb);
       t.appendChild(elTfoot(`<tr class="tfim"><td>Total</td><td class="num">${brl(rr2.total)}</td><td></td><td class="num">${rr2.n}</td></tr>`));
@@ -3292,6 +3500,48 @@ async function fichaObraEm(c,o,fechar){
       s2.appendChild(el(`<div style="margin-top:12px">${gRosca(cents.slice(0,8).map(([k,v])=>({r:k,v:v.total})))}</div>`));
     }
     c.appendChild(s2);
+
+    /* --- custo por m²: o dono escolhe o que entra ---
+       "quanto custou o m² DA CONSTRUÇÃO" e "quanto custou o m² com tudo" são
+       perguntas diferentes e as duas são legítimas. Cada grupo é um botão:
+       aceso entra na conta, apagado sai. A escolha vale para TODAS as obras
+       (obraM2Fora é global) — senão uma obra somaria terreno e a outra não,
+       e a comparação viraria mentira. */
+    if(rr2&&(+o.area>0||true)){
+      const s2m=el('<div class="secao"><h4>Custo por m² — escolha o que entra</h4></div>');
+      const grupos=Object.entries(rr2.centros).sort((x,y)=>y[1].total-x[1].total)
+        .map(([k,v])=>({k,v:v.total}));
+      const cc2=contasObra(o,rr2);
+      if(cc2.comissao)grupos.push({k:'Comissão da venda',v:cc2.comissao});
+      if(cc2.imposto)grupos.push({k:'Imposto da venda',v:cc2.imposto});
+      const chips=el('<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px"></div>');
+      grupos.forEach(g=>{
+        const foraAgora=(E.obraM2Fora||[]).includes(g.k);
+        const b2=el(`<button class="chip" style="cursor:pointer;border:1px solid ${foraAgora?'var(--linha)':'var(--verde)'};
+          background:${foraAgora?'transparent':'color-mix(in srgb,var(--verde) 12%,transparent)'};
+          color:${foraAgora?'var(--suave)':'inherit'};${foraAgora?'text-decoration:line-through;':''}"
+          title="${foraAgora?'clique para voltar a somar':'clique para tirar da conta'}">${esc(g.k)} · ${brl(g.v)}</button>`);
+        b2.onclick=()=>{
+          if(!Array.isArray(E.obraM2Fora))E.obraM2Fora=[];
+          const i2=E.obraM2Fora.indexOf(g.k);
+          if(i2>=0)E.obraM2Fora.splice(i2,1);else E.obraM2Fora.push(g.k);
+          salvar();pinta();
+        };
+        chips.appendChild(b2);
+      });
+      s2m.appendChild(chips);
+      if(+o.area>0){
+        const nForaComValor=grupos.filter(g=>(E.obraM2Fora||[]).includes(g.k)).length;
+        s2m.appendChild(el(`<div class="grade" style="gap:8px">
+          ${kpi('m² nos grupos escolhidos',brl(cc2.porM2),brl(cc2.custoSel)+' ÷ '+cc2.area+' m²')}
+          ${nForaComValor?kpi('m² somando tudo',brl(cc2.porM2Tudo),brl(cc2.custoTudo)+' com o que você tirou','a'):''}
+        </div>`));
+        if(!nForaComValor)s2m.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:6px 0 0">Tudo está entrando na conta. Toque num grupo para tirá-lo — terreno e comissão são os que mais distorcem a comparação entre obras.</p>'));
+      } else {
+        s2m.appendChild(el('<div class="aviso">Preencha a <b>área construída (m²)</b> na Ficha lá em cima — sem ela não há divisão.</div>'));
+      }
+      c.appendChild(s2m);
+    }
 
     /* --- lançar despesa à mão ---
        Nem tudo vem do ERP: a diária paga em dinheiro, a taxa do cartório, o
@@ -3466,6 +3716,61 @@ async function fichaObraEm(c,o,fechar){
       E.obraAportes));
     c.appendChild(s6);
 
+    /* --- retorno por investidor, com o TEMPO de cada aporte na conta ---
+       R$ 50 mil postos no primeiro mês trabalharam a obra inteira; os mesmos
+       50 mil postos na véspera da venda quase não trabalharam. Por isso o
+       rateio do lucro aqui é por CAPITAL × TEMPO (quanto × por quantos meses
+       até o fim do recebimento), e o retorno de cada um é a TIR dos aportes
+       datados dele contra a devolução no fim — a mesma conta do XIRR da
+       planilha. REGRA DE VITRINE, NÃO DE CARTÓRIO: o acerto real é o que
+       vocês combinarem; isto mostra o que cada real rendeu no tempo. */
+    if(meus.length){
+      const s6b=el('<div class="secao"><h4>Retorno dos aportes</h4></div>');
+      const cc6=contasObra(o,(_fmResumo||{})[o.id]||rr2);
+      const fim=o.recebidoEm||o.vendaData||'';
+      const tFim=fim?new Date(fim+'T12:00').getTime():Date.now();
+      const porQuem={};
+      meus.forEach(x=>{
+        const q=(x.quem||'?').trim()||'?';
+        const r6=porQuem[q]??={total:0,capTempo:0,fluxos:[]};
+        const v6=+x.valor||0;
+        r6.total+=v6;
+        const mesesTrab=x.data?Math.max(0,(tFim-new Date(x.data+'T12:00').getTime())/2629800000):0;
+        r6.capTempo+=v6*mesesTrab;
+        if(x.data)r6.fluxos.push({d:x.data,v:-v6});
+      });
+      const somaCT=Object.values(porQuem).reduce((s6c,x)=>s6c+x.capTempo,0);
+      const vendida=cc6.venda>0&&!!fim;
+      const rol6=el('<div class="rolagem"></div>');
+      const t6=document.createElement('table');
+      t6.innerHTML='<thead><tr><th>Quem</th><th style="text-align:right">Aportou</th><th style="text-align:right">Capital × tempo</th>'
+        +(vendida?'<th style="text-align:right">Lucro que lhe cabe</th><th style="text-align:right">Recebe</th><th style="text-align:right">Retorno</th>':'')
+        +'</tr></thead>';
+      const tb6=document.createElement('tbody');
+      Object.entries(porQuem).sort((x,y)=>y[1].total-x[1].total).forEach(([q,r6])=>{
+        const fatia=somaCT?r6.capTempo/somaCT:0;
+        let extra='';
+        if(vendida){
+          const parte=cc6.lucro*fatia;
+          const recebe=r6.total+parte;
+          const tir=tirAnual([...r6.fluxos,{d:fim,v:recebe}]);
+          extra=`<td class="num" style="padding:8px 10px;color:${parte>=0?'var(--verde)':'var(--vermelho)'}">${brl(parte)}</td>
+            <td class="num" style="padding:8px 10px">${brl(recebe)}</td>
+            <td class="num" style="padding:8px 10px;font-weight:600;color:${(tir??0)>=0?'var(--verde)':'var(--vermelho)'}">${tir==null?'—':tir.toFixed(1)+'% a.a.'}</td>`;
+        }
+        tb6.appendChild(elTr(`<td style="padding:8px 10px"><b>${esc(q)}</b></td>
+          <td class="num" style="padding:8px 10px">${brl(r6.total)}</td>
+          <td class="num" style="padding:8px 10px;color:var(--suave)">${(fatia*100).toFixed(1)}%</td>${extra}`));
+      });
+      t6.appendChild(tb6);rol6.appendChild(t6);s6b.appendChild(rol6);
+      if(!vendida){
+        s6b.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin-top:9px">O retorno aparece quando a <b>venda</b> e o <b>recebimento concluído</b> estiverem lançados. A coluna capital × tempo já mostra quanto cada um carregou a obra até aqui.</p>'));
+      } else {
+        s6b.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin-top:9px">Rateio por capital × tempo até '+fmtDataAno(fim)+'; retorno é a TIR anual dos aportes datados de cada um. O dinheiro que saiu do SEU bolso só entra nesta conta se você lançar como aporte seu.</p>'));
+      }
+      c.appendChild(s6b);
+    }
+
     /* --- a venda --- */
     const s7=el('<div class="secao"><h4>Venda</h4></div>');
     s7.appendChild(campos(o,[
@@ -3500,6 +3805,9 @@ async function fichaObraEm(c,o,fechar){
       E.obras=E.obras.filter(x=>x.id!==o.id);salvar();fechar();
     };
     s9.appendChild(del);s9.appendChild(el('<span class="cresce"></span>'));
+    const pdf=el('<button class="btn ghost">🖨 Salvar em PDF</button>');
+    pdf.onclick=()=>imprimirObra(o,(_fmResumo||{})[o.id]||rr2,custos);
+    s9.appendChild(pdf);
     const okb=el('<button class="btn">Pronto</button>');okb.onclick=fechar;s9.appendChild(okb);
     c.appendChild(s9);
     };
