@@ -161,7 +161,10 @@ tr:hover .lixo{opacity:1}
 .solta{border:1.5px dashed var(--linha);border-radius:11px;padding:16px;text-align:center;color:var(--suave);
   font-size:13px;cursor:pointer;transition:.15s}
 .solta.ocupado{opacity:.55;pointer-events:none}
-.secao.fechada>*:not(h4){display:none}
+/* !important: vários filhos trazem display no próprio elemento (flex, grid),
+   e estilo inline vence folha de estilo — sem isto a seção 'fechada' ficava
+   com o miolo à mostra. */
+.secao.fechada>*:not(h4){display:none!important}
 .solta:hover,.solta.sobre{border-color:var(--verde);color:var(--verde);background:var(--verde-cl)}
 
 /* checklist */
@@ -3469,20 +3472,40 @@ async function fichaObraEm(c,o,fechar){
       ${kpi('Lucro',cc.venda?brl(cc.lucro):'—',cc.venda?cc.margem.toFixed(1)+'%'+(cc.aporte?' · '+cc.retorno.toFixed(0)+'% sobre o aporte':''):'ainda não vendida',cc.venda?(cc.lucro>=0?'p':'v'):'')}
     </div>`));
 
-    /* --- a ficha --- */
+    /* --- a ficha ---
+       Formulário aberto para sempre é convite a mexer sem querer e faz a tela
+       parecer inacabada. Preenchida, a ficha vira RESUMO e só abre no ✎ —
+       o mesmo blocoTravado das passagens e hotéis. "Novo" enquanto não tem
+       nome: obra recém-criada já nasce com os campos à mostra. */
     const s1=secR('Ficha');
-    s1.appendChild(campos(o,[
-      {k:'nome',t:'Nome da obra',ph:'ex.: Casa Vila Segura 27'},
-      {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposObra')},
-      {k:'status',t:'Status',tipo:'select',opcoes:CFG('statusObra')},
-      {k:'empresa',t:'Por qual empresa correu',tipo:'select',opcoes:[...new Set(['Fortemais',...E.empresasPJ.map(x=>x.nome).filter(Boolean)])]},
-      {k:'endereco',t:'Endereço',full:true},
-      {k:'area',t:'Área construída (m²)',tipo:'number'},
-      {k:'areaTerreno',t:'Área do terreno (m²)',tipo:'number'},
-      {k:'inicio',t:'Início',tipo:'date'},
-      {k:'fim',t:'Fim (ou previsão)',tipo:'date'},
-      {k:'obs',t:'Anotações',tipo:'textarea',full:true},
-    ],()=>{salvar()}));
+    const dado=(r5,v5)=>v5?`<span style="margin-right:14px;white-space:nowrap"><span style="color:var(--suave);font-size:11.5px">${r5}</span> <b>${esc(String(v5))}</b></span>`:'';
+    s1.appendChild(blocoTravado({
+      id:'obra-ficha-'+o.id, alvo:o, novo:()=>!String(o.nome||'').trim(),
+      resumo:()=>`<div style="line-height:1.9">
+        <b style="font-size:14.5px">${esc(o.nome||'Obra sem nome')}</b>
+        ${o.tipo?`<span class="tag" style="margin-left:7px">${esc(o.tipo)}</span>`:''}
+        ${o.status?`<span class="tag">${esc(o.status)}</span>`:''}
+        <div style="margin-top:5px">
+          ${dado('Empresa',o.empresa)}${dado('Endereço',o.endereco)}
+          ${dado('Área',+o.area?o.area+' m²':'')}${dado('Terreno',+o.areaTerreno?o.areaTerreno+' m²':'')}
+          ${dado('Início',o.inicio?fmtDataAno(o.inicio):'')}${dado('Fim',o.fim?fmtDataAno(o.fim):'')}
+        </div>
+        ${o.obs?`<div style="margin-top:5px;color:var(--suave);font-size:12.5px;white-space:pre-wrap">${esc(o.obs)}</div>`:''}
+      </div>`,
+      campos:[
+        {k:'nome',t:'Nome da obra',ph:'ex.: Casa Vila Segura 27'},
+        {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposObra')},
+        {k:'status',t:'Status',tipo:'select',opcoes:CFG('statusObra')},
+        {k:'empresa',t:'Por qual empresa correu',tipo:'select',opcoes:[...new Set(['Fortemais',...E.empresasPJ.map(x=>x.nome).filter(Boolean)])]},
+        {k:'endereco',t:'Endereço',full:true},
+        {k:'area',t:'Área construída (m²)',tipo:'number'},
+        {k:'areaTerreno',t:'Área do terreno (m²)',tipo:'number'},
+        {k:'inicio',t:'Início',tipo:'date'},
+        {k:'fim',t:'Fim (ou previsão)',tipo:'date'},
+        {k:'obs',t:'Anotações',tipo:'textarea',full:true},
+      ],
+      aoMudar:()=>{}, // o m² e o custo/m² só mudam ao fechar; repintar aqui tiraria o foco
+    }));
     c.appendChild(s1);
 
     /* --- centro de custo --- */
@@ -3891,7 +3914,22 @@ async function fichaObraEm(c,o,fechar){
     if(!cc7.impostoLanc)defs7.push({k:'impostoValor',t:'Imposto pago (R$)',tipo:'moeda'});
     if(!cc7.comissaoLanc)defs7.push({k:'comissaoValor',t:'Comissão paga (R$)',tipo:'moeda'});
     defs7.push({k:'outrasDeducoes',t:'Outras deduções (R$)',tipo:'moeda'});
-    s7.appendChild(campos(o,defs7,()=>{salvar();pinta()}));
+    /* Mesma regra da Ficha: venda lançada vira resumo. "Novo" enquanto não
+       há valor de venda — obra sem vender abre os campos direto. */
+    s7.appendChild(blocoTravado({
+      id:'obra-venda-'+o.id, alvo:o, novo:()=>!(+o.vendaValor),
+      resumo:()=>`<div style="line-height:1.9">
+        <b style="font-size:14.5px">${+o.vendaValor?brl(+o.vendaValor):'Ainda não vendida'}</b>
+        <div style="margin-top:3px">
+          ${dado('Vendida em',o.vendaData?fmtDataAno(o.vendaData):'')}
+          ${dado('Fim do recebimento',o.recebidoEm?fmtDataAno(o.recebidoEm):'')}
+          ${dado('Comprador',o.comprador)}
+          ${dado('Imposto',cc7.imposto?brl(cc7.imposto)+(cc7.impostoLanc?' 🔗':''):'')}
+          ${dado('Comissão',cc7.comissao?brl(cc7.comissao)+(cc7.comissaoLanc?' 🔗':''):'')}
+          ${dado('Outras deduções',+o.outrasDeducoes?brl(+o.outrasDeducoes):'')}
+        </div></div>`,
+      campos:defs7, aoMudar:()=>{},
+    }));
     if(cc7.impostoLanc)s7.appendChild(el(`<p style="font-size:12.5px;margin:9px 0 0">🔗 <b>Imposto: ${brl(cc7.impostoLanc)}</b>, puxado dos lançamentos no plano "Imposto da venda" — nada a digitar aqui.</p>`));
     if(cc7.comissaoLanc)s7.appendChild(el(`<p style="font-size:12.5px;margin:${cc7.impostoLanc?4:9}px 0 0">🔗 <b>Comissão: ${brl(cc7.comissaoLanc)}</b>, puxada dos lançamentos no plano "Comissão da venda" — nada a digitar aqui.</p>`));
     s7.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin-top:9px">
