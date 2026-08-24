@@ -161,6 +161,7 @@ tr:hover .lixo{opacity:1}
 .solta{border:1.5px dashed var(--linha);border-radius:11px;padding:16px;text-align:center;color:var(--suave);
   font-size:13px;cursor:pointer;transition:.15s}
 .solta.ocupado{opacity:.55;pointer-events:none}
+.secao.fechada>*:not(h4){display:none}
 .solta:hover,.solta.sobre{border-color:var(--verde);color:var(--verde);background:var(--verde-cl)}
 
 /* checklist */
@@ -3425,6 +3426,18 @@ async function fichaObraEm(c,o,fechar){
     const custos=rr2?await fmCustos(o.id):[];
 
     const pinta=()=>{c.innerHTML='';montar()};
+    /* Os subtítulos da ficha abrem e fecham no toque. O estado mora em
+       E.colapso — o mesmo lugar dos blocos das telas — e vale para TODAS as
+       obras: quem fecha "Fornecedores" numa, quer fechada nas outras. */
+    const secR=(titulo)=>{
+      const id='obf-'+titulo.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);
+      const fechada=!!E.colapso[id];
+      const sc=el('<div class="secao'+(fechada?' fechada':'')+'"></div>');
+      const h=el(`<h4 style="cursor:pointer;user-select:none"><span class="seta" style="display:inline-block;font-size:10px;margin-right:6px;transform:rotate(${fechada?-90:0}deg);transition:transform .15s">▼</span>${titulo}</h4>`);
+      h.onclick=()=>{E.colapso[id]=!E.colapso[id];salvar();pinta()};
+      sc.appendChild(h);
+      return sc;
+    };
     const montar=()=>{
     const cc=contasObra(o,(_fmResumo||{})[o.id]||rr2);
 
@@ -3437,7 +3450,7 @@ async function fichaObraEm(c,o,fechar){
     </div>`));
 
     /* --- a ficha --- */
-    const s1=el('<div class="secao"><h4>Ficha</h4></div>');
+    const s1=secR('Ficha');
     s1.appendChild(campos(o,[
       {k:'nome',t:'Nome da obra',ph:'ex.: Casa Vila Segura 27'},
       {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposObra')},
@@ -3453,7 +3466,7 @@ async function fichaObraEm(c,o,fechar){
     c.appendChild(s1);
 
     /* --- centro de custo --- */
-    const s2=el('<div class="secao"><h4>Para onde foi o dinheiro</h4></div>');
+    const s2=secR('Para onde foi o dinheiro');
     if(!rr2){
       s2.appendChild(el('<div class="vazio">Nenhum custo lançado. Traga o export do ERP na tela principal, bloco 📥.</div>'));
     } else {
@@ -3547,7 +3560,7 @@ async function fichaObraEm(c,o,fechar){
        (obraM2Fora é global) — senão uma obra somaria terreno e a outra não,
        e a comparação viraria mentira. */
     if(rr2&&(+o.area>0||true)){
-      const s2m=el('<div class="secao"><h4>Custo por m² — escolha o que entra</h4></div>');
+      const s2m=secR('Custo por m² — escolha o que entra');
       const grupos=Object.entries(rr2.centros).sort((x,y)=>y[1].total-x[1].total)
         .map(([k,v])=>({k,v:v.total}));
       const cc2=contasObra(o,rr2);
@@ -3587,7 +3600,7 @@ async function fichaObraEm(c,o,fechar){
        frete avulso. O lançamento manual grava NA MESMA tabela dos importados
        (id próprio, origem "manual") — uma fonte só de verdade, e o reimporte
        do arquivo não mexe nele porque a chave é outra. */
-    const s2b=el('<div class="secao"><h4>Lançar despesa</h4></div>');
+    const s2b=secR('Lançar despesa');
     const nvo={data:hoje(),nome:'',centro:CFG('centrosObra')[0],fornecedor:'',valor:0};
     s2b.appendChild(campos(nvo,[
       {k:'data',t:'Data',tipo:'date'},
@@ -3618,7 +3631,7 @@ async function fichaObraEm(c,o,fechar){
 
     /* --- últimos lançamentos: conferir e poder apagar --- */
     if(custos.length){
-      const s2c=el('<div class="secao"><h4>Últimos lançamentos</h4></div>');
+      const s2c=secR('Últimos lançamentos');
       const ults=custos.slice(-12).reverse();
       const rolU=el('<div class="rolagem"></div>');
       const tU=document.createElement('table');
@@ -3653,7 +3666,7 @@ async function fichaObraEm(c,o,fechar){
 
     /* --- especialidades: o cruzamento que o ERP não faz --- */
     if(custos.length){
-      const s3=el('<div class="secao"><h4>Por especialidade — material × mão de obra</h4></div>');
+      const s3=secR('Por especialidade — material × mão de obra');
       const esp={};
       let semDono=0,semDonoV=0;
       custos.forEach(l=>{
@@ -3688,7 +3701,7 @@ async function fichaObraEm(c,o,fechar){
       c.appendChild(s3);
 
       /* --- os fornecedores: onde UMA marcação classifica dezenas de lançamentos --- */
-      const s4=el('<div class="secao"><h4>Fornecedores e prestadores</h4></div>');
+      const s4=secR('Fornecedores e prestadores');
       s4.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:0 0 9px">Diga o que cada um faz, uma vez só: todos os pagamentos a ele — passados e futuros, em todas as obras — entram na especialidade. É assim que "FULANO BOMBEIRO" vira mão de obra de hidráulica.</p>'));
       const fs=Object.entries(rr2.fornecedores).sort((x,y)=>y[1].total-x[1].total);
       const rol4=el('<div class="rolagem" style="max-height:340px;overflow-y:auto"></div>');
@@ -3732,7 +3745,7 @@ async function fichaObraEm(c,o,fechar){
       c.appendChild(s4);
 
       /* --- a curva: custo mês a mês, aporte junto --- */
-      const s5=el('<div class="secao"><h4>A curva da obra</h4></div>');
+      const s5=secR('A curva da obra');
       const meses=Object.entries(rr2.meses).sort();
       const apMes={};
       E.obraAportes.filter(x=>x.obra===o.id).forEach(x=>{const k=(x.data||'').slice(0,7);if(k)apMes[k]=(apMes[k]||0)+(+x.valor||0)});
@@ -3742,7 +3755,7 @@ async function fichaObraEm(c,o,fechar){
     }
 
     /* --- aportes --- */
-    const s6=el('<div class="secao"><h4>Aportes — dinheiro posto na obra</h4></div>');
+    const s6=secR('Aportes — dinheiro posto na obra');
     s6.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:0 0 6px">Aporte não é venda: é o que o sócio (ou você) colocou para bancar a obra. No acerto final, cada um recebe o que pôs mais a parte no lucro.</p>'));
     const meus=E.obraAportes.filter(x=>x.obra===o.id);
     s6.appendChild(tabelaBloco('fm-ap-'+o.id,'','',meus,[
@@ -3764,7 +3777,7 @@ async function fichaObraEm(c,o,fechar){
        planilha. REGRA DE VITRINE, NÃO DE CARTÓRIO: o acerto real é o que
        vocês combinarem; isto mostra o que cada real rendeu no tempo. */
     if(meus.length){
-      const s6b=el('<div class="secao"><h4>Retorno dos aportes</h4></div>');
+      const s6b=secR('Retorno dos aportes');
       const ret=retornoAportes(o,(_fmResumo||{})[o.id]||rr2);
       s6b.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:0 0 9px">'+
         'Preencha a <b>% do lucro</b> de cada um — é ela que divide. Sem % preenchida, '+
@@ -3813,7 +3826,7 @@ async function fichaObraEm(c,o,fechar){
     }
 
     /* --- a venda --- */
-    const s7=el('<div class="secao"><h4>Venda</h4></div>');
+    const s7=secR('Venda');
     s7.appendChild(campos(o,[
       {k:'vendaValor',t:'Valor da venda',tipo:'moeda'},
       {k:'vendaData',t:'Data da venda',tipo:'date'},
@@ -3829,7 +3842,7 @@ async function fichaObraEm(c,o,fechar){
     c.appendChild(s7);
 
     /* --- arquivos e apagar --- */
-    const s8=el('<div class="secao"><h4>Arquivos da obra</h4></div>');
+    const s8=secR('Arquivos da obra');
     s8.appendChild(areaArquivos('obra:'+o.id,'Matrícula, alvará, habite-se, contrato de venda, memorial'));
     c.appendChild(s8);
     const s9=el('<div class="secao" style="display:flex;gap:9px"></div>');
