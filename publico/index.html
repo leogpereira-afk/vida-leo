@@ -3099,11 +3099,55 @@ function tirAnual(fluxos){
   const fs=fluxos.filter(f=>f.v&&f.d).map(f=>({t:new Date(f.d+'T12:00').getTime(),v:f.v}));
   if(fs.length<2||!fs.some(f=>f.v<0)||!fs.some(f=>f.v>0))return null;
   const t0=Math.min(...fs.map(f=>f.t));
+  // tudo no mesmo dia: não existe "ao ano" — a bisseção despencaria para −100%
+  if(Math.max(...fs.map(f=>f.t))===t0)return null;
   const vp=r=>fs.reduce((s2,f)=>s2+f.v/Math.pow(1+r,(f.t-t0)/31557600000),0);
   let lo=-0.9999,hi=100;
   if(vp(lo)*vp(hi)>0)return null;
   for(let i=0;i<200;i++){const m=(lo+hi)/2;(vp(lo)*vp(m)<=0)?hi=m:lo=m}
   return (lo+hi)/2*100;
+}
+
+
+/* O retorno dos aportes, calculado num lugar SÓ — a tela e o PDF leem daqui.
+   A % DE CADA UM É DO DONO: se ele preencher o rateio (o.rateio, por pessoa),
+   é essa % que divide o lucro. O capital × tempo continua na tabela como
+   SUGESTÃO — é o que cada real carregou de obra — mas não manda mais.
+   Aporte datado DEPOIS do fim do recebimento não carrega tempo nenhum
+   (máx(0, …)) e, na TIR, entra no próprio fim — dinheiro que chegou depois
+   da festa não multiplica. */
+function retornoAportes(o,rr2){
+  const cc=contasObra(o,rr2);
+  const meus=E.obraAportes.filter(x=>x.obra===o.id);
+  const fim=o.recebidoEm||o.vendaData||'';
+  const tFim=fim?new Date(fim+'T12:00').getTime():Date.now();
+  const porQuem={};
+  meus.forEach(x=>{
+    const q=(x.quem||'?').trim()||'?';
+    const r6=porQuem[q]??={total:0,capTempo:0,fluxos:[],forasDoTempo:0};
+    const v6=+x.valor||0;
+    r6.total+=v6;
+    const tA=x.data?new Date(x.data+'T12:00').getTime():tFim;
+    const meses=Math.max(0,(tFim-tA)/2629800000);
+    r6.capTempo+=v6*meses;
+    if(x.data&&tA>tFim)r6.forasDoTempo++;
+    r6.fluxos.push({d:(x.data&&tA<=tFim)?x.data:(fim||x.data||hoje()),v:-v6});
+  });
+  const somaCT=Object.values(porQuem).reduce((s2,x)=>s2+x.capTempo,0);
+  const rateio=o.rateio&&typeof o.rateio==='object'?o.rateio:{};
+  const somaManual=Object.entries(porQuem).reduce((s2,[q])=>s2+(+rateio[q]||0),0);
+  const usaManual=somaManual>0;
+  const vendida=cc.venda>0&&!!fim;
+  const linhas=Object.entries(porQuem).sort((x,y)=>y[1].total-x[1].total).map(([q,r6])=>{
+    const fatiaCT=somaCT?r6.capTempo/somaCT:0;
+    const fatia=usaManual?(+rateio[q]||0)/100:fatiaCT;
+    const parte=vendida?cc.lucro*fatia:0;
+    const recebe=r6.total+parte;
+    const tir=vendida?tirAnual([...r6.fluxos,{d:fim,v:recebe}]):null;
+    return {quem:q,total:r6.total,fatiaCT,fatia,parte,recebe,tir,
+      pctManual:rateio[q]===undefined?'':rateio[q],forasDoTempo:r6.forasDoTempo};
+  });
+  return {linhas,usaManual,somaManual,vendida,fim,lucro:cc.lucro};
 }
 
 /* ---- as contas de uma obra ----
@@ -3148,7 +3192,8 @@ function contasObra(o,r){
 /* ---------------- o dossiê da obra em PDF ----------------
    Mesmo padrão do roteiro de viagem: janela própria, window.print. Vai TUDO,
    inclusive o livro-caixa inteiro — é o documento da obra, o papel que se
-   guarda ou se mostra ao sócio, não um recorte de tela. */
+   guarda ou se mostra ao sócio, não um recorte de tela. O retorno dos
+   aportes sai de retornoAportes(), a MESMA função da tela: régua única. */
 function imprimirObra(o,rr2,custos){
   const w=window.open('','_blank');
   if(!w){alert('Libere o pop-up para gerar o PDF.');return}
@@ -3169,16 +3214,29 @@ function imprimirObra(o,rr2,custos){
   });
   const espLin=Object.entries(esp).map(([k,v])=>({k,...v,tot:v.mat+v.mao+v.outros})).sort((x,y)=>y.tot-x.tot);
 
-  // retorno por investidor: mesma regra da tela
   const meus=E.obraAportes.filter(x=>x.obra===o.id);
-  const tFim=fim?new Date(fim+'T12:00').getTime():Date.now();
-  const porQuem={};
-  meus.forEach(x=>{const q=(x.quem||'?').trim()||'?';
-    const r6=porQuem[q]??={total:0,capTempo:0,fluxos:[]};const v6=+x.valor||0;
-    r6.total+=v6;r6.capTempo+=v6*(x.data?Math.max(0,(tFim-new Date(x.data+'T12:00').getTime())/2629800000):0);
-    if(x.data)r6.fluxos.push({d:x.data,v:-v6})});
-  const somaCT=Object.values(porQuem).reduce((s2,x)=>s2+x.capTempo,0);
-  const vendida=c.venda>0&&!!fim;
+  const ret=retornoAportes(o,rr2);
+  const blocoRet=meus.length?`<h2>Aportes</h2><table>
+    <thead><tr><th>Data</th><th>Quem</th><th class="n">Valor</th><th>Obs</th></tr></thead><tbody>
+    ${meus.slice().sort((x,y)=>(x.data||'').localeCompare(y.data||'')).map(x=>`<tr>
+      <td>${x.data?fmtDataAno(x.data):'—'}</td><td>${esc(x.quem||'')}</td>
+      <td class="n">${brl(+x.valor||0)}</td><td>${esc(x.obs||'')}</td></tr>`).join('')}
+    <tr><td colspan="2"><b>Total</b></td><td class="n"><b>${brl(c.aporte)}</b></td><td></td></tr></tbody></table>
+
+  <h2>Retorno dos aportes ${ret.vendida?'':'(obra ainda em aberto)'}</h2>
+  <table><thead><tr><th>Quem</th><th class="n">Aportou</th><th class="n">% do lucro</th><th class="n">Capital × tempo</th>
+    ${ret.vendida?'<th class="n">Lucro que lhe cabe</th><th class="n">Recebe</th><th class="n">Retorno</th>':''}</tr></thead><tbody>
+    ${ret.linhas.map(li=>{
+      const pct=(li.fatia*100).toFixed(1)+'%';
+      if(!ret.vendida)return `<tr><td>${esc(li.quem)}</td><td class="n">${brl(li.total)}</td>
+        <td class="n">${pct}</td><td class="n">${(li.fatiaCT*100).toFixed(1)}%</td></tr>`;
+      return `<tr><td>${esc(li.quem)}</td><td class="n">${brl(li.total)}</td>
+        <td class="n">${pct}</td><td class="n">${(li.fatiaCT*100).toFixed(1)}%</td>
+        <td class="n ${li.parte>=0?'verd':'verm'}">${brl(li.parte)}</td><td class="n">${brl(li.recebe)}</td>
+        <td class="n"><b>${li.tir==null?'—':li.tir.toFixed(1)+'% a.a.'}</b></td></tr>`;
+    }).join('')}</tbody></table>
+  ${ret.usaManual&&Math.abs(ret.somaManual-100)>0.01?`<p style="font-size:11px;color:#a33">⚠️ As porcentagens somam ${ret.somaManual.toFixed(1)}%, não 100%.</p>`:''}
+  <p style="font-size:11px;color:#777">${ret.usaManual?'Divisão pela % combinada entre as partes.':'Divisão por capital × tempo (referência — nenhuma % foi definida).'} Retorno é a TIR anual dos aportes datados${ret.fim?' até '+fmtDataAno(ret.fim):''}.</p>`:'';
 
   w.document.write(`<!doctype html><meta charset="utf-8"><title>${esc(o.nome||'Obra')} — Fortemais</title>
   <style>
@@ -3229,26 +3287,7 @@ function imprimirObra(o,rr2,custos){
       <td class="n">${l.mao?brl(l.mao):'—'}</td><td class="n">${l.outros?brl(l.outros):'—'}</td>
       <td class="n"><b>${brl(l.tot)}</b></td></tr>`).join('')}</tbody></table>`:''}
 
-  ${meus.length?`<h2>Aportes</h2><table>
-    <thead><tr><th>Data</th><th>Quem</th><th class="n">Valor</th><th>Obs</th></tr></thead><tbody>
-    ${meus.slice().sort((x,y)=>(x.data||'').localeCompare(y.data||'')).map(x=>`<tr>
-      <td>${x.data?fmtDataAno(x.data):'—'}</td><td>${esc(x.quem||'')}</td>
-      <td class="n">${brl(+x.valor||0)}</td><td>${esc(x.obs||'')}</td></tr>`).join('')}
-    <tr><td colspan="2"><b>Total</b></td><td class="n"><b>${brl(c.aporte)}</b></td><td></td></tr></tbody></table>
-
-  <h2>Retorno dos aportes ${vendida?'':'(obra ainda em aberto)'}</h2>
-  <table><thead><tr><th>Quem</th><th class="n">Aportou</th><th class="n">Capital × tempo</th>
-    ${vendida?'<th class="n">Lucro que lhe cabe</th><th class="n">Recebe</th><th class="n">Retorno</th>':''}</tr></thead><tbody>
-    ${Object.entries(porQuem).sort((x,y)=>y[1].total-x[1].total).map(([q,r6])=>{
-      const fatia=somaCT?r6.capTempo/somaCT:0;
-      if(!vendida)return `<tr><td>${esc(q)}</td><td class="n">${brl(r6.total)}</td><td class="n">${(fatia*100).toFixed(1)}%</td></tr>`;
-      const parte=c.lucro*fatia,recebe=r6.total+parte;
-      const tir=tirAnual([...r6.fluxos,{d:fim,v:recebe}]);
-      return `<tr><td>${esc(q)}</td><td class="n">${brl(r6.total)}</td><td class="n">${(fatia*100).toFixed(1)}%</td>
-        <td class="n ${parte>=0?'verd':'verm'}">${brl(parte)}</td><td class="n">${brl(recebe)}</td>
-        <td class="n"><b>${tir==null?'—':tir.toFixed(1)+'% a.a.'}</b></td></tr>`;
-    }).join('')}</tbody></table>
-  <p style="font-size:11px;color:#777">Rateio do lucro por capital × tempo${fim?' até '+fmtDataAno(fim):''}; retorno é a TIR anual dos aportes datados. Regra de referência — o acerto combinado entre as partes é o que vale.</p>`:''}
+  ${blocoRet}
 
   ${(custos&&custos.length)?`<h2>Livro-caixa — todos os lançamentos (${custos.length})</h2><table>
     <thead><tr><th>Data</th><th>O que</th><th>Plano</th><th>Fornecedor</th><th class="n">Valor</th></tr></thead><tbody>
@@ -3726,47 +3765,49 @@ async function fichaObraEm(c,o,fechar){
        vocês combinarem; isto mostra o que cada real rendeu no tempo. */
     if(meus.length){
       const s6b=el('<div class="secao"><h4>Retorno dos aportes</h4></div>');
-      const cc6=contasObra(o,(_fmResumo||{})[o.id]||rr2);
-      const fim=o.recebidoEm||o.vendaData||'';
-      const tFim=fim?new Date(fim+'T12:00').getTime():Date.now();
-      const porQuem={};
-      meus.forEach(x=>{
-        const q=(x.quem||'?').trim()||'?';
-        const r6=porQuem[q]??={total:0,capTempo:0,fluxos:[]};
-        const v6=+x.valor||0;
-        r6.total+=v6;
-        const mesesTrab=x.data?Math.max(0,(tFim-new Date(x.data+'T12:00').getTime())/2629800000):0;
-        r6.capTempo+=v6*mesesTrab;
-        if(x.data)r6.fluxos.push({d:x.data,v:-v6});
-      });
-      const somaCT=Object.values(porQuem).reduce((s6c,x)=>s6c+x.capTempo,0);
-      const vendida=cc6.venda>0&&!!fim;
+      const ret=retornoAportes(o,(_fmResumo||{})[o.id]||rr2);
+      s6b.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:0 0 9px">'+
+        'Preencha a <b>% do lucro</b> de cada um — é ela que divide. Sem % preenchida, '+
+        'vale o capital × tempo (quanto cada real carregou de obra), que fica na tabela como referência.</p>'));
       const rol6=el('<div class="rolagem"></div>');
       const t6=document.createElement('table');
-      t6.innerHTML='<thead><tr><th>Quem</th><th style="text-align:right">Aportou</th><th style="text-align:right">Capital × tempo</th>'
-        +(vendida?'<th style="text-align:right">Lucro que lhe cabe</th><th style="text-align:right">Recebe</th><th style="text-align:right">Retorno</th>':'')
+      t6.innerHTML='<thead><tr><th>Quem</th><th style="text-align:right">Aportou</th>'
+        +'<th style="text-align:right">% do lucro</th>'
+        +'<th style="text-align:right" title="quanto cada real carregou de obra — referência">Capital × tempo</th>'
+        +(ret.vendida?'<th style="text-align:right">Lucro que lhe cabe</th><th style="text-align:right">Recebe</th><th style="text-align:right">Retorno</th>':'')
         +'</tr></thead>';
       const tb6=document.createElement('tbody');
-      Object.entries(porQuem).sort((x,y)=>y[1].total-x[1].total).forEach(([q,r6])=>{
-        const fatia=somaCT?r6.capTempo/somaCT:0;
+      ret.linhas.forEach(li6=>{
         let extra='';
-        if(vendida){
-          const parte=cc6.lucro*fatia;
-          const recebe=r6.total+parte;
-          const tir=tirAnual([...r6.fluxos,{d:fim,v:recebe}]);
-          extra=`<td class="num" style="padding:8px 10px;color:${parte>=0?'var(--verde)':'var(--vermelho)'}">${brl(parte)}</td>
-            <td class="num" style="padding:8px 10px">${brl(recebe)}</td>
-            <td class="num" style="padding:8px 10px;font-weight:600;color:${(tir??0)>=0?'var(--verde)':'var(--vermelho)'}">${tir==null?'—':tir.toFixed(1)+'% a.a.'}</td>`;
+        if(ret.vendida){
+          extra=`<td class="num" style="padding:8px 10px;color:${li6.parte>=0?'var(--verde)':'var(--vermelho)'}">${brl(li6.parte)}</td>
+            <td class="num" style="padding:8px 10px">${brl(li6.recebe)}</td>
+            <td class="num" style="padding:8px 10px;font-weight:600;color:${(li6.tir??0)>=0?'var(--verde)':'var(--vermelho)'}">${li6.tir==null?'—':li6.tir.toFixed(1)+'% a.a.'}</td>`;
         }
-        tb6.appendChild(elTr(`<td style="padding:8px 10px"><b>${esc(q)}</b></td>
-          <td class="num" style="padding:8px 10px">${brl(r6.total)}</td>
-          <td class="num" style="padding:8px 10px;color:var(--suave)">${(fatia*100).toFixed(1)}%</td>${extra}`));
+        const tr=elTr(`<td style="padding:8px 10px"><b>${esc(li6.quem)}</b>${li6.forasDoTempo?' <span class="tag" style="font-size:10px" title="aporte com data depois do fim do recebimento não carrega tempo — corrija a data se o dinheiro entrou antes">data?</span>':''}</td>
+          <td class="num" style="padding:8px 10px">${brl(li6.total)}</td>
+          <td class="num" style="padding:6px 10px"></td>
+          <td class="num" style="padding:8px 10px;color:var(--suave)">${(li6.fatiaCT*100).toFixed(1)}%</td>${extra}`);
+        const pct=el(`<input type="number" inputmode="decimal" min="0" max="100" step="0.1" placeholder="—"
+          style="width:74px;text-align:right" value="${li6.pctManual===''?'':li6.pctManual}">`);
+        pct.onchange=()=>{
+          if(!o.rateio||typeof o.rateio!=='object')o.rateio={};
+          const v7=pct.value.trim();
+          if(v7==='')delete o.rateio[li6.quem];else o.rateio[li6.quem]=+v7;
+          salvar();pinta();
+        };
+        tr.children[2].appendChild(pct);tr.children[2].appendChild(el('<span style="color:var(--suave)"> %</span>'));
+        tb6.appendChild(tr);
       });
       t6.appendChild(tb6);rol6.appendChild(t6);s6b.appendChild(rol6);
-      if(!vendida){
-        s6b.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin-top:9px">O retorno aparece quando a <b>venda</b> e o <b>recebimento concluído</b> estiverem lançados. A coluna capital × tempo já mostra quanto cada um carregou a obra até aqui.</p>'));
+      if(ret.usaManual&&Math.abs(ret.somaManual-100)>0.01){
+        s6b.appendChild(el(`<div class="aviso" style="margin-top:9px">⚠️ As porcentagens somam <b>${ret.somaManual.toFixed(1)}%</b>, não 100%. `+
+          (ret.somaManual<100?'Sobra lucro sem dono ('+brl(ret.lucro*(100-ret.somaManual)/100)+').':'Está sendo dividido mais lucro do que existe.')+'</div>'));
+      }
+      if(!ret.vendida){
+        s6b.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin-top:9px">O retorno aparece quando a <b>venda</b> e o <b>recebimento concluído</b> estiverem lançados.</p>'));
       } else {
-        s6b.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin-top:9px">Rateio por capital × tempo até '+fmtDataAno(fim)+'; retorno é a TIR anual dos aportes datados de cada um. O dinheiro que saiu do SEU bolso só entra nesta conta se você lançar como aporte seu.</p>'));
+        s6b.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin-top:9px">Retorno é a TIR anual dos aportes datados de cada um até '+fmtDataAno(ret.fim)+'. Aporte com data depois do fim não multiplica tempo.</p>'));
       }
       c.appendChild(s6b);
     }
