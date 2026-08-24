@@ -3790,16 +3790,53 @@ async function fichaObraEm(c,o,fechar){
       c.appendChild(s4);
 
       /* --- a curva: custo mês a mês, aporte junto --- */
+      /* A CURVA MUDA DE PASSO CONFORME O RECORTE.
+         Uma obra de 41 meses em barras mensais vira um borrão: os rótulos se
+         atropelam e nenhum número dá para ler. Então "Todos os anos" mostra
+         UMA barra por ano (4 barras, legíveis), e escolher um ano abre os 12
+         meses dele. Mesma ideia do seletor de mês do resto do app. */
       const s5=secR('A curva da obra');
       const meses=Object.entries(rr2.meses).sort();
       const apMes={};
       E.obraAportes.filter(x=>x.obra===o.id).forEach(x=>{const k=(x.data||'').slice(0,7);if(k)apMes[k]=(apMes[k]||0)+(+x.valor||0)});
-      /* UM invólucro só: el() devolve apenas o primeiro elemento da raiz —
-         com a legenda e o gráfico lado a lado, o gráfico era descartado e a
-         seção aparecia vazia. Mesmo defeito do <tr> solto. */
-      s5.appendChild(el(`<div>
-        <div style="font-size:12.5px;color:var(--suave);margin-bottom:6px">Custo por mês — os meses com aporte estão marcados embaixo</div>
-        ${gBarras(meses.map(([k,v])=>({r:k.slice(2).split('-').reverse().join('/')+(apMes[k]?' ●':''),v})))}</div>`));
+      const anosC=[...new Set(meses.map(([k])=>k.slice(0,4)))].sort();
+      // ano escolhido que não existe nesta obra volta para "todos"
+      if(filtro.fmCurvaAno&&filtro.fmCurvaAno!=='todos'&&!anosC.includes(filtro.fmCurvaAno))filtro.fmCurvaAno='todos';
+      const anoC=filtro.fmCurvaAno||'todos';
+      const cv=el('<div></div>');
+      if(anosC.length>1){
+        const barra=el('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px"></div>');
+        [['todos','Todos os anos'],...anosC.map(y=>[y,y])].forEach(([v2,t2])=>{
+          const on=anoC===v2;
+          const b2=el(`<button class="chip" style="cursor:pointer;border:1px solid ${on?'var(--verde)':'var(--linha)'};
+            background:${on?'color-mix(in srgb,var(--verde) 12%,transparent)':'transparent'};
+            color:${on?'inherit':'var(--suave)'}">${t2}</button>`);
+          b2.onclick=()=>{filtro.fmCurvaAno=v2;pinta()};
+          barra.appendChild(b2);
+        });
+        cv.appendChild(barra);
+      }
+      let dados,legenda;
+      if(anoC==='todos'&&anosC.length>1){
+        const porAno={};
+        meses.forEach(([k,v])=>{porAno[k.slice(0,4)]=(porAno[k.slice(0,4)]||0)+v});
+        const apAno={};
+        Object.entries(apMes).forEach(([k,v])=>{apAno[k.slice(0,4)]=(apAno[k.slice(0,4)]||0)+v});
+        dados=anosC.map(y=>({r:y+(apAno[y]?' ●':''),v:porAno[y]||0}));
+        legenda='Custo por ano — toque num ano para ver os meses. O ● marca quem teve aporte.';
+      } else {
+        const y=anoC==='todos'?anosC[0]:anoC;
+        // os 12 meses do ano, inclusive os sem gasto: o vazio também conta história
+        dados=Array.from({length:12},(_,i)=>{
+          const k=y+'-'+String(i+1).padStart(2,'0');
+          return {r:String(i+1).padStart(2,'0')+'/'+y.slice(2)+(apMes[k]?' ●':''),v:rr2.meses[k]||0};
+        });
+        legenda='Custo mês a mês em '+y+'. O ● marca os meses com aporte.';
+      }
+      cv.appendChild(el(`<div>
+        <div style="font-size:12.5px;color:var(--suave);margin-bottom:6px">${legenda}</div>
+        ${gBarras(dados)}</div>`));
+      s5.appendChild(cv);
       c.appendChild(s5);
     }
 
