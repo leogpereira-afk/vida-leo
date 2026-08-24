@@ -821,7 +821,7 @@ function flagsLan(y){
 function gBarras(dados,{alt=150,fmt=brl,cor=null,clicavel=false,sel=-1}={}){
   if(!dados.length||dados.every(d=>!d.v)) return `<div class="vazio">Sem dados ainda.</div>`;
   const max=Math.max(...dados.map(d=>Math.abs(d.v)))||1, n=dados.length;
-  // a margem acompanha o rótulo: com centavos, 'R$ 1.438.816,18' não cabia em 44
+  // a margem acompanha o rótulo: com centavos, 'R$ 1.234.567,89' não cabia em 44
   const L=Math.max(44,String(fmt(max)).length*5.5+10);
   const larg=Math.max(300,n*Math.min(86,720/n)+L),passo=(larg-L-8)/n;
   return `<svg viewBox="0 0 ${larg} ${alt+34}" style="width:100%;height:${alt+34}px;overflow:visible">
@@ -3169,7 +3169,10 @@ function retornoAportes(o,rr2){
   const somaCT=Object.values(porQuem).reduce((s2,x)=>s2+x.capTempo,0);
   const rateio=o.rateio&&typeof o.rateio==='object'?o.rateio:{};
   const somaManual=Object.entries(porQuem).reduce((s2,[q])=>s2+(+rateio[q]||0),0);
-  const usaManual=somaManual>0;
+  /* "definiu" é ter a chave, não ter valor maior que zero. Antes, digitar 0%
+     para o único sócio somava 0, caía no automático e ele levava 100% — o
+     oposto exato do que o dono acabara de mandar. */
+  const usaManual=Object.keys(porQuem).some(q=>rateio[q]!==undefined&&rateio[q]!==''); 
   const vendida=cc.venda>0&&!!fim;
   const linhas=Object.entries(porQuem).sort((x,y)=>y[1].total-x[1].total).map(([q,r6])=>{
     const fatiaCT=somaCT?r6.capTempo/somaCT:0;
@@ -3199,6 +3202,11 @@ function contasObra(o,r){
     if(ehImpostoVenda(k))impostoLanc+=v.total;
     else if(ehComissaoVenda(k))comissaoLanc+=v.total;
   }
+  /* SEM RESUMO NÃO HÁ CONTA. Quando o servidor não responde, `r` vem null e
+     o custo virava 0 — e o lucro, "venda inteira", em verde. Zero que na
+     verdade é "não sei" é a pior mentira que um painel de dinheiro conta.
+     `semDados` propaga isso: quem exibe mostra "—", não número. */
+  const semDados=!r;
   const custo=((r&&r.total)||0)-impostoLanc-comissaoLanc;
   const aporte=E.obraAportes.filter(x=>x.obra===o.id).reduce((s,x)=>s+(+x.valor||0),0);
   const venda=+o.vendaValor||0;
@@ -3206,8 +3214,9 @@ function contasObra(o,r){
   const comissao=comissaoLanc||(+o.comissaoValor||0);
   const outras=+o.outrasDeducoes||0;
   const liquido=venda-imposto-comissao-outras;
-  const lucro=venda?liquido-custo:0;
-  const margem=venda?lucro/venda*100:0;
+  const podeLucro=!!venda&&!semDados;      // sem custo conhecido não existe lucro
+  const lucro=podeLucro?liquido-custo:0;
+  const margem=podeLucro?lucro/venda*100:0;
   const area=+o.area||0;
   const meses=(r&&r.de&&r.ate)?Math.max(1,Math.round((new Date(r.ate)-new Date(r.de))/2629800000)):0;
   /* O custo/m² segue a SELEÇÃO do dono (obraM2Fora): ele escolhe se o
@@ -3224,13 +3233,16 @@ function contasObra(o,r){
   if(!fora.has('Comissão da venda'))custoSel+=comissao;
   if(!fora.has('Imposto da venda'))custoSel+=imposto;
   const custoTudo=custo+comissao+imposto;
-  return {custo,aporte,venda,imposto,comissao,impostoLanc,comissaoLanc,outras,liquido,lucro,margem,area,meses,custoSel,custoTudo,
+  return {custo,aporte,venda,imposto,comissao,impostoLanc,comissaoLanc,outras,liquido,lucro,margem,area,meses,custoSel,custoTudo,semDados,podeLucro,
     porM2:area?custoSel/area:0, porM2Tudo:area?custoTudo/area:0, vendaM2:area&&venda?venda/area:0,
     // quanto do custo NÃO veio de aporte de sócio: saiu do caixa do dono
     proprio:custo-aporte,
     // lucro por mês de obra: 20% em 8 meses vale mais que 30% em 3 anos
     porMes:meses?lucro/meses:0,
-    retorno:aporte?lucro/aporte*100:0};
+    /* O MESMO retorno da tabela de investidores: lucro ÷ aportado. Antes o
+       cartão usava o lucro INTEIRO sobre o aporte de um só sócio e mostrava
+       154% onde a tabela mostrava 77% — dois números para a mesma pergunta. */
+    retorno:(podeLucro&&aporte)?lucro/aporte*100:null};
 }
 
 
@@ -3307,8 +3319,8 @@ function imprimirObra(o,rr2,custos){
     <div><span class="rot">Custo total</span><b class="verm">${brl(c.custo)}</b></div>
     <div><span class="rot">Aportes</span><b>${brl(c.aporte)}</b></div>
     ${c.venda?`<div><span class="rot">Venda líquida</span><b>${brl(c.liquido)}</b></div>
-    <div><span class="rot">Lucro</span><b class="${c.lucro>=0?'verd':'verm'}">${brl(c.lucro)} · ${c.margem.toFixed(1)}%</b></div>`:''}
-    ${c.area?`<div><span class="rot">Custo/m² (grupos escolhidos)</span><b>${brl(c.porM2)}</b></div>`:''}
+    <div><span class="rot">Lucro</span><b class="${c.lucro>=0?'verd':'verm'}">${c.podeLucro?brl(c.lucro)+' · '+c.margem.toFixed(1)+'%':'—'}</b></div>`:''}
+    ${c.area?`<div><span class="rot">Custo/m² ${(E.obraM2Fora||[]).length?'(grupos escolhidos)':'(com tudo)'}</span><b>${brl(c.porM2)}</b></div>`:''}
   </div>
 
   <h2>Ficha</h2>
@@ -3319,6 +3331,7 @@ function imprimirObra(o,rr2,custos){
   ${linhaKV('Venda',c.venda?brl(c.venda)+(o.vendaData?' em '+fmtDataAno(o.vendaData):''):'')}
   ${linhaKV('Imposto pago',c.imposto?brl(c.imposto):'')}
   ${linhaKV('Comissão paga',c.comissao?brl(c.comissao):'')}
+  ${linhaKV('Outras deduções',c.outras?brl(c.outras):'')}
   ${linhaKV('Recebimento concluído',fim?fmtDataAno(fim):'')}
   ${linhaKV('Observações',esc(o.obs||''))}
 
@@ -3401,9 +3414,9 @@ async function vFortemais(m){
       ${an?`<span class="tag">${an}</span>`:'<span class="tag">em aberto</span>'}
       <span class="cresce"></span>
       <span style="font-size:11px;color:var(--suave)">custo</span>
-      <span style="color:var(--vermelho);font-variant-numeric:tabular-nums;font-weight:600">${brl(c.custo)}</span>
+      <span style="color:${c.semDados?'var(--suave)':'var(--vermelho)'};font-variant-numeric:tabular-nums;font-weight:600"${c.semDados?' title="servidor não respondeu"':''}>${c.semDados?'—':brl(c.custo)}</span>
       <span style="font-size:11px;color:var(--suave)">lucro</span>
-      <span style="color:${c.venda?(c.lucro>=0?'var(--verde)':'var(--vermelho)'):'var(--suave)'};font-variant-numeric:tabular-nums;font-weight:600;min-width:104px;text-align:right">${c.venda?brl(c.lucro):'—'}</span>
+      <span style="color:${c.podeLucro?(c.lucro>=0?'var(--verde)':'var(--vermelho)'):'var(--suave)'};font-variant-numeric:tabular-nums;font-weight:600;min-width:104px;text-align:right">${c.podeLucro?brl(c.lucro):'—'}</span>
       <span class="seta" style="transform:rotate(${aberta?0:-90}deg);transition:transform .15s">▼</span>
     </div>`);
     linha.onclick=()=>{filtro.fmAberta=aberta?null:o.id;r()};
@@ -3417,11 +3430,12 @@ async function vFortemais(m){
     oc.appendChild(cont);
   });
   if(visiveis.length){
-    const totC=visiveis.reduce((s2,x)=>s2+x.c.custo,0);
-    const vend=visiveis.filter(x=>x.c.venda>0);
+    const totC=visiveis.reduce((s2,x)=>s2+(x.c.semDados?0:x.c.custo),0);
+    const semC=visiveis.filter(x=>x.c.semDados).length;
+    const vend=visiveis.filter(x=>x.c.podeLucro);
     const totL=vend.reduce((s2,x)=>s2+x.c.lucro,0);
     oc.appendChild(el(`<div style="display:flex;gap:10px;justify-content:flex-end;padding:11px 6px 2px;font-size:12.5px;color:var(--suave)">
-      ${visiveis.length} obra(s) · custo <b style="color:var(--vermelho)">${brl(totC)}</b>
+      ${visiveis.length} obra(s) · custo <b style="color:var(--vermelho)">${brl(totC)}</b>${semC?' <span style="color:var(--areia)">(faltam '+semC+' — servidor)</span>':''}
       ${vend.length?` · lucro <b style="color:${totL>=0?'var(--verde)':'var(--vermelho)'}">${brl(totL)}</b>`:''}</div>`));
   }
   m.appendChild(bloco('fm-obras','🏗️ Obras','uma linha por obra — clique para expandir',oc));
@@ -3495,12 +3509,23 @@ async function fichaObraEm(c,o,fechar){
     const cc=contasObra(o,(_fmResumo||{})[o.id]||rr2);
 
     /* --- o resultado, sempre à vista --- */
+    /* A conta escrita embaixo do número tem de FECHAR com o número. Antes
+       "outras deduções" sumia do rótulo da venda líquida, e o R$/m² embaixo
+       do Custo dividia um total diferente do que estava em cima. */
+    const contaLiq='venda '+brl(cc.venda)+' − imposto '+brl(cc.imposto)+' − comissão '+brl(cc.comissao)
+      +(cc.outras?' − outras '+brl(cc.outras):'');
+    const foraM2=(E.obraM2Fora||[]).length;
     c.appendChild(el(`<div class="grade" style="gap:8px;margin-bottom:4px">
-      ${kpi('Custo',brl(cc.custo),cc.area?brl(cc.porM2)+'/m² nos grupos escolhidos':'')}
-      ${kpi('Aportes',brl(cc.aporte),cc.proprio>0?brl(cc.proprio)+' do seu bolso':'','a')}
-      ${kpi('Venda líquida',cc.venda?brl(cc.liquido):'—',cc.venda?'venda '+brl(cc.venda)+' − imposto '+brl(cc.imposto)+' − comissão '+brl(cc.comissao):'')}
-      ${kpi('Lucro',cc.venda?brl(cc.lucro):'—',cc.venda?cc.margem.toFixed(1)+'%'+(cc.aporte?' · '+cc.retorno.toFixed(0)+'% sobre o aporte':''):'ainda não vendida',cc.venda?(cc.lucro>=0?'p':'v'):'')}
+      ${kpi('Custo',cc.semDados?'—':brl(cc.custo),cc.semDados?'servidor não respondeu':(cc.area?brl(cc.porM2)+'/m² '+(foraM2?'nos grupos escolhidos':'com tudo'):''))}
+      ${kpi('Aportes',brl(cc.aporte),cc.semDados?'':(cc.proprio>0?brl(cc.proprio)+' do seu bolso':''),'a')}
+      ${kpi('Venda líquida',cc.venda?brl(cc.liquido):'—',cc.venda?contaLiq:'')}
+      ${kpi('Lucro',cc.podeLucro?brl(cc.lucro):'—',
+        cc.semDados?'falta o custo — não dá para saber'
+        :cc.venda?cc.margem.toFixed(1)+'%'+(cc.retorno!=null?' · '+cc.retorno.toFixed(0)+'% sobre o aporte':'')
+        :'ainda não vendida',
+        cc.podeLucro?(cc.lucro>=0?'p':'v'):'')}
     </div>`));
+    if(cc.semDados)c.appendChild(el('<div class="aviso" style="margin-bottom:10px">⚠️ Não consegui ler os custos desta obra no servidor. O que está em branco é <b>desconhecido</b>, não zero — recarregue quando a conexão voltar.</div>'));
 
     /* --- a ficha ---
        Formulário aberto para sempre é convite a mexer sem querer e faz a tela
@@ -3621,7 +3646,16 @@ async function fichaObraEm(c,o,fechar){
         }
       });
       t.appendChild(tb);
-      t.appendChild(elTfoot(`<tr class="tfim"><td>Total</td><td class="num">${brl(rr2.total)}</td><td></td><td class="num">${rr2.n}</td></tr>`));
+      /* rr2.total é a soma de TODOS os lançamentos, inclusive os dos planos
+         "Imposto/Comissão da venda" — que foram tirados do custo da obra de
+         propósito. Chamar isso de "Total" embaixo da coluna de custo faria a
+         soma não bater com o cartão lá em cima. */
+      const cvend=contasObra(o,rr2);
+      const desvio=(cvend.impostoLanc||0)+(cvend.comissaoLanc||0);
+      t.appendChild(elTfoot(`<tr class="tfim"><td>${desvio?'Custo da obra':'Total'}</td>`
+        +`<td class="num">${brl(rr2.total-desvio)}</td><td></td><td class="num">${rr2.n}</td></tr>`
+        +(desvio?`<tr><td colspan="4" style="padding:7px 10px;font-size:12px;color:var(--suave)">`
+          +`+ ${brl(desvio)} nos planos da venda, que não entram no custo — somando tudo, ${brl(rr2.total)}.</td></tr>`:'')));
       rol.appendChild(t);s2.appendChild(rol);
       s2.appendChild(el(`<div style="margin-top:12px">${gRosca(cents.slice(0,8).map(([k,v])=>({r:k,v:v.total})))}</div>`));
     }
@@ -4016,12 +4050,20 @@ async function fichaObraEm(c,o,fechar){
     const s9=el('<div class="secao" style="display:flex;gap:9px"></div>');
     const del=el('<button class="btn ghost" style="color:var(--vermelho)">Apagar obra</button>');
     del.onclick=async()=>{
-      const temCusto=rr2&&rr2.n;
-      if(!confirm('Apagar esta obra'+(temCusto?' e os '+rr2.n+' lançamentos de custo dela no servidor':'')+'? Os aportes dela também saem.'))return;
+      if(!confirm('Apagar esta obra, os lançamentos de custo dela no servidor e os aportes?'))return;
       if(!await apagarAnexosDe('obra:'+o.id))return;
-      if(temCusto){
-        try{ await apiSync('POST',{acao:'obraCustosApagar',obra:o.id});fmEsquecer() }
-        catch(e){ alert('Não consegui apagar os custos no servidor: '+(e.message||e)+'\nNada foi apagado.');return }
+      /* MANDA APAGAR SEMPRE, sem perguntar ao cache se existe custo. O cache
+         pode estar velho (ou nem ter carregado, se o servidor falhou ao abrir
+         a ficha) — e aí a ficha saía do estado deixando centenas de linhas
+         órfãs no banco, sem nada apontando para elas. Apagar o que não existe
+         é inofensivo; deixar órfão é lixo que ninguém mais alcança. */
+      try{
+        const dd=await apiSync('POST',{acao:'obraCustosApagar',obra:o.id});
+        if(!dd||!dd.ok)throw new Error((dd&&dd.erro)||'o servidor não confirmou');
+        fmEsquecer();
+      }catch(e){
+        alert('Não consegui apagar os custos no servidor: '+(e.message||e)+
+          '\n\nNada foi apagado — a obra continua aqui. Tente de novo com conexão.');return;
       }
       E.obraAportes=E.obraAportes.filter(x=>x.obra!==o.id);
       E.obras=E.obras.filter(x=>x.id!==o.id);salvar();fechar();
@@ -4127,6 +4169,17 @@ function blocoImportarObra(){
       const cab={};Object.entries(linhas[0]).forEach(([c,v])=>cab[String(v).trim()]=c);
       const need=['ID Parcela','Tipo','Valor parcela'];
       for(const k of need)if(!cab[k])throw new Error('não achei a coluna "'+k+'" — este arquivo é o export de Resultados?');
+      /* As outras colunas não são obrigatórias, mas a AUSÊNCIA delas muda o
+         resultado em silêncio: sem "Centro de custo" tudo cai num balde só,
+         sem "Data" a curva some, sem "Projeto" a obra é uma só. Se o ERP
+         renomear uma coluna, o dono tem de saber ANTES de gravar. */
+      const querem=['Projeto','Centro de custo','Categoria financeira','Data de competência',
+        'Nome','Fornecedor','Cliente','Forma de pagamento parcela','Conta bancária','Empresa'];
+      const semElas=querem.filter(k=>!cab[k]);
+      if(semElas.length&&!confirm('Este arquivo não tem '+semElas.length+' coluna(s) que eu uso:\n\n· '
+        +semElas.join('\n· ')+'\n\nDá para importar assim, mas o que vier delas fica em branco '
+        +'(sem "Centro de custo", por exemplo, todo gasto cai num balde só).\n\nImportar mesmo assim?'))
+        throw new Error('cancelado — o arquivo não tem todas as colunas');
       const g=c=>cab[c]||null;
       const pega=(l,c)=>{const k=g(c);return k?String(l[k]??'').trim():''};
       const num=v=>{const x=+String(v).replace(',','.');return isNaN(x)?0:x};
@@ -4155,10 +4208,16 @@ function blocoImportarObra(){
       let criadas=0,custosTot=0,aportesTot=0,receitas=[];
       for(const proj of nomes){
         const ls=porProjeto[proj];
-        // casa com a obra existente pelo nome; senão cria
+        /* A obra guarda o NOME QUE VEIO DO ERP (projetoErp). Sem isso, bastava
+           o dono arrumar o nome na ficha para a importação seguinte não achar
+           a obra, criar uma cópia e MOVER os 810 lançamentos para ela —
+           deixando a original vazia e o histórico partido em duas. */
         const nomeLimpo=proj.replace(/^obra\s+/i,'').trim();
-        let o=E.obras.find(x=>(x.nome||'').toLowerCase()===nomeLimpo.toLowerCase()||(x.nome||'').toLowerCase()===proj.toLowerCase());
-        if(!o){o={id:uid(),nome:nomeLimpo||proj,empresa:pega(ls[0],'Empresa')||'Fortemais',
+        const cf=t2=>String(t2||'').trim().toLowerCase();
+        let o=E.obras.find(x=>cf(x.projetoErp)===cf(proj))
+          ||E.obras.find(x=>cf(x.nome)===cf(nomeLimpo)||cf(x.nome)===cf(proj));
+        if(o&&!o.projetoErp){o.projetoErp=proj}     // adota o vínculo na primeira vez
+        if(!o){o={id:uid(),nome:nomeLimpo||proj,projetoErp:proj,empresa:pega(ls[0],'Empresa')||'Fortemais',
           tipo:CFG('tiposObra')[0],status:'Em obra',endereco:'',area:0,areaTerreno:0,
           inicio:'',fim:'',vendaValor:0,vendaData:'',recebidoEm:'',comprador:'',impostoValor:0,
           comissaoValor:0,outrasDeducoes:0,obs:''};

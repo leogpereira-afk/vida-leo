@@ -210,7 +210,12 @@ Deno.serve(async (req: Request) => {
         for (let de = 0; ; de += passo) {
           let q = sb.from("leo_obra_custos")
             .select("id, obra, data, nome, centro, fornecedor, valor, forma, conta, origem")
-            .order("data", { ascending: true }).range(de, de + passo - 1);
+            // desempate por id: `data` REPETE (dezenas de lançamentos no mesmo
+            // dia). Sem uma chave única na ordenação, a paginação do Postgres
+            // pode devolver a mesma linha em duas páginas e pular outra — o
+            // total sairia errado em silêncio a partir de 1.000 linhas.
+            .order("data", { ascending: true }).order("id", { ascending: true })
+            .range(de, de + passo - 1);
           if (obra) q = q.eq("obra", obra);
           const { data, error } = await q;
           if (error) throw new Error(error.message);
