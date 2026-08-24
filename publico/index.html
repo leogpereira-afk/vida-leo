@@ -145,7 +145,7 @@ tr:hover .lixo{opacity:1}
 .modal .secao{padding:16px 20px;border-bottom:1px solid var(--linha)}
 .modal .secao:last-child{border-bottom:0}
 .modal .secao h4{font:600 11.5px Inter;letter-spacing:.05em;text-transform:uppercase;color:var(--suave);margin-bottom:10px}
-.campos{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.campos{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));align-items:end}
 .campo label{display:block;font-size:11.5px;color:var(--suave);margin-bottom:3px}
 .campo input,.campo select,.campo textarea{width:100%;border:1px solid var(--linha);background:var(--bg);
   color:inherit;font:inherit;padding:8px 10px;border-radius:9px}
@@ -615,6 +615,7 @@ const SEED={
      lido do export real de uma obra inteira (824 lançamentos). Mexer aqui
      não quebra nada -- categoria é dado, e o importador cria a que faltar. */
   centrosObra:['Terreno','Mão de obra','Insumo diversos','Insumo hidráulico','Insumo elétrico',
+    'Imposto da venda','Comissão da venda',
     'Aluguel equipamentos','Documentação','Impostos','Condomínio','Copasa','Cemig','Projeto',
     'Custo administrativo','Frete','Cartório','Outros'],
   especialidades:['Obra geral','Terreno','Projeto','Documentação','Terraplenagem','Fundação','Estrutura',
@@ -3045,6 +3046,11 @@ const elTfoot=h=>{const tf=document.createElement('tfoot');tf.innerHTML=h;return
 
 /* De que natureza é este centro de custo. Serve para o cruzamento
    "material × mão de obra" por especialidade. */
+/* Dois planos são da VENDA, não da obra: lançamento neles vira o imposto/
+   a comissão da ficha e SAI do custo — o vínculo que impede contar duas
+   vezes. Reconhecidos pelo nome, com ou sem acento. */
+const ehImpostoVenda=k=>/^imposto\s+da\s+venda$/i.test(String(k||'').trim());
+const ehComissaoVenda=k=>/^comiss[aã]o\s+da\s+venda$/i.test(String(k||'').trim());
 function naturezaCentro(c){
   const x=String(c||'').toLowerCase();
   if(x.includes('mão de obra')||x.includes('mao de obra'))return 'Mão de obra';
@@ -3157,14 +3163,21 @@ function retornoAportes(o,rr2){
 /* ---- as contas de uma obra ----
    Uma função só, para os cartões e a ficha nunca discordarem. */
 function contasObra(o,r){
-  const custo=(r&&r.total)||0;
+  /* Lançamento nos planos "Imposto da venda"/"Comissão da venda" é a fonte
+     PRIMEIRA do imposto e da comissão: veio da planilha, está datado e tem
+     comprovante. Ele sai do custo da obra e entra como dedução da venda —
+     nunca nos dois. O campo digitado na ficha só vale quando NÃO existe
+     lançamento vinculado (senão seria o mesmo dinheiro duas vezes). */
+  let impostoLanc=0,comissaoLanc=0;
+  if(r)for(const [k,v] of Object.entries(r.centros||{})){
+    if(ehImpostoVenda(k))impostoLanc+=v.total;
+    else if(ehComissaoVenda(k))comissaoLanc+=v.total;
+  }
+  const custo=((r&&r.total)||0)-impostoLanc-comissaoLanc;
   const aporte=E.obraAportes.filter(x=>x.obra===o.id).reduce((s,x)=>s+(+x.valor||0),0);
   const venda=+o.vendaValor||0;
-  /* Imposto e comissão são LANÇADOS, não calculados — decisão do dono
-     ("manual tb não percentual"). Percentual bonito que ninguém confere vira
-     número falso; o valor pago de verdade ele tem no comprovante. */
-  const imposto=+o.impostoValor||0;
-  const comissao=+o.comissaoValor||0;
+  const imposto=impostoLanc||(+o.impostoValor||0);
+  const comissao=comissaoLanc||(+o.comissaoValor||0);
   const outras=+o.outrasDeducoes||0;
   const liquido=venda-imposto-comissao-outras;
   const lucro=venda?liquido-custo:0;
@@ -3178,11 +3191,14 @@ function contasObra(o,r){
      são grupos sintéticos: não são lançamentos, vêm da ficha da venda. */
   const fora=new Set(E.obraM2Fora||[]);
   let custoSel=0;
-  if(r)for(const [k,v] of Object.entries(r.centros||{}))if(!fora.has(k))custoSel+=v.total;
+  if(r)for(const [k,v] of Object.entries(r.centros||{})){
+    if(ehImpostoVenda(k)||ehComissaoVenda(k))continue;  // já entram como "da venda" logo abaixo
+    if(!fora.has(k))custoSel+=v.total;
+  }
   if(!fora.has('Comissão da venda'))custoSel+=comissao;
   if(!fora.has('Imposto da venda'))custoSel+=imposto;
   const custoTudo=custo+comissao+imposto;
-  return {custo,aporte,venda,imposto,comissao,outras,liquido,lucro,margem,area,meses,custoSel,custoTudo,
+  return {custo,aporte,venda,imposto,comissao,impostoLanc,comissaoLanc,outras,liquido,lucro,margem,area,meses,custoSel,custoTudo,
     porM2:area?custoSel/area:0, porM2Tudo:area?custoTudo/area:0, vendaM2:area&&venda?venda/area:0,
     // quanto do custo NÃO veio de aporte de sócio: saiu do caixa do dono
     proprio:custo-aporte,
@@ -3488,7 +3504,8 @@ async function fichaObraEm(c,o,fechar){
       const tb=document.createElement('tbody');
       cents.forEach(([k,v])=>{
         const aberto=planoAberto===k;
-        const tr=elTr(`<td style="padding:8px 10px"><span class="seta" style="display:inline-block;transform:rotate(${aberto?0:-90}deg);font-size:10px;margin-right:5px">▼</span><b>${esc(k)}</b></td>
+        const daVenda=ehImpostoVenda(k)||ehComissaoVenda(k);
+        const tr=elTr(`<td style="padding:8px 10px"><span class="seta" style="display:inline-block;transform:rotate(${aberto?0:-90}deg);font-size:10px;margin-right:5px">▼</span><b>${esc(k)}</b>${daVenda?' <span class="tag" style="font-size:10px" title="não soma no custo da obra — vira a dedução da venda">→ venda</span>':''}</td>
           <td class="num" style="padding:8px 10px">${brl(v.total)}</td>
           <td class="num" style="padding:8px 10px;color:var(--suave)">${(v.total/rr2.total*100).toFixed(1)}%</td>
           <td class="num" style="padding:8px 10px;color:var(--suave)">${v.n}</td>`);
@@ -3566,6 +3583,7 @@ async function fichaObraEm(c,o,fechar){
     if(rr2&&(+o.area>0||true)){
       const s2m=secR('Custo por m² — escolha o que entra');
       const grupos=Object.entries(rr2.centros).sort((x,y)=>y[1].total-x[1].total)
+        .filter(([k])=>!ehImpostoVenda(k)&&!ehComissaoVenda(k))   // entram como sintéticos abaixo
         .map(([k,v])=>({k,v:v.total}));
       const cc2=contasObra(o,rr2);
       if(cc2.comissao)grupos.push({k:'Comissão da venda',v:cc2.comissao});
@@ -3861,17 +3879,24 @@ async function fichaObraEm(c,o,fechar){
 
     /* --- a venda --- */
     const s7=secR('Venda');
-    s7.appendChild(campos(o,[
+    const cc7=contasObra(o,(_fmResumo||{})[o.id]||rr2);
+    const defs7=[
       {k:'vendaValor',t:'Valor da venda',tipo:'moeda'},
       {k:'vendaData',t:'Data da venda',tipo:'date'},
-      {k:'recebidoEm',t:'Recebimento concluído em — define o ano da obra',tipo:'date'},
+      {k:'recebidoEm',t:'Fim do recebimento',tipo:'date'},
       {k:'comprador',t:'Comprador'},
-      {k:'impostoValor',t:'Imposto pago (R$)',tipo:'moeda'},
-      {k:'comissaoValor',t:'Comissão paga (R$)',tipo:'moeda'},
-      {k:'outrasDeducoes',t:'Outras deduções (R$)',tipo:'moeda'},
-    ],()=>{salvar();pinta()}));
+    ];
+    // com lançamento vinculado, o campo digitado SOME — mostrar os dois seria
+    // convidar a preencher duas vezes o mesmo dinheiro
+    if(!cc7.impostoLanc)defs7.push({k:'impostoValor',t:'Imposto pago (R$)',tipo:'moeda'});
+    if(!cc7.comissaoLanc)defs7.push({k:'comissaoValor',t:'Comissão paga (R$)',tipo:'moeda'});
+    defs7.push({k:'outrasDeducoes',t:'Outras deduções (R$)',tipo:'moeda'});
+    s7.appendChild(campos(o,defs7,()=>{salvar();pinta()}));
+    if(cc7.impostoLanc)s7.appendChild(el(`<p style="font-size:12.5px;margin:9px 0 0">🔗 <b>Imposto: ${brl(cc7.impostoLanc)}</b>, puxado dos lançamentos no plano "Imposto da venda" — nada a digitar aqui.</p>`));
+    if(cc7.comissaoLanc)s7.appendChild(el(`<p style="font-size:12.5px;margin:${cc7.impostoLanc?4:9}px 0 0">🔗 <b>Comissão: ${brl(cc7.comissaoLanc)}</b>, puxada dos lançamentos no plano "Comissão da venda" — nada a digitar aqui.</p>`));
     s7.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin-top:9px">
-      Lance o imposto e a comissão que foram PAGOS, do comprovante — nada aqui é calculado por percentual.
+      ${(cc7.impostoLanc&&cc7.comissaoLanc)?'':'Se o imposto ou a comissão estiverem na planilha como pagamento, lance-os (ou corrija-os) nos planos <b>"Imposto da venda"</b> e <b>"Comissão da venda"</b> — a ficha puxa de lá, tira do custo da obra, e nunca conta duas vezes. '}Nada aqui é calculado por percentual.
+      O <b>fim do recebimento</b> é quando o dinheiro terminou de entrar — é ele que define o ano da obra.
       Recebeu parte em bem (carro, lote)? Lance o valor cheio na venda e anote nas observações da ficha.</p>`));
     c.appendChild(s7);
 
