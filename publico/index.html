@@ -3875,10 +3875,9 @@ async function fichaObraEm(c,o,fechar){
       Recebeu parte em bem (carro, lote)? Lance o valor cheio na venda e anote nas observações da ficha.</p>`));
     c.appendChild(s7);
 
-    /* --- arquivos e apagar --- */
-    const s8=secR('Arquivos da obra');
-    s8.appendChild(areaArquivos('obra:'+o.id,'Matrícula, alvará, habite-se, contrato de venda, memorial'));
-    c.appendChild(s8);
+    /* Sem seção de arquivos: isto é um PAINEL DE RESULTADO, não um arquivo
+       morto — decisão do dono. O apagarAnexosDe no botão de apagar fica, por
+       segurança, para limpar qualquer anexo que tenha entrado antes disso. */
     const s9=el('<div class="secao" style="display:flex;gap:9px"></div>');
     const del=el('<button class="btn ghost" style="color:var(--vermelho)">Apagar obra</button>');
     del.onclick=async()=>{
