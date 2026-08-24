@@ -3013,14 +3013,18 @@ function blocoCopias(){
         '<td style="padding:9px 10px;text-align:right"></td>';
       const bt=el('<button class="btn ghost mini">↩ Restaurar</button>');
       bt.onclick=async()=>{
-        // Os ANEXOS não voltam no tempo: quem apagou uma ficha levou os arquivos
-        // dela junto, e nenhuma cópia traz arquivo de volta. Dizer isso antes é o
-        // mínimo -- senão a ficha reaparece vazia e parece que a cópia veio torta.
+        /* O QUE A CÓPIA NÃO TRAZ DE VOLTA. Ela guarda o estado (as fichas) e o
+           índice dos anexos — NÃO os arquivos e NÃO o livro-caixa das obras,
+           que moram em tabelas próprias e ficam como estão hoje. Uma ficha de
+           obra restaurada volta com os custos ATUAIS, não com os da data da
+           cópia. Silenciar isso faria a restauração parecer torta. */
         if(!confirm('Trazer a cópia de '+fmtDataAno(b.em.slice(0,10))+'?\n\n'+
           'Tudo que você lançou DEPOIS dela sai de cena. O estado de agora fica guardado '+
           'em Configurações → Versão descartada, então dá para voltar atrás.\n\n'+
-          'Atenção: os ARQUIVOS anexados ficam como estão hoje — eles não voltam no tempo. '+
-          'Uma ficha que você apagou volta sem os anexos dela.'))return;
+          'O que NÃO volta no tempo:\n'+
+          '· os ARQUIVOS anexados — ficha apagada volta sem os anexos dela;\n'+
+          '· o LIVRO-CAIXA das obras (Fortemais) — a ficha volta, os lançamentos de '+
+          'custo continuam como estão hoje.'))return;
         bt.disabled=true;bt.textContent='Trazendo…';
         try{
           const r2=await apiSync('POST',{acao:'backupPegar',id:b.id});
