@@ -3794,8 +3794,12 @@ async function fichaObraEm(c,o,fechar){
       const meses=Object.entries(rr2.meses).sort();
       const apMes={};
       E.obraAportes.filter(x=>x.obra===o.id).forEach(x=>{const k=(x.data||'').slice(0,7);if(k)apMes[k]=(apMes[k]||0)+(+x.valor||0)});
-      s5.appendChild(el(`<div style="font-size:12.5px;color:var(--suave);margin-bottom:6px">Custo por mês — os meses com aporte estão marcados embaixo</div>
-        ${gBarras(meses.map(([k,v])=>({r:k.slice(2).split('-').reverse().join('/')+(apMes[k]?' ●':''),v})))}`));
+      /* UM invólucro só: el() devolve apenas o primeiro elemento da raiz —
+         com a legenda e o gráfico lado a lado, o gráfico era descartado e a
+         seção aparecia vazia. Mesmo defeito do <tr> solto. */
+      s5.appendChild(el(`<div>
+        <div style="font-size:12.5px;color:var(--suave);margin-bottom:6px">Custo por mês — os meses com aporte estão marcados embaixo</div>
+        ${gBarras(meses.map(([k,v])=>({r:k.slice(2).split('-').reverse().join('/')+(apMes[k]?' ●':''),v})))}</div>`));
       c.appendChild(s5);
     }
 
