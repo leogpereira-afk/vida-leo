@@ -42,6 +42,7 @@ h1,h2,h3,.serif{font-family:Fraunces,Georgia,serif;font-weight:600;letter-spacin
   background:none;color:var(--suave);font:500 14px Inter;cursor:pointer;text-align:left;transition:.15s}
 .nav button:hover{background:var(--bg);color:var(--tinta)}
 .nav button.on{background:var(--verde-cl);color:var(--verde);font-weight:600}
+.nav button .fora{margin-left:auto;font-size:11px;opacity:.55}
 .nav .ic{width:20px;text-align:center;font-size:15px}
 .nav .sep{margin:12px 10px 6px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--suave);opacity:.75}
 .ponte{display:flex;align-items:center;gap:10px;margin:14px 6px 0;padding:9px 10px;
@@ -1105,6 +1106,7 @@ const MODS=[
   {id:'saude',ic:'🩺',nome:'Saúde',grupo:'',render:vSaude},
   {id:'estrategia',ic:'♟️',nome:'Gestão estratégica',grupo:'Empresa',render:vEstrategia},
   {id:'fortemais',ic:'🏗️',nome:'Fortemais',grupo:'Projeto especial',render:vFortemais},
+  {id:'bosques',ic:'🌳',nome:'Portal dos Bosques',url:'https://leogpereira-afk.github.io/bosques/'},
   {id:'oportunidades',ic:'💡',nome:'Oportunidades',grupo:'Extra',render:vOportunidades},
   {id:'documentos',ic:'🪪',nome:'Documentos',grupo:'',render:vDocumentos},
   {id:'guia',ic:'🧭',nome:'Guia de vida',grupo:'',render:vGuia},
@@ -1115,8 +1117,13 @@ function menu(){
   const nav=document.getElementById('nav');nav.innerHTML='';
   MODS.forEach(m=>{
     if(m.grupo)nav.appendChild(el(`<div class="sep">${m.grupo}</div>`));
-    const b=el(`<button class="${m.id===atual?'on':''}"><span class="ic">${m.ic}</span><span class="tx">${m.nome}</span></button>`);
-    b.onclick=()=>irTela(m.id);
+    /* Entrada com `url` é ATALHO para outro sistema, não tela daqui: abre em
+       outra aba, nunca fica marcada como ativa, e o ↗ avisa antes do clique.
+       Sem isto o menu prometeria uma tela que não existe. */
+    const b=el(`<button class="${!m.url&&m.id===atual?'on':''}"><span class="ic">${m.ic}</span><span class="tx">${m.nome}</span>${m.url?'<span class="fora">↗</span>':''}</button>`);
+    if(m.url){b.title='abre em outra aba — sistema com login próprio';
+      b.onclick=()=>window.open(m.url,'_blank','noopener');}
+    else b.onclick=()=>irTela(m.id);
     nav.appendChild(b);
   });
 }
