@@ -209,7 +209,7 @@ Deno.serve(async (req: Request) => {
         const out: Record<string, unknown>[] = [];
         for (let de = 0; ; de += passo) {
           let q = sb.from("leo_obra_custos")
-            .select("id, obra, data, nome, centro, fornecedor, valor, forma, conta")
+            .select("id, obra, data, nome, centro, fornecedor, valor, forma, conta, origem")
             .order("data", { ascending: true }).range(de, de + passo - 1);
           if (obra) q = q.eq("obra", obra);
           const { data, error } = await q;

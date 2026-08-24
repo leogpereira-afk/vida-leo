@@ -3092,9 +3092,11 @@ function contasObra(o,r){
   const custo=(r&&r.total)||0;
   const aporte=E.obraAportes.filter(x=>x.obra===o.id).reduce((s,x)=>s+(+x.valor||0),0);
   const venda=+o.vendaValor||0;
-  // % ou valor: quem preencheu o valor manda; senão aplica o percentual sobre a venda
-  const imposto=+o.impostoValor||(venda*(+o.impostoPct||0)/100);
-  const comissao=+o.comissaoValor||(venda*(+o.comissaoPct||0)/100);
+  /* Imposto e comissão são LANÇADOS, não calculados — decisão do dono
+     ("manual tb não percentual"). Percentual bonito que ninguém confere vira
+     número falso; o valor pago de verdade ele tem no comprovante. */
+  const imposto=+o.impostoValor||0;
+  const comissao=+o.comissaoValor||0;
   const outras=+o.outrasDeducoes||0;
   const liquido=venda-imposto-comissao-outras;
   const lucro=venda?liquido-custo:0;
@@ -3141,8 +3143,8 @@ async function vFortemais(m){
 
   const novaObra=()=>{const o={id:uid(),nome:'',empresa:'Fortemais',tipo:CFG('tiposObra')[0],
     status:'Vendida',endereco:'',area:0,areaTerreno:0,inicio:'',fim:'',
-    vendaValor:0,vendaData:'',recebidoEm:'',comprador:'',impostoPct:0,impostoValor:0,
-    comissaoPct:0,comissaoValor:0,outrasDeducoes:0,obs:''};
+    vendaValor:0,vendaData:'',recebidoEm:'',comprador:'',impostoValor:0,
+    comissaoValor:0,outrasDeducoes:0,obs:''};
     E.obras.push(o);salvar();filtro.fmAberta=o.id;r()};
 
   m.appendChild(painel('Ano',
@@ -3233,6 +3235,8 @@ async function vFortemais(m){
 /* A ficha desenha DENTRO da linha expandida — o dono pediu lista enxuta,
    não modal: "na obra essa ser só uma linha que quando eu abrir ela expandir". */
 async function fichaObraEm(c,o,fechar){
+    // depois de lançar ou apagar um custo, a ficha se redesenha com dados frescos
+    const recarregar=()=>{fmEsquecer();c.innerHTML='<div class="vazio">Atualizando…</div>';fichaObraEm(c,o,fechar)};
     const R=(await fmResumo())||{};
     const rr2=R[o.id]||null;
     const cx=contasObra(o,rr2);
@@ -3288,6 +3292,75 @@ async function fichaObraEm(c,o,fechar){
       s2.appendChild(el(`<div style="margin-top:12px">${gRosca(cents.slice(0,8).map(([k,v])=>({r:k,v:v.total})))}</div>`));
     }
     c.appendChild(s2);
+
+    /* --- lançar despesa à mão ---
+       Nem tudo vem do ERP: a diária paga em dinheiro, a taxa do cartório, o
+       frete avulso. O lançamento manual grava NA MESMA tabela dos importados
+       (id próprio, origem "manual") — uma fonte só de verdade, e o reimporte
+       do arquivo não mexe nele porque a chave é outra. */
+    const s2b=el('<div class="secao"><h4>Lançar despesa</h4></div>');
+    const nvo={data:hoje(),nome:'',centro:CFG('centrosObra')[0],fornecedor:'',valor:0};
+    s2b.appendChild(campos(nvo,[
+      {k:'data',t:'Data',tipo:'date'},
+      {k:'valor',t:'Valor',tipo:'moeda'},
+      {k:'nome',t:'O que foi',ph:'ex.: diária pedreiro, taxa cartório'},
+      {k:'centro',t:'Centro de custo',tipo:'select',opcoes:CFG('centrosObra')},
+      {k:'fornecedor',t:'Fornecedor / quem recebeu',tipo:'sugestao',
+        opcoes:rr2?Object.keys(rr2.fornecedores).filter(x=>x!=='(sem fornecedor)').sort():[]},
+    ],()=>{}));
+    const bl=el('<button class="btn" style="margin-top:11px">Lançar despesa</button>');
+    bl.onclick=async()=>{
+      // o clique tira o foco do campo de valor antes do handler: o blur já gravou
+      if(!(+nvo.valor)){alert('Sem valor não há lançamento.');return}
+      if(!String(nvo.nome).trim()){alert('Diga o que foi — sem isso a linha não conta história.');return}
+      bl.disabled=true;bl.textContent='Lançando…';
+      try{
+        const d2=await apiSync('POST',{acao:'obraCustosGravar',linhas:[{
+          id:uid(),obra:o.id,data:nvo.data,nome:String(nvo.nome).trim(),
+          centro:nvo.centro,fornecedor:String(nvo.fornecedor).trim(),
+          valor:+nvo.valor,forma:'',conta:'',valor_original:+nvo.valor,origem:'manual'}]});
+        if(!d2||!d2.ok)throw new Error((d2&&d2.erro)||'falha ao gravar');
+        recarregar();
+      }catch(e){bl.disabled=false;bl.textContent='Lançar despesa';
+        alert('Não consegui lançar: '+(e.message||e)+'\nNada foi gravado — tente de novo com internet.')}
+    };
+    s2b.appendChild(bl);
+    c.appendChild(s2b);
+
+    /* --- últimos lançamentos: conferir e poder apagar --- */
+    if(custos.length){
+      const s2c=el('<div class="secao"><h4>Últimos lançamentos</h4></div>');
+      const ults=custos.slice(-12).reverse();
+      const rolU=el('<div class="rolagem"></div>');
+      const tU=document.createElement('table');
+      tU.innerHTML='<thead><tr><th>Data</th><th>O que</th><th>Centro</th><th>Quem</th><th style="text-align:right">Valor</th><th style="width:34px"></th></tr></thead>';
+      const tbU=document.createElement('tbody');
+      ults.forEach(l=>{
+        const tr=elTr(`<td style="padding:8px 10px;white-space:nowrap">${l.data?fmtDataAno(l.data):'—'}</td>
+          <td style="padding:8px 10px">${esc(l.nome||'—')}${l.origem==='manual'?' <span class="tag" style="font-size:10px">manual</span>':''}</td>
+          <td style="padding:8px 10px;color:var(--suave)">${esc(l.centro||'—')}</td>
+          <td style="padding:8px 10px;color:var(--suave)">${esc(l.fornecedor||'—')}</td>
+          <td class="num" style="padding:8px 10px;color:var(--vermelho)">${brl(l.valor)}</td>
+          <td style="padding:8px 10px"></td>`);
+      const bx=el('<button class="lixo" title="Apagar">✕</button>');
+        bx.onclick=async()=>{
+          const doErP=l.origem&&l.origem!=='manual';
+          if(!confirm('Apagar "'+(l.nome||'lançamento')+'" ('+brl(l.valor)+')?'+
+            (doErP?'\n\nEle veio do arquivo do ERP: se você importar o mesmo arquivo de novo, ele VOLTA.':'')))return;
+          bx.disabled=true;
+          try{
+            const d3=await apiSync('POST',{acao:'obraCustosApagar',ids:[l.id]});
+            if(!d3||!d3.ok)throw new Error((d3&&d3.erro)||'falha ao apagar');
+            recarregar();
+          }catch(e){bx.disabled=false;alert('Não consegui apagar: '+(e.message||e))}
+        };
+        tr.lastElementChild.appendChild(bx);
+        tbU.appendChild(tr);
+      });
+      tU.appendChild(tbU);rolU.appendChild(tU);s2c.appendChild(rolU);
+      if(custos.length>12)s2c.appendChild(el('<p style="font-size:12px;color:var(--suave);margin-top:7px">Mostrando os 12 mais recentes de '+custos.length+'. O total lá de cima soma TODOS.</p>'));
+      c.appendChild(s2c);
+    }
 
     /* --- especialidades: o cruzamento que o ERP não faz --- */
     if(custos.length){
@@ -3400,15 +3473,13 @@ async function fichaObraEm(c,o,fechar){
       {k:'vendaData',t:'Data da venda',tipo:'date'},
       {k:'recebidoEm',t:'Recebimento concluído em — define o ano da obra',tipo:'date'},
       {k:'comprador',t:'Comprador'},
-      {k:'impostoPct',t:'Imposto (%)',tipo:'number',ph:'ex.: 5,93'},
-      {k:'impostoValor',t:'ou imposto em R$ (se preenchido, manda)',tipo:'moeda'},
-      {k:'comissaoPct',t:'Comissão (%)',tipo:'number',ph:'ex.: 5'},
-      {k:'comissaoValor',t:'ou comissão em R$ (se preenchido, manda)',tipo:'moeda'},
+      {k:'impostoValor',t:'Imposto pago (R$)',tipo:'moeda'},
+      {k:'comissaoValor',t:'Comissão paga (R$)',tipo:'moeda'},
       {k:'outrasDeducoes',t:'Outras deduções (R$)',tipo:'moeda'},
     ],()=>{salvar();pinta()}));
     s7.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin-top:9px">
-      O imposto de verdade depende do regime da empresa no ano da venda — confirme o percentual com o contador.
-      Recebeu parte em bem (carro, lote)? Lance o valor cheio na venda e anote no campo de observações da ficha.</p>`));
+      Lance o imposto e a comissão que foram PAGOS, do comprovante — nada aqui é calculado por percentual.
+      Recebeu parte em bem (carro, lote)? Lance o valor cheio na venda e anote nas observações da ficha.</p>`));
     c.appendChild(s7);
 
     /* --- arquivos e apagar --- */
@@ -3559,8 +3630,8 @@ function blocoImportarObra(){
         let o=E.obras.find(x=>(x.nome||'').toLowerCase()===nomeLimpo.toLowerCase()||(x.nome||'').toLowerCase()===proj.toLowerCase());
         if(!o){o={id:uid(),nome:nomeLimpo||proj,empresa:pega(ls[0],'Empresa')||'Fortemais',
           tipo:CFG('tiposObra')[0],status:'Em obra',endereco:'',area:0,areaTerreno:0,
-          inicio:'',fim:'',vendaValor:0,vendaData:'',comprador:'',impostoPct:0,impostoValor:0,
-          comissaoPct:0,comissaoValor:0,outrasDeducoes:0,obs:''};
+          inicio:'',fim:'',vendaValor:0,vendaData:'',recebidoEm:'',comprador:'',impostoValor:0,
+          comissaoValor:0,outrasDeducoes:0,obs:''};
           E.obras.push(o);criadas++}
         const lote=[];
         for(const l of ls){
