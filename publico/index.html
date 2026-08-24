@@ -3229,14 +3229,14 @@ function imprimirObra(o,rr2,custos){
 
   <h2>Retorno dos aportes ${ret.vendida?'':'(obra ainda em aberto)'}</h2>
   <table><thead><tr><th>Quem</th><th class="n">Aportou</th><th class="n">% do lucro</th>
-    ${ret.vendida?'<th class="n">Lucro que lhe cabe</th><th class="n">Recebe</th><th class="n">ROI</th><th class="n">TIR</th>':''}</tr></thead><tbody>
+    ${ret.vendida?'<th class="n">Lucro que lhe cabe</th><th class="n">ROI</th><th class="n">TIR</th>':''}</tr></thead><tbody>
     ${ret.linhas.map(li=>{
       const pct=(li.fatia*100).toFixed(1)+'%';
       if(!ret.vendida)return `<tr><td>${esc(li.quem)}</td><td class="n">${brl(li.total)}</td>
         <td class="n">${pct}</td></tr>`;
       return `<tr><td>${esc(li.quem)}</td><td class="n">${brl(li.total)}</td>
         <td class="n">${pct}</td>
-        <td class="n ${li.parte>=0?'verd':'verm'}">${brl(li.parte)}</td><td class="n">${brl(li.recebe)}</td>
+        <td class="n ${li.parte>=0?'verd':'verm'}">${brl(li.parte)}</td>
         <td class="n"><b>${li.roi==null?'—':li.roi.toFixed(1)+'%'}</b></td>
         <td class="n"><b>${li.tir==null?'—':li.tir.toFixed(1)+'% a.a.'}</b></td></tr>`;
     }).join('')}</tbody></table>
@@ -3790,7 +3790,7 @@ async function fichaObraEm(c,o,fechar){
       const t6=document.createElement('table');
       t6.innerHTML='<thead><tr><th>Quem</th><th style="text-align:right">Aportou</th>'
         +'<th style="text-align:right">% do lucro</th>'
-        +(ret.vendida?'<th style="text-align:right">Lucro que lhe cabe</th><th style="text-align:right">Recebe</th>'
+        +(ret.vendida?'<th style="text-align:right">Lucro que lhe cabe</th>'
           +'<th style="text-align:right" title="quanto rendeu no total, sem olhar o relógio">ROI</th>'
           +'<th style="text-align:right" title="quanto rendeu POR ANO, olhando as datas">TIR</th>':'')
         +'</tr></thead>';
@@ -3799,7 +3799,6 @@ async function fichaObraEm(c,o,fechar){
         let extra='';
         if(ret.vendida){
           extra=`<td class="num" style="padding:8px 10px;color:${li6.parte>=0?'var(--verde)':'var(--vermelho)'}">${brl(li6.parte)}</td>
-            <td class="num" style="padding:8px 10px">${brl(li6.recebe)}</td>
             <td class="num" style="padding:8px 10px;font-weight:600;color:${(li6.roi??0)>=0?'var(--verde)':'var(--vermelho)'}">${li6.roi==null?'—':li6.roi.toFixed(1)+'%'}</td>
             <td class="num" style="padding:8px 10px;font-weight:600;color:${(li6.tir??0)>=0?'var(--verde)':'var(--vermelho)'}">${li6.tir==null?'—':li6.tir.toFixed(1)+'% a.a.'}</td>`;
         }
