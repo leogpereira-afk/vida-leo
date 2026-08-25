@@ -3516,11 +3516,16 @@ async function fichaObraEm(c,o,fechar){
       const id='obf-'+titulo.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);
       const fechada=!!E.colapso[id];
       const sc=el('<div class="secao'+(fechada?' fechada':'')+'"></div>');
+      /* A SETA FICA NO FIM. Na esquerda ela empurrava o texto do título 17px
+         para dentro, e ele deixava de bater com a tabela e o texto logo
+         abaixo — a faixa parecia deslocada da própria seção. Com a margem
+         negativa compensando o respiro, o título agora começa exatamente na
+         mesma coluna do conteúdo. */
       const h=el(`<h4 class="barra">
-        <span class="seta" style="transform:rotate(${fechada?-90:0}deg)">▼</span>
         <span>${titulo}</span>
         <span class="cresce"></span>
-        ${(fechada&&dica)?`<span class="resumo">${dica}</span>`:''}</h4>`);
+        ${(fechada&&dica)?`<span class="resumo">${dica}</span>`:''}
+        <span class="seta" style="transform:rotate(${fechada?-90:0}deg)">▼</span></h4>`);
       h.onclick=()=>{E.colapso[id]=!E.colapso[id];salvar();pinta()};
       sc.appendChild(h);
       return sc;
