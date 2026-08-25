@@ -3105,6 +3105,19 @@ function especDoCentro(c){
   return '';
 }
 const especDe=l=>(E.obraFornecedores[(l.fornecedor||'').trim()]||'')||especDoCentro(l.centro);
+/* A ESPECIALIDADE É O OFÍCIO, NÃO A NATUREZA. Se o dono marcou um fornecedor
+   como "Mão de obra - Pintura" e outro como "Pintura", eram duas linhas na
+   tabela — mas a tabela JÁ TEM coluna de material e de mão de obra, e quem
+   decide a natureza é o plano de contas, não o rótulo. Aqui o prefixo cai:
+   "Mão de obra - Pintura" e "Material alvenaria" viram "Pintura" e
+   "Alvenaria", e cada uma aparece UMA vez, com as duas colunas preenchidas.
+   Não mexe no dado dele — só na hora de agrupar. */
+const especLimpa=e=>{
+  let t=String(e||'').trim();
+  t=t.replace(/^(m[ãa]o\s*de\s*obra|material|materiais|insumos?|servi[çc]os?)\s*(-|–|—|:|de|da|do)?\s*/i,'').trim();
+  if(!t)return String(e||'').trim();                 // "Mão de obra" sozinho continua sendo o rótulo
+  return t.charAt(0).toUpperCase()+t.slice(1);
+};
 
 /* ---- o livro-caixa: fica no servidor, cache por sessão ---- */
 let _fmResumo=null,_fmResumoP=null,_fmGer=0,_fmCustos={};
@@ -3269,7 +3282,7 @@ function imprimirObra(o,rr2,custos){
   (custos||[]).forEach(l=>{
     const e2=especDe(l);if(!e2)return;
     const nat=naturezaCentro(l.centro);
-    const r3=esp[e2]??={mat:0,mao:0,outros:0};
+    const r3=esp[especLimpa(e2)]??={mat:0,mao:0,outros:0};
     if(nat==='Material')r3.mat+=(+l.valor||0);
     else if(nat==='Mão de obra')r3.mao+=(+l.valor||0);
     else r3.outros+=(+l.valor||0);
@@ -3417,6 +3430,8 @@ async function vFortemais(m){
       <b>${esc(o.nome||'Obra sem nome')}</b>
       ${an?`<span class="tag">${an}</span>`:'<span class="tag">em aberto</span>'}
       <span class="cresce"></span>
+      <span style="font-size:11px;color:var(--suave)">venda</span>
+      <span style="font-variant-numeric:tabular-nums;font-weight:600">${c.venda?brl(c.venda):'—'}</span>
       <span style="font-size:11px;color:var(--suave)">custo</span>
       <span style="color:${c.semDados?'var(--suave)':'var(--vermelho)'};font-variant-numeric:tabular-nums;font-weight:600"${c.semDados?' title="servidor não respondeu"':''}>${c.semDados?'—':brl(c.custo)}</span>
       <span style="font-size:11px;color:var(--suave)">lucro</span>
@@ -3436,10 +3451,11 @@ async function vFortemais(m){
   if(visiveis.length){
     const totC=visiveis.reduce((s2,x)=>s2+(x.c.semDados?0:x.c.custo),0);
     const semC=visiveis.filter(x=>x.c.semDados).length;
+    const totV=visiveis.reduce((s2,x)=>s2+(+x.c.venda||0),0);
     const vend=visiveis.filter(x=>x.c.podeLucro);
     const totL=vend.reduce((s2,x)=>s2+x.c.lucro,0);
     oc.appendChild(el(`<div style="display:flex;gap:10px;justify-content:flex-end;padding:11px 6px 2px;font-size:12.5px;color:var(--suave)">
-      ${visiveis.length} obra(s) · custo <b style="color:var(--vermelho)">${brl(totC)}</b>${semC?' <span style="color:var(--areia)">(faltam '+semC+' — servidor)</span>':''}
+      ${visiveis.length} obra(s)${totV?' · venda <b>'+brl(totV)+'</b>':''} · custo <b style="color:var(--vermelho)">${brl(totC)}</b>${semC?' <span style="color:var(--areia)">(faltam '+semC+' — servidor)</span>':''}
       ${vend.length?` · lucro <b style="color:${totL>=0?'var(--verde)':'var(--vermelho)'}">${brl(totL)}</b>`:''}</div>`));
   }
   m.appendChild(bloco('fm-obras','🏗️ Obras','uma linha por obra — clique para expandir',oc));
@@ -3785,7 +3801,7 @@ async function fichaObraEm(c,o,fechar){
         const e2=especDe(l);
         const nat=naturezaCentro(l.centro);
         if(!e2){if(nat==='Mão de obra'||nat==='Material'){semDono++;semDonoV+=(+l.valor||0)}return}
-        const r3=esp[e2]??={mat:0,mao:0,outros:0};
+        const r3=esp[especLimpa(e2)]??={mat:0,mao:0,outros:0};
         if(nat==='Material')r3.mat+=(+l.valor||0);
         else if(nat==='Mão de obra')r3.mao+=(+l.valor||0);
         else r3.outros+=(+l.valor||0);
