@@ -30,7 +30,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const JWT_SECRET = Deno.env.get("EQUIPE_JWT_SECRET") ?? "";
 const LEO_SECRET = Deno.env.get("LEO_SESSION_SECRET") ?? "";
 const DIAS = 30;
-const SISTEMAS = ["brief", "pcp", "compras", "dre", "painel", "rh", "pops", "central", "bosques"] as const;
+const SISTEMAS = ["brief", "pcp", "compras", "dre", "painel", "rh", "pops", "central", "bosques", "domo"] as const;
 type Sistema = typeof SISTEMAS[number];
 
 // Papéis de cada sistema, com quem administra. Lista fechada: papel digitado
@@ -39,6 +39,8 @@ const PAPEIS: Record<Sistema, { todos: string[]; admin: string[] }> = {
   // bosques (25/08/2026): sistema PESSOAL do dono, só-leitura no painel-acesso
   // — ninguém cria conta dele por aqui; a lista existe para validação apenas.
   bosques: { todos: ["direcao", "escritorio", "corretor"], admin: [] },
+  // domo (25/08/2026): idem — sistema pessoal do dono, só-leitura no painel.
+  domo: { todos: ["direcao", "escritorio", "obra"], admin: [] },
   // medidor (05/08/2026): quem vai à rua medir. Vê só o que foi DIRECIONADO a
   // ele e só a parte de campo do briefing (da etapa 4 em diante). Não cria
   // briefing, não vê preço nem O.S. -- o trabalho dele é medir e fotografar.
