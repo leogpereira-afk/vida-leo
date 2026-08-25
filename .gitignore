@@ -2,3 +2,4 @@
 .netlify/
 backups/
 node_modules/
+.backup-fortemais-token
