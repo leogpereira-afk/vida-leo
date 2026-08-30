@@ -591,6 +591,13 @@ const SEED={
      hidráulica -- de uma vez, para trás e para a frente. É a diferença entre
      classificar 90 fornecedores e classificar 824 lançamentos. */
   obras:[],obraAportes:[],obraFornecedores:{},
+  /* Caixa e VGV — o modelo patrimonial que morava na planilha "Patrimonial".
+     São poucas dezenas de linhas em cada lista: cabem no estado, ao contrário
+     do livro-caixa das obras. Quatro listas independentes, como na planilha:
+     contas (o que existe hoje), empreendimentos (VGV e aportes), casas e
+     reservas. NUNCA cruzar contas com empreendimentos pela posição — na
+     planilha original são duas listas na mesma tabela, sem relação por linha. */
+  contas:[],empreend:[],casas:[],reservas:[],
   /* obraM2Fora: os grupos que o dono TIROU da conta do custo/m² (terreno,
      comissão…). É UMA escolha para todas as obras, de propósito: se cada obra
      tivesse a sua, o m² de uma não compararia com o da outra. */
@@ -634,6 +641,7 @@ const SEED={
     /* O centro de custo NÃO foi inventado por mim: é o do próprio ERP do Léo,
      lido do export real de uma obra inteira (824 lançamentos). Mexer aqui
      não quebra nada -- categoria é dado, e o importador cria a que faltar. */
+  tiposConta:['Dinheiro','Cheque','Permuta','Dívida'],
   centrosObra:['Terreno','Mão de obra','Insumo diversos','Insumo hidráulico','Insumo elétrico',
     'Imposto da venda','Comissão da venda',
     'Aluguel equipamentos','Documentação','Impostos','Condomínio','Copasa','Cemig','Projeto',
@@ -664,7 +672,7 @@ function carregar(){
   const base=structuredClone(SEED);
   const d=(s&&s.viagens)?{...base,...s}:base;
   // migração: todo registro precisa de id estável (arquivos são ligados por ele)
-  for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades','obras','obraAportes'])
+  for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades','obras','obraAportes','contas','empreend','casas','reservas'])
     (d[k]||[]).forEach(x=>{if(!x.id)x.id=uid()});
   d.viagens.forEach(v=>{if(!Array.isArray(v.custos))v.custos=[];
     if(!Array.isArray(v.passagens))v.passagens=[];
@@ -1100,6 +1108,7 @@ const MODS=[
   {id:'rendimentos',ic:'📈',nome:'Rendimentos',grupo:'Dinheiro',render:vRendimentos},
   {id:'gastos',ic:'💸',nome:'Gastos',grupo:'',render:vGastos},
   {id:'patrimonio',ic:'🏠',nome:'Patrimônio',grupo:'',render:vPatrimonio},
+  {id:'caixavgv',ic:'💰',nome:'Caixa e VGV',grupo:'',render:vCaixaVGV},
   {id:'viagens',ic:'✈️',nome:'Viagens',grupo:'Vida',render:vViagens},
   {id:'agenda',ic:'📅',nome:'Agenda',grupo:'',render:vAgenda},
   {id:'demandas',ic:'✅',nome:'Demandas',grupo:'',render:vDemandas},
@@ -4151,8 +4160,12 @@ function linhasDoXlsx(zip){
   const linhas=[];
   for(const mr of dec(zip[folha]).matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g)){
     const cels={};
-    for(const mc of mr[1].matchAll(/<c r="([A-Z]+)\d+"([^>]*)>([\s\S]*?)<\/c>/g)){
-      const col=mc[1],attrs=mc[2],corpo=mc[3];
+    /* CÉLULA VAZIA VEM AUTOFECHADA: <c r="E3" s="36"/>. Sem prever isso, o
+       padrão não fechava ali e ia varrendo até o próximo </c> — engolindo as
+       células seguintes e colocando o valor de uma coluna na outra, calado.
+       A alternância abaixo aceita as duas formas. */
+    for(const mc of mr[1].matchAll(/<c r="([A-Z]+)\d+"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)){
+      const col=mc[1],attrs=mc[2],corpo=mc[3]||'';
       let v='';
       const t=(attrs.match(/t="(\w+)"/)||[])[1]||'';
       if(t==='inlineStr'){v=[...corpo.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(x=>x[1]).join('')}
@@ -4302,6 +4315,329 @@ function blocoImportarObra(){
   solta.addEventListener('drop',e=>{e.preventDefault();solta.classList.remove('sobre');if(e.dataTransfer.files[0])receber(e.dataTransfer.files[0])});
   cx.appendChild(solta);cx.appendChild(inp);cx.appendChild(st);
   return cx;
+}
+
+
+/* ================================================================
+   CAIXA E VGV — a planilha "Patrimonial" dentro da Central.
+
+   QUATRO LISTAS INDEPENDENTES, como no original:
+     · contas      — o que existe hoje, por tipo (dinheiro/cheque/permuta/dívida)
+     · empreend    — empreendimentos: VGV, aporte residual/total, previsão
+     · casas       — as casas: aporte feito, restante, VGV
+     · reservas    — reservas líquidas (a receber miúdo)
+   Na planilha elas moravam na MESMA tabela, lado a lado, e a linha 4 de uma
+   não tinha relação com a linha 4 da outra. Aqui viram listas de verdade —
+   o que impede o erro de cruzar as duas metades.
+   ================================================================ */
+const cxN=v=>+v||0;
+function contasVGV(){
+  const porTipo=t=>E.contas.filter(x=>(x.tipo||'')===t).reduce((s2,x)=>s2+cxN(x.valor),0);
+  const dinheiro=porTipo('Dinheiro'), cheque=porTipo('Cheque');
+  const permuta=porTipo('Permuta'), divida=porTipo('Dívida');
+  const totalContas=E.contas.reduce((s2,x)=>s2+cxN(x.valor),0);
+  const semTipo=E.contas.filter(x=>!CFG('tiposConta').includes(x.tipo||'')).reduce((s2,x)=>s2+cxN(x.valor),0);
+  const vgv=E.empreend.reduce((s2,x)=>s2+cxN(x.vgv),0);
+  const aporteResidual=E.empreend.reduce((s2,x)=>s2+cxN(x.aporteResidual),0);
+  const aporteTotal=E.empreend.reduce((s2,x)=>s2+cxN(x.aporteTotal),0);
+  const previsao=E.empreend.reduce((s2,x)=>s2+cxN(x.previsao),0);
+  const casasRestante=E.casas.reduce((s2,x)=>s2+cxN(x.restante),0);
+  const casasVgv=E.casas.reduce((s2,x)=>s2+cxN(x.vgv),0);
+  const reservas=E.reservas.reduce((s2,x)=>s2+cxN(x.valor),0);
+  /* CAIXA LIVRE = só o dinheiro. Cheque ainda não compensou, permuta não é
+     dinheiro e dívida é o que se deve — a mesma régua do "Valor a Investir
+     Líquido" da planilha. */
+  const caixaLivre=dinheiro;
+  const receber=previsao+reservas;
+  const pagar=aporteResidual+casasRestante+divida;
+  return {dinheiro,cheque,permuta,divida,totalContas,semTipo,vgv,aporteResidual,aporteTotal,
+    previsao,casasRestante,casasVgv,reservas,caixaLivre,receber,pagar,
+    saldo:caixaLivre+receber-pagar};
+}
+
+/* Os avisos que a planilha não dava sozinha. Cada um é uma pergunta que o
+   número não responde — some quando deixa de valer. */
+function avisosVGV(){
+  const c=contasVGV(); const av=[];
+  if(c.semTipo)av.push({t:'grave',x:`${brl(c.semTipo)} em contas sem tipo reconhecido — não entram em nenhum dos totais por tipo.`});
+  const nomesEmp=E.empreend.map(x=>(x.nome||'').toLowerCase().trim()).filter(Boolean);
+  const dobra=E.casas.filter(x=>{
+    const n2=(x.nome||'').toLowerCase().trim(); if(!n2||!cxN(x.restante))return false;
+    return nomesEmp.some(e=>e&&(e.includes(n2.slice(0,10))||n2.includes(e.slice(0,10))));
+  });
+  if(dobra.length)av.push({t:'grave',x:`${dobra.length} casa(s) com nome parecido a um empreendimento — o aporte pode estar contado DUAS vezes no "A pagar": ${dobra.map(x=>x.nome).join(', ')}.`});
+  const devem=E.contas.filter(x=>x.tipo==='Dívida'&&/\bdeve\b/i.test(x.nome||'')&&!/^l[ée]o\s+deve/i.test((x.nome||'').trim()));
+  if(devem.length)av.push({t:'medio',x:`${devem.length} lançamento(s) do tipo Dívida têm nome de quem deve A VOCÊ (${devem.map(x=>x.nome).join(', ')}). Somados com o que você deve, o total não é nem uma coisa nem outra.`});
+  const semValor=E.empreend.filter(x=>!cxN(x.vgv)&&!cxN(x.aporteResidual)&&!cxN(x.aporteTotal)&&!cxN(x.previsao)).length;
+  if(semValor)av.push({t:'pequeno',x:`${semValor} empreendimento(s) sem nenhum valor preenchido — ocupam linha e não somam nada.`});
+  return av;
+}
+
+
+/* ---------------- a tela Caixa e VGV ---------------- */
+function vCaixaVGV(m){
+  const r=rr('caixavgv');
+  const c=contasVGV();
+  m.appendChild(cab('Caixa e VGV','O que existe hoje, o que ainda entra e o que ainda sai. Tudo editável aqui.'));
+
+  m.appendChild(ligaKpis(el(`<div class="grade">
+    ${kpi('Caixa livre hoje',brl(c.caixaLivre),'só dinheiro — sem cheque, permuta nem dívida','v','cx-contas')}
+    ${kpi('A receber',brl(c.receber),'previsão + reservas','','cx-emp')}
+    ${kpi('A pagar',brl(c.pagar),'aporte residual + casas + dívidas','r','cx-emp')}
+    ${kpi('Saldo projetado',brl(c.saldo),'se tudo entrar e tudo for pago',c.saldo>=0?'p':'v','cx-conf')}
+  </div>`),{'cx-contas':'cx-contas','cx-emp':'cx-emp','cx-conf':'cx-conf'}));
+
+  m.appendChild(el(`<div class="grade">
+    ${kpi('V.G.V total',brl(c.vgv),E.empreend.length+' empreendimento(s)')}
+    ${kpi('Aporte residual',brl(c.aporteResidual),'ainda devo aportar','a')}
+    ${kpi('Caixa total',brl(c.totalContas),'todos os tipos somados, como na planilha')}
+    ${kpi('V.G.V das casas',brl(c.casasVgv),E.casas.length+' casa(s)')}
+  </div>`));
+
+  /* ---- avisos: só aparecem quando valem ---- */
+  const av=avisosVGV();
+  if(av.length){
+    const cxa=el('<div class="corpo"></div>');
+    av.forEach(x=>cxa.appendChild(el(`<div class="aviso" style="margin-bottom:7px">${x.t==='grave'?'⚠️':'💡'} ${esc(x.x)}</div>`)));
+    m.appendChild(bloco('cx-conf','🔎 Conferência','o que olhar antes de confiar no total',cxa));
+  }
+
+  /* ---- 1. contas e dívidas ---- */
+  const t1=el('<div></div>');
+  t1.appendChild(el(`<div class="grade" style="gap:8px;margin-bottom:10px">
+    ${kpi('Dinheiro',brl(c.dinheiro),'','v')}
+    ${kpi('Cheque',brl(c.cheque),'a compensar')}
+    ${kpi('Permuta',brl(c.permuta),'vira dinheiro na venda','a')}
+    ${kpi('Dívida',brl(c.divida),'','r')}
+  </div>`));
+  t1.appendChild(tabelaBloco('cx-contas-t','','',E.contas,[
+    {k:'nome',t:'Conta / dívida',ph:'ex.: Conta sicoob'},
+    {k:'valor',t:'Valor',tipo:'moeda',w:150},
+    {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposConta'),w:130},
+  ],()=>({nome:'',valor:0,tipo:CFG('tiposConta')[0]}),r,
+    `<td>Total</td><td class="num">${brl(c.totalContas)}</td><td></td>`,E.contas));
+  m.appendChild(bloco('cx-contas','🏦 Contas e dívidas','o que existe hoje, por tipo',t1));
+
+  /* ---- 2. empreendimentos ---- */
+  m.appendChild(bloco('cx-emp','🏢 Empreendimentos','V.G.V, aportes e o que está previsto receber',
+    tabelaBloco('cx-emp-t','','',E.empreend,[
+      {k:'nome',t:'Empreendimento'},
+      {k:'ano',t:'Ano',w:70},
+      {k:'mes',t:'Mês',w:70},
+      {k:'vgv',t:'V.G.V',tipo:'moeda',w:140},
+      {k:'aporteResidual',t:'Aporte residual',tipo:'moeda',w:140},
+      {k:'aporteTotal',t:'Aporte total',tipo:'moeda',w:130},
+      {k:'previsao',t:'Previsão de receb.',tipo:'moeda',w:140},
+    ],()=>({nome:'',ano:String(anoHoje),mes:'',vgv:0,aporteResidual:0,aporteTotal:0,previsao:0}),r,
+      `<td colspan="3">Totais</td><td class="num">${brl(c.vgv)}</td><td class="num">${brl(c.aporteResidual)}</td>`+
+      `<td class="num">${brl(c.aporteTotal)}</td><td class="num">${brl(c.previsao)}</td>`,E.empreend)));
+
+  /* ---- 3. casas ---- */
+  m.appendChild(bloco('cx-casas','🏡 Casas','aporte feito, quanto falta e o V.G.V de cada uma',
+    tabelaBloco('cx-casas-t','','',E.casas,[
+      {k:'nome',t:'Casa'},
+      {k:'aporte',t:'Aporte',tipo:'moeda',w:140},
+      {k:'restante',t:'Aporte restante',tipo:'moeda',w:150},
+      {k:'vgv',t:'V.G.V',tipo:'moeda',w:150},
+    ],()=>({nome:'',aporte:0,restante:0,vgv:0}),r,
+      `<td>Totais</td><td class="num">${brl(E.casas.reduce((s2,x)=>s2+cxN(x.aporte),0))}</td>`+
+      `<td class="num">${brl(c.casasRestante)}</td><td class="num">${brl(c.casasVgv)}</td>`,E.casas)));
+
+  /* ---- 4. reservas líquidas ---- */
+  m.appendChild(bloco('cx-res','💧 Reservas líquidas','o que ainda entra, miúdo',
+    tabelaBloco('cx-res-t','','',E.reservas,[
+      {k:'nome',t:'De onde vem'},
+      {k:'valor',t:'Valor',tipo:'moeda',w:150},
+      {k:'pct',t:'% do total',tipo:'calc',dir:'r',calc:x=>c.reservas?((cxN(x.valor)/c.reservas)*100).toFixed(1)+'%':'—'},
+    ],()=>({nome:'',valor:0}),r,
+      `<td>Total</td><td class="num">${brl(c.reservas)}</td><td></td>`,E.reservas)));
+
+  /* ---- 5. trazer da planilha + PDF ---- */
+  const acoes=el('<div class="corpo"></div>');
+  acoes.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:0 0 11px">'+
+    'Você pode lançar tudo à mão nas tabelas acima <b>ou</b> trazer da sua planilha Patrimonial. '+
+    'A importação <b>substitui</b> as quatro listas pelo que estiver no arquivo — o estado de agora fica guardado em Configurações → Versão descartada.</p>'));
+  const lin=el('<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center"></div>');
+  const inp=el('<input type="file" accept=".xlsx,.xlsm" hidden>');
+  const bimp=el('<button class="btn">📥 Trazer da planilha</button>');
+  bimp.onclick=()=>inp.click();
+  inp.onchange=()=>{if(inp.files[0])importarPatrimonial(inp.files[0],r);inp.value=''};
+  const bpdf=el('<button class="btn ghost">🖨 Salvar em PDF</button>');
+  bpdf.onclick=()=>imprimirCaixaVGV();
+  lin.appendChild(bimp);lin.appendChild(bpdf);lin.appendChild(inp);
+  acoes.appendChild(lin);
+  m.appendChild(bloco('cx-acoes','📥 Planilha e PDF','trazer da Patrimonial, ou levar tudo para o papel',acoes));
+}
+
+
+/* ---------------- trazer da planilha Patrimonial ----------------
+   O leitor de .xlsx do Fortemais só olhava a primeira aba. Aqui preciso de
+   duas — "Lançamentos" e "Casas" — então a busca é pelo NOME da aba, lido do
+   workbook.xml. Nome de aba muda de lugar; nome de arquivo interno não é
+   confiável. */
+function abasDoXlsx(zip){
+  const dec=b=>new TextDecoder().decode(b);
+  const wb=zip['xl/workbook.xml']; if(!wb)throw new Error('arquivo sem workbook.xml — é um .xlsx mesmo?');
+  const rels={};
+  if(zip['xl/_rels/workbook.xml.rels'])
+    for(const m of dec(zip['xl/_rels/workbook.xml.rels']).matchAll(/<Relationship([^>]*)\/>/g)){
+      const id=(m[1].match(/Id="([^"]+)"/)||[])[1], alvo=(m[1].match(/Target="([^"]+)"/)||[])[1];
+      if(id&&alvo)rels[id]=alvo.replace(/^\/?xl\//,'').replace(/^\//,'');
+    }
+  const out={};
+  for(const m of dec(wb).matchAll(/<sheet([^>]*)\/>/g)){
+    const nome=(m[1].match(/name="([^"]*)"/)||[])[1];
+    const rid=(m[1].match(/r:id="([^"]+)"/)||[])[1];
+    if(nome&&rid&&rels[rid])out[nome]='xl/'+rels[rid];
+  }
+  return out;
+}
+/* Uma aba vira {A1:'texto', B2:'123'} — endereço direto, porque a planilha do
+   Léo não tem cabeçalho em toda aba (a Casas guarda dado nas linhas 1,2,3). */
+function celulasDaAba(zip,caminho){
+  const dec=b=>new TextDecoder().decode(b);
+  const comp=[];
+  if(zip['xl/sharedStrings.xml'])
+    for(const m of dec(zip['xl/sharedStrings.xml']).matchAll(/<si>([\s\S]*?)<\/si>/g))
+      comp.push([...m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(x=>x[1]).join(''));
+  const des=t=>t.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&');
+  const cel={};
+  const xml=zip[caminho]; if(!xml)return cel;
+  // mesma armadilha da célula autofechada — ver o comentário em linhasDoXlsx
+  for(const mc of dec(xml).matchAll(/<c r="([A-Z]+\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)){
+    const end=mc[1],attrs=mc[2],corpo=mc[3]||'';
+    const t=(attrs.match(/t="(\w+)"/)||[])[1]||'';
+    let v='';
+    if(t==='inlineStr')v=[...corpo.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(x=>x[1]).join('');
+    else{const mv=corpo.match(/<v>([\s\S]*?)<\/v>/);v=mv?mv[1]:''}
+    if(t==='s')v=comp[+v]??'';
+    cel[end]=des(v);
+  }
+  return cel;
+}
+async function importarPatrimonial(f,r){
+  try{
+    const zip=await lerZipAuto(new Uint8Array(await f.arrayBuffer()));
+    const abas=abasDoXlsx(zip);
+    const acha=alvo=>Object.keys(abas).find(n=>n.toLowerCase().trim()===alvo);
+    const nLanc=acha('lançamentos')||acha('lancamentos');
+    const nCasas=acha('casas');
+    if(!nLanc)throw new Error('não achei a aba "Lançamentos". Abas neste arquivo: '+Object.keys(abas).join(', '));
+    const L=celulasDaAba(zip,abas[nLanc]);
+    const C=nCasas?celulasDaAba(zip,abas[nCasas]):{};
+    const num=v=>{const x=parseFloat(String(v??'').replace(',','.'));return isNaN(x)?0:x};
+    const txt=v=>String(v??'').trim();
+
+    /* As duas metades da aba Lançamentos são listas INDEPENDENTES: A-G são
+       empreendimentos, H-J são contas. Percorrer as duas separadamente é o que
+       impede o erro que a própria documentação da planilha adverte. */
+    const empreend=[],contas=[];
+    for(let i=2;i<=400;i++){
+      const nome=txt(L['A'+i]);
+      const vals=[num(L['D'+i]),num(L['E'+i]),num(L['F'+i]),num(L['G'+i])];
+      if(nome||vals.some(v=>v))
+        empreend.push({id:uid(),nome,ano:txt(L['B'+i]),mes:txt(L['C'+i]),
+          vgv:vals[0],aporteResidual:vals[1],aporteTotal:vals[2],previsao:vals[3]});
+      const cn=txt(L['H'+i]), cv=num(L['I'+i]), ct=txt(L['J'+i]);
+      if(cn||cv||ct)contas.push({id:uid(),nome:cn,valor:cv,tipo:ct});
+    }
+    // Casas: nome+aporte na linha 1, restante na 2, VGV na 3 — sete colunas
+    const casas=[];
+    for(const col of ['A','B','C','D','E','F','G']){
+      const rot=txt(C[col+'1']);
+      if(!rot)continue;
+      // "Vila 300mt  R$ 245.000,00" → nome e aporte saem do mesmo rótulo
+      const mv=rot.match(/R\$\s*([\d.]+,\d{2}|[\d.]+)/);
+      const aporte=mv?num(mv[1].replace(/\./g,'').replace(',','.')):0;
+      casas.push({id:uid(),nome:rot.replace(/[-–]?\s*R\$[\s\S]*$/,'').trim()||rot,
+        aporte,restante:num(C[col+'2']),vgv:num(C[col+'3'])});
+    }
+    // Reservas líquidas: descrição em C, valor em D, a partir da linha 8
+    const reservas=[];
+    for(let i=6;i<=60;i++){
+      const n2=txt(C['C'+i]), v2=num(C['D'+i]);
+      if(n2&&v2)reservas.push({id:uid(),nome:n2,valor:v2});
+    }
+    if(!empreend.length&&!contas.length)throw new Error('a aba Lançamentos veio vazia');
+
+    const resumo=`Vou substituir o que está na tela por:\n\n`+
+      `· ${empreend.length} empreendimento(s)\n· ${contas.length} conta(s) e dívida(s)\n`+
+      `· ${casas.length} casa(s)\n· ${reservas.length} reserva(s)\n\n`+
+      `O que está aqui agora fica guardado em Configurações → Versão descartada. Continuar?`;
+    if(!confirm(resumo))return;
+    guardaDescartado();
+    E.empreend=empreend;E.contas=contas;E.casas=casas;E.reservas=reservas;
+    salvar();
+    if(r)r();
+    const c2=contasVGV();
+    alert('Pronto.\n\nCaixa livre '+brl(c2.caixaLivre)+'\nA receber '+brl(c2.receber)+
+      '\nA pagar '+brl(c2.pagar)+'\nSaldo projetado '+brl(c2.saldo));
+  }catch(e){alert('Não consegui ler a planilha: '+(e.message||e))}
+}
+
+/* ---------------- o PDF de Caixa e VGV ---------------- */
+function imprimirCaixaVGV(){
+  const w=window.open('','_blank');
+  if(!w){alert('Libere o pop-up para gerar o PDF.');return}
+  const c=contasVGV(), av=avisosVGV();
+  const tab=(titulo,cols,linhas,rodape)=>linhas.length?`<h2>${titulo}</h2><table>
+    <thead><tr>${cols.map(x=>`<th${x[1]?' class="n"':''}>${x[0]}</th>`).join('')}</tr></thead><tbody>
+    ${linhas.join('')}${rodape?`<tr class="tot">${rodape}</tr>`:''}</tbody></table>`:'';
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>Caixa e VGV</title>
+  <style>
+    body{font:12.5px/1.55 -apple-system,Helvetica,sans-serif;padding:26px;color:#1a1a1a;max-width:860px}
+    h1{font-size:21px;margin:0 0 2px}h2{font-size:14px;margin:22px 0 8px;border-bottom:1px solid #ccc;padding-bottom:4px}
+    .sub{color:#777;margin:0 0 14px}
+    table{border-collapse:collapse;width:100%;font-size:12px}
+    th{text-align:left;border-bottom:1.5px solid #333;padding:5px 8px}
+    td{border-bottom:1px solid #e2e2e2;padding:5px 8px}
+    .n{text-align:right;font-variant-numeric:tabular-nums}
+    .tot td{border-top:1.5px solid #333;font-weight:bold}
+    .kpis{display:flex;gap:22px;flex-wrap:wrap;margin:12px 0 4px}
+    .kpis div{min-width:160px}.kpis b{display:block;font-size:17px}
+    .av{background:#fdf6e3;border-left:3px solid #c98a4b;padding:7px 10px;margin:5px 0;font-size:11.5px}
+    @media print{body{padding:0}h2{page-break-after:avoid}tr{page-break-inside:avoid}}
+  </style>
+  <h1>Caixa e VGV</h1>
+  <p class="sub">Posição em ${fmtDataAno(hoje())}</p>
+  <div class="kpis">
+    <div><span style="color:#777">Caixa livre hoje</span><b>${brl(c.caixaLivre)}</b></div>
+    <div><span style="color:#777">A receber</span><b>${brl(c.receber)}</b></div>
+    <div><span style="color:#777">A pagar</span><b>${brl(c.pagar)}</b></div>
+    <div><span style="color:#777">Saldo projetado</span><b>${brl(c.saldo)}</b></div>
+    <div><span style="color:#777">V.G.V total</span><b>${brl(c.vgv)}</b></div>
+  </div>
+  ${av.length?`<h2>Conferência</h2>${av.map(x=>`<div class="av">${esc(x.x)}</div>`).join('')}`:''}
+  ${tab('Contas e dívidas',[['Conta',0],['Tipo',0],['Valor',1]],
+    E.contas.slice().sort((x,y)=>cxN(y.valor)-cxN(x.valor)).map(x=>
+      `<tr><td>${esc(x.nome||'')}</td><td>${esc(x.tipo||'')}</td><td class="n">${brl(cxN(x.valor))}</td></tr>`),
+    `<td colspan="2">Total</td><td class="n">${brl(c.totalContas)}</td>`)}
+  ${tab('Empreendimentos',[['Empreendimento',0],['Ano',0],['V.G.V',1],['Aporte residual',1],['Previsão',1]],
+    E.empreend.map(x=>`<tr><td>${esc(x.nome||'')}</td><td>${esc(x.ano||'')}</td>
+      <td class="n">${cxN(x.vgv)?brl(cxN(x.vgv)):'—'}</td>
+      <td class="n">${cxN(x.aporteResidual)?brl(cxN(x.aporteResidual)):'—'}</td>
+      <td class="n">${cxN(x.previsao)?brl(cxN(x.previsao)):'—'}</td></tr>`),
+    `<td colspan="2">Totais</td><td class="n">${brl(c.vgv)}</td><td class="n">${brl(c.aporteResidual)}</td><td class="n">${brl(c.previsao)}</td>`)}
+  ${tab('Casas',[['Casa',0],['Aporte',1],['Restante',1],['V.G.V',1]],
+    E.casas.map(x=>`<tr><td>${esc(x.nome||'')}</td><td class="n">${brl(cxN(x.aporte))}</td>
+      <td class="n">${brl(cxN(x.restante))}</td><td class="n">${brl(cxN(x.vgv))}</td></tr>`),
+    `<td>Totais</td><td class="n">${brl(E.casas.reduce((s2,x)=>s2+cxN(x.aporte),0))}</td>
+     <td class="n">${brl(c.casasRestante)}</td><td class="n">${brl(c.casasVgv)}</td>`)}
+  ${tab('Reservas líquidas',[['De onde vem',0],['Valor',1],['%',1]],
+    E.reservas.slice().sort((x,y)=>cxN(y.valor)-cxN(x.valor)).map(x=>
+      `<tr><td>${esc(x.nome||'')}</td><td class="n">${brl(cxN(x.valor))}</td>
+       <td class="n">${c.reservas?((cxN(x.valor)/c.reservas)*100).toFixed(1)+'%':'—'}</td></tr>`),
+    `<td>Total</td><td class="n">${brl(c.reservas)}</td><td></td>`)}
+  <h2>Como isto é calculado</h2>
+  <p style="font-size:11.5px;color:#555">
+    <b>Caixa livre hoje</b> = só o dinheiro; cheque ainda não compensou, permuta não é dinheiro e dívida é o que se deve.<br>
+    <b>A receber</b> = previsão de recebimento dos empreendimentos + reservas líquidas.<br>
+    <b>A pagar</b> = aporte residual + aporte restante das casas + dívidas.<br>
+    <b>Saldo projetado</b> = caixa livre + a receber − a pagar.<br>
+    <b>Caixa total</b> (${brl(c.totalContas)}) soma TODOS os tipos, inclusive permuta e dívida — por isso é maior que o caixa livre.
+  </p>`);
+  w.document.close();
+  setTimeout(()=>w.print(),400);
 }
 
 /* ===================== BUSCA EM TUDO =====================
@@ -8038,6 +8374,7 @@ const GRUPOS_CFG=[
   {k:'catGasto',t:'Classificações de gasto',d:'separam para onde vai o dinheiro',ic:'💸'},
   {k:'catCasa',t:'Contas da casa',d:'condomínio, luz, água, internet, IPTU',ic:'🏠'},
   {k:'catCusto',t:'Categorias de custo de viagem',d:'o centro de custo de cada viagem',ic:'✈️'},
+  {k:'tiposConta',t:'Tipos de conta e dívida',d:'dinheiro, cheque, permuta, dívida',ic:'💰'},
   {k:'centrosObra',t:'Centro de custo das obras',d:'como o gasto da obra é separado',ic:'🏗️'},
   {k:'especialidades',t:'Especialidades da obra',d:'hidráulica, elétrica, pintura — cruza com o centro',ic:'🔧'},
   {k:'tiposObra',t:'Tipos de obra',d:'casa, lote, reforma',ic:'🧱'},
