@@ -4370,6 +4370,19 @@ function avisosVGV(){
   if(devem.length)av.push({t:'medio',x:`${devem.length} lançamento(s) do tipo Dívida têm nome de quem deve A VOCÊ (${devem.map(x=>x.nome).join(', ')}). Somados com o que você deve, o total não é nem uma coisa nem outra.`});
   const semValor=E.empreend.filter(x=>!cxN(x.vgv)&&!cxN(x.aporteResidual)&&!cxN(x.aporteTotal)&&!cxN(x.previsao)).length;
   if(semValor)av.push({t:'pequeno',x:`${semValor} empreendimento(s) sem nenhum valor preenchido — ocupam linha e não somam nada.`});
+  /* nome repetido: o total soma as DUAS linhas, e ninguém percebe olhando a lista */
+  const rep=lista=>{const c2={};lista.forEach(x=>{const k=(x.nome||'').trim().toLowerCase();if(k)c2[k]=(c2[k]||0)+1});
+    return Object.entries(c2).filter(([,q])=>q>1).map(([k])=>k)};
+  const re=rep(E.empreend), rc=rep(E.contas), rk=rep(E.casas);
+  if(re.length)av.push({t:'medio',x:`Empreendimento repetido: ${re.join(', ')}. Os totais somam as duas linhas — confira se é intencional.`});
+  if(rc.length)av.push({t:'medio',x:`Conta repetida: ${rc.join(', ')}. Pode ser a mesma conta lançada duas vezes, ou a mesma com saldo e dívida — só você sabe.`});
+  if(rk.length)av.push({t:'medio',x:`Casa repetida: ${rk.join(', ')}.`});
+  // empreendimento com aporte previsto mas sem VGV: não dá para saber se vale a pena
+  const semVgv=E.empreend.filter(x=>!cxN(x.vgv)&&(cxN(x.aporteResidual)||cxN(x.aporteTotal)));
+  if(semVgv.length)av.push({t:'pequeno',x:`${semVgv.length} empreendimento(s) com aporte lançado e sem V.G.V (${semVgv.slice(0,3).map(x=>x.nome).join(', ')}${semVgv.length>3?'…':''}) — sem o V.G.V não dá para saber se o aporte se paga.`});
+  // sanidade: aporte residual maior que o VGV é quase sempre erro de digitação
+  const invert=E.empreend.filter(x=>cxN(x.vgv)&&cxN(x.aporteResidual)>cxN(x.vgv));
+  if(invert.length)av.push({t:'grave',x:`${invert.length} empreendimento(s) com aporte residual MAIOR que o V.G.V (${invert.map(x=>x.nome).join(', ')}) — quase sempre é vírgula no lugar errado.`});
   return av;
 }
 
@@ -4394,6 +4407,31 @@ function vCaixaVGV(m){
     ${kpi('V.G.V das casas',brl(c.casasVgv),E.casas.length+' casa(s)')}
   </div>`));
 
+  /* ---- A CONTA EM UMA LINHA ----
+     Quatro números soltos não contam a história; a barra proporcional conta.
+     É a diferença entre "sei os valores" e "entendi a situação". */
+  const maxb=Math.max(c.caixaLivre,c.receber,c.pagar,Math.abs(c.saldo),1);
+  const barra=(rot,val,cor,expl)=>`<div style="margin-bottom:9px">
+    <div style="display:flex;align-items:baseline;gap:8px;font-size:12.5px">
+      <b style="min-width:132px">${rot}</b>
+      <span style="font-variant-numeric:tabular-nums;font-weight:600;color:${cor}">${brl(val)}</span>
+      <span style="color:var(--suave);font-size:11.5px">${expl}</span>
+    </div>
+    <div style="height:10px;background:var(--linha);border-radius:5px;overflow:hidden;margin-top:3px">
+      <div style="height:100%;width:${Math.min(100,Math.abs(val)/maxb*100)}%;background:${cor};border-radius:5px"></div>
+    </div></div>`;
+  const cxConta=el(`<div class="corpo">
+    ${barra('Caixa livre hoje',c.caixaLivre,'var(--verde)','o dinheiro que está na mão')}
+    ${barra('+ A receber',c.receber,'var(--azul)','previsão dos empreendimentos + reservas')}
+    ${barra('− A pagar',c.pagar,'var(--vermelho)','aporte residual + casas + dívidas')}
+    ${barra('= Saldo projetado',c.saldo,c.saldo>=0?'var(--verde)':'var(--vermelho)','o que sobra se tudo entrar e tudo for pago')}
+    <p style="font-size:12px;color:var(--suave);margin-top:11px;line-height:1.55">
+      ${c.saldo>=0
+        ? `Se tudo acontecer como está lançado, sobram <b>${brl(c.saldo)}</b>. Mas o caixa que você tem <b>hoje</b> é ${brl(c.caixaLivre)} e o que precisa pagar é ${brl(c.pagar)} — ${c.pagar>c.caixaLivre?`faltam <b>${brl(c.pagar-c.caixaLivre)}</b>, que dependem do que está previsto entrar. O aperto é de PRAZO, não de valor.`:'o caixa de hoje já cobre.'}`
+        : `Falta <b>${brl(-c.saldo)}</b>: mesmo recebendo tudo o que está previsto, o que você deve aportar é maior. Ou entra dinheiro novo, ou algum aporte precisa esperar.`}
+    </p></div>`);
+  m.appendChild(bloco('cx-conta','🧮 A conta em uma linha','de onde vem e para onde vai',cxConta));
+
   /* ---- avisos: só aparecem quando valem ---- */
   const av=avisosVGV();
   if(av.length){
@@ -4410,6 +4448,8 @@ function vCaixaVGV(m){
     ${kpi('Permuta',brl(c.permuta),'vira dinheiro na venda','a')}
     ${kpi('Dívida',brl(c.divida),'','r')}
   </div>`));
+  if(c.totalContas)t1.appendChild(el(`<div style="margin-bottom:12px">${gRosca(
+    CFG('tiposConta').map(t=>({r:t,v:E.contas.filter(x=>x.tipo===t).reduce((s2,x)=>s2+cxN(x.valor),0)})))}</div>`));
   t1.appendChild(tabelaBloco('cx-contas-t','','',E.contas,[
     {k:'nome',t:'Conta / dívida',ph:'ex.: conta do banco, cheque, dívida'},
     {k:'valor',t:'Valor',tipo:'moeda',w:150},
@@ -4432,6 +4472,13 @@ function vCaixaVGV(m){
       `<td colspan="3">Totais</td><td class="num">${brl(c.vgv)}</td><td class="num">${brl(c.aporteResidual)}</td>`+
       `<td class="num">${brl(c.aporteTotal)}</td><td class="num">${brl(c.previsao)}</td>`,E.empreend)));
 
+  /* ---- V.G.V por empreendimento: onde está o dinheiro grande ---- */
+  const comVgv=E.empreend.filter(x=>cxN(x.vgv)).sort((x,y)=>cxN(y.vgv)-cxN(x.vgv)).slice(0,10);
+  if(comVgv.length>1)
+    m.appendChild(bloco('cx-gvgv','📊 V.G.V por empreendimento','os dez maiores',
+      el(`<div class="corpo">${gBarras(comVgv.map(x=>({r:(x.nome||'—').slice(0,14),v:cxN(x.vgv)})))}
+        <p style="font-size:12px;color:var(--suave);margin-top:8px">V.G.V é o valor geral de vendas — quanto o empreendimento vale vendido, não quanto sobra para você.</p></div>`)));
+
   /* ---- 3. casas ---- */
   m.appendChild(bloco('cx-casas','🏡 Casas','aporte feito, quanto falta e o V.G.V de cada uma',
     tabelaBloco('cx-casas-t','','',E.casas,[
@@ -4451,6 +4498,30 @@ function vCaixaVGV(m){
       {k:'pct',t:'% do total',tipo:'calc',dir:'r',calc:x=>c.reservas?((cxN(x.valor)/c.reservas)*100).toFixed(1)+'%':'—'},
     ],()=>({nome:'',valor:0}),r,
       `<td>Total</td><td class="num">${brl(c.reservas)}</td><td></td>`,E.reservas)));
+
+  /* ---- quanto falta aportar em cada casa ---- */
+  const casasFalta=E.casas.filter(x=>cxN(x.restante)).sort((x,y)=>cxN(y.restante)-cxN(x.restante));
+  if(casasFalta.length)
+    m.appendChild(bloco('cx-gcasas','📊 Quanto falta aportar em cada casa','o que ainda sai do bolso',
+      el(`<div class="corpo">${gBarras(casasFalta.map(x=>({r:(x.nome||'—').slice(0,14),v:cxN(x.restante)})),{cor:'var(--vermelho)'})}
+        <p style="font-size:12px;color:var(--suave);margin-top:8px">Soma ${brl(c.casasRestante)}. As casas com barra zerada já estão com o aporte quitado.</p></div>`)));
+
+  /* ---- entenda cada número ---- */
+  const dida=el('<div class="corpo"></div>');
+  [['Caixa livre hoje','Só o dinheiro. Cheque ainda não compensou, permuta é bem e não dinheiro, e dívida é o que você deve — nenhum dos três está disponível para gastar hoje.'],
+   ['Caixa total','Soma TODOS os tipos, inclusive permuta e dívida. É o número que a planilha chamava de "Total Líquido". Serve para ver o tamanho da posição, não para decidir gasto.'],
+   ['A receber','Previsão de recebimento dos empreendimentos mais as reservas líquidas. É dinheiro combinado, não dinheiro na conta.'],
+   ['A pagar','O aporte que você ainda deve nos empreendimentos, mais o que falta nas casas, mais as dívidas.'],
+   ['Saldo projetado','Caixa livre + a receber − a pagar. Responde: "se tudo acontecer como está escrito, eu fico com quanto?"'],
+   ['V.G.V','Valor geral de vendas: quanto o empreendimento vale se vendido inteiro. Não é seu lucro nem sua parte — é o tamanho do negócio.'],
+   ['Aporte residual','O que você se comprometeu a pôr e ainda não pôs.'],
+   ['Aporte total','O que já foi definido como aporte, incluindo o que já entrou.'],
+  ].forEach(([k,v])=>{
+    dida.appendChild(el(`<div style="margin-bottom:9px">
+      <b style="font-size:12.5px">${k}</b>
+      <div style="font-size:12px;color:var(--suave);line-height:1.5">${v}</div></div>`));
+  });
+  m.appendChild(bloco('cx-dida','📖 Entenda cada número','o que cada um responde, em português',dida));
 
   /* ---- 5. trazer da planilha + PDF ---- */
   const acoes=el('<div class="corpo"></div>');
