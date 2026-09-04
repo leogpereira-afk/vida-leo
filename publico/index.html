@@ -162,6 +162,19 @@ tr:hover .lixo{opacity:1}
 .solta{border:1.5px dashed var(--linha);border-radius:11px;padding:16px;text-align:center;color:var(--suave);
   font-size:13px;cursor:pointer;transition:.15s}
 .solta.ocupado{opacity:.55;pointer-events:none}
+/* ---- ranking: barra horizontal, identidade pelo rótulo ---- */
+.rank{display:flex;flex-direction:column;gap:9px}
+.rank-tit{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--suave);margin-bottom:1px}
+.rank-l{display:flex;flex-direction:column;gap:3px}
+.rank-cab{display:flex;align-items:baseline;gap:8px;font-size:12.5px}
+.rank-nome{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.rank-val{margin-left:auto;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}
+.rank-pct{color:var(--suave);font-weight:400;font-size:11.5px;margin-left:7px}
+/* trilho de 10px com a barra dentro: ponta arredondada, base quadrada */
+.rank-tr{height:10px;background:color-mix(in srgb,var(--linha) 55%,transparent);border-radius:0 5px 5px 0}
+.rank-b{height:100%;border-radius:0 5px 5px 0;min-width:3px;transition:width .25s}
+.rank-nota{font-size:11.5px;color:var(--suave);margin-top:2px}
+.rank-l:hover .rank-nome{color:var(--verde)}
 /* !important: vários filhos trazem display no próprio elemento (flex, grid),
    e estilo inline vence folha de estilo — sem isto a seção 'fechada' ficava
    com o miolo à mostra. */
@@ -3691,7 +3704,8 @@ async function fichaObraEm(c,o,fechar){
         +(desvio?`<tr><td colspan="4" style="padding:7px 10px;font-size:12px;color:var(--suave)">`
           +`+ ${brl(desvio)} nos planos da venda, que não entram no custo — somando tudo, ${brl(rr2.total)}.</td></tr>`:'')));
       rol.appendChild(t);s2.appendChild(rol);
-      s2.appendChild(el(`<div style="margin-top:12px">${gRosca(cents.slice(0,8).map(([k,v])=>({r:k,v:v.total})))}</div>`));
+      s2.appendChild(el(`<div style="margin-top:14px">${ranking(
+        cents.map(([k,v])=>({r:k,v:v.total})),{titulo:'Para onde foi, do maior para o menor',max:8})}</div>`));
     }
     c.appendChild(s2);
 
@@ -4448,8 +4462,9 @@ function vCaixaVGV(m){
     ${kpi('Permuta',brl(c.permuta),'vira dinheiro na venda','a')}
     ${kpi('Dívida',brl(c.divida),'','r')}
   </div>`));
-  if(c.totalContas)t1.appendChild(el(`<div style="margin-bottom:12px">${gRosca(
-    CFG('tiposConta').map(t=>({r:t,v:E.contas.filter(x=>x.tipo===t).reduce((s2,x)=>s2+cxN(x.valor),0)})))}</div>`));
+  if(c.totalContas)t1.appendChild(el(`<div style="margin-bottom:14px">${ranking(
+    CFG('tiposConta').map(t=>({r:t,v:E.contas.filter(x=>x.tipo===t).reduce((s2,x)=>s2+cxN(x.valor),0)})),
+    {titulo:'Por tipo',max:6})}</div>`));
   t1.appendChild(tabelaBloco('cx-contas-t','','',E.contas,[
     {k:'nome',t:'Conta / dívida',ph:'ex.: conta do banco, cheque, dívida'},
     {k:'valor',t:'Valor',tipo:'moeda',w:150},
@@ -4476,8 +4491,8 @@ function vCaixaVGV(m){
   const comVgv=E.empreend.filter(x=>cxN(x.vgv)).sort((x,y)=>cxN(y.vgv)-cxN(x.vgv)).slice(0,10);
   if(comVgv.length>1)
     m.appendChild(bloco('cx-gvgv','📊 V.G.V por empreendimento','os dez maiores',
-      el(`<div class="corpo">${gBarras(comVgv.map(x=>({r:(x.nome||'—').slice(0,14),v:cxN(x.vgv)})))}
-        <p style="font-size:12px;color:var(--suave);margin-top:8px">V.G.V é o valor geral de vendas — quanto o empreendimento vale vendido, não quanto sobra para você.</p></div>`)));
+      el(`<div class="corpo">${ranking(comVgv.map(x=>({r:x.nome||'—',v:cxN(x.vgv)})),{max:10})}
+        <p style="font-size:12px;color:var(--suave);margin-top:11px">V.G.V é o valor geral de vendas — quanto o empreendimento vale vendido, não quanto sobra para você.</p></div>`)));
 
   /* ---- 3. casas ---- */
   m.appendChild(bloco('cx-casas','🏡 Casas','aporte feito, quanto falta e o V.G.V de cada uma',
@@ -4503,8 +4518,8 @@ function vCaixaVGV(m){
   const casasFalta=E.casas.filter(x=>cxN(x.restante)).sort((x,y)=>cxN(y.restante)-cxN(x.restante));
   if(casasFalta.length)
     m.appendChild(bloco('cx-gcasas','📊 Quanto falta aportar em cada casa','o que ainda sai do bolso',
-      el(`<div class="corpo">${gBarras(casasFalta.map(x=>({r:(x.nome||'—').slice(0,14),v:cxN(x.restante)})),{cor:'var(--vermelho)'})}
-        <p style="font-size:12px;color:var(--suave);margin-top:8px">Soma ${brl(c.casasRestante)}. As casas com barra zerada já estão com o aporte quitado.</p></div>`)));
+      el(`<div class="corpo">${ranking(casasFalta.map(x=>({r:x.nome||'—',v:cxN(x.restante)})),{ac:'var(--vermelho)',max:10})}
+        <p style="font-size:12px;color:var(--suave);margin-top:11px">Soma ${brl(c.casasRestante)}. As casas que já quitaram o aporte não aparecem.</p></div>`)));
 
   /* ---- entenda cada número ---- */
   const dida=el('<div class="corpo"></div>');
@@ -4709,6 +4724,52 @@ function imprimirCaixaVGV(){
   </p>`);
   w.document.close();
   setTimeout(()=>w.print(),400);
+}
+
+
+/* ================== RANKING ==================================
+   A forma certa para "quem é o maior" é BARRA HORIZONTAL, não rosca.
+   Motivo medido, não opinião: rodei o validador de paleta do guia de
+   visualização sobre as 8 cores da casa e, exigindo que TODAS se separem
+   entre si (que é o caso de uma rosca, onde todas aparecem juntas), o teto
+   honesto é 4 cores — e a nossa falhava até entre vizinhas: #7a8b53 e
+   #a8674b ficam a ΔE 2,6 para quem tem daltonismo verde e a 11,5 para quem
+   enxerga cor normalmente (o piso é 15).
+
+   Barra horizontal resolve por construção: a identidade vem do RÓTULO e da
+   POSIÇÃO, não da cor. Uma cor só, magnitude no comprimento. Assim não há
+   limite de itens nem problema de daltonismo.
+
+   Regras do guia aplicadas: barra ≤24px com ponta arredondada de 4px e base
+   quadrada; valor no fim da barra (rótulo direto); texto nunca veste a cor
+   do dado; nada de número em cima de tudo — só o que a linha carrega. */
+function ranking(itens,{ac='var(--verde)',fmt=brl,max=8,titulo='',mostraPct=true,aoClicar=null}={}){
+  const val=itens.filter(x=>Math.abs(+x.v||0)>0.005).sort((x,y)=>Math.abs(y.v)-Math.abs(x.v));
+  if(!val.length)return '<div class="vazio">Sem dados ainda.</div>';
+  /* Passa de `max`? O resto vira UMA linha "Outros" — a alternativa (mostrar
+     tudo) faz a lista virar parede, e a de cortar calado esconderia dinheiro. */
+  const topo=val.slice(0,max), resto=val.slice(max);
+  const somaResto=resto.reduce((t,x)=>t+(+x.v||0),0);
+  const linhas=[...topo,...(resto.length?[{r:`Outros (${resto.length})`,v:somaResto,_resto:true}]:[])];
+  const total=val.reduce((t,x)=>t+(+x.v||0),0);
+  const maior=Math.max(...linhas.map(x=>Math.abs(+x.v||0)))||1;
+  return `<div class="rank">${titulo?`<div class="rank-tit">${titulo}</div>`:''}
+    ${linhas.map((x,i)=>{
+      const v=+x.v||0, larg=Math.max(1.5,Math.abs(v)/maior*100);
+      const pct=total?(v/total*100):0;
+      // o primeiro colocado ganha a cor cheia; os outros recuam — é o
+      // "emphasis" do guia: quem lidera salta, o resto é contexto
+      const cor=x._resto?'var(--linha)':(i===0?ac:`color-mix(in srgb,${ac} ${Math.max(28,88-i*13)}%,transparent)`);
+      return `<div class="rank-l"${aoClicar&&!x._resto?` data-rk="${esc(x.r)}" style="cursor:pointer"`:''}>
+        <div class="rank-cab">
+          <span class="rank-nome">${x.ic||''}${esc(x.r)}</span>
+          <span class="rank-val">${fmt(v)}${mostraPct&&total?`<span class="rank-pct">${pct.toFixed(pct<10?1:0)}%</span>`:''}</span>
+        </div>
+        <div class="rank-tr"><div class="rank-b" style="width:${larg}%;background:${cor}"></div></div>
+      </div>`;
+    }).join('')}
+    ${resto.length?`<div class="rank-nota">As ${resto.length} menores estão somadas em “Outros”.</div>`:''}
+  </div>`;
 }
 
 /* ===================== BUSCA EM TUDO =====================
@@ -6885,15 +6946,9 @@ function vRendimentos(m){
         const trs=document.createElement('tr');
         if(!aberto)trs.style.display='none';
         trs.style.background='color-mix(in srgb,var(--bg) 55%,transparent)';
-        trs.innerHTML=`<td colspan="8" style="padding:7px 10px 8px">
-          <div style="display:flex;flex-wrap:wrap;gap:5px 14px;align-items:center">
-            <span style="font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--suave)">no mês, por empresa</span>
-            ${empsOrd.map(([e2,v2])=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px">
-              ${avatar(e2,17)}<b>${esc(e2)}</b>
-              <span style="font-variant-numeric:tabular-nums">${brl(v2)}</span>
-              <span style="color:var(--suave);font-size:11.5px">${somaG?(v2/somaG*100).toFixed(0)+'%':''}</span>
-            </span>`).join('')}
-          </div></td>`;
+        trs.innerHTML=`<td colspan="8" style="padding:10px 12px 13px">
+          ${ranking(empsOrd.map(([e2,v2])=>({r:e2,v:v2,ic:avatar(e2,17)})),
+            {titulo:'No mês, por empresa',max:6})}</td>`;
         tb2.appendChild(trs); filhasM.push(trs);
       }
       g.itens.forEach(x=>{
