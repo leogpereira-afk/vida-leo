@@ -6519,36 +6519,6 @@ function vRendimentos(m){
   mA.appendChild(bloco('rd-rank','🏆 O que mais deu lucro',
     temDetalhe?(todos?`por empresa nos 7 anos — clique para abrir os negócios`:`por empresa em ${ano} — clique para abrir os negócios`):(todos?'somando os 7 anos':'por empresa em '+ano),lc));
 
-  /* ---- LEITURA DE ANALISTA ---- */
-  const an=el('<div class="corpo"></div>');
-  const notas=[];
-  if(temDetalhe){
-    const pont=grupos.reduce((s,g)=>s+g.itens.filter(x=>x.tipo==='p').reduce((a,b)=>a+b.v,0),0);
-    const rec=totalSel-pont;
-    notas.push(`<div class="sug"><b>💡 Quanto é recorrente e quanto foi sorte</b><p>
-      <b>${brl(rec)}</b> (${(rec/totalSel*100).toFixed(0)}%) se repete todo mês — pró-labore, aluguel e rendimento das aplicações.
-      <b>${brl(pont)}</b> (${(pont/totalSel*100).toFixed(0)}%) veio de negócios pontuais.
-      ${pont/totalSel>0.5?`Se esses negócios não se repetirem, ${ano} cairia para perto de <b>${brl(rec)}</b>.
-      Essa é a sua base real — vale saber se ela paga o seu custo de vida.`:'A sua base recorrente sustenta a maior parte do ano.'}</p></div>`);
-  }
-  if(conc>40) notas.push(`<div class="sug"><b>⚠️ Concentração em ${maior.r}</b><p>
-    ${conc.toFixed(0)}% de tudo ${todos?'que você já ganhou':'do ano'} vem de uma fonte só.
-    Não é erro — mas é o seu maior risco: se ela parar, ${conc.toFixed(0)}% da renda para junto.</p></div>`);
-  const aplicAno=todos?(H.empresas['Aplicação']||[]).reduce((a,b)=>a+b,0):(H.empresas['Aplicação']?.[iAno]||0);
-  if(aplicAno>0) notas.push(`<div class="sug"><b>📈 Suas aplicações renderam ${brl(aplicAno)}</b><p>
-    É ${(aplicAno/totalSel*100).toFixed(1)}% do total e é o único dinheiro que trabalha sem você.
-    Para saber se está bom, falta um dado que a planilha não tem: <b>quanto está aplicado em cada banco</b>.
-    Sem isso dá para ver quem rendeu mais em reais, mas não quem rendeu melhor.</p></div>`);
-  if(!todos&&cresc!=null&&cresc<-10) notas.push(`<div class="sug"><b>📉 ${ano} veio abaixo de ${ano-1}</b><p>
-    Queda de ${Math.abs(cresc).toFixed(0)}% (${brl(Math.abs(H.totalAno[iAno]-H.totalAno[iAno-1]))}).
-    Vale olhar qual fonte encolheu — costuma ser um negócio pontual que não se repetiu.</p></div>`);
-  const melhorAno=H.anos[H.totalAno.indexOf(Math.max(...H.totalAno))];
-  if(todos) notas.push(`<div class="sug"><b>🗓️ Seu melhor ano foi ${melhorAno}</b><p>
-    ${brl(Math.max(...H.totalAno))}. A média dos anos completos é ${brl(H.mediaAnual)} —
-    e a tendência dos últimos anos é de crescimento, com 2025 como exceção.</p></div>`);
-  an.innerHTML=`<div class="lista-sug">${notas.join('')}</div>`;
-  mA.appendChild(bloco('rd-analise','🔎 Leitura dos números','o que eu olharia no seu lugar',an));
-
   /* ---- conferência: o lançado bate com o histórico? — com o dedo no que destoa ---- */
   const cfx=el('<div></div>');
   {
@@ -6805,33 +6775,6 @@ function vRendimentos(m){
     mA.appendChild(bloco('rd-emp','Participação por empresa','no acumulado',ce));
   }
 
-  // ---- aplicações por instituição ----
-  // junta o que veio da planilha antiga com o que ele lança hoje — senão o campo
-  // "Instituição" do lançamento não aparece em lugar nenhum
-  const API=structuredClone(H.aplicPorInst||{});
-  E.rendimentos.filter(x=>x.instituicao&&(+x.valor||0)>0).forEach(x=>{
-    const a=(x.data||'').slice(0,4); if(!a) return;
-    API[a]=API[a]||{};
-    API[a][x.instituicao]=(API[a][x.instituicao]||0)+(+x.valor||0);
-  });
-  const anosApi=Object.keys(API).sort();
-  if(anosApi.length){
-    const ai=el('<div></div>');
-    const totApl=H.anos.map((a,i)=>H.empresas['Aplicação']?.[i]||0).reduce((s,v)=>s+v,0);
-    const detalhado=anosApi.reduce((s,a)=>s+Object.values(API[a]).reduce((x,y)=>x+y,0),0);
-    ai.appendChild(el(`<div class="corpo" style="padding-bottom:0"><p style="font-size:12.5px;color:var(--suave)">
-      Detalhe por instituição em ${anosApi.join(', ')} — ${brl(detalhado)} no total${
-        totApl>0&&detalhado<=totApl?`, de ${brl(totApl)} em aplicações`:''}.
-      Para um lançamento novo entrar aqui, preencha a <b>Instituição</b> na tabela abaixo.</p></div>`));
-    anosApi.slice().reverse().forEach(a=>{
-      const d=Object.entries(API[a]).map(([r2,v])=>({r:r2,v}));
-      const tA=d.reduce((t,x)=>t+x.v,0);
-      ai.appendChild(el(`<div class="corpo" style="padding-top:4px">
-        ${ranking(d,{titulo:a+' — '+brl(tA),max:8,ac:'var(--azul)'})}</div>`));
-    });
-    mA.appendChild(bloco('rd-aplic','Aplicações por instituição','rendimento de cada conta',ai));
-  }
-
   const linhas=Object.entries(H.empresas).map(([nome,vals])=>({nome,vals,tot:vals.reduce((a,b)=>a+b,0)})).sort((a,b)=>b.tot-a.tot);
   const maiorTot=linhas[0].tot;
   const th=el('<div class="rolagem"></div>');
@@ -7073,6 +7016,18 @@ function vRendimentos(m){
   const bt2=el('<button class="mais">+ Novo lançamento</button>'); bt2.onclick=novoRend;
   pe2.appendChild(bt2); lc2.appendChild(pe2);
   m.appendChild(bloco('rd-lanc','Lançamentos de '+ano,doAno.length+' lançamento(s) — clique no mês para abrir; em Instituição ou Tipo para corrigir ali mesmo; no resto da linha para abrir a ficha',lc2));
+  /* ORDEM DA TELA: o dono lê os LANÇAMENTOS primeiro e o resumo por empresa
+     logo depois; o resto do painel é contexto. A troca é feita aqui, no fim,
+     movendo os dois blocos já prontos para o topo — reordenar a construção
+     espalharia a mudança por meia função e quebraria as contas que dependem
+     da sequência. */
+  {
+    const prim=[...m.children].find(x=>x.dataset&&x.dataset.bid);
+    const lan=m.querySelector(':scope > [data-bid="rd-lanc"]');
+    const men=m.querySelector(':scope > [data-bid="rd-mensal"]');
+    if(prim&&lan&&prim!==lan){ m.insertBefore(lan,prim); if(men)m.insertBefore(men,prim); }
+  }
+
 }
 
 function modalRendimento(x,novo){
