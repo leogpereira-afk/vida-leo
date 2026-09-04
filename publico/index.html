@@ -4369,8 +4369,18 @@ function contasVGV(){
   const caixaLivre=dinheiro;
   const receber=previsao+reservas;
   const pagar=aporteResidual+casasRestante+divida;
+  /* AS CONTAS DO PAINEL DELE, com o nome e a fórmula que ele usa na planilha.
+     Eu tinha inventado outros oito números e deixado estes de fora — inclusive
+     o "Valor a Investir Líquido", que é o número com que ele decide.
+       Valor a Investir        = Total Líquido − Aporte residual        (H9)
+       Valor a Investir Líquido = aquele − Cheque − Dívida − Permuta    (H17)
+       Soma dos tipos          = conferência: tem de bater com o Total Líquido */
+  const somaTipos=dinheiro+cheque+permuta+divida;
+  const aInvestir=totalContas-aporteResidual;
+  const aInvestirLiq=aInvestir-cheque-divida-permuta;
   return {dinheiro,cheque,permuta,divida,totalContas,semTipo,vgv,aporteResidual,aporteTotal,
     previsao,casasRestante,casasVgv,reservas,caixaLivre,receber,pagar,
+    somaTipos,aInvestir,aInvestirLiq,
     saldo:caixaLivre+receber-pagar};
 }
 
@@ -4412,19 +4422,40 @@ function vCaixaVGV(m){
   const c=contasVGV();
   m.appendChild(cab('Caixa e VGV','O que existe hoje, o que ainda entra e o que ainda sai. Tudo editável aqui.'));
 
-  m.appendChild(ligaKpis(el(`<div class="grade">
-    ${kpi('Caixa livre hoje',brl(c.caixaLivre),'só dinheiro — sem cheque, permuta nem dívida','v','cx-contas')}
-    ${kpi('A receber',brl(c.receber),'previsão + reservas','','cx-emp')}
-    ${kpi('A pagar',brl(c.pagar),'aporte residual + casas + dívidas','r','cx-emp')}
-    ${kpi('Saldo projetado',brl(c.saldo),'se tudo entrar e tudo for pago',c.saldo>=0?'p':'v','cx-conf')}
-  </div>`),{'cx-contas':'cx-contas','cx-emp':'cx-emp','cx-conf':'cx-conf'}));
-
+  /* O PAINEL É O DELE. Doze números em quatro blocos de três, com os nomes
+     e as fórmulas da planilha — mexer nisso o obrigaria a reaprender o que
+     já sabe de cor. O que eu acrescentei fica DEPOIS, nunca no lugar. */
   m.appendChild(el(`<div class="grade">
-    ${kpi('V.G.V total',brl(c.vgv),E.empreend.length+' empreendimento(s)')}
+    ${kpi('Total V.G.V',brl(c.vgv),E.empreend.length+' empreendimento(s)')}
     ${kpi('Aporte residual',brl(c.aporteResidual),'ainda devo aportar','a')}
-    ${kpi('Caixa total',brl(c.totalContas),'todos os tipos somados, como na planilha')}
-    ${kpi('V.G.V das casas',brl(c.casasVgv),E.casas.length+' casa(s)')}
+    ${kpi('Aporte total',brl(c.aporteTotal),'já definido')}
   </div>`));
+  m.appendChild(el(`<div class="grade">
+    ${kpi('Previsão de recebimento',brl(c.previsao),'dos empreendimentos')}
+    ${kpi('Total Líquido',brl(c.totalContas),'todos os tipos somados')}
+    ${kpi('Valor a Investir',brl(c.aInvestir),'Total Líquido − aporte residual',c.aInvestir>=0?'':'v')}
+  </div>`));
+  m.appendChild(ligaKpis(el(`<div class="grade">
+    ${kpi('Dinheiro',brl(c.dinheiro),'','v','cx-contas')}
+    ${kpi('Permuta',brl(c.permuta),'vira dinheiro na venda','a','cx-contas')}
+    ${kpi('Dívida',brl(c.divida),'','r','cx-contas')}
+  </div>`),{'cx-contas':'cx-contas'}));
+  m.appendChild(ligaKpis(el(`<div class="grade">
+    ${kpi('Cheque',brl(c.cheque),'a compensar','','cx-contas')}
+    ${kpi('Soma dos tipos',brl(c.somaTipos),
+      Math.abs(c.somaTipos-c.totalContas)<0.01?'confere com o Total Líquido':'NÃO bate — '+brl(c.totalContas-c.somaTipos)+' com tipo em branco',
+      Math.abs(c.somaTipos-c.totalContas)<0.01?'':'r','cx-conf')}
+    ${kpi('Valor a Investir Líquido',brl(c.aInvestirLiq),'sem cheque, dívida nem permuta',c.aInvestirLiq>=0?'p':'v')}
+  </div>`),{'cx-conf':'cx-conf'}));
+
+  /* O que eu acrescentei ao painel dele — fluxo, que a planilha não tinha. */
+  m.appendChild(el(`<div style="margin:16px 0 6px;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--suave)">Além da planilha — o fluxo</div>`));
+  m.appendChild(ligaKpis(el(`<div class="grade">
+    ${kpi('Caixa livre hoje',brl(c.caixaLivre),'só dinheiro — o que dá para gastar hoje','v','cx-contas')}
+    ${kpi('A receber',brl(c.receber),'previsão + reservas das casas','','cx-emp')}
+    ${kpi('A pagar',brl(c.pagar),'aporte residual + casas + dívidas','r','cx-emp')}
+    ${kpi('Saldo projetado',brl(c.saldo),'se tudo entrar e tudo for pago',c.saldo>=0?'p':'v','cx-conta')}
+  </div>`),{'cx-contas':'cx-contas','cx-emp':'cx-emp','cx-conta':'cx-conta'}));
 
   /* ---- A CONTA EM UMA LINHA ----
      Quatro números soltos não contam a história; a barra proporcional conta.
@@ -4451,6 +4482,21 @@ function vCaixaVGV(m){
     </p></div>`);
   m.appendChild(bloco('cx-conta','🧮 A conta em uma linha','de onde vem e para onde vai',cxConta));
 
+  /* ---- OS DOIS RANKINGS QUE A PLANILHA JÁ TINHA ----
+     A aba Painel VGV tem dois gráficos: "Ranking — Total Líquido por conta" e
+     "Ranking por Tipo de Capital". Ele já pensava assim; faltava no sistema. */
+  if(E.contas.length){
+    const rk=el('<div class="corpo"></div>');
+    rk.appendChild(el(`<div style="display:grid;gap:22px;grid-template-columns:repeat(auto-fit,minmax(290px,1fr))">
+      <div>${ranking(E.contas.map(x=>({r:x.nome||'—',v:cxN(x.valor)})),
+        {titulo:'Total Líquido por conta',max:10})}</div>
+      <div>${ranking(CFG('tiposConta').map(t=>({r:t,
+        v:E.contas.filter(x=>x.tipo===t).reduce((s2,x)=>s2+cxN(x.valor),0)})),
+        {titulo:'Por tipo de capital',max:6,ac:'var(--azul)'})}</div>
+    </div>`));
+    m.appendChild(bloco('cx-rank','🏆 Rankings','os mesmos dois gráficos do Painel VGV da planilha',rk));
+  }
+
   /* ---- avisos: só aparecem quando valem ---- */
   const av=avisosVGV();
   if(av.length){
@@ -4467,9 +4513,7 @@ function vCaixaVGV(m){
     ${kpi('Permuta',brl(c.permuta),'vira dinheiro na venda','a')}
     ${kpi('Dívida',brl(c.divida),'','r')}
   </div>`));
-  if(c.totalContas)t1.appendChild(el(`<div style="margin-bottom:14px">${ranking(
-    CFG('tiposConta').map(t=>({r:t,v:E.contas.filter(x=>x.tipo===t).reduce((s2,x)=>s2+cxN(x.valor),0)})),
-    {titulo:'Por tipo',max:6})}</div>`));
+
   t1.appendChild(tabelaBloco('cx-contas-t','','',E.contas,[
     {k:'nome',t:'Conta / dívida',ph:'ex.: conta do banco, cheque, dívida'},
     {k:'valor',t:'Valor',tipo:'moeda',w:150},
