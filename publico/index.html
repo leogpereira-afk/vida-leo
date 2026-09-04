@@ -6871,24 +6871,100 @@ function vRendimentos(m){
         <td></td>`;
       tb2.appendChild(trg);
       const filhasM=[];
+      /* SUBTOTAL POR EMPRESA DENTRO DO MÊS.
+         A linha do mês diz quanto entrou; ela não diz DE ONDE. Com 11
+         lançamentos de cinco empresas, somar Impresilk de cabeça é o tipo de
+         conta que ninguém faz — então a conta vem pronta, uma linha por
+         empresa, ordenada da maior para a menor. Some quando o mês tem uma
+         empresa só (aí o subtotal seria o próprio total do mês). */
+      const porEmp={};
+      g.itens.forEach(x=>{const e2=(x.empresa||'—').trim()||'—';
+        porEmp[e2]=(porEmp[e2]||0)+(+x.valor||0)});
+      const empsOrd=Object.entries(porEmp).sort((u,v)=>v[1]-u[1]);
+      if(empsOrd.length>1){
+        const trs=document.createElement('tr');
+        if(!aberto)trs.style.display='none';
+        trs.style.background='color-mix(in srgb,var(--bg) 55%,transparent)';
+        trs.innerHTML=`<td colspan="8" style="padding:7px 10px 8px">
+          <div style="display:flex;flex-wrap:wrap;gap:5px 14px;align-items:center">
+            <span style="font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--suave)">no mês, por empresa</span>
+            ${empsOrd.map(([e2,v2])=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:12.5px">
+              ${avatar(e2,17)}<b>${esc(e2)}</b>
+              <span style="font-variant-numeric:tabular-nums">${brl(v2)}</span>
+              <span style="color:var(--suave);font-size:11.5px">${somaG?(v2/somaG*100).toFixed(0)+'%':''}</span>
+            </span>`).join('')}
+          </div></td>`;
+        tb2.appendChild(trs); filhasM.push(trs);
+      }
       g.itens.forEach(x=>{
         const tr=document.createElement('tr'); tr.style.cursor='pointer';
         if(!aberto) tr.style.display='none';
         tr.innerHTML=`<td style="padding:9px 10px;white-space:nowrap;font-variant-numeric:tabular-nums">${fmtDataAno(x.data)}</td>
           <td style="padding:9px 10px;white-space:nowrap">${avatar(x.empresa||'—',20)}<b>${esc(x.empresa||'—')}</b></td>
-          <td style="padding:9px 10px;color:var(--suave)">${esc(x.instituicao||'—')}</td>
-          <td style="padding:9px 10px">${esc(x.tipo||'—')}${flagsLan(x)}</td>
+          <td class="cel-inst" style="padding:5px 6px"></td>
+          <td class="cel-tipo" style="padding:5px 6px"></td>
           <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${brl(+x.valor||0)}</td>
           <td style="padding:9px 10px;text-align:right;color:var(--tinta);font-variant-numeric:tabular-nums;font-weight:600">${somaG?((+x.valor||0)/somaG*100).toFixed(1)+'%':'—'}</td>
           <td style="padding:9px 10px;text-align:right;color:var(--suave);font-variant-numeric:tabular-nums">${totLanc?((+x.valor||0)/totLanc*100).toFixed(1)+'%':'—'}</td>
           <td style="padding:9px 10px;color:var(--suave);font-size:12.5px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.obs||'')}</td>`;
+        /* INSTITUIÇÃO E TIPO SE EDITAM AQUI, na própria linha.
+           Antes só dava pela ficha: abrir, digitar, fechar, repetir. Para
+           preencher o que está como "—" em dezenas de lançamentos antigos,
+           isso é trabalho demais para uma correção de uma palavra.
+           O clique na CÉLULA edita; o clique no resto da linha continua
+           abrindo a ficha (stopPropagation impede um virar o outro).
+           A lista de sugestões é a mesma da ficha — e instituição nova
+           digitada aqui também entra na lista para sempre. */
+        const celEdit=(td,campo,opcoes,aoGravarNovo)=>{
+          const pinta=()=>{
+            td.innerHTML='';
+            const v=String(x[campo]||'').trim();
+            const sp=el(`<span style="display:inline-block;padding:4px 7px;border-radius:7px;cursor:text;
+              color:${v?'inherit':'var(--suave)'};border:1px dashed transparent"
+              title="clique para editar">${v?esc(v):'—'}</span>`);
+            sp.onmouseenter=()=>sp.style.borderColor='var(--linha)';
+            sp.onmouseleave=()=>sp.style.borderColor='transparent';
+            sp.onclick=ev=>{ev.stopPropagation();abre()};
+            td.appendChild(sp);
+            if(campo==='tipo'){const f=flagsLan(x);if(f)td.appendChild(el('<span>'+f+'</span>'))}
+          };
+          const abre=()=>{
+            td.innerHTML='';
+            const lid='dl'+campo+Math.random().toString(36).slice(2,8);
+            const inp=el(`<input list="${lid}" value="${esc(x[campo]||'')}" placeholder="—"
+              style="width:100%;min-width:90px;border:1px solid var(--verde);background:var(--card);
+              color:inherit;font:inherit;padding:5px 7px;border-radius:7px">`);
+            const dl=el(`<datalist id="${lid}">${opcoes().map(o=>`<option value="${esc(o)}">`).join('')}</datalist>`);
+            let fechou=false;
+            const grava=()=>{
+              if(fechou)return; fechou=true;
+              const novo2=inp.value.trim();
+              if(novo2!==String(x[campo]||'')){x[campo]=novo2;if(aoGravarNovo)aoGravarNovo(novo2);salvar();r()}
+              else pinta();
+            };
+            inp.onclick=ev=>ev.stopPropagation();
+            inp.onkeydown=ev=>{ev.stopPropagation();
+              if(ev.key==='Enter'){ev.preventDefault();grava()}
+              if(ev.key==='Escape'){fechou=true;pinta()}};
+            inp.onblur=grava;
+            td.appendChild(inp);td.appendChild(dl);inp.focus();inp.select();
+          };
+          pinta();
+        };
+        celEdit(tr.querySelector('.cel-inst'),'instituicao',
+          ()=>maisUsados(E.rendimentos,'instituicao',CFG('instituicoes')),
+          v=>{const q=String(v||'').trim();
+            if(q&&!CFG('instituicoes').some(o=>normaliza(o)===normaliza(q)))
+              E.config.instituicoes=[...CFG('instituicoes'),q].sort((u,v2)=>u.localeCompare(v2));});
+        celEdit(tr.querySelector('.cel-tipo'),'tipo',()=>maisUsados(E.rendimentos,'tipo'));
         tr.onclick=()=>modalRendimento(x);
         tb2.appendChild(tr); filhasM.push(tr);
       });
       trg.onclick=()=>{
         const fechado=filhasM[0].style.display==='none';
         filhasM.forEach(f=>f.style.display=fechado?'':'none');
-        trg.querySelector('.setaM').textContent=(fechado?'▾ ':'▸ ')+filhasM.length+' lançamento(s)';
+        // filhasM inclui a linha de subtotal por empresa — a contagem é a dos itens
+        trg.querySelector('.setaM').textContent=(fechado?'▾ ':'▸ ')+g.itens.length+' lançamento(s)';
       };
     });
     t2.appendChild(tb2);
@@ -6901,7 +6977,7 @@ function vRendimentos(m){
   const pe2=el('<div style="padding:0 17px 15px"></div>');
   const bt2=el('<button class="mais">+ Novo lançamento</button>'); bt2.onclick=novoRend;
   pe2.appendChild(bt2); lc2.appendChild(pe2);
-  m.appendChild(bloco('rd-lanc','Lançamentos de '+ano,doAno.length+' lançamento(s) — os 2 últimos meses vêm abertos; clique no mês para abrir os outros, e na linha para corrigir',lc2));
+  m.appendChild(bloco('rd-lanc','Lançamentos de '+ano,doAno.length+' lançamento(s) — clique no mês para abrir; em Instituição ou Tipo para corrigir ali mesmo; no resto da linha para abrir a ficha',lc2));
 }
 
 function modalRendimento(x,novo){
