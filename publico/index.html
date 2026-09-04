@@ -6853,6 +6853,46 @@ function vRendimentos(m){
   });
   mA.appendChild(bloco('rd-hist','Por empresa, ano a ano','clique numa empresa para filtrar por ela',th));
 
+  /* ---- POR EMPRESA, MÊS A MÊS ----
+     Mesma tabela da anual, um degrau abaixo: empresa nas linhas, os meses do
+     ano nas colunas. Estava dentro da lista de lançamentos e confundia as
+     duas coisas — lá é o extrato, linha a linha; aqui é o resumo. Separado,
+     cada um faz uma coisa só. */
+  {
+    const doAnoM=E.rendimentos.filter(x=>/^\d{4}-\d{2}/.test(x.data||'')&&(x.data||'').startsWith(ano));
+    const empsM=[...new Set(doAnoM.map(x=>(x.empresa||'—').trim()||'—'))];
+    const mat=empsM.map(nm=>{
+      const vals=MESES.map((_,i)=>doAnoM.filter(x=>x.empresa===nm&&+((x.data||'').slice(5,7))===i+1)
+        .reduce((t,x)=>t+(+x.valor||0),0));
+      return {nome:nm,vals,tot:vals.reduce((t,v)=>t+v,0)};
+    }).sort((x,y)=>y.tot-x.tot);
+    // só os meses que têm algo — 12 colunas vazias em janeiro não ajudam ninguém
+    const iMeses=MESES.map((_,i)=>i).filter(i=>mat.some(l=>l.vals[i]));
+    const cm=el('<div></div>');
+    if(!mat.length){
+      cm.innerHTML=`<div class="vazio">Nenhum lançamento em ${ano} ainda. Os anos antigos vieram da planilha só com o total do ano — o mês a mês existe a partir do que você lança aqui.</div>`;
+    } else {
+      const totMes=iMeses.map(i=>mat.reduce((t,l)=>t+l.vals[i],0));
+      const geral=mat.reduce((t,l)=>t+l.tot,0);
+      const rolm=el('<div class="rolagem"></div>');
+      rolm.innerHTML=`<table>
+        <thead><tr><th>Empresa</th>${iMeses.map(i=>`<th style="text-align:right">${MESES[i]}</th>`).join('')}
+          <th class="fixaDir" style="text-align:right">Total</th></tr></thead>
+        <tbody>${mat.map(l=>`<tr data-memp="${esc(l.nome)}" style="cursor:pointer">
+          <td style="padding:9px 10px;white-space:nowrap">${avatar(l.nome,22)}<b>${esc(l.nome)}</b></td>
+          ${iMeses.map(i=>`<td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;color:${l.vals[i]?'inherit':'var(--suave)'}">${l.vals[i]?brl(l.vals[i]):'—'}</td>`).join('')}
+          <td class="fixaDir" style="padding:9px 10px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${brl(l.tot)}</td></tr>`).join('')}
+        </tbody>
+        <tfoot><tr class="tfim"><td>Total</td>${totMes.map(v=>`<td style="text-align:right">${brl(v)}</td>`).join('')}
+          <td class="fixaDir" style="text-align:right">${brl(geral)}</td></tr></tfoot></table>`;
+      rolm.querySelectorAll('[data-memp]').forEach(tr=>tr.onclick=()=>{
+        filtro.rendEmp=tr.dataset.memp; filtro.rendAnoSel=-1; r();
+      });
+      cm.appendChild(rolm);
+    }
+    mA.appendChild(bloco('rd-mensal','Por empresa, mês a mês','o mesmo recorte da tabela acima, dentro de '+ano,cm));
+  }
+
   /* ---- MENSAL: cada mês abre os lançamentos daquele mês ---- */
   const tmc = el('<div></div>');
   const mesesComAlgo = porMes.filter(v => v).length;
@@ -6952,25 +6992,6 @@ function vRendimentos(m){
         <td></td>`;
       tb2.appendChild(trg);
       const filhasM=[];
-      /* SUBTOTAL POR EMPRESA DENTRO DO MÊS.
-         A linha do mês diz quanto entrou; ela não diz DE ONDE. Com 11
-         lançamentos de cinco empresas, somar Impresilk de cabeça é o tipo de
-         conta que ninguém faz — então a conta vem pronta, uma linha por
-         empresa, ordenada da maior para a menor. Some quando o mês tem uma
-         empresa só (aí o subtotal seria o próprio total do mês). */
-      const porEmp={};
-      g.itens.forEach(x=>{const e2=(x.empresa||'—').trim()||'—';
-        porEmp[e2]=(porEmp[e2]||0)+(+x.valor||0)});
-      const empsOrd=Object.entries(porEmp).sort((u,v)=>v[1]-u[1]);
-      if(empsOrd.length>1){
-        const trs=document.createElement('tr');
-        if(!aberto)trs.style.display='none';
-        trs.style.background='color-mix(in srgb,var(--bg) 55%,transparent)';
-        trs.innerHTML=`<td colspan="8" style="padding:10px 12px 13px">
-          ${ranking(empsOrd.map(([e2,v2])=>({r:e2,v:v2,ic:avatar(e2,17)})),
-            {titulo:'No mês, por empresa',max:6})}</td>`;
-        tb2.appendChild(trs); filhasM.push(trs);
-      }
       g.itens.forEach(x=>{
         const tr=document.createElement('tr'); tr.style.cursor='pointer';
         if(!aberto) tr.style.display='none';
@@ -7038,8 +7059,7 @@ function vRendimentos(m){
       trg.onclick=()=>{
         const fechado=filhasM[0].style.display==='none';
         filhasM.forEach(f=>f.style.display=fechado?'':'none');
-        // filhasM inclui a linha de subtotal por empresa — a contagem é a dos itens
-        trg.querySelector('.setaM').textContent=(fechado?'▾ ':'▸ ')+g.itens.length+' lançamento(s)';
+        trg.querySelector('.setaM').textContent=(fechado?'▾ ':'▸ ')+filhasM.length+' lançamento(s)';
       };
     });
     t2.appendChild(tb2);
