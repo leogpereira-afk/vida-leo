@@ -175,6 +175,11 @@ tr:hover .lixo{opacity:1}
 .rank-b{height:100%;border-radius:0 5px 5px 0;min-width:3px;transition:width .25s}
 .rank-nota{font-size:11.5px;color:var(--suave);margin-top:2px}
 .rank-l:hover .rank-nome{color:var(--verde)}
+/* coluna que fica visível mesmo rolando a tabela para o lado */
+.rolagem table th.fixaDir,.rolagem table td.fixaDir{position:sticky;right:0;background:var(--card);
+  box-shadow:-6px 0 8px -6px rgba(30,32,28,.14)}
+.rolagem table thead th.fixaDir{background:var(--card);z-index:2}
+.rolagem table tfoot .fixaDir{background:var(--bg)}
 /* !important: vários filhos trazem display no próprio elemento (flex, grid),
    e estilo inline vence folha de estilo — sem isto a seção 'fechada' ficava
    com o miolo à mostra. */
@@ -6787,8 +6792,18 @@ function vRendimentos(m){
   });
   mA.appendChild(bloco('rd-acum','Acumulado geral','clique num ano para abrir só ele',ac));
 
-  mA.appendChild(bloco('rd-emp','Participação por empresa','no acumulado',graficoEl(gRosca(
-    Object.entries(H.empresas).map(([nm,v])=>({r:nm,v:v.reduce((a,b)=>a+b,0),cor:marcaDe(nm).cor}))))));
+  /* Era rosca de 5 fatias. Duas delas (2% cada) ficavam com cores que o
+     validador reprova — e num anel de 5 quem lê tem de casar cor com legenda.
+     No ranking a identidade vem do nome e da bolinha da empresa, que já é a
+     marca dela; a barra só carrega o tamanho. */
+  {
+    const porEmp=Object.entries(H.empresas).map(([nm,v])=>({r:nm,v:v.reduce((x,y)=>x+y,0),ic:avatar(nm,18)}));
+    const totEmp=porEmp.reduce((t,x)=>t+x.v,0);
+    const ce=el(`<div class="corpo">
+      <div style="font-size:12.5px;color:var(--suave);margin-bottom:12px">Somando todos os anos: <b style="color:var(--tinta)">${brl(totEmp)}</b>.</div>
+      ${ranking(porEmp,{max:8})}</div>`);
+    mA.appendChild(bloco('rd-emp','Participação por empresa','no acumulado',ce));
+  }
 
   // ---- aplicações por instituição ----
   // junta o que veio da planilha antiga com o que ele lança hoje — senão o campo
@@ -6808,9 +6823,11 @@ function vRendimentos(m){
       Detalhe por instituição em ${anosApi.join(', ')} — ${brl(detalhado)} no total${
         totApl>0&&detalhado<=totApl?`, de ${brl(totApl)} em aplicações`:''}.
       Para um lançamento novo entrar aqui, preencha a <b>Instituição</b> na tabela abaixo.</p></div>`));
-    anosApi.forEach(a=>{
-      const d=Object.entries(API[a]).map(([r2,v])=>({r:r2,v})).sort((x,y)=>y.v-x.v);
-      ai.appendChild(el(`<div class="grafico"><div style="font-size:12px;color:var(--suave);margin-bottom:8px">${a}</div>${gRosca(d)}</div>`));
+    anosApi.slice().reverse().forEach(a=>{
+      const d=Object.entries(API[a]).map(([r2,v])=>({r:r2,v}));
+      const tA=d.reduce((t,x)=>t+x.v,0);
+      ai.appendChild(el(`<div class="corpo" style="padding-top:4px">
+        ${ranking(d,{titulo:a+' — '+brl(tA),max:8,ac:'var(--azul)'})}</div>`));
     });
     mA.appendChild(bloco('rd-aplic','Aplicações por instituição','rendimento de cada conta',ai));
   }
@@ -6818,11 +6835,14 @@ function vRendimentos(m){
   const linhas=Object.entries(H.empresas).map(([nome,vals])=>({nome,vals,tot:vals.reduce((a,b)=>a+b,0)})).sort((a,b)=>b.tot-a.tot);
   const maiorTot=linhas[0].tot;
   const th=el('<div class="rolagem"></div>');
-  th.innerHTML=`<table><thead><tr><th>Empresa</th>${H.anos.map(a=>`<th style="text-align:right">${a}</th>`).join('')}<th style="text-align:right">Total</th></tr></thead><tbody>
-    ${linhas.map(l=>`<tr data-hemp="${esc(l.nome)}" style="cursor:pointer"><td style="padding:9px 10px;white-space:nowrap">${avatar(l.nome,22)}<b>${esc(l.nome)}</b><div class="barra"><i style="width:${(l.tot/maiorTot*100).toFixed(0)}%;background:${marcaDe(l.nome).cor}"></i></div></td>
+  /* A barrinha embaixo do nome repetia o ranking logo acima e roubava altura
+     de cada linha; saiu. A coluna Total ficava cortada na rolagem horizontal —
+     agora ela gruda na borda direita, que é a coluna que se procura primeiro. */
+  th.innerHTML=`<table><thead><tr><th>Empresa</th>${H.anos.map(a=>`<th style="text-align:right">${a}</th>`).join('')}<th class="fixaDir" style="text-align:right">Total</th></tr></thead><tbody>
+    ${linhas.map(l=>`<tr data-hemp="${esc(l.nome)}" style="cursor:pointer"><td style="padding:9px 10px;white-space:nowrap">${avatar(l.nome,22)}<b>${esc(l.nome)}</b></td>
       ${l.vals.map(v=>`<td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;color:${v?'inherit':'var(--suave)'}">${v?brl(v):'—'}</td>`).join('')}
-      <td style="padding:9px 10px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${brl(l.tot)}</td></tr>`).join('')}
-    </tbody><tfoot><tr class="tfim"><td>Total</td>${H.totalAno.map(v=>`<td style="text-align:right">${brl(v)}</td>`).join('')}<td style="text-align:right">${brl(H.totalGeral)}</td></tr></tfoot></table>`;
+      <td class="fixaDir" style="padding:9px 10px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">${brl(l.tot)}</td></tr>`).join('')}
+    </tbody><tfoot><tr class="tfim"><td>Total</td>${H.totalAno.map(v=>`<td style="text-align:right">${brl(v)}</td>`).join('')}<td class="fixaDir" style="text-align:right">${brl(H.totalGeral)}</td></tr></tfoot></table>`;
   th.querySelectorAll('[data-hemp]').forEach(tr => tr.onclick = () => {
     const nome = tr.dataset.hemp, vals = (H.empresas || {})[nome] || [];
     // cai no ano em que essa empresa mais rendeu — clicar e ir parar num ano vazio nao ajuda
