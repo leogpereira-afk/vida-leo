@@ -124,7 +124,7 @@ async function crachaOk(token: string): Promise<boolean> {
       new TextEncoder().encode(`${partes[0]}.${partes[1]}`));
     if (!ok) return false;
     const p = JSON.parse(new TextDecoder().decode(b64url(partes[1])));
-    if (typeof p.exp === "number" && p.exp < Math.floor(Date.now() / 1000)) return false;
+    if (typeof p.exp !== "number" || !Number.isFinite(p.exp) || p.exp <= Math.floor(Date.now() / 1000)) return false;
     return p.sis === "central";
   } catch {
     return false;

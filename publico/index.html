@@ -243,15 +243,18 @@ tr:hover .lixo{opacity:1}
   .main{padding:20px 15px 60px}
 }
 </style>
+<link rel="stylesheet" href="./refinamento.css">
 </head>
 <body>
+<a class="pular" href="#main">Pular para o conteúdo</a>
 <div class="app">
-  <aside class="side">
+  <aside class="side" aria-label="Navegação principal">
     <div class="marca"><svg viewBox="0 0 64 64" width="30" height="30" style="flex:0 0 auto"><g fill="#3B45E5">
       <rect x="4" y="4" width="13" height="56"/><rect x="23" y="4" width="37" height="13"/>
       <rect x="23" y="26" width="37" height="12"/><rect x="47" y="26" width="13" height="34"/>
       <rect x="30" y="47" width="17" height="13"/></g></svg><div><b>LEONARDO</b><small style="letter-spacing:.18em">GONÇALVES</small></div></div>
-    <nav class="nav" id="nav"></nav>
+    <div class="atalhos-topo"><button class="btn ghost" onclick="abrirBusca()" aria-label="Buscar em tudo">⌕ Buscar</button><button class="btn ghost menu-mobile" aria-expanded="false" aria-controls="nav" onclick="alternarMenu()">☰ Menu</button></div>
+    <nav class="nav" id="nav" aria-label="Seções"></nav>
     <!-- A ponte para o lado da empresa. Fica aqui, e não no rodapé de ações,
          porque é navegação: o rodapé é para o que MEXE nos dados. -->
     <a class="ponte" href="https://impresilk.com.br/painel" target="_blank" rel="noopener"
@@ -261,7 +264,7 @@ tr:hover .lixo{opacity:1}
     <button class="ponte" onclick="abrirBusca()" style="margin-bottom:0" title="buscar em tudo (atalho: /)">
       <span class="ic">🔎</span><span class="tx">Buscar em tudo</span><span class="fora">/</span>
     </button>
-    <div class="rodape">
+    <details class="ferramentas"><summary>Ferramentas e backup</summary><div class="rodape">
       <button onclick="sincronizarAgora()">☁ Sincronizar</button>
       <button onclick="salvarPDF()">🖨 PDF</button>
       <button onclick="exportar()">⬇ Backup</button>
@@ -269,10 +272,9 @@ tr:hover .lixo{opacity:1}
       <button onclick="exportarArquivos()">⬇ Arquivos</button>
       <button onclick="pedirArquivo(importarArquivos,'.zip')">⬆ Restaurar arquivos</button>
       <button onclick="sairApp()" style="color:var(--vermelho)">⏻ Sair</button>
-      <div id="stSync" style="width:100%;font-size:11px;color:var(--suave);padding:4px 2px 0">☁ —</div>
-    </div>
+      </div></details><div id="stSync" role="status" aria-live="polite">☁ —</div>
   </aside>
-  <main class="main" id="main"></main>
+  <main class="main" id="main" tabindex="-1"></main>
 </div>
 <div id="modais"></div>
 
@@ -286,7 +288,8 @@ tr:hover .lixo{opacity:1}
 // porque está espalhado pelo código.
 const brl=n=>(+n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:2,maximumFractionDigits:2});
 const brl2=brl;
-const hoje=()=>new Date().toISOString().slice(0,10);
+const dataLocal=(d=new Date())=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const hoje=()=>dataLocal();
 const anoHoje=new Date().getFullYear();
 const mesAtual=()=>hoje().slice(0,7);
 const MESES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
@@ -294,7 +297,7 @@ const fmtData=d=>d?d.slice(8,10)+'/'+d.slice(5,7):'—';
 // validade de documento SEM o ano engana — aqui o ano vai junto
 const fmtDataAno=d=>d?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):'—';
 const fmtDataLonga=d=>d?new Date(d+'T12:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'}):'—';
-const diasEntre=(a,b)=>(a&&b)?Math.max(1,Math.round((new Date(b)-new Date(a))/864e5)+1):'';
+const diasEntre=(a,b)=>(a&&b)?Math.max(0,Math.round((new Date(b)-new Date(a))/864e5)+1)||0:'';
 const uid=()=>'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // tira acento/caixa/espaço extra — usado pra casar nome de pessoa e de exame
@@ -312,6 +315,7 @@ function maisUsados(lista,campo,extras){
   (extras||[]).forEach(v=>{const q=String(v??'').trim();if(q&&!(q in c))c[q]=0});
   return Object.keys(c).sort((a,b)=>c[b]-c[a]||a.localeCompare(b));
 }
+const urlSegura=u=>{try{const v=new URL(u);return ['https:','http:'].includes(v.protocol)?v.href:'#'}catch(_){return '#'}};
 const tamanho=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(0)+' KB':(b/1048576).toFixed(1)+' MB';
 
 /* ================== ARQUIVOS ==================================
@@ -655,7 +659,7 @@ const SEED={
     comoDecido:['Rápido, com o dado que tenho','Analiso tudo antes de decidir','Decido e depois valido com gente de confiança','Pela intuição, e o número confirma','Delego a decisão e cobro o resultado'],
     oQueMeMove:['Construir algo que dure','Ser reconhecido pelo que entrego','Liberdade e autonomia','Segurança da família','Aprender e dominar o assunto','Competir e vencer','Ajudar quem está do meu lado'],
     comoRecarrego:['Sozinho, em silêncio','Treinando / correndo','Com a família','Viajando','Com amigos e conversa','Estudando algo novo','Dormindo e desacelerando'],
-    tiposConta:['Conta corrente PF','Conta corrente PJ','Poupança','Investimento','Cartão de crédito','Consórcio','Outro'],
+    tiposContaBanco:['Conta corrente PF','Conta corrente PJ','Poupança','Investimento','Cartão de crédito','Consórcio','Outro'],
     /* O centro de custo NÃO foi inventado por mim: é o do próprio ERP do Léo,
      lido do export real de uma obra inteira (824 lançamentos). Mexer aqui
      não quebra nada -- categoria é dado, e o importador cria a que faltar. */
@@ -912,11 +916,11 @@ function seletor(valor,opcoes,aoMudar){
   s.onchange=()=>aoMudar(s.value);return s;
 }
 function btnRecolher(){
-  const b=el('<button class="btn ghost mini">⇕ Recolher tudo</button>');
+  const b=el('<button class="btn ghost mini">⇕ Abrir / recolher tudo</button>');
   b.onclick=()=>{
     const bs=[...document.querySelectorAll('#main .bloco')];
     const fechar=bs.some(x=>!x.classList.contains('fechado'));
-    bs.forEach(x=>{x.classList.toggle('fechado',fechar);if(x.dataset.bid)E.colapso[x.dataset.bid]=fechar});
+    bs.forEach(x=>{x.classList.toggle('fechado',fechar);x.querySelector('header').setAttribute('aria-expanded',String(!fechar));if(x.dataset.bid)E.colapso[x.dataset.bid]=fechar});
     salvar();b.textContent=fechar?'⇕ Abrir tudo':'⇕ Recolher tudo';
   };
   return b;
@@ -924,14 +928,16 @@ function btnRecolher(){
 
 /* ---------- blocos recolhíveis ---------- */
 function bloco(id,titulo,dica,conteudoEl){
-  const fechado=E.colapso[id]?' fechado':'';
-  const b=el(`<section class="bloco${fechado}" data-bid="${id}"><header><h2>${titulo}</h2><span class="dica">${dica||''}</span>
+  const recolhido=E.colapso[id]??id.startsWith('cf-');
+  const fechado=recolhido?' fechado':'';
+  const b=el(`<section class="bloco${fechado}" data-bid="${id}"><header tabindex="0" role="button" aria-expanded="${!recolhido}"><h2>${titulo}</h2><span class="dica">${dica||''}</span>
     <span class="seta">▼</span></header><div class="conteudo"></div></section>`);
   b.querySelector('.conteudo').appendChild(conteudoEl);
   b.querySelector('header').onclick=()=>{
     b.classList.toggle('fechado');
-    E.colapso[id]=b.classList.contains('fechado'); salvar();
+    E.colapso[id]=b.classList.contains('fechado');b.querySelector('header').setAttribute('aria-expanded',String(!E.colapso[id])); salvar();
   };
+  b.querySelector('header').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();b.querySelector('header').click()}};
   return b;
 }
 const graficoEl=h=>el(`<div class="grafico">${h}</div>`);
@@ -946,7 +952,7 @@ function tabela(lista,colunas,aoMudar,rodape,alvo,abrir){
     const tr=document.createElement('tr');
     tr.innerHTML=colunas.map(c=>{
       const v=it[c.k]??'';
-      if(c.tipo==='select') return `<td><select data-i="${i}" data-k="${c.k}">`+c.opcoes.map(o=>`<option${o===v?' selected':''}>${esc(o)}</option>`).join('')+`</select></td>`;
+      if(c.tipo==='select') return `<td><select data-i="${i}" data-k="${c.k}">`+[...new Set([...c.opcoes,...(v?[v]:[])])].map(o=>`<option${o===v?' selected':''}>${esc(o)}</option>`).join('')+`</select></td>`;
       if(c.tipo==='calc') return `<td style="padding:8px 10px;${c.dir==='r'?'text-align:right;':''}color:var(--suave);font-variant-numeric:tabular-nums">${c.calc(it)}</td>`;
       if(c.tipo==='moeda') return `<td class="num"><input type="text" inputmode="decimal" class="moeda" data-i="${i}" data-k="${c.k}" value="${v?brl2(v):''}" placeholder="R$ 0,00"></td>`;
       const tipo=c.tipo||'text';
@@ -956,6 +962,7 @@ function tabela(lista,colunas,aoMudar,rodape,alvo,abrir){
     tb.appendChild(tr);
   });
   t.appendChild(tb);
+  tb.querySelectorAll('input,select,textarea').forEach(a=>{const c=colunas.find(c=>c.k===a.dataset.k);if(c)a.setAttribute('aria-label',c.t+' · linha '+(+a.dataset.i+1))});
   if(rodape){const tf=document.createElement('tfoot');tf.innerHTML=`<tr class="tfim">${rodape}</tr>`;t.appendChild(tf)}
   if(abrir) t.addEventListener('click',ev=>{
     const b=ev.target.closest('[data-abrir]'); if(!b)return;
@@ -972,7 +979,8 @@ function tabela(lista,colunas,aoMudar,rodape,alvo,abrir){
     salvar();aoMudar&&aoMudar(true)});
   t.addEventListener('click',ev=>{const b=ev.target.closest('[data-del]');if(!b)return;
     const it=lista[+b.dataset.del], base=alvo||lista, i=base.indexOf(it);
-    if(i>=0)base.splice(i,1); else base.splice(+b.dataset.del,1);
+    if(!confirm('Apagar este registro?'))return;
+    if(i>=0)base.splice(i,1); else return;
     salvar();aoMudar&&aoMudar()});
   return t;
 }
@@ -993,21 +1001,36 @@ function tabelaBloco(id,titulo,dica,lista,colunas,novo,render,rodape,alvo,abrir)
 
 /* ---------- modal ---------- */
 function abrirModal(titulo,sub,montar,aoFechar){
-  const f=el(`<div class="fundo"><div class="modal"><header><div><h3>${titulo}</h3><p>${sub||''}</p></div>
-    <button class="fechar">✕</button></header><div class="mcorpo"></div></div></div>`);
-  const fechar=()=>{f.remove();aoFechar&&aoFechar();tela()};
+  const anterior=document.activeElement, id=uid();
+  const f=el(`<div class="fundo"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="${id}" tabindex="-1"><header><div><h3 id="${id}">${titulo}</h3><p>${sub||''}</p></div>
+    <button class="fechar" aria-label="Fechar janela">✕</button></header><div class="mcorpo"></div></div></div>`);
+  let fechado=false;
+  const fechar=()=>{if(fechado)return;fechado=true;if(f.contains(document.activeElement))document.activeElement.blur();document.removeEventListener('keydown',teclas);f.remove();aoFechar&&aoFechar();tela();if(anterior?.isConnected)anterior.focus();else document.querySelector('#modais .fundo:last-child .modal, #main')?.focus({preventScroll:true})};
+  const teclas=ev=>{
+    if(!f.isConnected){document.removeEventListener('keydown',teclas);return}
+    if(f!==document.querySelector('#modais .fundo:last-child'))return;
+    if(ev.key==='Escape'){ev.preventDefault();ev.stopImmediatePropagation();fechar();return}
+    if(ev.key==='Tab'){
+      const itens=[...f.querySelectorAll('button,input,select,textarea,a[href],[tabindex="0"]')].filter(x=>!x.disabled&&x.getClientRects().length);
+      const primeiro=itens[0],ultimo=itens.at(-1);
+      if(!primeiro){ev.preventDefault();f.querySelector('.modal').focus();return}
+      if(ev.shiftKey&&(document.activeElement===primeiro||!itens.includes(document.activeElement))){ev.preventDefault();ultimo.focus()}
+      else if(!ev.shiftKey&&(document.activeElement===ultimo||!itens.includes(document.activeElement))){ev.preventDefault();primeiro.focus()}
+    }
+  };
   f.querySelector('.fechar').onclick=fechar;
   f.onclick=ev=>{if(ev.target===f)fechar()};
-  document.addEventListener('keydown',function esc(ev){if(ev.key==='Escape'){fechar();document.removeEventListener('keydown',esc)}});
   montar(f.querySelector('.mcorpo'),fechar);
   document.getElementById('modais').appendChild(f);
+  document.addEventListener('keydown',teclas);
+  f.querySelector('.fechar').focus();
 }
 function campos(obj,defs,aoMudar){
   const c=el('<div class="campos"></div>');
   defs.forEach(d=>{
     const w=el(`<div class="campo"><label>${d.t}</label></div>`);
     let inp;
-    if(d.tipo==='select'){inp=el(`<select>${d.opcoes.map(o=>`<option${o===(obj[d.k]??'')?' selected':''}>${esc(o)}</option>`).join('')}</select>`)}
+    if(d.tipo==='select'){inp=el(`<select>${[...new Set([...d.opcoes,...(obj[d.k]?[obj[d.k]]:[])])].map(o=>`<option${o===(obj[d.k]??'')?' selected':''}>${esc(o)}</option>`).join('')}</select>`)}
     else if(d.tipo==='textarea'){inp=el(`<textarea placeholder="${d.ph||''}"></textarea>`);inp.value=obj[d.k]??''}
     // sugestão: escreve o que quiser, com as opções já usadas à mão (datalist).
     // Aceita valor novo na hora — e ele passa a aparecer na próxima vez.
@@ -1017,35 +1040,23 @@ function campos(obj,defs,aoMudar){
       inp.value=obj[d.k]??'';
       w.appendChild(el(`<datalist id="${lid}">${(d.opcoes||[]).map(o=>`<option value="${esc(o)}"></option>`).join('')}</datalist>`));
     }
-    // moeda: digita-se pelos CENTAVOS, como em caixa — 1827897 vira R$ 18.278,97.
-    // Guarda número; antes o campo virava texto e "R$ 1.200,00" quebrava as somas.
+    // Decimal nativo: funciona com teclado móvel, seleção, colagem e valores negativos.
     else if(d.tipo==='moeda'){
       inp=el(`<input type="text" inputmode="numeric" class="moeda">`);
-      let cent=Math.round((+obj[d.k]||0)*100);
-      const pinta=()=>{inp.value=brl2(cent/100)};   // sempre com os ,00 à vista
-      pinta();
-      const grava=()=>{const v2=cent/100;if((+obj[d.k]||0)!==v2){obj[d.k]=v2;salvar();aoMudar&&aoMudar()}};
-      inp.addEventListener('focusin',()=>{try{inp.setSelectionRange(inp.value.length,inp.value.length)}catch(_){}});
-      inp.addEventListener('click',()=>{try{inp.setSelectionRange(inp.value.length,inp.value.length)}catch(_){}});
-      inp.addEventListener('keydown',ev=>{
-        if(ev.ctrlKey||ev.metaKey||ev.altKey)return;
-        if(ev.key==='Tab'||ev.key==='Enter'){grava();return}
-        if(/^[0-9]$/.test(ev.key)){ev.preventDefault();if(cent<1e12){cent=cent*10+ +ev.key;pinta()}}
-        else if(ev.key==='Backspace'){ev.preventDefault();cent=Math.floor(cent/10);pinta()}
-        else if(ev.key==='Delete'){ev.preventDefault();cent=0;pinta()}
-        else if(ev.key.length===1){ev.preventDefault()}   // vírgula, ponto e letras não fazem falta
-      });
-      inp.addEventListener('paste',ev=>{ev.preventDefault();
-        const txt=((ev.clipboardData||window.clipboardData).getData('text')||'');
-        cent=Math.round((moedaNum(txt)||0)*100);pinta()});
+      inp.inputMode='decimal';
+      inp.value=brl2(obj[d.k]);
+      inp.addEventListener('focus',()=>{inp.value=String(+obj[d.k]||0).replace('.',',');inp.select()});
+      const grava=()=>{const v=moedaNum(inp.value);if((+obj[d.k]||0)!==v){obj[d.k]=v;salvar();aoMudar&&aoMudar()}inp.value=brl2(v)};
       inp.addEventListener('blur',grava);
     }
     else{inp=el(`<input type="${d.tipo||'text'}" placeholder="${d.ph||''}">`);inp.value=obj[d.k]??''}
     if(d.full)w.style.gridColumn='1/-1';
+    if(d.tipo!=='moeda'&&inp.tagName!=='SELECT')inp.addEventListener('input',()=>{obj[d.k]=inp.type==='number'?(inp.value===''?0:+inp.value):inp.value;salvar()});
     if(d.tipo!=='moeda') inp.addEventListener('change',()=>{
       obj[d.k]=inp.type==='number'?(inp.value===''?0:+inp.value):inp.value;
       if(d.aoGravar)d.aoGravar(obj[d.k]);
       salvar();aoMudar&&aoMudar()});
+    inp.id=uid();w.querySelector('label').htmlFor=inp.id;
     w.appendChild(inp);c.appendChild(w);
   });
   return c;
@@ -1139,7 +1150,8 @@ const MODS=[
   {id:'guia',ic:'🧭',nome:'Guia de vida',grupo:'',render:vGuia},
   {id:'config',ic:'⚙️',nome:'Configurações',grupo:'',render:vConfig},
 ];
-let atual='inicio';
+let atual=MODS.some(m=>!m.url&&m.id===location.hash.slice(1))?location.hash.slice(1):'inicio';
+function alternarMenu(forcar){const aberto=typeof forcar==='boolean'?forcar:!document.querySelector('.side').classList.contains('menu-aberto');document.querySelector('.side').classList.toggle('menu-aberto',aberto);document.querySelector('.menu-mobile').setAttribute('aria-expanded',String(aberto))}
 function menu(){
   const nav=document.getElementById('nav');nav.innerHTML='';
   MODS.forEach(m=>{
@@ -1150,16 +1162,17 @@ function menu(){
     const b=el(`<button class="${!m.url&&m.id===atual?'on':''}"><span class="ic">${m.ic}</span><span class="tx">${m.nome}</span>${m.url?'<span class="fora">↗</span>':''}</button>`);
     if(m.url){b.title='abre em outra aba — sistema com login próprio';
       b.onclick=()=>window.open(m.url,'_blank','noopener');}
-    else b.onclick=()=>irTela(m.id);
+    else {b.onclick=()=>irTela(m.id);if(m.id===atual)b.setAttribute('aria-current','page')}
     nav.appendChild(b);
   });
 }
 function tela(){const m=document.getElementById('main');m.innerHTML='';MODS.find(x=>x.id===atual).render(m);return rolaAlvo()}
 const rr=id=>()=>{if(atual===id){const m=document.getElementById('main');m.innerHTML='';MODS.find(x=>x.id===id).render(m);rolaAlvo()}};
 // trocar de tela: sobe ao topo, a não ser que alguém tenha pedido um bloco
-function irTela(id){atual=id;menu();if(!tela())window.scrollTo(0,0)}
+function irTela(id){if(!MODS.some(m=>m.id===id&&!m.url))return;atual=id;if(location.hash!=='#'+id)history.pushState(null,'','#'+id);alternarMenu(false);menu();if(!tela())window.scrollTo(0,0);document.getElementById('main').focus({preventScroll:true})}
+window.addEventListener('popstate',()=>{const id=location.hash.slice(1)||'inicio';if(MODS.some(m=>m.id===id&&!m.url)){atual=id;menu();tela()}});
 const cab=(t,s)=>el(`<div class="topo"><div><h1>${t}</h1><p>${s||''}</p></div><span class="cresce"></span></div>`);
-const kpi=(rot,val,sub,cl,ir)=>`<div class="kpi ${cl||''}${ir?' clic':''}"${ir?` data-kpi="${ir}" title="clique para abrir"`:''}><div class="rot">${rot}</div><div class="val">${val}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
+const kpi=(rot,val,sub,cl,ir)=>`<div class="kpi ${cl||''}${ir?' clic':''}"${ir?` data-kpi="${ir}" role="button" tabindex="0" title="Abrir detalhes"`:''}><div class="rot">${rot}</div><div class="val">${val}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
 /* Cada card leva ao bloco que explica o número. Quase sempre é preciso
    re-renderizar antes de rolar, então o alvo fica guardado e a rolagem
    acontece quando a tela termina de ser remontada. */
@@ -1171,7 +1184,7 @@ function rolaAlvo(){
   setTimeout(()=>{
     const b=document.querySelector(`[data-bid="${id}"]`);
     if(!b)return;
-    b.classList.remove('fechado');
+    b.classList.remove('fechado');b.querySelector('header')?.setAttribute('aria-expanded','true');
     const alvoY=Math.max(0,window.scrollY+b.getBoundingClientRect().top-12);
     window.scrollTo({top:alvoY,behavior:'smooth'});
     // alguns navegadores engolem o 'smooth' e não saem do lugar — garante o pulo
@@ -1181,7 +1194,7 @@ function rolaAlvo(){
 }
 /* liga os cards marcados ao mapa de destinos da tela */
 function ligaKpis(cx,mapa){
-  cx.querySelectorAll('[data-kpi]').forEach(k=>k.onclick=()=>{const f=mapa[k.dataset.kpi];if(f)f()});
+  cx.querySelectorAll('[data-kpi]').forEach(k=>{k.onclick=()=>{const f=mapa[k.dataset.kpi];if(f)f()};k.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();k.click()}}});
   return cx;
 }
 /* ---- viagem internacional: detecção + conferência de documentos ---- */
@@ -1283,8 +1296,9 @@ function vInicio(m){
   const fixo=fixoMensal();
   const nFixo=FIXOS().reduce((s,f)=>s+f.lista.length,0);
   const abertas=E.demandas.filter(d=>d.status!=='Concluída').length;
-  const ult=[...E.peso].sort((a,b)=>(a.data||'').localeCompare(b.data||'')).pop();
-  const vDias=E.viagens.filter(v=>v.status!=='Cancelado').reduce((s,v)=>s+(+diasEntre(v.ida,v.volta)||0),0);
+  const ult=E.peso.filter(x=>+x.peso>0).sort((a,b)=>(a.data||'').localeCompare(b.data||'')).pop();
+  const viagensAno=E.viagens.filter(v=>v.status!=='Cancelado'&&v.ida&&v.volta&&v.ida<=anoHoje+'-12-31'&&v.volta>=anoHoje+'-01-01');
+  const vDias=viagensAno.reduce((s,v)=>s+(+diasEntre(v.ida<anoHoje+'-01-01'?anoHoje+'-01-01':v.ida,v.volta>anoHoje+'-12-31'?anoHoje+'-12-31':v.volta)||0),0);
   m.appendChild(cab('Olá, Léo 👋','Sua vida num painel só. Hoje é '+new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'})+'.'));
 
   /* ---- RADAR: o que precisa de você ---- */
@@ -1303,17 +1317,17 @@ function vInicio(m){
     rc2.querySelectorAll('[data-ir]').forEach(b=>b.onclick=()=>irTela(b.dataset.ir));
   } else rc2.innerHTML='<div class="vazio">Nada pedindo atenção agora. 👏</div>';
   m.appendChild(bloco('ini-radar',`🔔 O que precisa de você${urgentes?' · '+urgentes+' atrasado(s)':''}`,'documentos, exames, prazos, viagens e datas da família',rc2));
-  m.appendChild(el(`<div class="grade">
-    ${kpi('Ganhos do mês',brl(rendMes),mesAtual().split('-').reverse().join('/'),'v')}
-    ${kpi('Gastos do mês',brl(gastoMes),'lançados por alto','r')}
-    ${kpi('Custo fixo',brl2(fixo)+'/mês',nFixo+' contas que debitam sozinhas','a')}
-    ${kpi('Demandas abertas',abertas,abertas?'em andamento':'tudo em dia')}
-    ${kpi('Peso atual',ult?ult.peso+' kg':'—',ult?fmtData(ult.data):'sem registro')}
-    ${kpi('Dias viajando',vDias+' dias',E.viagens.length+' viagens no ano')}</div>`));
+  m.appendChild(ligaKpis(el(`<div class="grade inicio-grade">
+    ${kpi('Ganhos do mês',brl(rendMes),mesAtual().split('-').reverse().join('/'),'v','rendimentos')}
+    ${kpi('Gastos do mês',brl(gastoMes),'despesas registradas','r','gastos')}
+    ${kpi('Custo fixo',brl2(fixo)+'/mês',nFixo+' contas recorrentes','a','gastos')}
+    ${kpi('Demandas abertas',abertas,abertas?'em andamento':'tudo em dia','','demandas')}
+    ${kpi('Peso atual',ult?ult.peso+' kg':'—',ult?fmtData(ult.data):'sem registro','','saude')}
+    ${kpi('Dias viajando',vDias+' dias',viagensAno.length+' viagens em '+anoHoje,'','viagens')}</div>`),Object.fromEntries(['rendimentos','gastos','demandas','saude','viagens'].map(id=>[id,()=>irTela(id)]))));
 
   // dash: entradas x saídas dos últimos 6 meses
-  const ms=[];for(let i=5;i>=0;i--){const d=new Date();d.setMonth(d.getMonth()-i);ms.push(d.toISOString().slice(0,7))}
-  m.appendChild(bloco('ini-dash','Ganhos x gastos','últimos 6 meses',graficoEl(gBarras(
+  const ms=[];for(let i=5;i>=0;i--){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-i);ms.push(dataLocal(d).slice(0,7))}
+  m.appendChild(bloco('ini-dash','Saldo mensal','ganhos menos gastos registrados · últimos 6 meses',graficoEl(gBarras(
     ms.map(mm=>({r:MESES[+mm.slice(5,7)-1],v:E.rendimentos.filter(x=>(x.data||'').startsWith(mm)).reduce((s,x)=>s+(+x.valor||0),0)
       -E.gastos.filter(g=>g.mes===mm).reduce((s,g)=>s+(+g.valor||0),0)})),{fmt:brl}))));
 
@@ -2143,7 +2157,7 @@ function gradeMes(eventos,r){
         padding:2px 6px;font-size:11px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.titulo)}</div>`));
     });
     if(doDia.length>3) cl.appendChild(el(`<div style="font-size:10.5px;color:var(--suave);padding-left:3px">+${doDia.length-3} mais</div>`));
-    if(doDia.length) cl.onclick=()=>modalDia(iso,doDia);
+    if(doDia.length){cl.onclick=()=>modalDia(iso,doDia);cl.setAttribute('role','button');cl.tabIndex=0;cl.setAttribute('aria-label',fmtDataAno(iso)+' · '+doDia.length+' evento(s)');cl.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();cl.click()}}}
     cel.appendChild(cl);
   }
   cx.appendChild(g);
@@ -2386,8 +2400,8 @@ function exportarIcs(){
     if(!a.data)return;
     linhas.push('BEGIN:VEVENT','UID:'+a.id+'@centralleo');
     if(a.hora){linhas.push('DTSTART:'+dt(a.data,a.hora));
-      const [H,M]=a.hora.split(':').map(Number);linhas.push('DTEND:'+dt(a.data,z((H+1)%24)+':'+z(M)))}
-    else{linhas.push('DTSTART;VALUE=DATE:'+dt(a.data));linhas.push('DTEND;VALUE=DATE:'+dt(a.data))}
+      const fim=new Date(a.data+'T'+a.hora);fim.setHours(fim.getHours()+1);linhas.push('DTEND:'+dt(dataLocal(fim),z(fim.getHours())+':'+z(fim.getMinutes())))}
+    else{const fim=new Date(a.data+'T12:00');fim.setDate(fim.getDate()+1);linhas.push('DTSTART;VALUE=DATE:'+dt(a.data));linhas.push('DTEND;VALUE=DATE:'+dt(dataLocal(fim)))}
     linhas.push('SUMMARY:'+(a.titulo||'Compromisso').replace(/\n/g,' '));
     if(a.local)linhas.push('LOCATION:'+a.local.replace(/\n/g,' '));
     if(a.obs)linhas.push('DESCRIPTION:'+a.obs.replace(/\n/g,'\\n'));
@@ -3057,10 +3071,11 @@ function blocoCopias(){
           const r2=await apiSync('POST',{acao:'backupPegar',id:b.id});
           if(!r2||!r2.dados)throw new Error('cópia vazia');
           guardaDescartado();                    // o estado de agora fica de lado
+          validarBackup(r2.dados);
           localStorage.setItem(CHAVE,JSON.stringify(r2.dados));
           E=carregar();
           salvar();                              // marca _mt e agenda o envio
-          await enviarNuvem();                   // sobe pelo caminho normal (CAS)
+          if(!await enviarNuvem())throw new Error('Envio não confirmado. Confira o estado e tente sincronizar.');
           tela();                                // recarregar mataria o envio agendado
           alert('Cópia de '+fmtDataAno(b.em.slice(0,10))+' aplicada.');
         }catch(e){bt.disabled=false;bt.textContent='↩ Restaurar';alert('Não consegui restaurar: '+(e.message||e))}
@@ -5953,7 +5968,7 @@ function modalOport(o,novoReg){
       lista.innerHTML='';
       (o.links||[]).forEach((lk,i)=>{
         const li=el(`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--linha)">
-          <a href="${esc(lk.url)}" target="_blank" rel="noopener" style="flex:1;min-width:0;color:inherit;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          <a href="${esc(urlSegura(lk.url))}" target="_blank" rel="noopener" style="flex:1;min-width:0;color:inherit;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
             <b>${esc(lk.titulo||lk.url)}</b><div style="font-size:11px;color:var(--suave);overflow:hidden;text-overflow:ellipsis">${esc(lk.url)}</div></a>
           <button class="btn ghost mini" style="color:var(--vermelho)">✕</button></div>`);
         li.querySelector('button').onclick=()=>{o.links.splice(i,1);marcarMexido(o);salvar();pintaLinks()};
@@ -8247,12 +8262,12 @@ function vGuia(m) {
     'onde está o dinheiro, de quem é a conta e como transferir', E.bancos, [
       { k: 'banco', t: 'Banco', ph: 'nome do banco' },
       { k: 'titular', t: 'Titular', ph: 'você ou a empresa' },
-      { k: 'tipo', t: 'Tipo', tipo: 'select', opcoes: CFG('tiposConta'), w: 175 },
+      { k: 'tipo', t: 'Tipo', tipo: 'select', opcoes: CFG('tiposContaBanco'), w: 175 },
       { k: 'agencia', t: 'Agência', ph: '0000', w: 110 },
       { k: 'conta', t: 'Conta', ph: '00000-0', w: 130 },
       { k: 'pix', t: 'Chave PIX', ph: 'CNPJ, e-mail, telefone…' },
       { k: 'gerente', t: 'Gerente / telefone', ph: 'quem atende' },
-    ], () => ({ banco: '', titular: '', tipo: CFG('tiposConta')[0], agencia: '', conta: '', pix: '', gerente: '' }), r,
+    ], () => ({ banco: '', titular: '', tipo: CFG('tiposContaBanco')[0], agencia: '', conta: '', pix: '', gerente: '' }), r,
     '', E.bancos));
 
   /* ---- 7. PROTEÇÃO DA FAMÍLIA ---- */
@@ -8615,6 +8630,7 @@ const GRUPOS_CFG=[
   {k:'catGasto',t:'Classificações de gasto',d:'separam para onde vai o dinheiro',ic:'💸'},
   {k:'catCasa',t:'Contas da casa',d:'condomínio, luz, água, internet, IPTU',ic:'🏠'},
   {k:'catCusto',t:'Categorias de custo de viagem',d:'o centro de custo de cada viagem',ic:'✈️'},
+  {k:'tiposContaBanco',t:'Tipos de conta bancária',d:'conta corrente, poupança e investimento',ic:'🏦'},
   {k:'tiposConta',t:'Tipos de conta e dívida',d:'dinheiro, cheque, permuta, dívida',ic:'💰'},
   {k:'centrosObra',t:'Centro de custo das obras',d:'como o gasto da obra é separado',ic:'🏗️'},
   {k:'especialidades',t:'Especialidades da obra',d:'hidráulica, elétrica, pintura — cruza com o centro',ic:'🔧'},
@@ -8640,7 +8656,7 @@ function editorLista(chave,render){
     const ch=el(`<span class="chip" style="background:var(--bg);color:var(--tinta);border:1px solid var(--linha);
       display:inline-flex;align-items:center;gap:6px;padding:5px 6px 5px 11px;font-weight:500;font-size:13px">
       <span class="tx"></span><button class="lixo" style="opacity:.5;padding:1px 4px">✕</button></span>`);
-    ch.querySelector('.tx').textContent=item;
+    ch.querySelector('.tx').textContent=item;ch.querySelector('.lixo').setAttribute('aria-label','Remover '+item);
     ch.querySelector('.lixo').onclick=()=>{
       const usos=contarUso(chave,item);
       if(usos&&!confirm(`"${item}" está em uso em ${usos} registro(s). Apagar mesmo assim? Os registros continuam com o texto atual.`))return;
@@ -8654,6 +8670,7 @@ function editorLista(chave,render){
     <input type="text" placeholder="adicionar…" style="flex:1;min-width:170px;border:1px solid var(--linha);
       background:var(--bg);color:inherit;font:inherit;padding:8px 11px;border-radius:9px">
     <button class="btn mini" type="submit">+ Adicionar</button></form>`);
+  f.querySelector('input').setAttribute('aria-label','Adicionar opção em '+(GRUPOS_CFG.find(g=>g.k===chave)?.t||chave));
   f.onsubmit=ev=>{ev.preventDefault();
     const v=f.querySelector('input').value.trim();
     if(!v)return;
@@ -8674,6 +8691,8 @@ function contarUso(chave,valor){
     case 'formasPagto': return E.assinaturas.filter(x=>x.pago===valor).length
       + (E.seguros||[]).filter(x=>x.pago===valor).length
       + E.viagens.reduce((s,v)=>s+conta(v.custos||[],'pago'),0);
+    case 'tiposContaBanco': return conta(E.bancos||[],'tipo');
+    case 'tiposConta': return conta(E.contas||[],'tipo');
     case 'tiposSeguro': return conta(E.seguros||[],'tipo');
     case 'transportes': return conta(E.viagens,'transporte');
     case 'statusViagem': return conta(E.viagens,'status');
@@ -8690,7 +8709,9 @@ function contarUso(chave,valor){
 async function vConfig(m){
   const r=rr('config');
   m.appendChild(cab('Configurações','Tudo que aparece como opção nos formulários — cada lista com seu título.'));
+  m.appendChild(painel('Seções', 'Abra o assunto que deseja ajustar'));
   const t=await arqTotal();
+  if(atual!=='config')return;
   m.appendChild(el(`<div class="grade">
     ${kpi('Listas',GRUPOS_CFG.length,'configuráveis')}
     ${kpi('Opções',GRUPOS_CFG.reduce((s,g)=>s+CFG(g.k).length,0),'no total')}
@@ -8997,11 +9018,11 @@ async function vConfig(m){
     if(!confirm('Última confirmação.\n\nDá para voltar por Configurações → Cópias de segurança '+
       '(90 dias) ou → Versão descartada. Apagar mesmo?'))return;
     guardaDescartado();
-    const dd=await db();await new Promise(ok=>{const tx=dd.transaction('arq','readwrite');tx.objectStore('arq').clear();tx.oncomplete=ok});
     localStorage.removeItem(CHAVE);
     E=carregar();salvar();
-    await enviarNuvem();
+    const enviado=await enviarNuvem();
     arqEsquecerIndice();tela();
+    if(!enviado){alert('Envio não confirmado. Confira o estado e tente sincronizar.');return}
     alert('Apagado aqui e na nuvem.\n\nPara voltar atrás: Configurações → Cópias de segurança.');
   },'ghost');
   zerar.style.color='var(--vermelho)';
@@ -9038,18 +9059,29 @@ function pedirArquivo(cb,accept){const i=document.createElement('input');i.type=
    silêncio, ou a primeira edição empurrava os dados velhos por cima da nuvem.
    Agora grava pelo caminho normal (salvar + envio com a trava de concorrência),
    e o estado de antes fica em "Versão descartada". */
+function validarBackup(j){
+  if(!j||typeof j!=='object'||Array.isArray(j)||!Array.isArray(j.viagens))throw new Error('não parece um backup daqui');
+  for(const [k,v] of Object.entries(SEED)){
+    if(!(k in j))continue;
+    if(Array.isArray(v)){
+      if(!Array.isArray(j[k])||j[k].some(x=>k==='obraM2Fora'?typeof x!=='string':(!x||typeof x!=='object'||Array.isArray(x))))throw new Error('Lista inválida: '+k);
+    }else if(v&&typeof v==='object'&&(!j[k]||typeof j[k]!=='object'||Array.isArray(j[k])))throw new Error('Seção inválida: '+k);
+  }
+  return j;
+}
 async function restaurarBackup(f){
   try{
     const j=JSON.parse(await f.text());
-    if(!j.viagens)throw new Error('não parece um backup daqui');
+    validarBackup(j);
     if(!confirm('Trazer este arquivo?\n\nEle substitui o que está no painel AGORA, em todos os '+
       'aparelhos. O estado atual fica guardado em Configurações → Versão descartada.'))return;
     guardaDescartado();
     localStorage.setItem(CHAVE,JSON.stringify(j));
     E=carregar();salvar();
-    await enviarNuvem();
+    const enviado=await enviarNuvem();
     tela();
-    alert('Backup restaurado — e enviado para a nuvem.');
+    if(!enviado){alert('Envio não confirmado. Confira os dados e o status de sincronização antes de continuar.');return}
+    alert(DEV?'Backup restaurado nesta prévia local.':'Backup restaurado — e enviado para a nuvem.');
   }
   catch(e){alert('Não consegui ler: '+e.message)}
 }
@@ -9111,7 +9143,14 @@ async function apiPut(){
   const j=await r.json().catch(()=>({}));
   return {status:r.status,j};
 }
-async function enviarNuvem(){if(DEV&&!window.__testeSync)return;
+let envioEmCurso=null;
+function enviarNuvem(){
+  if(envioEmCurso)return envioEmCurso.then(()=>enviarNuvem());
+  envioEmCurso=executarEnvio().finally(()=>{envioEmCurso=null});
+  return envioEmCurso;
+}
+async function executarEnvio(){if(DEV&&!window.__testeSync)return true;
+  clearTimeout(syncTimer);
   try{
     if(!_tabBase){
       // esta aba ainda não viu o servidor (abriu offline, resposta perdida):
@@ -9119,16 +9158,16 @@ async function enviarNuvem(){if(DEV&&!window.__testeSync)return;
       // daqui é mais novo (edição offline), segue para o PUT protegido
       pintaSync('conferindo…');
       const r=await apiSync('GET');
-      if(r&&r.dados&&(r.dados._mt||0)>(E._mt||0)){adotaNuvem(r,true);return}
+      if(r&&r.dados&&(r.dados._mt||0)>(E._mt||0)){adotaNuvem(r,true);return false}
       marcaBase(r&&r.mt||0);
     }
     pintaSync('enviando…');
     const p=await apiPut();
-    if(p.status===409){const r=await apiSync('GET');adotaNuvem(r,true);return}
-    if(p.status===428){pintaSync('recarregue a página');return}
+    if(p.status===409){const r=await apiSync('GET');adotaNuvem(r,true);return false}
+    if(p.status===428){pintaSync('recarregue a página');return false}
     if(p.status<200||p.status>=300)throw new Error('HTTP '+p.status);
-    marcaBase(p.j&&p.j.mt);pintaSync('sincronizado');
-  }catch(e){pintaSync('erro ao enviar')}}
+    marcaBase(p.j&&p.j.mt);pintaSync('sincronizado');return true;
+  }catch(e){pintaSync('não enviado — tente sincronizar');return false}}
 async function puxarNuvem(){if(DEV&&!window.__testeSync){pintaSync('modo local');return}
   try{pintaSync('baixando…');
     const r=await apiSync('GET');
@@ -9142,10 +9181,7 @@ async function puxarNuvem(){if(DEV&&!window.__testeSync){pintaSync('modo local')
     else pintaSync('sincronizado');
   }catch(e){pintaSync('sem conexão')}}
 async function sincronizarAgora(){await puxarNuvem();tela()}
-function salvarPDF(){
-  document.querySelectorAll('.bloco.fechado').forEach(b=>b.classList.remove('fechado'));
-  window.print();
-}
+function salvarPDF(){window.print()}
 function telaLogin(){
   document.querySelector('.app').style.display='none';
   const f=el(`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px">
@@ -9156,8 +9192,8 @@ function telaLogin(){
         <rect x="30" y="47" width="17" height="13"/></g></svg>
       <h2 style="font-size:19px">LEONARDO</h2>
       <div style="letter-spacing:.22em;font-size:12px;color:var(--suave);margin-bottom:18px">GONÇALVES</div>
-      <input type="text" class="usr" placeholder="Usuário" autocomplete="username" value="leonardo" style="width:100%;border:1px solid var(--linha);background:var(--bg);color:inherit;font:inherit;padding:11px 13px;border-radius:10px;text-align:center;margin-bottom:9px">
-      <input type="password" placeholder="Senha" autocomplete="current-password" style="width:100%;border:1px solid var(--linha);background:var(--bg);color:inherit;font:inherit;padding:11px 13px;border-radius:10px;text-align:center">
+      <input type="text" class="usr" aria-label="Usuário" required placeholder="Usuário" autocomplete="username" value="leonardo" style="width:100%;border:1px solid var(--linha);background:var(--bg);color:inherit;font:inherit;padding:11px 13px;border-radius:10px;text-align:center;margin-bottom:9px">
+      <input type="password" aria-label="Senha" required placeholder="Senha" autocomplete="current-password" style="width:100%;border:1px solid var(--linha);background:var(--bg);color:inherit;font:inherit;padding:11px 13px;border-radius:10px;text-align:center">
       <label style="display:flex;gap:8px;align-items:center;justify-content:center;font-size:12.5px;color:var(--suave);margin:13px 0">
         <input type="checkbox" checked style="accent-color:var(--verde)"> Manter conectado neste aparelho</label>
       <button class="btn" style="width:100%">Entrar</button>
@@ -9165,7 +9201,7 @@ function telaLogin(){
     </form></div>`);
   const usr=f.querySelector('.usr'),senha=f.querySelector('input[type=password]'),manter=f.querySelector('input[type=checkbox]'),erroEl=f.querySelector('.erro');
   f.querySelector('form').onsubmit=async ev=>{
-    ev.preventDefault();erroEl.textContent='';
+    ev.preventDefault();erroEl.textContent='';const entrar=f.querySelector('button');entrar.disabled=true;entrar.textContent='Entrando…';
     try{
       /* ENTRADA PADRÃO PRIMEIRO: usuário + senha, a mesma dos outros sistemas.
          A Central era o único app com senha própria e sem usuário — ser
@@ -9176,8 +9212,9 @@ function telaLogin(){
         const e=await fetch(API_BASE_ACESSO,{method:'POST',
           headers:{'content-type':'application/json'},
           body:JSON.stringify({action:'entrar',usuario:usr.value.trim(),senha:senha.value})});
+        if(e.status>=500)throw new Error('servidor indisponível');
         if(e.ok){const d=await e.json();token=d?.crachas?.central?.token||null;}
-      }catch(_){/* rede: cai na porta antiga */}
+      }catch(_){throw new Error('sem conexão')}
 
       // Sem segunda porta: a Central entra pela entrada única, como os outros
       // sete. A senha própria deste app foi removida do servidor -- manter o
@@ -9186,7 +9223,7 @@ function telaLogin(){
       (manter.checked?localStorage:sessionStorage).setItem(T_CHAVE,token);
       f.remove();document.querySelector('.app').style.display='';
       menu();tela();puxarNuvem().then(()=>{tela();arqSubirPendentes().then(r=>{if(r.subiu)tela()})});
-    }catch(e){erroEl.textContent='Não consegui falar com o servidor. Tente de novo.'}
+    }catch(e){erroEl.textContent='Não consegui falar com o servidor. Tente de novo.'}finally{entrar.disabled=false;entrar.textContent='Entrar'}
   };
   document.body.appendChild(f);
   senha.focus();

@@ -1,1 +1,10 @@
-{"name":"vida-leo","private":true,"dependencies":{"@netlify/blobs":"^8.1.0"}}
+{
+  "name": "vida-leo",
+  "private": true,
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  },
+  "scripts": {
+    "test": "TZ=America/Sao_Paulo node --test tests/*.mjs"
+  }
+}
