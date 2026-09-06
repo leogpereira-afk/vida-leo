@@ -243,7 +243,7 @@ tr:hover .lixo{opacity:1}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css?v=e448eae0058d">
+<link rel="stylesheet" href="./refinamento.css?v=de06a77ee860">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -632,7 +632,7 @@ const SEED={
   norte:{proposito:'',valores:'',legado:''},
   roda:{},rituais:[],instrucoes:[],protecao:[],planoAno:[],pdi:[],livros:[],bancos:[],empresasPJ:[],patrimonio:[],
   oportunidades:[],
-  estrategia:{},
+  estrategia:{},planejamentoEmpresas:[],
   comportamento:{temperamentos:{},disc:{},discAdaptado:{},big5:{},valores:{},lideranca:{},
     tipoJung:'',tracoPrincipal:'',motivadorPrincipal:'',motivadorSecundario:'',medos:'',
     positividade:'',estima:'',flexibilidade:'',fonteLaudo:'',eneagramaTipo:'',comoDecido:'',oQueMeMove:'',comoMeRecarrego:'',meusPontosCegos:'',comoMeAjudar:'',numerologia:'',perfilDisc:'',eneagrama:'',bigfive:''},
@@ -733,6 +733,8 @@ function carregar(){
   // objetos únicos: garante que existam mesmo em backup antigo
   for(const k of ['sos','norte','roda','perfil','comportamento']) d[k]={...structuredClone(SEED[k]),...(d[k]||{})};
   for(const k of ['vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','seguros','planos','casa','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades']) if(!Array.isArray(d[k])) d[k]=[];
+  if(!Array.isArray(d.planejamentoEmpresas))d.planejamentoEmpresas=[];
+  d.planejamentoEmpresas.forEach(p=>{if(!p.id)p.id=uid()});
   // toda oportunidade tem uma lista de links, mesmo que vazia
   d.oportunidades.forEach(o=>{if(!Array.isArray(o.links))o.links=[]});
   if(!d.rendHist) d.rendHist=structuredClone(SEED.rendHist);
@@ -755,6 +757,7 @@ const CORES_STATUS={'Realizado':['var(--verde-cl)','var(--verde)'],'Confirmado':
   'Em Planejamento':['var(--areia-cl)','var(--areia)'],'Cancelado':['var(--vermelho-cl)','var(--vermelho)'],
   'Aberta':['var(--areia-cl)','var(--areia)'],'Fazendo':['var(--azul-cl)','var(--azul)'],
   'Concluída':['var(--verde-cl)','var(--verde)'],'Parada':['var(--vermelho-cl)','var(--vermelho)'],
+  'Semente':['var(--areia-cl)','var(--areia)'],'Estudando':['var(--azul-cl)','var(--azul)'],'Decidindo':['var(--areia-cl)','var(--areia)'],'Tocando':['var(--verde-cl)','var(--verde)'],'Arquivada':['var(--bg)','var(--suave)'],
   'Ativa':['var(--verde-cl)','var(--verde)'],'Cancelar':['var(--vermelho-cl)','var(--vermelho)'],
   'Em dia':['var(--verde-cl)','var(--verde)'],'Vencendo':['var(--areia-cl)','var(--areia)'],
   'Vencido':['var(--vermelho-cl)','var(--vermelho)'],'Em andamento':['var(--azul-cl)','var(--azul)'],
@@ -1097,11 +1100,12 @@ async function apagarAnexosDe(ref){
 }
 
 /* área de arquivos de um registro */
-function areaArquivos(ref,dica){
+function areaArquivos(ref,dica,somenteLeitura=false){
   const c=el(`<div><div class="arqs" style="margin-bottom:9px"></div>
     <button type="button" class="solta">📎 ${dica||'Clique ou arraste arquivos aqui'}</button>
     <input type="file" multiple hidden></div>`);
   const lista=c.querySelector('.arqs'),solta=c.querySelector('.solta'),inp=c.querySelector('input');
+  if(somenteLeitura){solta.disabled=true;solta.hidden=true;inp.disabled=true}
   const pintar=async()=>{
     lista.innerHTML='<div style="color:var(--suave);font-size:12.5px">Carregando…</div>';
     let as=[];
@@ -1118,6 +1122,7 @@ function areaArquivos(ref,dica){
         <button class="lixo" aria-label="${esc('Apagar arquivo '+a.nome)}">✕</button></div>`);
       it.querySelector('.abrir')?.setAttribute('aria-label','Abrir arquivo '+a.nome);
       it.querySelector('.baixar').setAttribute('aria-label','Baixar arquivo '+a.nome);
+      if(somenteLeitura){it.querySelector('.lixo').disabled=true;it.querySelector('.lixo').hidden=true}
       // A janela é aberta ANTES do await: depois de uma espera o navegador
       // trata window.open como pop-up e bloqueia.
       if(podeVisualizar)it.querySelector('.abrir').onclick=async e=>{
@@ -1134,6 +1139,7 @@ function areaArquivos(ref,dica){
         catch(err){ alert('Não consegui baixar: '+(err.message||err)) }
       };
       it.querySelector('.lixo').onclick=async()=>{
+        if(somenteLeitura)return;
         if(!confirm('Apagar o arquivo '+a.nome+'?'))return;
         try{ await arqDel(a.id);pintar() }
         catch(err){ alert('Não consegui apagar no servidor: '+(err.message||err)+'\nConfira a lista antes de tentar novamente.') }
@@ -1171,7 +1177,7 @@ const MODS=[
   {id:'agenda',ic:'📅',nome:'Agenda',grupo:'',render:vAgenda},
   {id:'demandas',ic:'✅',nome:'Demandas',grupo:'',render:vDemandas},
   {id:'saude',ic:'🩺',nome:'Saúde',grupo:'',render:vSaude},
-  {id:'estrategia',ic:'♟️',nome:'Gestão estratégica',grupo:'Empresa',render:vEstrategia},
+  {id:'estrategia',ic:'♟️',nome:'Planejamento estratégico',grupo:'Empresa',render:vEstrategia},
   {id:'fortemais',ic:'🏗️',nome:'Fortemais',grupo:'Projeto especial',render:vFortemais},
   {id:'bosques',ic:'🌳',nome:'Portal dos Bosques',url:'https://leogpereira-afk.github.io/bosques/'},
   {id:'oportunidades',ic:'💡',nome:'Oportunidades',grupo:'Extra',render:vOportunidades},
@@ -1196,7 +1202,7 @@ function menu(){
   });
 }
 function indiceDaTela(pagina){
-  if(pagina.classList.contains('viagens-layout'))return;
+  if(pagina.classList.contains('viagens-layout')||pagina.classList.contains('workspace-layout'))return;
   const blocos=[...pagina.querySelectorAll('.bloco[data-bid]')].filter(b=>b.querySelector('header h2')?.textContent.trim());
   if(blocos.length<2)return;
   const faixa=el('<div class="indice-tela"><label>Ir para um assunto</label><select><option value="">Ir para uma seção…</option></select></div>');
@@ -1330,12 +1336,13 @@ const kpi=(rot,val,sub,cl,ir)=>`<div class="kpi ${cl||''}${ir?' clic':''}"${ir?`
    re-renderizar antes de rolar, então o alvo fica guardado e a rolagem
    acontece quando a tela termina de ser remontada. */
 let _alvoBloco=null;
-function abreBloco(id){if(E.colapso[id]){E.colapso[id]=false;salvar()}_alvoBloco=id;}
+function abreBloco(id){if(id.startsWith('gu-'))filtro.guiaAba=grupoGuia(id);if(id.startsWith('es-'))filtro.estrAba=abaEstrategia(id);if(id==='op-rank')filtro.oportView='comparar';if(E.colapso[id]){E.colapso[id]=false;salvar()}_alvoBloco=id;}
 function rolaAlvo(pagina,id){
   if(!pagina.isConnected)return false;
   const b=[...pagina.querySelectorAll('[data-bid]')].find(x=>x.dataset.bid===id);
   if(!b)return false;
   b.classList.remove('fechado');b.querySelector('header')?.setAttribute('aria-expanded','true');
+  const details=b.closest('details');if(details)details.open=true;
   b.scrollIntoView({block:'start'});
   return true;
 }
@@ -2431,7 +2438,7 @@ function eventosDoEcossistema(){
     });
   }
 
-  if(on('acoes')) Object.entries(E.estrategia||{}).forEach(([emp,est])=>{
+  if(on('acoes')) planosParaAgenda().forEach(([emp,est])=>{
     (est.objetivos||[]).forEach(o=>(o.acoes||[]).forEach(a=>{
       if(a.ate&&a.status!=='Feita')ev.push({data:a.ate,hora:'',titulo:a.oque||'Ação',
         sub:emp+' · '+(o.titulo||'')+(a.quem?' · '+a.quem:'')+(a.status==='Travada'?' · 🚧 travada':''),
@@ -5836,37 +5843,190 @@ const ZONAS_PADRAO=[
 const STATUS_ACAO=['A fazer','Fazendo','Feita','Travada'];
 
 const empAtivas=()=>(E.empresasPJ||[]).filter(x=>x.status!=='Baixada'&&String(x.nome||'').trim());
-function estrDe(nome){
-  if(!E.estrategia[nome]) E.estrategia[nome]={missao:'',visao:'',valores:[],objetivos:[],
-    zonas:structuredClone(ZONAS_PADRAO),pecas:[]};
-  const e=E.estrategia[nome];
-  if(!Array.isArray(e.valores))e.valores=[];
-  if(!Array.isArray(e.objetivos))e.objetivos=[];
+function migrarPlanejamento(d){
+  if(!Array.isArray(d.planejamentoEmpresas))d.planejamentoEmpresas=[];
+  let mudou=false;
+  for(const [nome,antigo] of Object.entries(d.estrategia||{})){
+    if(!antigo||typeof antigo!=='object'||Array.isArray(antigo)||d.planejamentoEmpresas.some(p=>p.origemLegado===nome))continue;
+    if(!['missao','visao'].some(k=>String(antigo[k]||'').trim())&&!['valores','objetivos','pecas'].some(k=>Array.isArray(antigo[k])&&antigo[k].length))continue;
+    const empresa=(d.empresasPJ||[]).find(e=>e.nome===nome);
+    const empresaId=empresa?.id||'legado:'+nome;
+    if(d.planejamentoEmpresas.some(p=>p.empresaId===empresaId&&p.ano===2027))continue;
+    d.planejamentoEmpresas.push({...structuredClone(antigo),id:uid(),empresaId,
+      empresaNome:nome,ano:2027,origemLegado:nome,criadoEm:new Date().toISOString()});
+    mudou=true;
+  }
+  return mudou;
+}
+function normalizarPlano(e){
+  for(const k of ['valores','objetivos','pecas'])if(!Array.isArray(e[k]))e[k]=[];
   if(!Array.isArray(e.zonas)||!e.zonas.length)e.zonas=structuredClone(ZONAS_PADRAO);
-  if(!Array.isArray(e.pecas))e.pecas=[];
   e.objetivos.forEach(o=>{if(!Array.isArray(o.acoes))o.acoes=[]});
   return e;
+}
+function empresasPlanejamento(){
+  const empresas=(E.empresasPJ||[]).filter(e=>String(e.nome||'').trim()).map(e=>({...e}));
+  for(const p of E.planejamentoEmpresas||[])if(!empresas.some(e=>e.id===p.empresaId))
+    empresas.push({id:p.empresaId,nome:p.empresaNome||'Empresa anterior',status:'Histórico'});
+  return empresas.sort((a,b)=>(['Baixada','Histórico'].includes(a.status)-['Baixada','Histórico'].includes(b.status))||a.nome.localeCompare(b.nome,'pt-BR'));
+}
+function validarAnoPlano(empresaId,ano,ignorarId){
+  const n=Number(ano);
+  if(!/^\d{4}$/.test(String(ano))||n<2027||n>2200)throw new Error('Informe um ano entre 2027 e 2200.');
+  if((E.planejamentoEmpresas||[]).some(p=>p.empresaId===empresaId&&p.ano===n&&p.id!==ignorarId))
+    throw new Error('Esta empresa já tem um plano para '+n+'. Abra esse ano no histórico.');
+  return n;
+}
+function criarPlanoEmpresa(empresaId,ano,baseId=''){
+  const empresa=empresasPlanejamento().find(e=>e.id===empresaId);
+  if(!empresa)throw new Error('Selecione uma empresa cadastrada.');
+  const n=validarAnoPlano(empresaId,ano);
+  const base=baseId?(E.planejamentoEmpresas||[]).find(p=>p.id===baseId&&p.empresaId===empresaId):null;
+  if(baseId&&!base)throw new Error('O plano escolhido como base não pertence a esta empresa.');
+  const p={id:uid(),empresaId,empresaNome:empresa.nome,ano:n,criadoEm:new Date().toISOString(),
+    missao:base?.missao||'',visao:base?.visao||'',valores:structuredClone(base?.valores||[]),
+    objetivos:structuredClone(base?.objetivos||[]),zonas:structuredClone(base?.zonas||ZONAS_PADRAO),
+    pecas:structuredClone(base?.pecas||[]),balanco:'',aprendizados:'',baseId:base?.id||''};
+  const zonas=new Map();p.zonas.forEach(z=>{const anterior=z.id;z.id=uid();zonas.set(anterior,z.id)});
+  p.pecas.forEach(x=>{x.id=uid();x.zona=zonas.get(x.zona)||p.zonas[0]?.id||''});
+  p.objetivos.forEach(o=>{o.id=uid();o.ate='';o.acoes=(o.acoes||[]).map(a=>({...a,id:uid(),ate:'',status:'A fazer',travaPor:''}))});
+  E.planejamentoEmpresas.push(p);salvar();return p;
+}
+function planosParaAgenda(){
+  const planos=(E.planejamentoEmpresas||[]).filter(p=>!p.encerrado).map(p=>[
+    (E.empresasPJ.find(e=>e.id===p.empresaId)?.nome||p.empresaNome||'Empresa')+(p.ano?' · '+p.ano:''),p]);
+  for(const [nome,p] of Object.entries(E.estrategia||{}))if(!(E.planejamentoEmpresas||[]).some(x=>x.origemLegado===nome))planos.push([nome,p]);
+  return planos;
+}
+function modalAnoEmpresa(emp){
+  const lista=(E.planejamentoEmpresas||[]).filter(p=>p.empresaId===emp.id);
+  const atualAno=Math.max(2027,+hoje().slice(0,4));
+  const sugestao=Math.max(atualAno,...lista.filter(p=>p.ano).map(p=>p.ano+1));
+  abrirModal('Novo planejamento',esc(emp.nome),(c,fechar)=>{
+    const box=el('<div class="secao"></div>');
+    const form=el(`<form class="annual-form"><label>Ano do planejamento<input name="ano" type="number" min="2027" max="2200" step="1" required value="${sugestao}"></label></form>`);
+      const label=el('<label>Começar a partir de</label>');
+      const select=seletor('',[['','Em branco'],...lista.map(p=>[p.id,'Plano de '+p.ano])],()=>{},'Começar a partir de');
+      select.name='base';label.appendChild(select);form.appendChild(label);
+      form.appendChild(el('<p class="workspace-note">Ao usar outro plano como base, os textos e a equipe são copiados. As ações voltam para “A fazer” e os prazos ficam em branco para você definir. O plano original e seus anexos permanecem guardados.</p>'));
+    const erro=el('<p class="erro" role="alert"></p>');form.appendChild(erro);
+    const botao=el('<button class="btn" type="submit">Criar planejamento</button>');form.appendChild(botao);
+    form.onsubmit=e=>{e.preventDefault();try{
+      const ano=form.querySelector('[name="ano"]').value;
+      const p=criarPlanoEmpresa(emp.id,ano,form.querySelector('[name="base"]').value);
+      filtro.estrEmpresaId=emp.id;filtro.estrPlano=p.id;filtro.estrAba='plano';fechar();
+    }catch(err){erro.textContent=err.message}};
+    box.appendChild(form);c.appendChild(box);
+  },rr('estrategia'));
+}
+
+function prepararEstrategia(m){
+  m.classList.add('workspace-layout','estrategia-workspace');
+  if(migrarPlanejamento(E))salvar();
+  const empresas=empresasPlanejamento();
+  const topo=cab('Planejamento estratégico','Um plano por empresa e ano. Histórico preservado a partir de 2027.');m.appendChild(topo);
+  if(!empresas.length){
+    const vazio=el('<div class="workspace-empty"><h2>Qual empresa vamos planejar?</h2><p>Cadastre a empresa uma vez e organize objetivos, ações e resultados de cada ano.</p></div>');
+    vazio.appendChild(acao('Cadastrar empresa',()=>{abreBloco('gu-empresas');irTela('guia')}));m.appendChild(vazio);return null;
+  }
+  const emp=empresas.find(e=>e.id===filtro.estrEmpresaId)||empresas[0];filtro.estrEmpresaId=emp.id;
+  const planos=(E.planejamentoEmpresas||[]).filter(p=>p.empresaId===emp.id).sort((a,b)=>b.ano-a.ano);
+  const est=planos.find(p=>p.id===filtro.estrPlano)||planos.find(p=>p.ano===Math.max(2027,+hoje().slice(0,4)))||planos[0];
+  filtro.estrPlano=est?.id||'';
+  const filtros=el('<div class="workspace-filters strategy-filters"></div>');
+  const campo=(nome,select)=>{const label=el('<label>'+nome+'</label>');label.appendChild(select);filtros.appendChild(label)};
+  campo('Empresa',seletor(emp.id,empresas.map(e=>[e.id,e.nome+(['Baixada','Histórico'].includes(e.status)?' · '+e.status:'')]),v=>{filtro.estrEmpresaId=v;filtro.estrPlano='';rr('estrategia')()},'Empresa do planejamento'));
+  if(planos.length)campo('Ano / histórico',seletor(est.id,planos.map(p=>[p.id,p.ano+(p.encerrado?' · Encerrado':' · Em elaboração')]),v=>{filtro.estrPlano=v;rr('estrategia')()},'Ano do planejamento da empresa'));
+  filtros.appendChild(acao('+ Novo ano',()=>modalAnoEmpresa(emp),'ghost'));m.appendChild(filtros);
+  if(!est){
+    const vazio=el(`<div class="workspace-hero"><div><span class="workspace-eyebrow">PLANEJAMENTO ANUAL</span><h2>${esc(emp.nome)} · 2027</h2><p>Comece pelas prioridades da empresa. Depois, defina indicadores, responsáveis e prazos. Cada novo ano terá seu próprio plano.</p></div></div>`);
+    vazio.appendChild(acao('Criar planejamento',()=>modalAnoEmpresa(emp)));m.appendChild(vazio);return null;
+  }
+  normalizarPlano(est);
+  topo.appendChild(acao('Exportar PDF',()=>exportarPlanoPDF(emp,est),'ghost'));
+  const hero=el(`<div class="workspace-hero strategy-hero"><div><span class="workspace-eyebrow">${est.encerrado?'PLANO ENCERRADO':'PLANO EM ELABORAÇÃO'}</span><h2>${esc(emp.nome)} <span class="strategy-year">${est.ano}</span></h2><p>${est.encerrado?'Conteúdo guardado para consulta. Reabra o plano se precisar corrigir alguma informação.':'Defina a direção, acompanhe as ações e registre os resultados do ano.'}</p></div></div>`);
+  hero.appendChild(acao(est.encerrado?'Reabrir plano':'Encerrar plano',()=>{
+    if(!confirm((est.encerrado?'Reabrir':'Encerrar')+' o planejamento de '+emp.nome+' / '+est.ano+'? '+(est.encerrado?'A edição será liberada.':'Ele ficará protegido para consulta e poderá ser reaberto.')))return;
+    est.encerrado=!est.encerrado;salvar();rr('estrategia')();
+  },'ghost'));m.appendChild(hero);
+  return {emp,est};
+}
+function organizarEstrategia(m,emp,est){
+  const partes=[...m.querySelectorAll(':scope > [data-bid]')];
+  const avisosEquipe=[...m.querySelectorAll(':scope > .aviso')];
+  const hero=m.querySelector('.strategy-hero'),resumo=m.querySelector('.workspace-metrics');
+  const ui=abasWorkspace(m,'estr',[['plano','Objetivos e ações'],['identidade','Direção e empresa'],['equipe','Equipe'],['balanco','Resultados e arquivos']],filtro.estrAba||'plano',v=>filtro.estrAba=v);
+  if(resumo)ui.paineis.plano.appendChild(resumo);
+  const status=el('<p class="strategy-status">'+est.ano+' · '+(est.encerrado?'Plano encerrado · consulta':'Em elaboração · alterações salvas automaticamente')+'</p>');m.querySelector('.strategy-filters').after(status);
+  avisosEquipe.forEach(a=>ui.paineis.equipe.appendChild(a));
+  const editores={};Object.entries(ui.paineis).forEach(([k,p])=>{
+    const fieldset=el('<fieldset class="strategy-content"></fieldset>');if(est.encerrado&&k!=='empresa')fieldset.disabled=true;p.appendChild(fieldset);editores[k]=fieldset;
+  });
+  partes.forEach(b=>{editores[abaEstrategia(b.dataset.bid)].appendChild(b);abrirSecaoWorkspace(b)});
+  const identidade=m.querySelector('[data-bid="es-identidade"]');if(identidade)editores.identidade.prepend(identidade);
+  const balanco=el('<div class="corpo"></div>');balanco.appendChild(campos(est,[
+    {k:'balanco',t:'Resultados do ano',tipo:'textarea',full:true,ph:'O que foi alcançado? Compare os resultados com os indicadores definidos.'},
+    {k:'aprendizados',t:'Aprendizados e decisões para o próximo ano',tipo:'textarea',full:true,ph:'O que manter, melhorar ou deixar de fazer?'}]));
+  const b=bloco('es-balanco','Balanço do ano','guarde o resultado junto do plano',balanco);abrirSecaoWorkspace(b);editores.balanco.appendChild(b);
+  const arquivos=el('<div class="corpo"></div>');arquivos.appendChild(areaArquivos('planejamento:'+est.id,'Anexar planejamento, planilha ou apresentação deste ano',!!est.encerrado));
+  const a=bloco('es-arquivos','Arquivos de '+est.ano,'anexos exclusivos deste plano',arquivos);abrirSecaoWorkspace(a);
+  // Arquivos continuam acessíveis em anos encerrados; os controles de escrita são desabilitados.
+  ui.paineis.balanco.appendChild(a);
+  if(est.encerrado){a.classList.add('strategy-files-closed');a.querySelectorAll('input,button.solta').forEach(x=>x.disabled=true)}
+  if(hero){const encerrar=hero.querySelector('button');const rodape=el('<div class="workspace-card strategy-close"><h2>'+(est.encerrado?'Ano encerrado':'Concluir este planejamento')+'</h2><p class="workspace-note">'+(est.encerrado?'Reabra este ano para corrigir ou complementar o conteúdo.':'Ao encerrar, o conteúdo fica protegido para consulta. Você poderá reabrir quando precisar.')+'</p></div>');rodape.appendChild(encerrar);ui.paineis.balanco.appendChild(rodape);hero.remove()}
+}
+
+function htmlPlanoApresentacao(emp,plano){
+  const p=structuredClone(plano),paginas=[];
+  const titulo='Planejamento estratégico · '+emp.nome+' · '+p.ano;
+  const texto=s=>esc(String(s||'Não informado')).replace(/\n/g,'<br>');
+  const logo=document.querySelector('.logo-pessoal')?.getAttribute('src')||'./assets/logo-leonardo-goncalves.png';
+  const pagina=(nome,conteudo,cls='')=>paginas.push(`<section class="slide ${cls}"><header><img src="${esc(logo)}" alt="Leonardo Gonçalves" width="210" height="41"><span>${esc(emp.nome)} · ${p.ano}</span></header><h2>${esc(nome)}</h2>${conteudo}<footer>Planejamento estratégico · ${p.ano}<span>${paginas.length+1}</span></footer></section>`);
+  const acoes=(p.objetivos||[]).flatMap(o=>o.acoes||[]),feitas=acoes.filter(a=>a.status==='Feita').length;
+  pagina('Planejamento estratégico',`<div class="cover"><p class="year">${p.ano}</p><h1>${esc(emp.nome)}</h1><p>Direção, prioridades e execução</p><div class="metrics"><div><b>${(p.objetivos||[]).length}</b> objetivos</div><div><b>${acoes.length}</b> ações</div><div><b>${feitas}</b> concluídas</div></div><p class="muted">${p.encerrado?'Plano encerrado':'Plano em elaboração'} · Exportado em ${fmtDataAno(hoje())}</p></div>`,'cover-slide');
+  function narrativas(t,campos){
+    let conteudo='',peso=0,numero=0;
+    const emitir=()=>{if(!conteudo)return;pagina(t+(numero?' · continuação':''),conteudo);conteudo='';peso=0;numero++};
+    for(const [rotulo,valor] of campos){
+      const fonte=String(valor||'Não informado');
+      // Limita o conteúdo por página sem descartar nenhum trecho, inclusive textos com muitas quebras.
+      let restante=fonte,i=0;
+      while(restante.length){
+        let limite=Math.min(700,restante.length),quebras=0;
+        for(let j=0;j<limite;j++)if(restante[j]==='\n'&&++quebras===10){limite=j+1;break}
+        const parte=restante.slice(0,limite),custo=parte.length+(parte.match(/\n/g)||[]).length*65+180;
+        if(peso+custo>960)emitir();
+        conteudo+=`<div class="story"><h3>${esc(rotulo)}${i?' · continuação':''}</h3><p>${texto(parte)}</p></div>`;
+        peso+=custo;restante=restante.slice(limite);i++;
+      }
+    }
+    emitir();
+  }
+  narrativas('Direção da empresa',[['Missão',p.missao],['Visão',p.visao]]);
+  if((p.valores||[]).length)narrativas('Valores',(p.valores||[]).map(v=>[v.titulo||'Valor',v.oque||'']));
+  (p.objetivos||[]).forEach((o,i)=>{
+    narrativas('Objetivo '+(i+1),[['Objetivo',o.titulo],...(o.porque?[['Por que importa',o.porque]]:[]),['Indicador e prazo',(o.indicador||'Indicador não definido')+'\nPrazo: '+(o.ate?fmtDataAno(o.ate):'Não definido')]]);
+    (o.acoes||[]).forEach((a,j)=>narrativas('Objetivo '+(i+1)+' · Ação '+(j+1),[['Próximo passo',a.oque],['Execução','Responsável: '+(a.quem||'Não definido')+'\nPrazo: '+(a.ate?fmtDataAno(a.ate):'Não definido')+'\nSituação: '+(a.status||'A fazer')+(a.travaPor?'\nImpedimento: '+a.travaPor:'')]]));
+  });
+  if(!(p.objetivos||[]).length)pagina('Objetivos e ações','<p class="story">Nenhum objetivo registrado neste ano.</p>');
+  (p.zonas||[]).forEach(z=>{const pessoas=(p.pecas||[]).filter(x=>x.zona===z.id);if(pessoas.length)narrativas('Equipe · '+z.nome,pessoas.map(x=>[x.nome||'Pessoa',[(x.funcao||'Função não informada'),x.chave?'Pessoa-chave':'',x.substituto?'Substituto: '+x.substituto:'',x.obs||''].filter(Boolean).join('\n')]))});
+  narrativas('Balanço do ano',[['Resultados',p.balanco],['Aprendizados e próximos passos',p.aprendizados]]);
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(titulo)}</title><style>
+  *{box-sizing:border-box}body{margin:0;background:#e8eaf0;font:16px Arial,sans-serif;color:#222631}.tools{position:sticky;top:0;background:#fff;padding:14px 24px;display:flex;gap:16px;align-items:center;z-index:1;border-bottom:1px solid #ccc}.tools button{border:0;background:#4640ed;color:white;padding:12px 20px;border-radius:8px;font:inherit;cursor:pointer}.tools p{margin:0;font-size:14px}.slide{position:relative;background:white;max-width:1123px;min-height:740px;margin:28px auto;padding:40px 64px 78px;break-after:page;overflow-wrap:anywhere}.slide header{display:flex;justify-content:space-between;gap:20px;font-size:12px;letter-spacing:.05em;border-bottom:3px solid #4640ed;padding-bottom:16px;color:#4f5470}.slide h2{font-size:32px;margin:34px 0;color:#323050}.slide h3{font-size:22px;color:#4640ed}.story{font-size:21px;line-height:1.55;white-space:normal}.story p{margin:12px 0}.slide footer{position:absolute;bottom:24px;left:64px;right:64px;border-top:1px solid #dce0e7;padding-top:14px;font-size:11px;color:#5a6070;display:flex;justify-content:space-between}.cover .year{font-size:72px;line-height:1;font-weight:bold;color:#4640ed;margin:18px 0}.cover h1{font-size:44px;margin:18px 0}.cover>p{font-size:21px}.metrics{display:flex;gap:52px;margin:42px 0}.metrics b{display:block;font-size:34px;color:#4640ed}.muted{color:#5a6070;font-size:14px!important}@media(max-width:700px){.slide{padding:24px 24px 76px;min-height:650px;margin:16px}.slide footer{left:24px;right:24px}.tools{flex-wrap:wrap}.metrics{gap:24px}.cover h1{font-size:32px}.story{font-size:18px}}@page{size:A4 landscape;margin:0}@media print{body{background:white}.tools{display:none}.slide{width:297mm;min-height:210mm;max-width:none;margin:0;padding:12mm 17mm 22mm}.slide:last-child{break-after:auto}.slide header{font-size:9pt}.slide h2{font-size:25pt;margin:8mm 0}.slide h3{font-size:18pt}.story{font-size:15pt;line-height:1.5}.slide footer{left:17mm;right:17mm;bottom:7mm}.metrics{margin:9mm 0}*{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+  </style></head><body><div class="tools"><button type="button" id="salvar">Salvar como PDF</button><p>Na janela de impressão, escolha “Salvar como PDF”. Orientação paisagem.</p></div>${paginas.join('')}</body></html>`;
+}
+function exportarPlanoPDF(emp,plano){
+  const w=window.open('','_blank');if(!w){alert('Permita abrir a apresentação nesta janela para exportar o PDF.');return}
+  w.opener=null;w.document.open();w.document.write(htmlPlanoApresentacao(emp,plano));w.document.close();
+  w.document.getElementById('salvar').onclick=()=>w.print();
 }
 
 let _pecaNaMao=null;   // peça "pegada" para mover — funciona no dedo e no mouse
 
 function vEstrategia(m){
   const r=rr('estrategia');
-  const ativas=empAtivas();
-  m.appendChild(cab('Gestão estratégica','Quem somos, para onde vamos e com quem — empresa por empresa.'));
-
-  if(!ativas.length){
-    m.appendChild(el(`<div class="aviso">🏢 <b>Nenhuma empresa ativa cadastrada ainda.</b>
-      Cadastre em <b>Guia de vida → Minhas empresas</b> (nome, CNPJ, regime, sócios e banco) —
-      esta tela monta o resto em cima de lá, para o dado não morar em dois lugares.</div>`));
-    return;
-  }
-  if(filtro.estrEmp==null||!ativas.some(x=>x.nome===filtro.estrEmp)) filtro.estrEmp=ativas[0].nome;
-  const emp=ativas.find(x=>x.nome===filtro.estrEmp);
-  const est=estrDe(emp.nome);
-
-  m.appendChild(painel('Empresa',
-    seletor(filtro.estrEmp,ativas.map(x=>[x.nome,x.nome]),v=>{filtro.estrEmp=v;r()}),'|'));
+  const selecao=prepararEstrategia(m);if(!selecao)return;
+  const {emp,est}=selecao;
 
   /* ---- 1. a empresa: dados e bancos, lidos de onde já moram ---- */
   const objetivos=est.objetivos||[];
@@ -5877,12 +6037,10 @@ function vEstrategia(m){
   const chaves=(est.pecas||[]).filter(p=>p.chave);
   const semSubstituto=chaves.filter(p=>!String(p.substituto||'').trim());
 
-  m.appendChild(ligaKpis(el(`<div class="grade">
+  m.appendChild(ligaKpis(el(`<div class="grade workspace-metrics">
     ${kpi('Objetivos',objetivos.length,objetivos.length?'no plano':'nenhum ainda',null,'plano')}
     ${kpi('Ações abertas',abertas.length,atrasadas.length?atrasadas.length+' passaram do prazo':'nada atrasado',atrasadas.length?'r':'v','plano')}
-    ${kpi('Travadas',travadas.length,travadas.length?'esperando alguma coisa':'nenhuma travada',travadas.length?'a':'','plano')}
-    ${kpi('Peças no campo',(est.pecas||[]).length,(est.zonas||[]).length+' frentes',null,'campo')}
-    ${kpi('Sem substituto',semSubstituto.length,semSubstituto.length?'peça-chave que ninguém cobre':'toda peça-chave tem quem cubra',semSubstituto.length?'r':'v','campo')}</div>`),{
+    ${kpi('Travadas',travadas.length,travadas.length?'esperando alguma coisa':'nenhuma travada',travadas.length?'a':'','plano')}</div>`),{
     plano:()=>{abreBloco('es-plano');r()},
     campo:()=>{abreBloco('es-campo');r()},
   }));
@@ -5893,7 +6051,7 @@ function vEstrategia(m){
     Formar substituto é trabalho de tempo de paz.</div>`));
 
   const vazias=(est.zonas||[]).filter(z=>!(est.pecas||[]).some(p=>p.zona===z.id));
-  if(vazias.length) m.appendChild(el(`<div class="aviso">🕳️ <b>Frente sem ninguém:</b>
+  if(vazias.length&&est.pecas.length) m.appendChild(el(`<div class="aviso">🕳️ <b>Frente sem ninguém:</b>
     ${vazias.map(z=>esc(z.nome)).join(', ')}. Ou alguém está fazendo isso sem estar escrito
     (e sem tempo reservado), ou não está sendo feito.</div>`));
 
@@ -5962,6 +6120,12 @@ function vEstrategia(m){
   const px=el('<div class="corpo"></div>');
   const pintaPlano=()=>{
     px.innerHTML='';
+    const totais=objetivos.flatMap(o=>o.acoes||[]),pendentes=totais.filter(a=>a.status!=='Feita'),travadasAgora=pendentes.filter(a=>a.status==='Travada');
+    const metricas=[...m.querySelectorAll('.workspace-metrics .kpi')];
+    [objetivos.length,pendentes.length,travadasAgora.length].forEach((valor,i)=>{if(metricas[i])metricas[i].querySelector('.val').textContent=valor});
+    const vencidas=pendentes.filter(a=>a.ate&&a.ate<hoje()).length;
+    const legendas=[objetivos.length?'no plano':'nenhum ainda',vencidas?vencidas+' passaram do prazo':'nada atrasado',travadasAgora.length?'esperando alguma coisa':'nenhuma travada'];
+    legendas.forEach((texto,i)=>{if(metricas[i])metricas[i].querySelector('.sub').textContent=texto});
     if(!objetivos.length) px.appendChild(el('<div class="vazio">Nenhum objetivo ainda. Um objetivo é o que muda se der certo — não a tarefa.</div>'));
     objetivos.forEach((o,io)=>{
       const feitas=(o.acoes||[]).filter(a=>a.status==='Feita').length;
@@ -6000,6 +6164,8 @@ function vEstrategia(m){
             </div>
             <select class="selSt" style="font-size:11.5px;padding:3px 5px">${STATUS_ACAO.map(x=>`<option${x===(a.status||'A fazer')?' selected':''}>${x}</option>`).join('')}</select>
             <button class="btn ghost mini bDelA" style="color:var(--vermelho)">✕</button></div>`);
+          li.querySelector('.selSt').setAttribute('aria-label','Situação da ação '+(a.oque||ia+1));
+          li.querySelector('.bDelA').setAttribute('aria-label','Apagar ação '+(a.oque||ia+1));
           li.querySelector('.selSt').onchange=ev=>{
             a.status=ev.target.value;
             if(a.status==='Travada'){const q=prompt('Travada esperando o quê ou quem?',a.travaPor||'');if(q!=null)a.travaPor=q}
@@ -6015,7 +6181,8 @@ function vEstrategia(m){
         });
         if(!(o.acoes||[]).length) box.appendChild(el('<div class="vazio">Objetivo sem ação é desejo. Escreva a primeira.</div>'));
         const nova={oque:'',quem:'',ate:''};
-        box.appendChild(campos(nova,[
+        const adicionar=el('<details class="strategy-add-action"><summary>+ Nova ação</summary></details>');
+        adicionar.appendChild(campos(nova,[
           {k:'oque',t:'O que fazer',ph:'uma coisa concreta',full:true},
           {k:'quem',t:'Quem',tipo:'sugestao',ph:'nome',opcoes:[...new Set((est.pecas||[]).map(p=>p.nome).filter(Boolean))]},
           {k:'ate',t:'Até',tipo:'date'},
@@ -6024,26 +6191,30 @@ function vEstrategia(m){
         b.onclick=()=>{if(!String(nova.oque||'').trim()){alert('Escreva a ação.');return}
           o.acoes=[...(o.acoes||[]),{id:uid(),oque:nova.oque.trim(),quem:String(nova.quem||'').trim(),
             ate:nova.ate||'',status:'A fazer',travaPor:''}];
-          salvar();pintaAcoes()};
-        box.appendChild(b);
+          salvar();pintaPlano()};
+        adicionar.appendChild(b);box.appendChild(adicionar);
       };
       pintaAcoes();
+      cx2.querySelector('.bEd').setAttribute('aria-label','Editar objetivo '+(o.titulo||io+1));
+      cx2.querySelector('.bDelO').setAttribute('aria-label','Apagar objetivo '+(o.titulo||io+1));
       cx2.querySelector('.bEd').onclick=()=>modalObjetivo(o,()=>{salvar();pintaPlano()});
       cx2.querySelector('.bDelO').onclick=()=>{
         if(!confirm('Apagar o objetivo "'+(o.titulo||'sem título')+'" e as '+(o.acoes||[]).length+' ação(ões) dele?'))return;
         est.objetivos.splice(io,1);salvar();pintaPlano()};
       px.appendChild(cx2);
     });
-    const bNovo=el('<button class="mais">+ Novo objetivo</button>');
+    m.querySelector('[data-strategy-new]')?.remove();
+    const bNovo=el('<button class="btn mini" data-strategy-new>+ Novo objetivo</button>');
     bNovo.onclick=()=>{const o={id:uid(),titulo:'',porque:'',indicador:'',ate:'',acoes:[]};
-      est.objetivos.push(o);salvar();modalObjetivo(o,()=>{salvar();pintaPlano()},true)};
-    px.appendChild(bNovo);
+      est.objetivos.push(o);salvar();modalObjetivo(o,()=>{salvar();pintaPlano()},true,est)};
+    if(!est.encerrado)m.querySelector('.topo').insertBefore(bNovo,m.querySelector('.topo>button'));
   };
   pintaPlano();
-  m.appendChild(bloco('es-plano','🎯 Planejamento estratégico','objetivo de um lado, ações do outro',px));
+  m.appendChild(bloco('es-plano','Objetivos e ações','indicadores, responsáveis e prazos do ano',px));
 
   /* ---- 4. o campo tático ---- */
   m.appendChild(bloco('es-campo','♟️ Campo tático','as frentes, as peças e os buracos — clique numa peça e depois na frente para movê-la',campoTatico(est,r)));
+  organizarEstrategia(m,emp,est);
 }
 
 /* O CAMPO. Mover é em dois toques (pegar / soltar) de propósito: arrastar não
@@ -6082,17 +6253,18 @@ function campoTatico(est,r){
           ${p.chave?`<div style="font-size:11px;margin-top:6px;color:${String(p.substituto||'').trim()?'var(--suave)':'var(--vermelho)'}">
             ${String(p.substituto||'').trim()?'cobertura: '+esc(p.substituto):'⚠ ninguém cobre'}</div>`:''}
         </div>`);
-        pe.onclick=ev=>{ev.stopPropagation();
+        pe.onclick=ev=>{ev.stopPropagation();if(est.encerrado)return;
           if(_pecaNaMao===p.id){_pecaNaMao=null;pinta();return}
           if(_pecaNaMao){_pecaNaMao=null;pinta();return}
           _pecaNaMao=p.id;pinta();
         };
-        pe.ondblclick=ev=>{ev.stopPropagation();_pecaNaMao=null;modalPeca(est,p,()=>{salvar();pinta()})};
+        pe.ondblclick=ev=>{ev.stopPropagation();if(est.encerrado)return;_pecaNaMao=null;modalPeca(est,p,()=>{salvar();pinta()})};
         box.appendChild(pe);
       });
       if(!dentro.length) box.appendChild(el('<div class="vazio" style="padding:14px 4px;font-size:12px">Ninguém nesta frente.</div>'));
       // soltar aqui
       zEl.onclick=()=>{
+        if(est.encerrado)return;
         if(!_pecaNaMao)return;
         const p=(est.pecas||[]).find(x=>x.id===_pecaNaMao);
         if(p&&p.zona!==z.id){p.zona=z.id;salvar()}
@@ -6139,7 +6311,7 @@ function campoTatico(est,r){
   return cx;
 }
 
-function modalObjetivo(o,aoSalvar,novo){
+function modalObjetivo(o,aoSalvar,novo,plano){
   abrirModal(esc(o.titulo||'Novo objetivo'),'o que muda se der certo',(c,fechar)=>{
     const s1=el('<div class="secao"></div>');
     s1.appendChild(campos(o,[
@@ -6155,8 +6327,8 @@ function modalObjetivo(o,aoSalvar,novo){
     c.appendChild(s2);
   },()=>{
     if(novo&&!String(o.titulo||'').trim()){
-      const est=E.estrategia[filtro.estrEmp];
-      if(est)est.objetivos=est.objetivos.filter(x=>x.id!==o.id);
+      const est=plano||(E.planejamentoEmpresas||[]).find(p=>p.objetivos?.some(x=>x===o))||E.estrategia[filtro.estrEmp];
+      if(est){const i=est.objetivos.findIndex(x=>x.id===o.id);if(i>=0)est.objetivos.splice(i,1)}
       salvar();
     }
     aoSalvar&&aoSalvar();
@@ -6253,125 +6425,36 @@ const esfriou=o=>o.estagio!=='Arquivada'&&o.estagio!=='Tocando'&&(diasParado(o)?
 const marcarMexido=o=>{o.mexido=hoje()};
 
 function vOportunidades(m){
-  const r=rr('oportunidades');
-  const L=E.oportunidades||[];
-  if(filtro.oportEstagio==null) filtro.oportEstagio='Ativas';
-  if(filtro.oportTipo==null) filtro.oportTipo='Todos';
-
-  const novo=()=>{const o={id:uid(),titulo:'',tipo:CFG('tipoOportunidade')[0],estagio:'Semente',
-    porque:'',proximoPasso:'',ate:'',links:[],obs:'',mexido:hoje(),criada:hoje()};
-    E.oportunidades.push(o);salvar();modalOport(o,true)};
-
-  m.appendChild(cab('Oportunidades','Compare ideias, avalie prioridades e acompanhe as próximas decisões.'));
-
-  const tipos=[...new Set([...CFG('tipoOportunidade'),...L.map(o=>o.tipo)])].filter(Boolean);
-  m.appendChild(painel('Ver',
-    seletor(filtro.oportEstagio,[['Ativas','Ativas ('+L.filter(o=>o.estagio!=='Arquivada').length+')'],
-      ...ESTAGIOS.map(e=>[e,e+' ('+L.filter(o=>o.estagio===e).length+')']),['Todas','Todas ('+L.length+')']],
-      v=>{filtro.oportEstagio=v;r()},'Estágio da oportunidade'),
-    seletor(filtro.oportTipo,[['Todos','Todos os tipos'],...tipos.map(x=>[x,x])],
-      v=>{filtro.oportTipo=v;r()},'Tipo de oportunidade'),
-    acao('+ Nova oportunidade',novo),'|'));
-
-  const ativas=L.filter(o=>o.estagio!=='Arquivada');
-  const tocando=L.filter(o=>o.estagio==='Tocando');
-  const frias=L.filter(esfriou);
-  const semPasso=ativas.filter(o=>!String(o.proximoPasso||'').trim());
-  const atrasadas=ativas.filter(o=>o.ate&&o.ate<hoje());
-  const melhor=[...ativas].filter(respondida).sort((a,b)=>notaOport(b)-notaOport(a))[0];
-
-  m.appendChild(ligaKpis(el(`<div class="grade">
-    ${kpi('Na mesa',ativas.length,ativas.length?'ideias vivas':'nada em aberto',null,'lista')}
-    ${kpi('Tocando',tocando.length,tocando.length?'já saíram do papel':'nenhuma em andamento',tocando.length?'v':'')}
-    ${kpi('Melhor nota',melhor?notaOport(melhor):'—',melhor?esc(melhor.titulo||'sem título'):'responda a régua de alguma','a','ranking')}
-    ${kpi('Sem próximo passo',semPasso.length,semPasso.length?'ideia sem passo não anda':'todas com passo',semPasso.length?'r':'v','lista')}
-    ${kpi('Esfriando',frias.length,frias.length?'paradas há mais de 45 dias':'nenhuma largada','a','lista')}</div>`),{
-    lista:()=>{abreBloco('op-lista');r()},
-    ranking:()=>{abreBloco('op-rank');r()},
-  }));
-
-  if(atrasadas.length) m.appendChild(el(`<div class="aviso" style="background:var(--vermelho-cl);border-color:var(--vermelho)">
-    ⏰ <b>${atrasadas.length} ${atrasadas.length===1?'oportunidade passou':'oportunidades passaram'} da data do próximo passo:</b>
-    ${atrasadas.map(o=>esc(o.titulo||'sem título')+' ('+fmtDataAno(o.ate)+')').join('; ')}.
-    Ou faça, ou remarque, ou arquive — data vencida que fica parada só ensina a ignorar data.</div>`));
-
-  if(frias.length) m.appendChild(el(`<div class="aviso">🥶 <b>${frias.length} ${frias.length===1?'ideia está':'ideias estão'} esfriando</b> —
-    sem nenhum toque há mais de 45 dias: ${frias.map(o=>esc(o.titulo||'sem título')).join(', ')}.
-    Ideia parada não é neutra: ela ocupa espaço na cabeça. Vale arquivar o que já não te interessa.</div>`));
-
-  /* ---- o que merece o seu tempo agora ---- */
-  const rank=[...ativas].filter(respondida).sort((a,b)=>notaOport(b)-notaOport(a));
-  const rk=el('<div></div>');
-  if(!rank.length) rk.innerHTML='<div class="vazio">Nenhuma oportunidade avaliada ainda. Abra uma e responda as seis perguntas — leva um minuto e serve para comparar tudo com a mesma régua.</div>';
-  else{
-    rk.appendChild(el(`<div class="grafico">${gBarras(rank.slice(0,8).map(o=>({r:o.titulo||'sem título',v:notaOport(o)})),{fmt:v=>v,cor:'var(--verde)'})}</div>`));
-    const rol=el('<div class="rolagem"></div>');
-    const tb=document.createElement('table');
-    tb.innerHTML='<thead><tr><th>#</th><th>Oportunidade</th><th>Tipo</th><th>Estágio</th>'+
-      '<th style="text-align:right">Nota</th><th>O que puxa para cima / para baixo</th></tr></thead>';
-    const corpo=document.createElement('tbody');
-    rank.forEach((o,i)=>{
-      const nota=notaOport(o);
-      const fortes=CRITERIOS.filter(c=>c.peso>0&&(+o[c.k]||0)>=4).map(c=>c.t.toLowerCase());
-      const fracos=CRITERIOS.filter(c=>c.peso<0&&(+o[c.k]||0)>=4).map(c=>c.t.toLowerCase());
-      const tr=document.createElement('tr');tr.style.cursor='pointer';
-      tr.innerHTML=`<td style="padding:9px 10px;color:var(--suave);font-weight:600">${i+1}º</td>
-        <td style="padding:9px 10px"><b>${esc(o.titulo||'sem título')}</b>
-          ${o.porque?`<div style="font-size:11.5px;color:var(--suave);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.porque)}</div>`:''}</td>
-        <td style="padding:9px 10px;color:var(--suave)">${esc(o.tipo||'—')}</td>
-        <td style="padding:9px 10px">${chip(o.estagio==='Tocando'?'Realizado':o.estagio==='Decidindo'?'Confirmado':'Em Planejamento')}
-          <span style="font-size:11.5px;color:var(--suave);margin-left:4px">${esc(o.estagio)}</span></td>
-        <td style="padding:9px 10px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums;font-size:15px;color:${nota>=60?'var(--verde)':nota>=35?'var(--areia)':'var(--vermelho)'}">${nota}</td>
-        <td style="padding:9px 10px;font-size:12px;color:var(--suave)">${fortes.length?'↑ '+esc(fortes.join(', ')):''}${fortes.length&&fracos.length?' · ':''}${fracos.length?'↓ '+esc(fracos.join(', ')):''}${!fortes.length&&!fracos.length?'nada se destaca':''}</td>`;
-      tr.onclick=()=>modalOport(o);
-      corpo.appendChild(tr);
-    });
-    tb.appendChild(corpo);rol.appendChild(tb);rk.appendChild(rol);
-    rk.appendChild(el(`<div style="padding:11px 17px 4px;font-size:12.5px;color:var(--suave)">
-      A nota pesa seis respostas suas: ganho, ânimo e encaixe puxam para cima; tempo, custo e risco puxam para baixo.
-      Ela não decide nada — serve para as ideias serem comparadas pela mesma régua, e não pela ordem em que apareceram.</div>`));
+  m.classList.add('workspace-layout','oportunidades-workspace');const L=E.oportunidades||[];
+  const novo=()=>{const o={id:uid(),titulo:'',tipo:CFG('tipoOportunidade')[0],estagio:'Semente',porque:'',proximoPasso:'',ate:'',links:[],obs:'',mexido:hoje(),criada:hoje()};L.push(o);salvar();modalOport(o,true)};
+  const topo=cab('Oportunidades','Da ideia à decisão: veja o próximo passo e compare suas prioridades.');topo.appendChild(acao('+ Nova oportunidade',novo));m.appendChild(topo);
+  const ativas=L.filter(o=>o.estagio!=='Arquivada'),atrasadas=ativas.filter(o=>o.ate&&o.ate<hoje());
+  m.appendChild(ligaKpis(el(`<div class="grade workspace-metrics">${kpi('Em aberto',ativas.length,'ideias e projetos',null,'ativas')}${kpi('Em execução',ativas.filter(o=>o.estagio==='Tocando').length,'já saíram do papel','v','tocando')}${kpi('Prazos vencidos',atrasadas.length,'rever o próximo passo',atrasadas.length?'r':'','atrasadas')}${kpi('Para avaliar',ativas.filter(o=>!respondida(o)).length,'ainda sem nota',null,'avaliar')}</div>`),{ativas:()=>recorte('Ativas',''),tocando:()=>recorte('Tocando',''),atrasadas:()=>recorte('Ativas','atrasadas'),avaliar:()=>recorte('Ativas','avaliar')}));
+  const ui=abasWorkspace(m,'oport',[['lista','Minhas oportunidades'],['comparar','Comparar prioridades']],filtro.oportView||'lista',v=>{filtro.oportView=v;pintar()});
+  const filtros=el('<div class="workspace-filters"></div>');m.insertBefore(filtros,m.querySelector('.workspace-tabs'));
+  const busca=el('<input type="search" aria-label="Buscar oportunidade" placeholder="Buscar ideia, empresa ou próximo passo…">');busca.value=filtro.oportBusca||'';busca.oninput=()=>{filtro.oportBusca=busca.value;pintar()};filtros.appendChild(busca);
+  const estagios=[...new Set([...ESTAGIOS,...L.map(o=>o.estagio).filter(Boolean)])];
+  const select=seletor(filtro.oportEstagio||'Ativas',[['Ativas','Em aberto'],...estagios.map(e=>[e,e]),['Todas','Todas, incluindo arquivadas']],v=>{filtro.oportEstagio=v;filtro.oportRecorte='';pintar()},'Estágio da oportunidade');filtros.appendChild(select);
+  const tipos=[...new Set([...CFG('tipoOportunidade'),...L.map(o=>o.tipo).filter(Boolean)])];
+  filtros.appendChild(seletor(filtro.oportTipo||'Todos',[['Todos','Todos os tipos'],...tipos.map(t=>[t,t])],v=>{filtro.oportTipo=v;pintar()},'Tipo de oportunidade'));
+  const aviso=el('<div class="workspace-results"><p role="status" aria-live="polite"></p></div>');filtros.after(aviso);
+  aviso.appendChild(acao('Limpar filtros',()=>{filtro.oportBusca='';filtro.oportTipo='Todos';filtro.oportEstagio='Ativas';filtro.oportRecorte='';rr('oportunidades')()},'ghost'));
+  function recorte(est,rec){filtro.oportEstagio=est;filtro.oportRecorte=rec;select.value=est;filtro.oportView='lista';ui.selecionar('lista');pintar()}
+  function pintar(){
+    const est=filtro.oportEstagio||'Ativas';const vis=L.filter(o=>(est==='Todas'||(est==='Ativas'?o.estagio!=='Arquivada':o.estagio===est))&&(!filtro.oportTipo||filtro.oportTipo==='Todos'||o.tipo===filtro.oportTipo)&&normaliza([o.titulo,o.tipo,o.porque,o.proximoPasso].join(' ')).includes(normaliza(filtro.oportBusca||''))&&(!filtro.oportRecorte||(filtro.oportRecorte==='atrasadas'?o.ate&&o.ate<hoje():!respondida(o))))
+      .sort((a,b)=>(a.ate||'9999').localeCompare(b.ate||'9999')||notaOport(b)-notaOport(a));
+    aviso.querySelector('p').textContent=vis.length+' oportunidade(s)'+(filtro.oportRecorte==='atrasadas'?' · com prazo vencido':filtro.oportRecorte==='avaliar'?' · ainda sem avaliação':'');
+    const lista=ui.paineis.lista;lista.replaceChildren();const grid=el('<div class="workspace-grid" data-bid="op-lista"></div>');lista.appendChild(grid);
+    vis.forEach(o=>{const nota=respondida(o)?notaOport(o):null;const b=el(`<button class="workspace-opportunity"><span class="workspace-document-top">${chip(o.estagio||'Semente')}<span class="workspace-score">${nota===null?'Sem avaliação':nota+'/100'}</span></span><b class="workspace-item-title">${esc(o.titulo||'Oportunidade sem título')}</b><span class="workspace-owner">${esc(o.tipo||'Sem tipo')}</span>${o.porque?'<span class="workspace-description">'+esc(o.porque)+'</span>':''}<span class="workspace-next"><small>PRÓXIMO PASSO</small><b>${esc(o.proximoPasso||'Definir o próximo passo')}</b><span>${o.ate?'Até '+fmtDataAno(o.ate):'Sem prazo definido'}${o.ate&&o.ate<hoje()&&o.estagio!=='Arquivada'?' · Prazo vencido':''}</span></span><span class="workspace-document-footer">${esfriou(o)?'Sem atualização há '+diasParado(o)+' dias':'Abrir detalhes e avaliação'}<span aria-hidden="true">→</span></span></button>`);b.onclick=()=>modalOport(o);grid.appendChild(b)});
+    if(!vis.length)grid.innerHTML='<div class="workspace-empty"><h2>'+(!L.length?'Uma boa ideia começa com um registro.':'Nenhuma oportunidade neste filtro.')+'</h2><p>'+(!L.length?'Use “Nova oportunidade” para registrar a ideia, avaliar e definir o próximo passo.':'Ajuste a busca ou use “Limpar filtros”.')+'</p></div>';
+    const comparar=ui.paineis.comparar;comparar.replaceChildren(tituloWorkspace('Comparar prioridades','Nota baseada nas suas respostas sobre ganho, ânimo, encaixe, tempo, custo e risco.'));
+    const rank=el('<div class="workspace-card" data-bid="op-rank"></div>');comparar.appendChild(rank);
+    const avaliadas=vis.filter(respondida).sort((a,b)=>notaOport(b)-notaOport(a));
+    avaliadas.forEach((o,i)=>{const b=el(`<button class="workspace-row"><span class="workspace-rank">${i+1}</span><span><b>${esc(o.titulo||'Sem título')}</b><small>${esc(o.estagio||'Semente')} · ${esc(o.tipo||'Sem tipo')}</small></span><strong class="workspace-score">${notaOport(o)}/100</strong></button>`);b.onclick=()=>modalOport(o);rank.appendChild(b)});
+    if(!avaliadas.length)rank.innerHTML='<p class="vazio">Abra uma oportunidade e preencha a avaliação para começar a comparar.</p>';
+    comparar.appendChild(el('<p class="workspace-note">A nota organiza sua avaliação pessoal. Não representa previsão de retorno. A comparação respeita os filtros acima.</p>'));
   }
-  m.appendChild(bloco('op-rank','🎯 O que merece seu tempo agora','ordenado pela régua — clique para abrir',rk));
-
-  /* ---- a lista ---- */
-  const vis=L.filter(o=>(filtro.oportEstagio==='Todas'||
-      (filtro.oportEstagio==='Ativas'?o.estagio!=='Arquivada':o.estagio===filtro.oportEstagio))
-    &&(filtro.oportTipo==='Todos'||o.tipo===filtro.oportTipo))
-    .sort((a,b)=>(notaOport(b)-notaOport(a))||String(b.mexido||'').localeCompare(String(a.mexido||'')));
-  const cx=el('<div class="corpo"></div>');
-  const grid=el('<div class="cartoes"></div>');
-  vis.forEach(o=>{
-    const nota=respondida(o)?notaOport(o):null;
-    const dias=diasParado(o);
-    const c=el(`<button class="cartao" style="text-align:left">
-      <div class="tit">${esc(o.titulo||'(sem título)')}</div>
-      <div class="sub">${esc(o.tipo||'—')}${o.porque?' · '+esc(String(o.porque).slice(0,60)):''}</div>
-      <div class="pe">${chip(o.estagio==='Tocando'?'Realizado':o.estagio==='Arquivada'?'Cancelado':o.estagio==='Decidindo'?'Confirmado':'Em Planejamento')}
-        <span style="font-size:11.5px;color:var(--suave)">${esc(o.estagio)}</span>
-        ${nota!=null?`<b style="margin-left:auto;font-size:14px;color:${nota>=60?'var(--verde)':nota>=35?'var(--areia)':'var(--vermelho)'}">${nota}</b>`:'<span style="margin-left:auto;font-size:11.5px;color:var(--suave)">sem nota</span>'}</div>
-      ${o.proximoPasso?`<div style="font-size:12px;color:var(--suave);margin-top:7px;border-top:1px solid var(--linha);padding-top:7px">
-        ▶ ${esc(o.proximoPasso)}${o.ate?' · até '+fmtDataAno(o.ate):''}${o.ate&&o.ate<hoje()?' <b style="color:var(--vermelho)">(passou)</b>':''}</div>`
-        :'<div style="font-size:12px;color:var(--vermelho);margin-top:7px;border-top:1px solid var(--linha);padding-top:7px">sem próximo passo</div>'}
-      ${(o.links||[]).length?`<div style="font-size:11.5px;color:var(--suave);margin-top:5px">🔗 ${(o.links||[]).length} link(s)</div>`:''}
-      ${esfriou(o)?`<div style="font-size:11.5px;color:var(--areia);margin-top:5px">🥶 parada há ${dias} dias</div>`:''}
-    </button>`);
-    c.onclick=()=>modalOport(o);
-    grid.appendChild(c);
-  });
-  if(!vis.length) grid.innerHTML='<div class="vazio">Nada por aqui neste recorte.</div>';
-  cx.appendChild(grid);
-  const bt=el('<button class="mais">+ Nova oportunidade</button>');bt.onclick=novo;cx.appendChild(bt);
-  m.appendChild(bloco('op-lista','Todas as oportunidades','clique para abrir, avaliar e anexar',cx));
-
-  /* ---- onde a cabeça está ---- */
-  if(L.length){
-    const porTipo={},porEst={};
-    L.forEach(o=>{porTipo[o.tipo||'—']=(porTipo[o.tipo||'—']||0)+1;porEst[o.estagio]=(porEst[o.estagio]||0)+1});
-    const gx=el('<div></div>');
-    gx.appendChild(el(`<div class="grafico">${gRosca(Object.entries(porEst).map(([r2,v])=>({r:r2,v})),{fmt:v=>v})}</div>`));
-    gx.appendChild(el(`<div class="grafico">${gBarras(Object.entries(porTipo).map(([r2,v])=>({r:r2,v})).sort((a,b)=>b.v-a.v),{fmt:v=>v})}</div>`));
-    m.appendChild(bloco('op-dash','Oportunidades por estágio e tipo','por estágio e por tipo',gx));
-  }
+  pintar();
 }
 
 function modalOport(o,novoReg){
@@ -6383,7 +6466,7 @@ function modalOport(o,novoReg){
     s1.appendChild(campos(o,[
       {k:'titulo',t:'O que é',ph:'ex.: comprar sala comercial no centro',full:true},
       {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tipoOportunidade')},
-      {k:'estagio',t:'Estágio',tipo:'select',opcoes:ESTAGIOS},
+      {k:'estagio',t:'Estágio',tipo:'select',opcoes:[...new Set([...ESTAGIOS,o.estagio].filter(Boolean))]},
       {k:'porque',t:'Por que isso me interessa',tipo:'textarea',full:true,
         ph:'o que te chamou a atenção — daqui a seis meses você não vai lembrar'},
     ],()=>{marcarMexido(o);salvar()}));
@@ -8345,90 +8428,36 @@ function vGastos(m){
 
 
 /* ===================== DOCUMENTOS ===================== */
-function vDocumentos(m){
-  const r=rr('documentos');
-  const h=hoje();
-  const st=d=>{if(!d.validade)return '—';const dd=Math.round((new Date(d.validade)-new Date(h))/864e5);
-    return dd<0?'Vencido':dd<180?'Vencendo':'Em dia'};
-  const alerta=E.documentos.filter(d=>['Vencido','Vencendo'].includes(st(d))).length;
-  m.appendChild(cab('Documentos','Consulte arquivos, acompanhe validades e organize os documentos por pessoa.'));
-  const novoDoc=()=>{const d={id:uid(),nome:'',dono:'Léo',numero:'',validade:'',onde:'',obs:''};E.documentos.push(d);salvar();modalDoc(d)};
-  // a lista vem de Minha gente, não só de quem já tem documento — assim dá para ver quem está sem nada
-  const donos=[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...E.documentos.map(d=>d.dono||'Léo')])];
-  const nDe=q=>E.documentos.filter(x=>mesmaPessoa(x.dono||'Léo',q)).length;
-  // a minha linha abre sozinha; as outras ficam recolhidas até serem clicadas
-  if(filtro.docAbertos==null) filtro.docAbertos={'Léo':true};
-  const semNada=donos.filter(d=>!nDe(d)).length;
-  m.appendChild(painel('Documentos',
-    acao('+ Novo documento',novoDoc),
-    acao('▾ Abrir todos',()=>{donos.forEach(d=>filtro.docAbertos[d]=true);r()},'ghost'),
-    acao('▸ Recolher',()=>{filtro.docAbertos={};r()},'ghost'),'|'));
-  m.appendChild(el(`<div class="grade">
-    ${kpi('Documentos',E.documentos.length,donos.length+' pessoa(s)')}
-    ${kpi('Precisam de atenção',alerta,alerta?'vencidos ou perto':'nada vencendo',alerta?'r':'v')}
-    ${kpi('Sem documento nenhum',semNada,semNada?'pessoas sem nada cadastrado':'todo mundo tem algo',semNada?'a':'v')}</div>`));
-  if(!E.documentos.length) m.appendChild(el(`<div class="aviso">🪪 Sugestão de ordem: <b>passaporte, visto americano, visto chinês, CNH,
-    registro de arma (CR/CRAF), CRLV dos veículos, certidões de nascimento e casamento</b> e apólices de seguro.
-    Anexe o PDF ou a foto — resolve quando você precisa e não está em casa.</div>`));
-  const cx=el('<div class="corpo"></div>');
-  // Ordem: quem tem problema aparece primeiro; eu venho sempre na frente,
-  // porque é a minha linha que eu abro todo dia.
-  const pessoas=donos.map(dono=>{
-    const meus=E.documentos.filter(d=>mesmaPessoa(d.dono||'Léo',dono))
-      .sort((a,b)=>(a.validade||'9').localeCompare(b.validade||'9'));
-    const vencidos=meus.filter(d=>st(d)==='Vencido').length;
-    const vencendo=meus.filter(d=>st(d)==='Vencendo').length;
-    const proximo=meus.map(d=>d.validade).filter(d=>d&&d>=h).sort()[0]||'';
-    return {dono,meus,vencidos,vencendo,proximo};
-  }).sort((a,b)=>(mesmaPessoa(b.dono,'Léo')-mesmaPessoa(a.dono,'Léo'))
-    ||(b.vencidos-a.vencidos)||(b.vencendo-a.vencendo)||a.dono.localeCompare(b.dono));
-
-  pessoas.forEach(p=>{
-    const aberto=!!filtro.docAbertos[p.dono];
-    const sit=p.vencidos?chip('Vencido')+(p.vencidos>1?`<b style="font-size:11.5px">×${p.vencidos}</b>`:'')
-      :p.vencendo?chip('Vencendo')+(p.vencendo>1?`<b style="font-size:11.5px">×${p.vencendo}</b>`:'')
-      :p.meus.some(d=>!d.validade)?'<span class="chip">Validade não informada</span>':p.meus.length?chip('Em dia'):'';
-    const linha=el(`<div style="border:1px solid var(--linha);border-radius:var(--r);margin-bottom:10px;overflow:hidden;background:var(--card)">
-      <button class="cabPessoa" style="width:100%;display:flex;align-items:center;gap:10px;padding:13px 15px;background:var(--bg);border:none;border-bottom:1px solid transparent;font:inherit;color:inherit;text-align:left;cursor:pointer">
-        <span class="seta" style="color:var(--suave);font-size:12px;width:12px">${aberto?'▾':'▸'}</span>
-        ${avatar(p.dono,30)}
-        <b style="font-size:14.5px">${esc(p.dono)}</b>
-        <span style="font-size:12px;color:var(--suave)">${p.meus.length?p.meus.length+' documento(s)':'nenhum documento'}${p.proximo?' · próximo vence em '+fmtDataAno(p.proximo):''}</span>
-        <span style="margin-left:auto;display:flex;align-items:center;gap:6px">${sit}</span>
-      </button>
-      <div class="corpoPessoa" style="padding:${aberto?'13px 15px':'0'};display:${aberto?'block':'none'}"></div>
-    </div>`);
-    const corpo=linha.querySelector('.corpoPessoa');
-    const grid=el('<div class="cartoes"></div>');
-    p.meus.forEach(d=>{
-      const c=el(`<button class="cartao"><div class="tit">${esc(d.nome||'(sem nome)')}</div>
-        <div class="sub">${d.numero?esc(d.numero):'sem número'}${d.onde?' · '+esc(d.onde):''}</div>
-        <div class="pe">${chip(st(d))}${d.validade?`<span style="font-size:11.5px;color:var(--suave)">até ${fmtDataAno(d.validade)}</span>`:'<span style="font-size:11.5px;color:var(--suave)">sem validade</span>'}</div></button>`);
-      c.onclick=()=>modalDoc(d);grid.appendChild(c);
-    });
-    if(!p.meus.length) grid.innerHTML=`<div class="vazio">Nada cadastrado para ${esc(p.dono)} ainda.</div>`;
-    corpo.appendChild(grid);
-    const btP=el(`<button class="mais">+ Novo documento de ${esc(p.dono)}</button>`);
-    btP.onclick=()=>{const d={id:uid(),nome:'',dono:p.dono,numero:'',validade:'',onde:'',obs:''};
-      E.documentos.push(d);salvar();modalDoc(d)};
-    corpo.appendChild(btP);
-    linha.querySelector('.cabPessoa').onclick=()=>{
-      const abrindo=corpo.style.display==='none';
-      filtro.docAbertos[p.dono]=abrindo;
-      corpo.style.display=abrindo?'block':'none';
-      corpo.style.padding=abrindo?'13px 15px':'0';
-      linha.querySelector('.seta').textContent=abrindo?'▾':'▸';
-    };
-    cx.appendChild(linha);
-  });
-  const bt=el('<button class="mais">+ Novo documento</button>');
-  bt.onclick=novoDoc;
-  cx.appendChild(bt);
-  m.appendChild(bloco('dc-lista','Documentos por pessoa','clique no nome para abrir os documentos dele',cx));
-  const porSit={};E.documentos.forEach(d=>{const s2=st(d);porSit[s2]=(porSit[s2]||0)+1});
-  if(E.documentos.length) m.appendChild(bloco('dc-dash','Situação dos documentos','',graficoEl(gRosca(
-    Object.entries(porSit).map(([r2,v])=>({r:r2,v})),{fmt:v=>v}))));
+function statusDocumento(d){
+  if(!d.validade)return 'Validade não informada';
+  const dias=Math.round((new Date(d.validade+'T12:00')-new Date(hoje()+'T12:00'))/864e5);
+  return dias<0?'Vencido':dias<180?'Vencendo':'Em dia';
 }
+function vDocumentos(m){
+  m.classList.add('workspace-layout','documentos-workspace');
+  const lista=E.documentos,donos=[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...lista.map(d=>d.dono||'Léo')])];
+  const novo=()=>{const d={id:uid(),nome:'',dono:filtro.docPessoa&&filtro.docPessoa!=='Todos'?filtro.docPessoa:'Léo',numero:'',validade:'',onde:'',obs:''};lista.push(d);salvar();modalDoc(d)};
+  const topo=cab('Documentos','Encontre o que precisa e acompanhe as validades da família.');topo.appendChild(acao('+ Novo documento',novo));m.appendChild(topo);
+  const total=s=>lista.filter(d=>statusDocumento(d)===s).length;
+  const filtrar=s=>{filtro.docStatus=s;situacao.value=s;pintar()};
+  m.appendChild(ligaKpis(el(`<div class="grade workspace-metrics">${kpi('Guardados',lista.length,'documentos cadastrados',null,'todos')}${kpi('Vencidos',total('Vencido'),'precisam de revisão',total('Vencido')?'r':'','vencidos')}${kpi('Vencem em até 180 dias',total('Vencendo'),'planeje a renovação',total('Vencendo')?'a':'','vencendo')}${kpi('Validade não informada',total('Validade não informada'),'conferir os registros',null,'sem')}</div>`),{todos:()=>filtrar('Todos'),vencidos:()=>filtrar('Vencido'),vencendo:()=>filtrar('Vencendo'),sem:()=>filtrar('Validade não informada')}));
+  const filtros=el('<div class="workspace-filters"></div>');
+  const busca=el('<input type="search" aria-label="Buscar documento" placeholder="Buscar documento, número ou local…">');busca.value=filtro.docBusca||'';busca.oninput=()=>{filtro.docBusca=busca.value;pintar()};filtros.appendChild(busca);
+  filtros.appendChild(seletor(filtro.docPessoa||'Todos',[['Todos','Todas as pessoas'],...donos.map(d=>[d,d])],v=>{filtro.docPessoa=v;pintar()},'Pessoa do documento'));
+  const situacao=seletor(filtro.docStatus||'Todos',[['Todos','Todas as validades'],...['Vencido','Vencendo','Em dia','Validade não informada'].map(s=>[s,s])],v=>{filtro.docStatus=v;pintar()},'Situação do documento');filtros.appendChild(situacao);m.appendChild(filtros);
+  const resultado=el('<p class="workspace-note" role="status" aria-live="polite"></p>');m.appendChild(resultado);
+  const grid=el('<div class="workspace-grid" data-bid="dc-lista"></div>');m.appendChild(grid);
+  function pintar(){
+    const vis=lista.filter(d=>(!filtro.docPessoa||filtro.docPessoa==='Todos'||mesmaPessoa(d.dono||'Léo',filtro.docPessoa))&&(!filtro.docStatus||filtro.docStatus==='Todos'||statusDocumento(d)===filtro.docStatus)&&normaliza([d.nome,d.dono||'Léo',d.numero,d.onde].join(' ')).includes(normaliza(filtro.docBusca||'')))
+      .sort((a,b)=>(a.validade||'9999').localeCompare(b.validade||'9999')||String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'));
+    resultado.textContent=vis.length+' de '+lista.length+' documento(s) · vencimentos mais próximos primeiro';grid.replaceChildren();
+    vis.forEach(d=>{const s=statusDocumento(d);const b=el(`<button class="workspace-document"><span class="workspace-document-top"><span class="workspace-document-icon" aria-hidden="true">▤</span>${chip(s)}</span><b class="workspace-item-title">${esc(d.nome||'Documento sem nome')}</b><span class="workspace-owner">${esc(d.dono||'Léo')}</span><span class="workspace-document-data"><span>Validade<b>${d.validade?fmtDataAno(d.validade):'Não informada'}</b></span><span>Referência<b>${esc(d.numero||'Não informada')}</b></span></span><span class="workspace-document-footer">${esc(d.onde||'Local do original não informado')}<span> Abrir →</span></span></button>`);b.onclick=()=>modalDoc(d);grid.appendChild(b)});
+    if(!vis.length){const vazio=el('<div class="workspace-empty"><h2>'+(!lista.length?'Seus documentos, em um só lugar.':'Nenhum documento neste filtro.')+'</h2><p>'+(!lista.length?'Cadastre o documento e anexe a foto ou o PDF para consultar quando precisar.':'Tente outro nome, pessoa ou situação.')+'</p></div>');vazio.appendChild(acao(!lista.length?'+ Novo documento':'Limpar filtros',!lista.length?novo:()=>{filtro.docBusca='';filtro.docStatus='Todos';filtro.docPessoa='Todos';rr('documentos')()},'ghost'));grid.appendChild(vazio)}
+  }
+  pintar();
+}
+
+
 function modalDoc(d){
   abrirModal(esc(d.nome||'Novo documento'),esc(d.dono||''),(c,fechar)=>{
     const s1=el('<div class="secao"><h4>Dados</h4></div>');
@@ -8579,6 +8608,57 @@ const CAMINHOS={
   'Pessoal':['Escolher uma coisa para aprender no ano e o primeiro passo','Um dia por mês sem trabalho nenhum','Ler 10 páginas por dia — não um livro por mês'],
   'Viagem':['Reservar hotel assim que a data fecha','Fechar o orçamento antes de ir e lançar no centro de custo','Checar validade de passaporte e visto 6 meses antes'],
 };
+const GRUPOS_GUIA={planos:['gu-norte','gu-metas','gu-plano','gu-plano-ed'],familia:['gu-rituais','gu-rituais-ed','gu-pessoas','gu-paraeles','gu-protecao'],cadastros:['gu-empresas','gu-bancos'],desenvolvimento:['gu-roda','gu-comport','gu-pdi','gu-livros','gu-dash']};
+function grupoGuia(id){return Object.keys(GRUPOS_GUIA).find(k=>GRUPOS_GUIA[k].includes(id))||'resumo'}
+function abaEstrategia(id){return ({'es-dados':'identidade','es-identidade':'identidade','es-campo':'equipe','es-balanco':'balanco','es-arquivos':'balanco'})[id]||'plano'}
+function abasWorkspace(m,prefixo,opcoes,selecionada,mudar){
+  const nav=el('<nav class="workspace-tabs" aria-label="Áreas desta página"></nav>'),paineis={};
+  opcoes.forEach(([id,nome])=>{
+    const b=acao(nome,()=>{selecionar(id);mudar(id)},'ghost');b.dataset.view=id;
+    b.id=prefixo+'-aba-'+id;b.setAttribute('aria-controls',prefixo+'-'+id);nav.appendChild(b);
+    const p=el(`<section id="${prefixo}-${id}" class="workspace-pane" aria-labelledby="${b.id}"></section>`);paineis[id]=p;
+  });
+  function selecionar(id){if(!paineis[id])id=opcoes[0][0];Object.entries(paineis).forEach(([k,p])=>{p.hidden=k!==id;nav.querySelector('[data-view="'+k+'"]').setAttribute('aria-pressed',String(k===id))})}
+  m.appendChild(nav);Object.values(paineis).forEach(p=>m.appendChild(p));selecionar(selecionada);
+  return {paineis,selecionar};
+}
+function abrirSecaoWorkspace(b){b.classList.remove('fechado');b.querySelector('header')?.setAttribute('aria-expanded','true')}
+function tituloWorkspace(t,s){return el(`<div class="workspace-heading"><h2>${esc(t)}</h2>${s?'<p>'+esc(s)+'</p>':''}</div>`)}
+function organizarGuia(m,atrasoRitual){
+  m.classList.add('workspace-layout','guia-workspace');
+  const painel=m.querySelector('.painel'),botoes=[...painel.querySelectorAll('button')];
+  const topo=m.querySelector('.topo');topo.appendChild(botoes[0]);painel.remove();
+  m.querySelector(':scope > .grade')?.remove();m.querySelector('[data-bid="gu-sug"]')?.remove();
+  const partes=[...m.querySelectorAll(':scope > [data-bid]')];
+  const gu=abasWorkspace(m,'guia',[['resumo','Visão geral'],['planos','Meus planos'],['familia','Família'],['cadastros','Cadastros'],['desenvolvimento','Desenvolvimento']],filtro.guiaAba||'resumo',v=>filtro.guiaAba=v);
+  m.querySelectorAll(':scope > .guia-aviso-bancos').forEach(a=>m.querySelector('[data-bid="gu-bancos"] .conteudo').prepend(a));
+  const textos={planos:['Meus planos','Propósito, metas e planejamento pessoal de cada ano.'],familia:['Pessoas que importam','Relações, momentos e informações para cuidar da família.'],cadastros:['Empresas e contas','Uma base única, também usada no planejamento das empresas.'],desenvolvimento:['Meu desenvolvimento','Equilíbrio, habilidades e aprendizados para acompanhar.']};
+  Object.entries(textos).forEach(([k,[t,s]])=>gu.paineis[k].appendChild(tituloWorkspace(t,s)));
+  const acoes=el('<div class="workspace-actions"></div>');botoes.slice(1,5).forEach(b=>acoes.appendChild(b));gu.paineis.familia.appendChild(acoes);
+  partes.forEach(b=>gu.paineis[grupoGuia(b.dataset.bid)].appendChild(b));
+  // Os editores ficam junto do conteúdo que alteram, em vez de repetir seções na página.
+  for(const [resumo,ed,rotulo] of [['gu-rituais','gu-rituais-ed','Editar rituais'],['gu-plano','gu-plano-ed','Editar objetivos do ano']]){
+    const a=m.querySelector('[data-bid="'+resumo+'"]'),b=m.querySelector('[data-bid="'+ed+'"]');
+    if(a&&b){const d=el('<details class="workspace-editor"><summary>'+rotulo+'</summary></details>');d.appendChild(b);a.querySelector('.conteudo').appendChild(d);abrirSecaoWorkspace(b)}
+  }
+  for(const id of ['gu-metas','gu-pessoas','gu-empresas','gu-roda']){const b=m.querySelector('[data-bid="'+id+'"]');if(b)abrirSecaoWorkspace(b)}
+  const resumo=gu.paineis.resumo,metas=E.metas.filter(x=>x.status!=='Concluída'),rituais=E.rituais.filter(x=>(atrasoRitual(x)??-1)>0);
+  const ir=id=>{abreBloco(id);rr('guia')()};
+  const hero=el(`<div class="workspace-hero"><div><span class="workspace-eyebrow">SEU ESPAÇO PESSOAL</span><h2>Mais clareza para o que importa.</h2><p>${esc(E.norte.proposito||'Organize seus objetivos, cuide das relações e acompanhe seus próximos passos.')}</p></div></div>`);
+  hero.appendChild(acao(E.norte.proposito?'Revisar meu norte':'Definir meu norte',()=>ir('gu-norte'),'ghost'));resumo.appendChild(hero);
+  resumo.appendChild(ligaKpis(el(`<div class="grade workspace-metrics">${kpi('Metas em aberto',metas.length,'ver próximos passos',null,'metas')}${kpi('Rituais para retomar',rituais.length,'cuidar das relações',rituais.length?'a':'','rituais')}${kpi('Minha gente',E.pessoas.length,'pessoas cadastradas',null,'pessoas')}${kpi('Em desenvolvimento',E.pdi.filter(x=>x.status!=='Dominado').length,'habilidades e aprendizado',null,'pdi')}</div>`),{metas:()=>ir('gu-metas'),rituais:()=>ir('gu-rituais'),pessoas:()=>ir('gu-pessoas'),pdi:()=>ir('gu-pdi')}));
+  const col=el('<div class="workspace-columns"></div>');
+  const objetivos=el('<section class="workspace-card"><h2>Seus próximos passos</h2><p class="workspace-note">Metas abertas, com os prazos mais próximos primeiro.</p></section>');
+  [...metas].sort((a,b)=>(a.prazo||'9999').localeCompare(b.prazo||'9999')).slice(0,4).forEach(x=>{
+    const b=el(`<button class="workspace-row"><span><b>${esc(x.meta||'Meta sem título')}</b><small>${esc(x.area||'Pessoal')} · ${x.prazo?fmtDataAno(x.prazo):'Sem prazo definido'}</small></span><span aria-hidden="true">→</span></button>`);b.onclick=()=>modalMeta(x);objetivos.appendChild(b)});
+  if(!metas.length)objetivos.appendChild(el('<p class="vazio">Escolha uma meta que faça diferença para você e registre o primeiro passo.</p>'));
+  objetivos.appendChild(acao('Ver minhas metas',()=>ir('gu-metas'),'ghost'));col.appendChild(objetivos);
+  const rel=el('<section class="workspace-card"><h2>Cuidar e organizar</h2><p class="workspace-note">Acessos aos assuntos do seu dia a dia.</p></section>');
+  [['Família e momentos',rituais.length?rituais.length+' ritual(is) para retomar':'Pessoas, rituais e ideias para viver juntos',()=>ir('gu-pessoas')],['Documentos','Arquivos e vencimentos da família',()=>irTela('documentos')],['Planejamento das empresas','Planos anuais a partir de 2027',()=>irTela('estrategia')]].forEach(([t,s,fn])=>{
+    const b=el(`<button class="workspace-row"><span><b>${t}</b><small>${s}</small></span><span aria-hidden="true">→</span></button>`);b.onclick=fn;rel.appendChild(b)});
+  col.appendChild(rel);resumo.appendChild(col);
+}
+
 function vGuia(m) {
   const r = rr('guia');
   const feitas = E.metas.filter(x => x.status === 'Concluída').length;
@@ -8594,15 +8674,15 @@ function vGuia(m) {
   m.appendChild(painel(
     acao('+ Meta', () => { const x = { id: uid(), meta: '', area: CFG('areasMeta')[0], horizonte: CFG('horizonteMeta')[0], prazo: '', status: 'Aberta', obs: '', passos: [] }; E.metas.push(x); salvar(); modalMeta(x) }),
     acao('+ Pessoa', () => { const p = { id: uid(), nome: '', relacao: CFG('relacoes')[0], nascimento: '', gosta: '', obs: '' }; E.pessoas.push(p); salvar(); modalPessoa(p) }, 'ghost'),
-    acao('+ Ideia para eles', () => { E.paraEles.push({ id: uid(), pessoa: '', tipo: CFG('tiposParaEles')[0], oque: '', quando: '', status: 'Ideia' }); salvar(); r() }, 'ghost'),
-    acao('+ Ritual', () => { E.rituais.push({ id: uid(), ritual: '', comQuem: '', frequencia: 'Mensal', ultima: '', obs: '' }); salvar(); r() }, 'ghost'),
+    acao('+ Ideia para eles', () => { E.paraEles.push({ id: uid(), pessoa: '', tipo: CFG('tiposParaEles')[0], oque: '', quando: '', status: 'Ideia' }); salvar(); abreBloco('gu-paraeles'); r() }, 'ghost'),
+    acao('+ Ritual', () => { E.rituais.push({ id: uid(), ritual: '', comQuem: '', frequencia: 'Mensal', ultima: '', obs: '' }); salvar(); abreBloco('gu-rituais-ed'); r() }, 'ghost'),
     acao('📁 Se algo acontecer comigo', () => modalInstrucoes(), 'ghost'), '|'));
 
   /* ---- 1. MEU NORTE — depois de escrito, fica fixo no topo ---- */
   const N = E.norte, temNorte = ['proposito', 'valores', 'legado'].some(k => String(N[k] || '').trim());
   if (temNorte && !filtro.editandoNorte) {
     // vira uma placa para ler, não um formulário para preencher
-    const nf = el(`<div style="background:linear-gradient(180deg,var(--areia-cl),var(--bg));border:1px solid var(--areia);
+    const nf = el(`<div data-bid="gu-norte" class="guia-norte" style="background:linear-gradient(180deg,var(--areia-cl),var(--bg));border:1px solid var(--areia);
       border-radius:14px;padding:20px 22px;margin-bottom:20px;position:relative">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--suave);margin-bottom:12px">🧭 Meu norte</div>
       ${N.proposito ? `<div style="font-size:16.5px;line-height:1.5;font-weight:600;margin-bottom:14px">${esc(N.proposito)}</div>` : ''}
@@ -8764,7 +8844,7 @@ function vGuia(m) {
     '', E.empresasPJ));
 
   /* ---- 7b. BANCOS E PIX ---- */
-  const bc = el('<div></div>');
+  const bc = el('<div class="guia-aviso-bancos"></div>');
   bc.appendChild(el(`<div class="aviso" style="margin:0 0 4px">🔐 <b>Aqui não vai senha.</b>
     Chave PIX, agência e conta ajudam a família a achar o dinheiro. Senha fica no gerenciador de senhas —
     escreva só <i>onde</i> encontrar, nunca a senha em si.</div>`));
@@ -8879,7 +8959,7 @@ function vGuia(m) {
   }
   pl.insertBefore(selAno, pl.firstChild);
 
-  m.appendChild(bloco('gu-plano', '📆 Planejamento estratégico', 'os anos decididos agora, não em janeiro', pl));
+  m.appendChild(bloco('gu-plano', '📆 Plano pessoal do ano', 'metas pessoais, separadas por ano', pl));
   m.appendChild(tabelaBloco('gu-plano-ed', 'Editar o plano de ' + anoPlan, 'uma linha por objetivo',
     doPlano, [
       { k: 'area', t: 'Área', tipo: 'select', opcoes: CFG('areasMeta'), w: 150 },
@@ -8964,34 +9044,9 @@ function vGuia(m) {
     ], () => ({ titulo: '', autor: '', area: CFG('areasPDI')[0], status: 'Quero ler', nota: '', oQueFicou: '' }), r,
     '', E.livros));
 
-  /* ---- números ---- */
-  m.appendChild(el(`<div class="grade">
-    ${kpi('Empresas', ativasPJ, E.empresasPJ.length > ativasPJ ? (E.empresasPJ.length - ativasPJ) + ' baixada(s)' : 'ativas')}
-    ${kpi('Contas', E.bancos.length, E.bancos.filter(x => String(x.pix || '').trim()).length + ' com PIX')}
-    ${kpi('Planejamento', doPlano.length ? feitosP + '/' + doPlano.length : '—', doPlano.length ? 'feitos em ' + anoPlan : 'nada escrito em ' + anoPlan, doPlano.length && feitosP === doPlano.length ? 'v' : 'a')}
-    ${kpi('PDI', pdiAb, 'habilidades em desenvolvimento', pdiAb ? 'a' : 'v')}
-    ${kpi('Livros lidos', lidos, E.livros.filter(x => x.status === 'Quero ler').length + ' na fila')}
-    ${kpi('Proteção', prontos + '/' + PROTECAO.length, prontos === PROTECAO.length ? 'tudo resolvido' : 'itens no papel', prontos === PROTECAO.length ? 'v' : 'r')}
-    ${kpi('Metas', E.metas.length, feitas + ' concluída(s)')}
-    ${kpi('Progresso', E.metas.length ? Math.round(feitas / E.metas.length * 100) + '%' : '—', 'do que você definiu', 'v')}
-    ${kpi('Roda da vida', media ? media.toFixed(1) : '—', media ? 'média das áreas' : 'dê as notas acima', media >= 7 ? 'v' : media ? 'a' : '')}
-    ${kpi('Rituais atrasados', E.rituais.filter(x => (atrasoRitual(x) ?? -1) > 0).length, 'reencontre essa gente', 'a')}
-    ${kpi('Minha gente', E.pessoas.length, 'cadastrados')}
-    ${kpi('Para eles', pend, 'ideias pendentes', 'a')}</div>`));
-  if (media > 0) m.appendChild(bloco('gu-dash', 'Como está cada área', '', graficoEl(gBarras(
-    AR.map(a => ({ r: a, v: +(E.roda[a] || 0) })), { fmt: v => String(v), alt: 130 }))));
-
-  /* ---- sugestões ---- */
-  const s = el('<div class="corpo"></div>');
-  s.innerHTML = `<div class="lista-sug">
-    <div class="sug"><b>🆘 Ficha de emergência</b><p>Em Saúde. Tipo sanguíneo, alergias e quem avisar — imprimível. Você viaja demais para não ter isso.</p></div>
-    <div class="sug"><b>📁 Se algo acontecer comigo</b><p>No botão acima: onde está o dinheiro, os seguros, os documentos e o que a Pya precisa saber. É o maior presente que se deixa.</p></div>
-    <div class="sug"><b>🎫 Milhas e fidelidade</b><p>Você voou LATAM, GOL e AZUL só neste ano. Anotar saldo e status pode virar passagem de graça.</p></div>
-    <div class="sug"><b>📊 Retorno por viagem</b><p>A Canton Fair custou R$ 60 mil. Anote o que ela trouxe — decide o ano que vem.</p></div>
-    <div class="sug"><b>💰 Saldo por banco</b><p>Em Rendimentos falta o quanto está aplicado em cada banco. Sem isso dá pra ver quem rendeu mais em reais, mas não quem rendeu melhor.</p></div>
-    <div class="sug"><b>🛡️ Reserva de emergência</b><p>Marque seus gastos essenciais e eu calculo quantos meses você aguenta sem fechar negócio nenhum.</p></div>
-  </div>`;
-  m.appendChild(bloco('gu-sug', '💡 Pontos para revisar', 'com base nos registros do painel', s));
+  if(media>0)m.appendChild(bloco('gu-dash','Como está cada área','',graficoEl(gBarras(
+    AR.map(a=>({r:a,v:+(E.roda[a]||0)})),{fmt:v=>String(v),alt:130}))));
+  organizarGuia(m,atrasoRitual);
 }
 
 // pessoa com anexo de documentos
@@ -9615,9 +9670,15 @@ function validarBackup(j){
       if(!Array.isArray(j[k])||j[k].some(x=>k==='obraM2Fora'?typeof x!=='string':(!x||typeof x!=='object'||Array.isArray(x))))throw new Error('Lista inválida: '+k);
     }else if(v&&typeof v==='object'&&(!j[k]||typeof j[k]!=='object'||Array.isArray(j[k])))throw new Error('Seção inválida: '+k);
   }
-  const listasInternas={viagens:['custos','passagens','hoteis','tickets','roteiro','lugares'],metas:['passos'],oportunidades:['links']};
+  const listasInternas={viagens:['custos','passagens','hoteis','tickets','roteiro','lugares'],metas:['passos'],oportunidades:['links'],planejamentoEmpresas:['objetivos','valores','zonas','pecas']};
   for(const [col,camposLista] of Object.entries(listasInternas))for(const x of j[col]||[])for(const k of camposLista){
     if(x[k]!==undefined&&(!Array.isArray(x[k])||x[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))throw new Error('Lista inválida: '+col+'.'+k);
+  }
+  const chavesPlano=new Set();
+  for(const p of j.planejamentoEmpresas||[]){
+    if(!p.id||!p.empresaId||!Number.isInteger(p.ano)||p.ano<2027||p.ano>2200)throw new Error('Empresa ou ano inválido no planejamento.');
+    const chave=p.empresaId+':'+p.ano;if(chavesPlano.has(chave))throw new Error('Planejamento duplicado para a mesma empresa e ano.');chavesPlano.add(chave);
+    for(const o of p.objetivos||[])if(o.acoes!==undefined&&(!Array.isArray(o.acoes)||o.acoes.some(a=>!a||typeof a!=='object'||Array.isArray(a))))throw new Error('Lista inválida: planejamentoEmpresas.objetivos.acoes');
   }
   return j;
 }
