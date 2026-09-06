@@ -243,7 +243,7 @@ tr:hover .lixo{opacity:1}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css?v=2d4ddd254aa3">
+<link rel="stylesheet" href="./refinamento.css?v=3468fc9ca399">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -5821,25 +5821,13 @@ function modalPassagensGmail(grupos){
   });
 }
 
-/* ===================== GESTÃO ESTRATÉGICA =====================
-   Três camadas, na ordem em que uma sustenta a outra:
-
-   1. QUEM SOMOS   — missão, visão e valores. Serve para decidir quando não há
-                     regra: é o que sobra quando o manual não cobre o caso.
-   2. PARA ONDE    — objetivos, e ao lado de cada um as AÇÕES. Objetivo sem ação
-                     é desejo; ação sem objetivo é agitação.
-   3. COM QUEM     — o campo tático. NÃO é organograma: organograma responde
-                     "quem manda em quem", e essa não é a pergunta de quem está
-                     montando um time. As perguntas aqui são: que frentes eu
-                     tenho, quem está em cada uma, quem é insubstituível, e onde
-                     está o buraco. As peças se movem entre as frentes até a
-                     formação fazer sentido. */
+/* Planejamento anual por empresa: direção, objetivos, execução e resultados. */
 
 const ZONAS_PADRAO=[
-  {id:'z1',nome:'Frente de ataque',dica:'quem traz cliente e receita'},
-  {id:'z2',nome:'Entrega',dica:'quem faz o que foi vendido'},
-  {id:'z3',nome:'Retaguarda',dica:'financeiro, compras, administrativo'},
-  {id:'z4',nome:'Reserva',dica:'quem pode entrar, quem está em formação'},
+  {id:'z1',nome:'Comercial',dica:'Clientes, vendas e receita'},
+  {id:'z2',nome:'Operação',dica:'Entrega, qualidade e atendimento'},
+  {id:'z3',nome:'Administrativo',dica:'Finanças, compras e suporte'},
+  {id:'z4',nome:'Desenvolvimento',dica:'Formação e novas responsabilidades'},
 ];
 const STATUS_ACAO=['A fazer','Fazendo','Feita','Travada'];
 
@@ -5890,7 +5878,8 @@ function criarPlanoEmpresa(empresaId,ano,baseId=''){
     pecas:structuredClone(base?.pecas||[]),balanco:'',aprendizados:'',baseId:base?.id||''};
   const zonas=new Map();p.zonas.forEach(z=>{const anterior=z.id;z.id=uid();zonas.set(anterior,z.id)});
   p.pecas.forEach(x=>{x.id=uid();x.zona=zonas.get(x.zona)||p.zonas[0]?.id||''});
-  p.objetivos.forEach(o=>{o.id=uid();o.ate='';o.acoes=(o.acoes||[]).map(a=>({...a,id:uid(),ate:'',status:'A fazer',travaPor:''}))});
+  for(const k of ['diagnostico','forcas','fragilidades','oportunidades','ameacas','posicionamento','naoFazer'])p[k]=base?.[k]||'';
+  p.objetivos.forEach(o=>{o.id=uid();o.ate='';o.resultado='';o.resultadoEm='';o.acoes=(o.acoes||[]).map(a=>({...a,id:uid(),ate:'',status:'A fazer',travaPor:''}))});
   E.planejamentoEmpresas.push(p);salvar();return p;
 }
 function planosParaAgenda(){
@@ -5915,67 +5904,74 @@ function modalAnoEmpresa(emp){
     form.onsubmit=e=>{e.preventDefault();try{
       const ano=form.querySelector('[name="ano"]').value;
       const p=criarPlanoEmpresa(emp.id,ano,form.querySelector('[name="base"]').value);
-      filtro.estrEmpresaId=emp.id;filtro.estrPlano=p.id;filtro.estrAba='plano';fechar();
+      filtro.estrEmpresaId=emp.id;filtro.estrPlano=p.id;filtro.estrAba='resumo';fechar();
     }catch(err){erro.textContent=err.message}};
     box.appendChild(form);c.appendChild(box);
   },rr('estrategia'));
 }
 
 function prepararEstrategia(m){
-  m.classList.add('workspace-layout','estrategia-workspace');
+  m.classList.add('workspace-layout','estrategia-workspace','strategy-desk');
   if(migrarPlanejamento(E))salvar();
   const empresas=empresasPlanejamento();
-  const topo=cab('Planejamento estratégico','Um plano por empresa e ano. Histórico preservado a partir de 2027.');m.appendChild(topo);
+  const topo=cab('Planejamento estratégico','Direção clara. Prioridades definidas. Execução acompanhada.');m.appendChild(topo);
   if(!empresas.length){
-    const vazio=el('<div class="workspace-empty"><h2>Qual empresa vamos planejar?</h2><p>Cadastre a empresa uma vez e organize objetivos, ações e resultados de cada ano.</p></div>');
+    const vazio=el('<div class="workspace-empty"><h2>Comece pela sua empresa</h2><p>Cadastre uma empresa para organizar o planejamento anual, de 2027 em diante.</p></div>');
     vazio.appendChild(acao('Cadastrar empresa',()=>{abreBloco('gu-empresas');irTela('guia')}));m.appendChild(vazio);return null;
   }
   const emp=empresas.find(e=>e.id===filtro.estrEmpresaId)||empresas[0];filtro.estrEmpresaId=emp.id;
   const planos=(E.planejamentoEmpresas||[]).filter(p=>p.empresaId===emp.id).sort((a,b)=>b.ano-a.ano);
   const est=planos.find(p=>p.id===filtro.estrPlano)||planos.find(p=>p.ano===Math.max(2027,+hoje().slice(0,4)))||planos[0];
   filtro.estrPlano=est?.id||'';
-  const filtros=el('<div class="workspace-filters strategy-filters"></div>');
-  const campo=(nome,select)=>{const label=el('<label>'+nome+'</label>');label.appendChild(select);filtros.appendChild(label)};
-  campo('Empresa',seletor(emp.id,empresas.map(e=>[e.id,e.nome+(['Baixada','Histórico'].includes(e.status)?' · '+e.status:'')]),v=>{filtro.estrEmpresaId=v;filtro.estrPlano='';rr('estrategia')()},'Empresa do planejamento'));
-  if(planos.length)campo('Ano / histórico',seletor(est.id,planos.map(p=>[p.id,p.ano+(p.encerrado?' · Encerrado':' · Em elaboração')]),v=>{filtro.estrPlano=v;rr('estrategia')()},'Ano do planejamento da empresa'));
-  filtros.appendChild(acao('+ Novo ano',()=>modalAnoEmpresa(emp),'ghost'));m.appendChild(filtros);
+  const contexto=el('<div class="strategy-context"></div>');
+  const campo=(nome,select)=>{const label=el('<label>'+nome+'</label>');label.appendChild(select);contexto.appendChild(label)};
+  campo('Empresa',seletor(emp.id,empresas.map(e=>[e.id,e.nome+(['Baixada','Histórico'].includes(e.status)?' · '+e.status:'')]),v=>{filtro.estrEmpresaId=v;filtro.estrPlano='';filtro.estrObjetivo='';rr('estrategia')()},'Empresa do planejamento'));
+  if(est)campo('Planejamento anual',seletor(est.id,planos.map(p=>[p.id,p.ano+(p.encerrado?' · Encerrado':'')]),v=>{filtro.estrPlano=v;filtro.estrObjetivo='';rr('estrategia')()},'Ano do planejamento da empresa'));
+  const fim=el('<div class="strategy-context-actions"></div>');
+  if(est)fim.appendChild(el('<span class="strategy-badge">'+(est.encerrado?'Encerrado · consulta':'Em elaboração')+'</span>'));
+  fim.appendChild(acao('Novo ano',()=>modalAnoEmpresa(emp),'ghost'));contexto.appendChild(fim);m.appendChild(contexto);
   if(!est){
-    const vazio=el(`<div class="workspace-hero"><div><span class="workspace-eyebrow">PLANEJAMENTO ANUAL</span><h2>${esc(emp.nome)} · 2027</h2><p>Comece pelas prioridades da empresa. Depois, defina indicadores, responsáveis e prazos. Cada novo ano terá seu próprio plano.</p></div></div>`);
-    vazio.appendChild(acao('Criar planejamento',()=>modalAnoEmpresa(emp)));m.appendChild(vazio);return null;
+    const vazio=el(`<section class="strategy-start"><span class="strategy-kicker">SEU PRÓXIMO CICLO</span><h2>O próximo capítulo da<br>${esc(emp.nome)}.</h2><p>Transforme a direção da empresa em objetivos, ações e resultados. Cada ano terá seu próprio planejamento e histórico.</p><ol><li><b>01</b><span>Defina a direção<small>Missão, visão e valores</small></span></li><li><b>02</b><span>Escolha as prioridades<small>Objetivos e indicadores</small></span></li><li><b>03</b><span>Organize a execução<small>Equipe, ações e prazos</small></span></li></ol><div class="strategy-start-action"></div><small>Planejamentos a partir de 2027 · Apresentação em PDF</small></section>`);
+    vazio.querySelector('.strategy-start-action').appendChild(acao('Criar primeiro planejamento',()=>modalAnoEmpresa(emp)));m.appendChild(vazio);return null;
   }
-  normalizarPlano(est);
-  topo.appendChild(acao('Exportar PDF',()=>exportarPlanoPDF(emp,est),'ghost'));
-  const hero=el(`<div class="workspace-hero strategy-hero"><div><span class="workspace-eyebrow">${est.encerrado?'PLANO ENCERRADO':'PLANO EM ELABORAÇÃO'}</span><h2>${esc(emp.nome)} <span class="strategy-year">${est.ano}</span></h2><p>${est.encerrado?'Conteúdo guardado para consulta. Reabra o plano se precisar corrigir alguma informação.':'Defina a direção, acompanhe as ações e registre os resultados do ano.'}</p></div></div>`);
-  hero.appendChild(acao(est.encerrado?'Reabrir plano':'Encerrar plano',()=>{
-    if(!confirm((est.encerrado?'Reabrir':'Encerrar')+' o planejamento de '+emp.nome+' / '+est.ano+'? '+(est.encerrado?'A edição será liberada.':'Ele ficará protegido para consulta e poderá ser reaberto.')))return;
-    est.encerrado=!est.encerrado;salvar();rr('estrategia')();
-  },'ghost'));m.appendChild(hero);
+  normalizarPlano(est);topo.appendChild(acao('Exportar PDF',()=>exportarPlanoPDF(emp,est),'ghost'));
   return {emp,est};
 }
-function organizarEstrategia(m,emp,est){
-  const partes=[...m.querySelectorAll(':scope > [data-bid]')];
-  const avisosEquipe=[...m.querySelectorAll(':scope > .aviso')];
-  const hero=m.querySelector('.strategy-hero'),resumo=m.querySelector('.workspace-metrics');
-  const ui=abasWorkspace(m,'estr',[['plano','Objetivos e ações'],['identidade','Direção e empresa'],['equipe','Equipe'],['balanco','Resultados e arquivos']],filtro.estrAba||'plano',v=>filtro.estrAba=v);
-  if(resumo)ui.paineis.plano.appendChild(resumo);
-  const status=el('<p class="strategy-status">'+est.ano+' · '+(est.encerrado?'Plano encerrado · consulta':'Em elaboração · alterações salvas automaticamente')+'</p>');m.querySelector('.strategy-filters').after(status);
-  avisosEquipe.forEach(a=>ui.paineis.equipe.appendChild(a));
-  const editores={};Object.entries(ui.paineis).forEach(([k,p])=>{
-    const fieldset=el('<fieldset class="strategy-content"></fieldset>');if(est.encerrado&&k!=='empresa')fieldset.disabled=true;p.appendChild(fieldset);editores[k]=fieldset;
-  });
-  partes.forEach(b=>{editores[abaEstrategia(b.dataset.bid)].appendChild(b);abrirSecaoWorkspace(b)});
-  const identidade=m.querySelector('[data-bid="es-identidade"]');if(identidade)editores.identidade.prepend(identidade);
-  const balanco=el('<div class="corpo"></div>');balanco.appendChild(campos(est,[
-    {k:'balanco',t:'Resultados do ano',tipo:'textarea',full:true,ph:'O que foi alcançado? Compare os resultados com os indicadores definidos.'},
-    {k:'aprendizados',t:'Aprendizados e decisões para o próximo ano',tipo:'textarea',full:true,ph:'O que manter, melhorar ou deixar de fazer?'}]));
-  const b=bloco('es-balanco','Balanço do ano','guarde o resultado junto do plano',balanco);abrirSecaoWorkspace(b);editores.balanco.appendChild(b);
-  const arquivos=el('<div class="corpo"></div>');arquivos.appendChild(areaArquivos('planejamento:'+est.id,'Anexar planejamento, planilha ou apresentação deste ano',!!est.encerrado));
-  const a=bloco('es-arquivos','Arquivos de '+est.ano,'anexos exclusivos deste plano',arquivos);abrirSecaoWorkspace(a);
-  // Arquivos continuam acessíveis em anos encerrados; os controles de escrita são desabilitados.
-  ui.paineis.balanco.appendChild(a);
-  if(est.encerrado){a.classList.add('strategy-files-closed');a.querySelectorAll('input,button.solta').forEach(x=>x.disabled=true)}
-  if(hero){const encerrar=hero.querySelector('button');const rodape=el('<div class="workspace-card strategy-close"><h2>'+(est.encerrado?'Ano encerrado':'Concluir este planejamento')+'</h2><p class="workspace-note">'+(est.encerrado?'Reabra este ano para corrigir ou complementar o conteúdo.':'Ao encerrar, o conteúdo fica protegido para consulta. Você poderá reabrir quando precisar.')+'</p></div>');rodape.appendChild(encerrar);ui.paineis.balanco.appendChild(rodape);hero.remove()}
+
+function resumoEstrategia(est){
+  const objetivos=est.objetivos||[],acoes=objetivos.flatMap(o=>(o.acoes||[]).map(a=>({a,o})));
+  const feitas=acoes.filter(x=>x.a.status==='Feita'),abertas=acoes.filter(x=>x.a.status!=='Feita');
+  const atrasadas=abertas.filter(x=>x.a.ate&&x.a.ate<hoje()),travadas=abertas.filter(x=>x.a.status==='Travada');
+  const semQuem=abertas.filter(x=>!String(x.a.quem||'').trim()),semPrazo=abertas.filter(x=>!x.a.ate);
+  return {objetivos,acoes,feitas,abertas,atrasadas,travadas,semQuem,semPrazo,pct:acoes.length?Math.round(feitas.length/acoes.length*100):0};
 }
+function situacaoObjetivo(o){
+  const a=o.acoes||[],abertas=a.filter(x=>x.status!=='Feita');
+  if(!a.length)return ['Sem ações','neutral'];
+  if(!abertas.length)return ['Ações concluídas','done'];
+  if(abertas.some(x=>x.status==='Travada'))return ['Ação bloqueada','attention'];
+  if(abertas.some(x=>x.ate&&x.ate<hoje())||(o.ate&&o.ate<hoje()))return ['Prazo vencido','attention'];
+  if(a.some(x=>['Fazendo','Feita'].includes(x.status)))return ['Em andamento','active'];
+  return ['A iniciar','neutral'];
+}
+function formularioEstrategia(c,obj,defs,rotulo,gravar){
+  const form=el('<form class="strategy-form"></form>');
+  defs.forEach(d=>{
+    const label=el('<label'+(d.full?' class="full"':'')+'><span>'+esc(d.t)+'</span></label>');
+    let input;
+    if(d.tipo==='select')input=seletor(obj[d.k]??'',d.opcoes,()=>{},d.t);
+    else {input=el(d.tipo==='textarea'?'<textarea rows="4"></textarea>':'<input type="'+(d.tipo||'text')+'">');input.value=obj[d.k]??''}
+    input.name=d.k;if(d.req)input.required=true;if(d.ph)input.placeholder=d.ph;
+    if(d.tipo!=='select'&&d.tipo!=='date')input.maxLength=20000;
+    label.appendChild(input);form.appendChild(label);
+  });
+  const erro=el('<p class="strategy-form-error full" role="alert"></p>');form.appendChild(erro);
+  const rodape=el('<div class="strategy-form-footer full"><span>As alterações são guardadas ao salvar.</span><button type="submit" class="btn">'+esc(rotulo)+'</button></div>');form.appendChild(rodape);
+  form.onsubmit=e=>{e.preventDefault();const dados={};for(const d of defs){dados[d.k]=form.querySelector('[name="'+d.k+'"]').value.trim();if(d.req&&!dados[d.k]){erro.textContent='Preencha '+d.t.toLowerCase()+'.';return}}
+    try{gravar(dados)}catch(err){erro.textContent=err.message}};
+  c.appendChild(form);return form;
+}
+
 
 function htmlPlanoApresentacao(emp,plano){
   const p=structuredClone(plano),paginas=[];
@@ -5984,7 +5980,7 @@ function htmlPlanoApresentacao(emp,plano){
   const logo=document.querySelector('.logo-pessoal')?.getAttribute('src')||'./assets/logo-leonardo-goncalves.png';
   const pagina=(nome,conteudo,cls='')=>paginas.push(`<section class="slide ${cls}"><header><img src="${esc(logo)}" alt="Leonardo Gonçalves" width="210" height="41"><span>${esc(emp.nome)} · ${p.ano}</span></header><h2>${esc(nome)}</h2>${conteudo}<footer>Planejamento estratégico · ${p.ano}<span>${paginas.length+1}</span></footer></section>`);
   const acoes=(p.objetivos||[]).flatMap(o=>o.acoes||[]),feitas=acoes.filter(a=>a.status==='Feita').length;
-  pagina('Planejamento estratégico',`<div class="cover"><p class="year">${p.ano}</p><h1>${esc(emp.nome)}</h1><p>Direção, prioridades e execução</p><div class="metrics"><div><b>${(p.objetivos||[]).length}</b> objetivos</div><div><b>${acoes.length}</b> ações</div><div><b>${feitas}</b> concluídas</div></div><p class="muted">${p.encerrado?'Plano encerrado':'Plano em elaboração'} · Exportado em ${fmtDataAno(hoje())}</p></div>`,'cover-slide');
+  pagina('Planejamento estratégico',`<div class="cover"><p class="year">${p.ano}</p><h1>${esc(emp.nome)}</h1><p>Direção, prioridades e execução</p><div class="metrics"><div><b>${(p.objetivos||[]).length}</b> ${(p.objetivos||[]).length===1?'objetivo':'objetivos'}</div><div><b>${acoes.length}</b> ${acoes.length===1?'ação':'ações'}</div><div><b>${feitas}</b> concluídas</div></div><p class="muted">${p.encerrado?'Plano encerrado':'Plano em elaboração'} · Exportado em ${fmtDataAno(hoje())}</p></div>`,'cover-slide');
   function narrativas(t,campos){
     let conteudo='',peso=0,numero=0;
     const emitir=()=>{if(!conteudo)return;pagina(t+(numero?' · continuação':''),conteudo);conteudo='';peso=0;numero++};
@@ -5995,6 +5991,7 @@ function htmlPlanoApresentacao(emp,plano){
       while(restante.length){
         let limite=Math.min(700,restante.length),quebras=0;
         for(let j=0;j<limite;j++)if(restante[j]==='\n'&&++quebras===10){limite=j+1;break}
+        if(limite<restante.length&&!/\s/.test(restante[limite-1])){const espaco=restante.slice(0,limite).lastIndexOf(' ');if(espaco>limite/2)limite=espaco+1}
         const parte=restante.slice(0,limite),custo=parte.length+(parte.match(/\n/g)||[]).length*65+180;
         if(peso+custo>960)emitir();
         conteudo+=`<div class="story"><h3>${esc(rotulo)}${i?' · continuação':''}</h3><p>${texto(parte)}</p></div>`;
@@ -6004,13 +6001,14 @@ function htmlPlanoApresentacao(emp,plano){
     emitir();
   }
   narrativas('Direção da empresa',[['Missão',p.missao],['Visão',p.visao]]);
+  const contexto=[['Cenário atual',p.diagnostico],['Forças',p.forcas],['Pontos a melhorar',p.fragilidades],['Oportunidades',p.oportunidades],['Riscos externos',p.ameacas],['Valor para o cliente',p.posicionamento],['Fora das prioridades',p.naoFazer]].filter(([,v])=>v);if(contexto.length)narrativas('Diagnóstico e escolhas',contexto);
   if((p.valores||[]).length)narrativas('Valores',(p.valores||[]).map(v=>[v.titulo||'Valor',v.oque||'']));
   (p.objetivos||[]).forEach((o,i)=>{
-    narrativas('Objetivo '+(i+1),[['Objetivo',o.titulo],...(o.porque?[['Por que importa',o.porque]]:[]),['Indicador e prazo',(o.indicador||'Indicador não definido')+'\nPrazo: '+(o.ate?fmtDataAno(o.ate):'Não definido')]]);
+    narrativas('Objetivo '+(i+1),[['Objetivo',o.titulo],...(o.porque?[['Por que importa',o.porque]]:[]),['Indicador e prazo',(o.indicador||'Indicador não definido')+'\nPrazo: '+(o.ate?fmtDataAno(o.ate):'Não definido')],...(o.meta?[['Meta esperada',o.meta]]:[]),...(o.resultado?[['Resultado registrado',o.resultado+(o.resultadoEm?'\nVerificado em '+fmtDataAno(o.resultadoEm):'')]]:[])]);
     (o.acoes||[]).forEach((a,j)=>narrativas('Objetivo '+(i+1)+' · Ação '+(j+1),[['Próximo passo',a.oque],['Execução','Responsável: '+(a.quem||'Não definido')+'\nPrazo: '+(a.ate?fmtDataAno(a.ate):'Não definido')+'\nSituação: '+(a.status||'A fazer')+(a.travaPor?'\nImpedimento: '+a.travaPor:'')]]));
   });
   if(!(p.objetivos||[]).length)pagina('Objetivos e ações','<p class="story">Nenhum objetivo registrado neste ano.</p>');
-  (p.zonas||[]).forEach(z=>{const pessoas=(p.pecas||[]).filter(x=>x.zona===z.id);if(pessoas.length)narrativas('Equipe · '+z.nome,pessoas.map(x=>[x.nome||'Pessoa',[(x.funcao||'Função não informada'),x.chave?'Pessoa-chave':'',x.substituto?'Substituto: '+x.substituto:'',x.obs||''].filter(Boolean).join('\n')]))});
+  [...(p.zonas||[]),{id:null,nome:'Sem frente definida'}].forEach(z=>{const pessoas=(p.pecas||[]).filter(x=>z.id===null?!(p.zonas||[]).some(zona=>zona.id===x.zona):x.zona===z.id);if(pessoas.length)narrativas('Equipe · '+z.nome,pessoas.map(x=>[x.nome||'Pessoa',[(x.funcao||'Função não informada'),x.chave?'Pessoa-chave':'',x.substituto?'Substituto: '+x.substituto:'',x.obs||''].filter(Boolean).join('\n')]))});
   narrativas('Balanço do ano',[['Resultados',p.balanco],['Aprendizados e próximos passos',p.aprendizados]]);
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(titulo)}</title><style>
   *{box-sizing:border-box}body{margin:0;background:#e8eaf0;font:16px Arial,sans-serif;color:#222631}.tools{position:sticky;top:0;background:#fff;padding:14px 24px;display:flex;gap:16px;align-items:center;z-index:1;border-bottom:1px solid #ccc}.tools button{border:0;background:#4640ed;color:white;padding:12px 20px;border-radius:8px;font:inherit;cursor:pointer}.tools p{margin:0;font-size:14px}.slide{position:relative;background:white;max-width:1123px;min-height:740px;margin:28px auto;padding:40px 64px 78px;break-after:page;overflow-wrap:anywhere}.slide header{display:flex;justify-content:space-between;gap:20px;font-size:12px;letter-spacing:.05em;border-bottom:3px solid #4640ed;padding-bottom:16px;color:#4f5470}.slide h2{font-size:32px;margin:34px 0;color:#323050}.slide h3{font-size:22px;color:#4640ed}.story{font-size:21px;line-height:1.55;white-space:normal}.story p{margin:12px 0}.slide footer{position:absolute;bottom:24px;left:64px;right:64px;border-top:1px solid #dce0e7;padding-top:14px;font-size:11px;color:#5a6070;display:flex;justify-content:space-between}.cover .year{font-size:72px;line-height:1;font-weight:bold;color:#4640ed;margin:18px 0}.cover h1{font-size:44px;margin:18px 0}.cover>p{font-size:21px}.metrics{display:flex;gap:52px;margin:42px 0}.metrics b{display:block;font-size:34px;color:#4640ed}.muted{color:#5a6070;font-size:14px!important}@media(max-width:700px){.slide{padding:24px 24px 76px;min-height:650px;margin:16px}.slide footer{left:24px;right:24px}.tools{flex-wrap:wrap}.metrics{gap:24px}.cover h1{font-size:32px}.story{font-size:18px}}@page{size:A4 landscape;margin:0}@media print{body{background:white}.tools{display:none}.slide{width:297mm;min-height:210mm;max-width:none;margin:0;padding:12mm 17mm 22mm}.slide:last-child{break-after:auto}.slide header{font-size:9pt}.slide h2{font-size:25pt;margin:8mm 0}.slide h3{font-size:18pt}.story{font-size:15pt;line-height:1.5}.slide footer{left:17mm;right:17mm;bottom:7mm}.metrics{margin:9mm 0}*{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
@@ -6022,372 +6020,168 @@ function exportarPlanoPDF(emp,plano){
   w.document.getElementById('salvar').onclick=()=>w.print();
 }
 
-let _pecaNaMao=null;   // peça "pegada" para mover — funciona no dedo e no mouse
+let _pecaNaMao=null; // Compatibilidade com a navegação anterior da equipe.
 
 function vEstrategia(m){
-  const r=rr('estrategia');
   const selecao=prepararEstrategia(m);if(!selecao)return;
-  const {emp,est}=selecao;
+  const {emp,est}=selecao,r=rr('estrategia'),s=resumoEstrategia(est);
+  const ui=abasWorkspace(m,'estr',[['resumo','Visão geral'],['plano','Objetivos e ações'],['identidade','Direção'],['equipe','Equipe'],['balanco','Resultados e arquivos']],filtro.estrAba||'resumo',v=>filtro.estrAba=v);
+  const ir=(aba,obj)=>{filtro.estrAba=aba;if(obj)filtro.estrObjetivo=obj.id;r()};
+  const novoObjetivo=()=>modalObjetivo({id:uid(),acoes:[]},r,true,est);
+  const heading=(host,t,desc,botao)=>{const h=el('<div class="strategy-section-heading"><div><h2>'+esc(t)+'</h2><p>'+esc(desc)+'</p></div></div>');if(botao&&!est.encerrado)h.appendChild(botao);host.appendChild(h)};
+  const card=(host,t)=>{const c=el('<section class="strategy-card"><h3>'+esc(t)+'</h3></section>');host.appendChild(c);return c};
+  const badge=o=>{const [t,cls]=situacaoObjetivo(o);return '<span class="strategy-badge '+cls+'">'+t+'</span>'};
+  const abrirObjetivo=o=>ir('plano',o);
 
-  /* ---- 1. a empresa: dados e bancos, lidos de onde já moram ---- */
-  const objetivos=est.objetivos||[];
-  const acoesTodas=objetivos.flatMap(o=>o.acoes||[]);
-  const abertas=acoesTodas.filter(a=>a.status!=='Feita');
-  const travadas=acoesTodas.filter(a=>a.status==='Travada');
-  const atrasadas=abertas.filter(a=>a.ate&&a.ate<hoje());
-  const chaves=(est.pecas||[]).filter(p=>p.chave);
-  const semSubstituto=chaves.filter(p=>!String(p.substituto||'').trim());
+  // Visão de gestão: direção e execução separadas dos resultados dos indicadores.
+  const resumo=ui.paineis.resumo;
+  const hero=el(`<section class="strategy-overview"><div class="strategy-overview-copy"><span class="strategy-kicker">${esc(emp.nome)} · ${est.ano}</span><h2>${est.visao?'O futuro que estamos construindo.':'Qual será a conquista deste ciclo?'}</h2><p>${esc(est.visao||'Comece pela direção da empresa. Depois, escolha os objetivos que vão orientar as decisões deste ano.')}</p></div><div class="strategy-execution"><span>EXECUÇÃO DO PLANO</span><strong>${s.feitas.length}<small> / ${s.acoes.length}</small></strong><p>ações concluídas</p><div class="strategy-track" role="meter" aria-label="Execução das ações" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${s.pct}"><i style="width:${s.pct}%"></i></div><small>${s.acoes.length?s.pct+'% das ações registradas':'Adicione ações para acompanhar'}</small></div></section>`);
+  hero.querySelector('.strategy-overview-copy').appendChild(acao(est.visao?'Ver direção da empresa':'Definir direção',()=>ir('identidade'),'ghost'));resumo.appendChild(hero);
+  const nums=el('<div class="strategy-numbers"></div>');
+  [['Objetivos',s.objetivos.length,'Prioridades do ano'],['Ações em aberto',s.abertas.length,'Execução a acompanhar'],['Prazos vencidos',s.atrasadas.length,'Ações ainda não concluídas'],['Ações bloqueadas',s.travadas.length,'Precisam de uma decisão']].forEach(([nome,n,hint],i)=>{const b=acao('',()=>{filtro.estrFiltro=i===2?'atrasadas':i===3?'travadas':'todas';ir('plano')},'ghost');b.innerHTML='<span>'+nome+'</span><strong'+(i>1&&n?' class="strategy-alert-text"':'')+'>'+n+'</strong><small>'+hint+'</small>';nums.appendChild(b)});resumo.appendChild(nums);
+  const colunas=el('<div class="strategy-overview-grid"></div>');resumo.appendChild(colunas);
+  const prioridades=card(colunas,'Prioridades do ano');
+  prioridades.appendChild(el('<p class="strategy-muted">Objetivos, indicadores e o próximo passo de cada frente.</p>'));
+  if(!s.objetivos.length){prioridades.appendChild(el('<div class="strategy-inline-empty"><h4>O que precisa mudar até o fim do ano?</h4><p>Registre um objetivo e defina como reconhecer o resultado.</p></div>'));if(!est.encerrado)prioridades.appendChild(acao('Criar primeiro objetivo',novoObjetivo))}
+  s.objetivos.forEach((o,i)=>{const b=acao('',()=>abrirObjetivo(o),'ghost');b.className='strategy-priority';b.innerHTML=`<span class="strategy-order">${String(i+1).padStart(2,'0')}</span><span><b>${esc(o.titulo||'Objetivo sem título')}</b><small>${esc(o.indicador||'Indicador a definir')}</small>${badge(o)}</span><span aria-hidden="true">↗</span>`;prioridades.appendChild(b)});
+  const revisar=card(colunas,'Próxima revisão');
+  const pendencias=[
+    [!String(est.visao||'').trim(),'Definir a visão da empresa','identidade'],
+    [s.objetivos.filter(o=>!String(o.indicador||'').trim()).length,'Objetivos sem indicador','plano'],
+    [s.objetivos.filter(o=>!(o.acoes||[]).length).length,'Objetivos sem ações','plano'],
+    [s.semQuem.length,'Ações sem responsável','plano'],[s.semPrazo.length,'Ações sem prazo','plano']
+  ].filter(([n])=>n);
+  if(pendencias.length)pendencias.forEach(([n,t,aba])=>{const b=acao('',()=>ir(aba),'ghost');b.className='strategy-review-row';b.innerHTML='<span>'+t+'</span><b>'+(typeof n==='number'?n:'→')+'</b>';revisar.appendChild(b)});
+  else revisar.appendChild(el('<p class="strategy-muted">'+(s.objetivos.length?'Responsáveis, prazos e indicadores preenchidos. Na revisão, confira o resultado de cada objetivo.':'Crie os objetivos para começar a revisão do plano.')+'</p>'));
+  revisar.appendChild(el('<div class="strategy-review-note"><b>Ritmo de acompanhamento</b><p>Revise as ações mensalmente e os resultados a cada trimestre. Registre as decisões para orientar o próximo ciclo.</p></div>'));
+  const agenda=card(resumo,'Próximos prazos');agenda.classList.add('strategy-next-dates');
+  const prazos=[...s.abertas].filter(x=>x.a.ate).sort((a,b)=>a.a.ate.localeCompare(b.a.ate)).slice(0,4);
+  if(!prazos.length)agenda.appendChild(el('<p class="strategy-muted">Nenhuma ação com prazo em aberto. As datas aparecem aqui quando você as definir nos objetivos.</p>'));
+  prazos.forEach(({a,o})=>{const b=acao('',()=>abrirObjetivo(o),'ghost');b.className='strategy-deadline';b.innerHTML='<time'+(a.ate<hoje()?' class="strategy-alert-text"':'')+'>'+fmtDataAno(a.ate)+'</time><span><b>'+esc(a.oque)+'</b><small>'+esc(o.titulo)+' · '+esc(a.quem||'Responsável a definir')+'</small></span><span class="strategy-badge">'+esc(a.status||'A fazer')+'</span>';agenda.appendChild(b)});
 
-  m.appendChild(ligaKpis(el(`<div class="grade workspace-metrics">
-    ${kpi('Objetivos',objetivos.length,objetivos.length?'no plano':'nenhum ainda',null,'plano')}
-    ${kpi('Ações abertas',abertas.length,atrasadas.length?atrasadas.length+' passaram do prazo':'nada atrasado',atrasadas.length?'r':'v','plano')}
-    ${kpi('Travadas',travadas.length,travadas.length?'esperando alguma coisa':'nenhuma travada',travadas.length?'a':'','plano')}</div>`),{
-    plano:()=>{abreBloco('es-plano');r()},
-    campo:()=>{abreBloco('es-campo');r()},
-  }));
-
-  if(semSubstituto.length) m.appendChild(el(`<div class="aviso" style="background:var(--vermelho-cl);border-color:var(--vermelho)">
-    ⚠️ <b>${semSubstituto.length} peça-chave sem ninguém que cubra:</b> ${semSubstituto.map(p=>esc(p.nome)).join(', ')}.
-    Se qualquer uma sair de cena amanhã — doença, proposta melhor, briga — a frente dela para.
-    Formar substituto é trabalho de tempo de paz.</div>`));
-
-  const vazias=(est.zonas||[]).filter(z=>!(est.pecas||[]).some(p=>p.zona===z.id));
-  if(vazias.length&&est.pecas.length) m.appendChild(el(`<div class="aviso">🕳️ <b>Frente sem ninguém:</b>
-    ${vazias.map(z=>esc(z.nome)).join(', ')}. Ou alguém está fazendo isso sem estar escrito
-    (e sem tempo reservado), ou não está sendo feito.</div>`));
-
-  const dx=el('<div class="corpo"></div>');
-  dx.appendChild(el(`<div style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
-    ${[['CNPJ',emp.cnpj],['Regime',emp.regime],['Sócios',emp.socios],['Contabilidade',emp.contador],['Banco principal',emp.banco],['Situação',emp.status]]
-      .map(([r2,v])=>`<div style="border:1px solid var(--linha);border-radius:var(--r);padding:11px 13px;background:var(--card)">
-        <div style="font-size:11px;color:var(--suave);text-transform:uppercase;letter-spacing:.05em">${r2}</div>
-        <div style="font-size:14px;font-weight:600;margin-top:3px">${esc(v||'—')}</div></div>`).join('')}
-  </div>`));
-  const contas=(E.bancos||[]).filter(b=>normaliza(b.titular||'').includes(normaliza(emp.nome))
-    ||normaliza(emp.banco||'').includes(normaliza(b.banco||''))&&String(b.banco||'').trim());
-  if(contas.length){
-    const rol=el('<div class="rolagem" style="margin-top:12px"></div>');
-    rol.innerHTML='<table><thead><tr><th>Banco</th><th>Titular</th><th>Tipo</th><th>Agência</th><th>Conta</th><th>PIX</th><th>Gerente</th></tr></thead><tbody>'
-      +contas.map(b=>`<tr><td style="padding:9px 10px"><b>${esc(b.banco||'—')}</b></td>
-        <td style="padding:9px 10px;color:var(--suave)">${esc(b.titular||'—')}</td>
-        <td style="padding:9px 10px;color:var(--suave)">${esc(b.tipo||'—')}</td>
-        <td style="padding:9px 10px;font-variant-numeric:tabular-nums">${esc(b.agencia||'—')}</td>
-        <td style="padding:9px 10px;font-variant-numeric:tabular-nums">${esc(b.conta||'—')}</td>
-        <td style="padding:9px 10px;color:var(--suave)">${esc(b.pix||'—')}</td>
-        <td style="padding:9px 10px;color:var(--suave)">${esc(b.gerente||'—')}</td></tr>`).join('')
-      +'</tbody></table>';
-    dx.appendChild(rol);
-  } else dx.appendChild(el('<div class="vazio" style="margin-top:12px">Nenhuma conta ligada a esta empresa em Guia de vida → Bancos e PIX.</div>'));
-  m.appendChild(bloco('es-dados','🏢 '+esc(emp.nome),'dados e contas — vêm do Guia de vida, não se digita duas vezes',dx));
-
-  /* ---- 2. quem somos ---- */
-  const ix=el('<div class="corpo"></div>');
-  ix.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin:0 0 10px">
-    Isto não é enfeite de parede: é o que decide por você quando aparecer um caso que o manual não cobre.
-    Escreva curto o bastante para alguém repetir de cabeça.</p>`));
-  ix.appendChild(campos(est,[
-    {k:'missao',t:'Missão — por que existimos',tipo:'textarea',full:true,ph:'o problema que resolvemos, para quem'},
-    {k:'visao',t:'Visão — onde queremos chegar',tipo:'textarea',full:true,ph:'como a empresa é daqui a 3 ou 5 anos'},
-  ],()=>salvar()));
-  const vl=el('<div style="margin-top:12px"></div>');
-  const pintaValores=()=>{
-    vl.innerHTML='<div style="font-size:13px;font-weight:600;margin-bottom:7px">Valores — o que não se negocia</div>';
-    (est.valores||[]).forEach((v,i)=>{
-      const li=el(`<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--linha)">
-        <b style="color:var(--suave);font-size:12px;min-width:18px">${i+1}.</b>
-        <div style="flex:1"><b style="font-size:13.5px">${esc(v.titulo||'—')}</b>
-          ${v.oque?`<div style="font-size:12px;color:var(--suave)">${esc(v.oque)}</div>`:''}</div>
-        <button class="btn ghost mini" style="color:var(--vermelho)">✕</button></div>`);
-      li.querySelector('button').onclick=()=>{est.valores.splice(i,1);salvar();pintaValores()};
-      vl.appendChild(li);
-    });
-    if(!(est.valores||[]).length) vl.appendChild(el('<div class="vazio">Nenhum valor escrito ainda.</div>'));
-    const novo={titulo:'',oque:''};
-    vl.appendChild(campos(novo,[
-      {k:'titulo',t:'Valor',ph:'ex.: Prazo combinado é prazo cumprido'},
-      {k:'oque',t:'O que isso significa na prática',ph:'como se reconhece quem vive isso'},
-    ]));
-    const b=el('<button class="btn mini">+ Guardar valor</button>');
-    b.onclick=()=>{if(!String(novo.titulo||'').trim()){alert('Escreva o valor.');return}
-      est.valores=[...(est.valores||[]),{titulo:novo.titulo.trim(),oque:String(novo.oque||'').trim()}];
-      salvar();pintaValores()};
-    vl.appendChild(b);
-  };
-  pintaValores();
-  ix.appendChild(vl);
-  m.appendChild(bloco('es-identidade','🧭 Missão, visão e valores','o que decide quando não há regra',ix));
-
-  /* ---- 3. plano: objetivo à esquerda, ações à direita ---- */
-  const px=el('<div class="corpo"></div>');
-  const pintaPlano=()=>{
-    px.innerHTML='';
-    const totais=objetivos.flatMap(o=>o.acoes||[]),pendentes=totais.filter(a=>a.status!=='Feita'),travadasAgora=pendentes.filter(a=>a.status==='Travada');
-    const metricas=[...m.querySelectorAll('.workspace-metrics .kpi')];
-    [objetivos.length,pendentes.length,travadasAgora.length].forEach((valor,i)=>{if(metricas[i])metricas[i].querySelector('.val').textContent=valor});
-    const vencidas=pendentes.filter(a=>a.ate&&a.ate<hoje()).length;
-    const legendas=[objetivos.length?'no plano':'nenhum ainda',vencidas?vencidas+' passaram do prazo':'nada atrasado',travadasAgora.length?'esperando alguma coisa':'nenhuma travada'];
-    legendas.forEach((texto,i)=>{if(metricas[i])metricas[i].querySelector('.sub').textContent=texto});
-    if(!objetivos.length) px.appendChild(el('<div class="vazio">Nenhum objetivo ainda. Um objetivo é o que muda se der certo — não a tarefa.</div>'));
-    objetivos.forEach((o,io)=>{
-      const feitas=(o.acoes||[]).filter(a=>a.status==='Feita').length;
-      const pct=(o.acoes||[]).length?Math.round(feitas/o.acoes.length*100):0;
-      const cx2=el(`<div style="border:1px solid var(--linha);border-radius:var(--r);margin-bottom:12px;background:var(--card);overflow:hidden">
-        <div style="display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,1.4fr);gap:0;align-items:stretch" class="objGrade">
-          <div style="padding:14px 15px;border-right:1px solid var(--linha)" class="objEsq">
-            <div style="font-size:11px;color:var(--suave);text-transform:uppercase;letter-spacing:.05em">Objetivo ${io+1}</div>
-            <b style="font-size:15px;display:block;margin-top:3px">${esc(o.titulo||'(sem título)')}</b>
-            ${o.porque?`<div style="font-size:12.5px;color:var(--suave);margin-top:5px">${esc(o.porque)}</div>`:''}
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;font-size:12px;color:var(--suave)">
-              ${o.indicador?`<span>📏 ${esc(o.indicador)}</span>`:''}
-              ${o.ate?`<span>🗓 até ${fmtDataAno(o.ate)}${o.ate<hoje()?' <b style="color:var(--vermelho)">(passou)</b>':''}</span>`:''}
-            </div>
-            <div class="barra" style="margin-top:10px"><i style="width:${pct}%;background:${pct===100?'var(--verde)':'var(--areia)'}"></i></div>
-            <div style="font-size:11.5px;color:var(--suave);margin-top:4px">${feitas} de ${(o.acoes||[]).length} ação(ões) feita(s)</div>
-            <div style="display:flex;gap:6px;margin-top:10px"><button class="btn ghost mini bEd">✎ editar</button>
-              <button class="btn ghost mini bDelO" style="color:var(--vermelho)">🗑</button></div>
-          </div>
-          <div style="padding:14px 15px" class="objDir">
-            <div style="font-size:11px;color:var(--suave);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Ações</div>
-            <div class="acoes"></div>
-          </div>
-        </div></div>`);
-      const box=cx2.querySelector('.acoes');
-      const pintaAcoes=()=>{
-        box.innerHTML='';
-        (o.acoes||[]).forEach((a,ia)=>{
-          const li=el(`<div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--linha)">
-            <div style="flex:1;min-width:0">
-              <div style="font-size:13.5px;${a.status==='Feita'?'text-decoration:line-through;color:var(--suave)':''}">${esc(a.oque||'—')}</div>
-              <div style="font-size:11.5px;color:var(--suave);margin-top:2px">
-                ${a.quem?esc(a.quem):'<b style="color:var(--vermelho)">sem responsável</b>'}${a.ate?' · até '+fmtDataAno(a.ate):''}
-                ${a.ate&&a.ate<hoje()&&a.status!=='Feita'?' <b style="color:var(--vermelho)">(atrasada)</b>':''}
-                ${a.status==='Travada'&&a.travaPor?' · 🚧 '+esc(a.travaPor):''}</div>
-            </div>
-            <select class="selSt" style="font-size:11.5px;padding:3px 5px">${STATUS_ACAO.map(x=>`<option${x===(a.status||'A fazer')?' selected':''}>${x}</option>`).join('')}</select>
-            <button class="btn ghost mini bDelA" style="color:var(--vermelho)">✕</button></div>`);
-          li.querySelector('.selSt').setAttribute('aria-label','Situação da ação '+(a.oque||ia+1));
-          li.querySelector('.bDelA').setAttribute('aria-label','Apagar ação '+(a.oque||ia+1));
-          li.querySelector('.selSt').onchange=ev=>{
-            a.status=ev.target.value;
-            if(a.status==='Travada'){const q=prompt('Travada esperando o quê ou quem?',a.travaPor||'');if(q!=null)a.travaPor=q}
-            else a.travaPor='';
-            salvar();
-            // redesenha a tela inteira: mudar status mexe nos contadores lá em
-            // cima, e contador errado é pior que contador nenhum. O abreBloco
-            // traz a rolagem de volta para cá.
-            abreBloco('es-plano');r();
-          };
-          li.querySelector('.bDelA').onclick=()=>{o.acoes.splice(ia,1);salvar();abreBloco('es-plano');r()};
-          box.appendChild(li);
-        });
-        if(!(o.acoes||[]).length) box.appendChild(el('<div class="vazio">Objetivo sem ação é desejo. Escreva a primeira.</div>'));
-        const nova={oque:'',quem:'',ate:''};
-        const adicionar=el('<details class="strategy-add-action"><summary>+ Nova ação</summary></details>');
-        adicionar.appendChild(campos(nova,[
-          {k:'oque',t:'O que fazer',ph:'uma coisa concreta',full:true},
-          {k:'quem',t:'Quem',tipo:'sugestao',ph:'nome',opcoes:[...new Set((est.pecas||[]).map(p=>p.nome).filter(Boolean))]},
-          {k:'ate',t:'Até',tipo:'date'},
-        ]));
-        const b=el('<button class="btn mini">+ Ação</button>');
-        b.onclick=()=>{if(!String(nova.oque||'').trim()){alert('Escreva a ação.');return}
-          o.acoes=[...(o.acoes||[]),{id:uid(),oque:nova.oque.trim(),quem:String(nova.quem||'').trim(),
-            ate:nova.ate||'',status:'A fazer',travaPor:''}];
-          salvar();pintaPlano()};
-        adicionar.appendChild(b);box.appendChild(adicionar);
-      };
-      pintaAcoes();
-      cx2.querySelector('.bEd').setAttribute('aria-label','Editar objetivo '+(o.titulo||io+1));
-      cx2.querySelector('.bDelO').setAttribute('aria-label','Apagar objetivo '+(o.titulo||io+1));
-      cx2.querySelector('.bEd').onclick=()=>modalObjetivo(o,()=>{salvar();pintaPlano()});
-      cx2.querySelector('.bDelO').onclick=()=>{
-        if(!confirm('Apagar o objetivo "'+(o.titulo||'sem título')+'" e as '+(o.acoes||[]).length+' ação(ões) dele?'))return;
-        est.objetivos.splice(io,1);salvar();pintaPlano()};
-      px.appendChild(cx2);
-    });
-    m.querySelector('[data-strategy-new]')?.remove();
-    const bNovo=el('<button class="btn mini" data-strategy-new>+ Novo objetivo</button>');
-    bNovo.onclick=()=>{const o={id:uid(),titulo:'',porque:'',indicador:'',ate:'',acoes:[]};
-      est.objetivos.push(o);salvar();modalObjetivo(o,()=>{salvar();pintaPlano()},true,est)};
-    if(!est.encerrado)m.querySelector('.topo').insertBefore(bNovo,m.querySelector('.topo>button'));
-  };
-  pintaPlano();
-  m.appendChild(bloco('es-plano','Objetivos e ações','indicadores, responsáveis e prazos do ano',px));
-
-  /* ---- 4. o campo tático ---- */
-  m.appendChild(bloco('es-campo','♟️ Campo tático','as frentes, as peças e os buracos — clique numa peça e depois na frente para movê-la',campoTatico(est,r)));
-  organizarEstrategia(m,emp,est);
-}
-
-/* O CAMPO. Mover é em dois toques (pegar / soltar) de propósito: arrastar não
-   funciona no celular, e metade das vezes que você vai olhar isso é no celular. */
-function campoTatico(est,r){
-  const cx=el('<div class="corpo"></div>');
-  const grade=el('<div style="display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))"></div>');
-
-  const pinta=()=>{
-    grade.innerHTML='';
-    (est.zonas||[]).forEach(z=>{
-      const dentro=(est.pecas||[]).filter(p=>p.zona===z.id);
-      const zEl=el(`<div class="zonaT" style="border:1px solid var(--linha);border-radius:var(--r);background:var(--card);display:flex;flex-direction:column;min-height:150px">
-        <div style="padding:11px 13px;border-bottom:1px solid var(--linha);background:var(--bg);border-radius:var(--r) var(--r) 0 0">
-          <div style="display:flex;align-items:center;gap:6px">
-            <b style="font-size:14px;flex:1">${esc(z.nome)}</b>
-            <span style="font-size:11.5px;color:var(--suave)">${dentro.length}</span>
-            <button class="btn ghost mini bZed" title="renomear ou apagar a frente">⋯</button>
-          </div>
-          ${z.dica?`<div style="font-size:11.5px;color:var(--suave);margin-top:2px">${esc(z.dica)}</div>`:''}
-        </div>
-        <div class="dentro" style="padding:10px 11px;display:flex;flex-direction:column;gap:8px;flex:1"></div>
-      </div>`);
-      const box=zEl.querySelector('.dentro');
-      dentro.forEach(p=>{
-        const naMao=_pecaNaMao===p.id;
-        const pe=el(`<div class="pecaT" style="border:1px solid ${naMao?'var(--tinta)':'var(--linha)'};border-radius:10px;padding:9px 11px;cursor:pointer;background:${naMao?'var(--bg)':'transparent'};box-shadow:${naMao?'0 0 0 2px var(--tinta)':'none'}">
-          <div style="display:flex;align-items:center;gap:7px">
-            ${avatar(p.nome||'?',26)}
-            <div style="flex:1;min-width:0">
-              <b style="font-size:13.5px">${esc(p.nome||'(sem nome)')}</b>
-              <div style="font-size:11.5px;color:var(--suave)">${esc(p.funcao||'sem função definida')}</div>
-            </div>
-            ${p.chave?'<span title="peça-chave" style="font-size:14px">⭐</span>':''}
-          </div>
-          ${p.chave?`<div style="font-size:11px;margin-top:6px;color:${String(p.substituto||'').trim()?'var(--suave)':'var(--vermelho)'}">
-            ${String(p.substituto||'').trim()?'cobertura: '+esc(p.substituto):'⚠ ninguém cobre'}</div>`:''}
-        </div>`);
-        pe.onclick=ev=>{ev.stopPropagation();if(est.encerrado)return;
-          if(_pecaNaMao===p.id){_pecaNaMao=null;pinta();return}
-          if(_pecaNaMao){_pecaNaMao=null;pinta();return}
-          _pecaNaMao=p.id;pinta();
-        };
-        pe.ondblclick=ev=>{ev.stopPropagation();if(est.encerrado)return;_pecaNaMao=null;modalPeca(est,p,()=>{salvar();pinta()})};
-        box.appendChild(pe);
+  // Objetivos: uma leitura compacta; detalhes e ações ficam junto do objetivo.
+  const plano=ui.paineis.plano;plano.dataset.bid='es-plano';
+  heading(plano,'Objetivos e ações','Acompanhe a execução e confira o resultado pelos indicadores.',acao('+ Novo objetivo',novoObjetivo));
+  const filtros=el('<div class="strategy-objective-tools"></div>');
+  const busca=el('<input type="search" aria-label="Buscar objetivo ou ação" placeholder="Buscar objetivo ou ação">');busca.value=filtro.estrBusca||'';filtros.appendChild(busca);
+  const select=seletor(filtro.estrFiltro||'todas',[['todas','Todos os objetivos'],['atrasadas','Com ações atrasadas'],['travadas','Com ações bloqueadas'],['abertas','Com ações em aberto'] ],()=>pintar(),'Filtrar objetivos');filtros.appendChild(select);plano.appendChild(filtros);
+  const lista=el('<div class="strategy-objectives"></div>');plano.appendChild(lista);
+  function pintar(){
+    filtro.estrBusca=busca.value;filtro.estrFiltro=select.value;
+    lista.innerHTML='';
+    const visiveis=s.objetivos.filter(o=>{const a=o.acoes||[],ab=a.filter(x=>x.status!=='Feita');return normaliza([o.titulo,o.indicador,...a.map(x=>x.oque+' '+x.quem)].join(' ')).includes(normaliza(busca.value))&&(select.value==='todas'||select.value==='atrasadas'&&ab.some(x=>x.ate&&x.ate<hoje())||select.value==='travadas'&&ab.some(x=>x.status==='Travada')||select.value==='abertas'&&ab.length)});
+    if(!visiveis.length){const vazio=el('<div class="workspace-empty"><h3>'+(s.objetivos.length?'Nenhum objetivo neste filtro':'Defina a primeira prioridade')+'</h3><p>'+(s.objetivos.length?'Altere a busca ou o filtro para consultar os demais objetivos.':'Escreva o resultado esperado. Depois, acrescente as ações, os responsáveis e os prazos.')+'</p></div>');if(!s.objetivos.length&&!est.encerrado)vazio.appendChild(acao('+ Novo objetivo',novoObjetivo));lista.appendChild(vazio)}
+    visiveis.forEach(o=>{
+      const feitas=(o.acoes||[]).filter(a=>a.status==='Feita').length,io=s.objetivos.indexOf(o);
+      const cx=el(`<details class="strategy-objective"${filtro.estrObjetivo===o.id?' open':''}><summary><span class="strategy-order">${String(io+1).padStart(2,'0')}</span><span class="strategy-objective-title"><b>${esc(o.titulo||'Objetivo sem título')}</b><small>${esc(o.indicador||'Indicador a definir')}</small></span>${badge(o)}<span class="strategy-objective-count">${feitas}/${(o.acoes||[]).length} ações</span><span class="strategy-chevron" aria-hidden="true">⌄</span></summary><div class="strategy-objective-body"></div></details>`);
+      cx.ontoggle=()=>{if(cx.open)filtro.estrObjetivo=o.id;else if(filtro.estrObjetivo===o.id)filtro.estrObjetivo=''};
+      const body=cx.querySelector('.strategy-objective-body');
+      if(o.porque)body.appendChild(el('<p class="strategy-objective-why">'+esc(o.porque)+'</p>'));
+      body.appendChild(el(`<div class="strategy-goal-data"><div><span>Meta esperada</span><b>${esc(o.meta||o.indicador||'A definir')}</b></div><div><span>Resultado registrado</span><b>${esc(o.resultado||'Ainda não registrado')}</b>${o.resultadoEm?'<small>Atualizado em '+fmtDataAno(o.resultadoEm)+'</small>':''}</div><div><span>Prazo do objetivo</span><b>${o.ate?fmtDataAno(o.ate):'A definir'}</b></div></div>`));
+      const toolbar=el('<div class="strategy-objective-actions"></div>');
+      if(!est.encerrado){toolbar.appendChild(acao('Editar objetivo',()=>modalObjetivo(o,r,false,est),'ghost'));toolbar.appendChild(acao('Registrar resultado',()=>modalResultadoEstrategia(est,o,r),'ghost'));const del=acao('Excluir objetivo',()=>{if(confirm('Excluir “'+(o.titulo||'Objetivo')+'” e suas '+(o.acoes||[]).length+' ações?')){est.objetivos=est.objetivos.filter(x=>x!==o);salvar();r()}},'ghost strategy-delete');del.setAttribute('aria-label','Apagar objetivo '+(o.titulo||io+1));toolbar.appendChild(del)}body.appendChild(toolbar);
+      const ah=el('<div class="strategy-action-heading"><h3>Plano de ação</h3><span>'+feitas+' de '+(o.acoes||[]).length+' concluídas</span></div>');body.appendChild(ah);
+      (o.acoes||[]).forEach((a,ia)=>{
+        const li=el(`<div class="strategy-action-row"><div><b>${esc(a.oque||'Ação sem título')}</b><small>${esc(a.quem||'Responsável a definir')} · ${a.ate?fmtDataAno(a.ate):'Prazo a definir'}${a.ate&&a.ate<hoje()&&a.status!=='Feita'?' · Prazo vencido':''}</small>${a.status==='Travada'&&a.travaPor?'<p class="strategy-alert-text">'+esc(a.travaPor)+'</p>':''}</div><div class="strategy-action-controls"></div></div>`);
+        const controls=li.querySelector('.strategy-action-controls');
+        const st=seletor(a.status||'A fazer',STATUS_ACAO,v=>{if(est.encerrado)return;if(v==='Travada'){modalAcaoEstrategia(est,o,a,r,'Travada');return}a.status=v;a.travaPor='';salvar();filtro.estrObjetivo=o.id;r()},'Situação da ação '+(a.oque||ia+1));st.classList.add('selSt');st.disabled=!!est.encerrado;controls.appendChild(st);
+        if(!est.encerrado){const edit=acao('Editar',()=>modalAcaoEstrategia(est,o,a,r),'ghost');edit.setAttribute('aria-label','Editar ação '+a.oque);controls.appendChild(edit);const del=acao('×',()=>{if(confirm('Excluir a ação “'+a.oque+'”?')){o.acoes=o.acoes.filter(x=>x!==a);salvar();filtro.estrObjetivo=o.id;r()}},'ghost bDelA');del.setAttribute('aria-label','Apagar ação '+(a.oque||ia+1));controls.appendChild(del)}body.appendChild(li);
       });
-      if(!dentro.length) box.appendChild(el('<div class="vazio" style="padding:14px 4px;font-size:12px">Ninguém nesta frente.</div>'));
-      // soltar aqui
-      zEl.onclick=()=>{
-        if(est.encerrado)return;
-        if(!_pecaNaMao)return;
-        const p=(est.pecas||[]).find(x=>x.id===_pecaNaMao);
-        if(p&&p.zona!==z.id){p.zona=z.id;salvar()}
-        _pecaNaMao=null;pinta();
-      };
-      zEl.querySelector('.bZed').onclick=ev=>{ev.stopPropagation();
-        const nome=prompt('Nome da frente:',z.nome);
-        if(nome==null)return;
-        if(!String(nome).trim()){
-          const dentro2=(est.pecas||[]).filter(x=>x.zona===z.id);
-          if(dentro2.length){alert('Tire as '+dentro2.length+' peça(s) daqui antes de apagar a frente.');return}
-          if(!confirm('Apagar a frente "'+z.nome+'"?'))return;
-          est.zonas=est.zonas.filter(x=>x.id!==z.id);salvar();pinta();return;
-        }
-        z.nome=String(nome).trim();
-        const dica=prompt('Uma linha explicando o que é essa frente:',z.dica||'');
-        if(dica!=null)z.dica=String(dica).trim();
-        salvar();pinta();
-      };
-      grade.appendChild(zEl);
+      if(!(o.acoes||[]).length)body.appendChild(el('<p class="strategy-muted">Adicione o primeiro passo para alcançar este objetivo.</p>'));
+      if(!est.encerrado)body.appendChild(acao('+ Nova ação',()=>modalAcaoEstrategia(est,o,null,r),'ghost strategy-add'));
+      lista.appendChild(cx);
     });
-    // frente nova
-    const add=el(`<button style="border:1px dashed var(--linha);border-radius:var(--r);background:none;color:var(--suave);
-      min-height:150px;cursor:pointer;font:500 13px Inter">+ Nova frente</button>`);
-    add.onclick=()=>{const nome=prompt('Nome da frente nova:','');
-      if(nome==null||!String(nome).trim())return;
-      const dica=prompt('Uma linha explicando o que é essa frente:','')||'';
-      est.zonas=[...(est.zonas||[]),{id:uid(),nome:String(nome).trim(),dica:String(dica).trim()}];
-      salvar();pinta()};
-    grade.appendChild(add);
-  };
-  pinta();
+  }
+  busca.oninput=pintar;pintar();
 
-  cx.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin:0 0 11px">
-    Clique numa peça para <b>pegar</b> e depois na frente para <b>soltar</b>. Clique duplo abre a ficha dela.
-    ⭐ marca quem é peça-chave — e a ficha pergunta <b>quem cobre</b>, que é a pergunta que ninguém faz antes de precisar.</p>`));
-  cx.appendChild(grade);
-  const bp=el('<button class="mais">+ Nova peça</button>');
-  bp.onclick=()=>{
-    const p={id:uid(),nome:'',funcao:'',zona:(est.zonas[0]||{}).id,chave:false,substituto:'',obs:''};
-    est.pecas.push(p);salvar();modalPeca(est,p,()=>{salvar();pinta()},true);
-  };
-  cx.appendChild(bp);
-  return cx;
+  const identidade=ui.paineis.identidade;identidade.dataset.bid='es-identidade';
+  heading(identidade,'Direção da empresa','Registre o ponto de partida e as escolhas que vão orientar o ano.');
+  const narrativas=[
+    ['Identidade','Missão, visão e valores', [['missao','Missão'],['visao','Visão']],()=>modalDirecaoEstrategia(est,'identidade',r)],
+    ['Diagnóstico','De onde estamos partindo', [['diagnostico','Cenário atual'],['forcas','Forças'],['fragilidades','Pontos a melhorar'],['oportunidades','Oportunidades'],['ameacas','Riscos externos']],()=>modalDirecaoEstrategia(est,'diagnostico',r)],
+    ['Escolhas estratégicas','Onde concentrar energia', [['posicionamento','Valor que entregamos ao cliente'],['naoFazer','O que fica fora das prioridades']],()=>modalDirecaoEstrategia(est,'escolhas',r)]
+  ];
+  narrativas.forEach(([t,sub,campos,editar])=>{const c=card(identidade,t);c.classList.add('strategy-direction');c.appendChild(el('<p class="strategy-muted">'+sub+'</p>'));const grid=el('<div class="strategy-narratives"></div>');campos.forEach(([k,nome])=>grid.appendChild(el('<div><h4>'+nome+'</h4><p'+(!est[k]?' class="strategy-muted"':'')+'>'+esc(est[k]||'Ainda não definido.')+'</p></div>')));if(t==='Identidade')grid.appendChild(el('<div class="full"><h4>Valores</h4>'+(est.valores.length?est.valores.map(v=>'<p><b>'+esc(v.titulo)+'</b>'+ (v.oque?' · '+esc(v.oque):'')+'</p>').join(''):'<p class="strategy-muted">Ainda não definidos.</p>')+'</div>'));c.appendChild(grid);if(!est.encerrado){c.appendChild(acao('Editar '+t.toLowerCase(),editar,'ghost'));if(t==='Identidade'){const gerenciar=el('<details class="strategy-values-edit"><summary>Gerenciar valores</summary></details>');est.valores.forEach(v=>gerenciar.appendChild(acao('Editar: '+v.titulo,()=>modalValorEstrategia(est,v,r),'ghost')));gerenciar.appendChild(acao('+ Adicionar valor',()=>modalValorEstrategia(est,null,r),'ghost'));c.appendChild(gerenciar)}}});
+  const dados=el('<details class="strategy-company" data-bid="es-dados"><summary>Dados cadastrais da empresa</summary><div class="strategy-goal-data"></div></details>');
+  [['CNPJ',emp.cnpj],['Regime',emp.regime],['Sócios',emp.socios],['Contabilidade',emp.contador],['Banco principal',emp.banco],['Situação',emp.status]].forEach(([t,v])=>dados.querySelector('div').appendChild(el('<div><span>'+t+'</span><b>'+esc(v||'Não informado')+'</b></div>')));
+  const contas=(E.bancos||[]).filter(b=>String(b.titular||'').trim()&&normaliza(b.titular).includes(normaliza(emp.nome))||String(emp.banco||'').trim()&&String(b.banco||'').trim()&&normaliza(emp.banco)===normaliza(b.banco));
+  contas.forEach(b=>dados.appendChild(el('<p>'+esc(b.banco)+' · '+esc(b.titular||'Titular não informado')+' · Tipo '+esc(b.tipo||'—')+' · Agência '+esc(b.agencia||'—')+' · Conta '+esc(b.conta||'—')+' · PIX '+esc(b.pix||'—')+' · Gerente '+esc(b.gerente||'—')+'</p>')));identidade.appendChild(dados);
+
+  const equipe=ui.paineis.equipe;equipe.dataset.bid='es-campo';heading(equipe,'Equipe e responsabilidades','Organize as frentes de trabalho e quem responde por cada uma.');equipe.appendChild(campoTatico(est,r));
+  const balanco=ui.paineis.balanco;heading(balanco,'Resultados e memória do ano','Registre o que mudou, as decisões tomadas e os documentos deste ciclo.');
+  const resultados=card(balanco,'Resultados dos objetivos');
+  resultados.appendChild(el('<p class="strategy-muted">Concluir ações não comprova que uma meta foi atingida. Confira o resultado de cada indicador.</p>'));
+  if(!s.objetivos.length)resultados.appendChild(el('<p class="strategy-muted">Os objetivos aparecerão aqui quando forem cadastrados.</p>'));
+  s.objetivos.forEach(o=>{const b=acao('',()=>abrirObjetivo(o),'ghost');b.className='strategy-result-row';b.innerHTML='<span><b>'+esc(o.titulo)+'</b><small>Meta: '+esc(o.meta||o.indicador||'A definir')+'</small></span><span>'+esc(o.resultado||'Resultado não registrado')+(o.resultadoEm?'<small>'+fmtDataAno(o.resultadoEm)+'</small>':'')+'</span>';resultados.appendChild(b)});
+  const conclusao=card(balanco,'Balanço do ano');conclusao.dataset.bid='es-balanco';
+  [['balanco','Resultados e decisões'],['aprendizados','Aprendizados para o próximo ano']].forEach(([k,t])=>conclusao.appendChild(el('<div><h4>'+t+'</h4><p class="strategy-prose">'+esc(est[k]||'Ainda não registrado.')+'</p></div>')));
+  if(!est.encerrado)conclusao.appendChild(acao('Registrar balanço',()=>modalDirecaoEstrategia(est,'balanco',r),'ghost'));
+  const arquivos=card(balanco,'Arquivos de '+est.ano);arquivos.dataset.bid='es-arquivos';arquivos.appendChild(areaArquivos('planejamento:'+est.id,'Adicionar documento deste planejamento',!!est.encerrado));
+  const fechar=card(balanco,est.encerrado?'Planejamento encerrado':'Encerrar este ciclo');fechar.appendChild(el('<p class="strategy-muted">'+(est.encerrado?'Este ano está protegido para consulta. Você pode reabrir para complementar o conteúdo.':'Depois de registrar os resultados, proteja este ano para consulta. O conteúdo e os anexos ficam no histórico.')+'</p>'));
+  fechar.appendChild(acao(est.encerrado?'Reabrir planejamento':'Encerrar planejamento',()=>{if(!confirm((est.encerrado?'Reabrir':'Encerrar')+' o planejamento de '+emp.nome+' / '+est.ano+'?'))return;est.encerrado=!est.encerrado;salvar();r()},'ghost'));
 }
 
 function modalObjetivo(o,aoSalvar,novo,plano){
-  abrirModal(esc(o.titulo||'Novo objetivo'),'o que muda se der certo',(c,fechar)=>{
-    const s1=el('<div class="secao"></div>');
-    s1.appendChild(campos(o,[
-      {k:'titulo',t:'Objetivo',full:true,ph:'ex.: dobrar a venda de fachadas até dezembro'},
-      {k:'porque',t:'Por que este e não outro',tipo:'textarea',full:true,ph:'o que ele destrava'},
-      {k:'indicador',t:'Como vou saber que chegou',ph:'ex.: 40 fachadas/mês'},
-      {k:'ate',t:'Até quando',tipo:'date'},
-    ],aoSalvar));
-    c.appendChild(s1);
-    const s2=el('<div class="secao" style="display:flex;gap:9px"></div>');
-    const ok=el('<button class="btn">Pronto</button>');ok.onclick=fechar;
-    s2.appendChild(el('<span class="cresce"></span>'));s2.appendChild(ok);
-    c.appendChild(s2);
-  },()=>{
-    if(novo&&!String(o.titulo||'').trim()){
-      const est=plano||(E.planejamentoEmpresas||[]).find(p=>p.objetivos?.some(x=>x===o))||E.estrategia[filtro.estrEmp];
-      if(est){const i=est.objetivos.findIndex(x=>x.id===o.id);if(i>=0)est.objetivos.splice(i,1)}
-      salvar();
-    }
-    aoSalvar&&aoSalvar();
-  });
+  if(plano?.encerrado)return;
+  abrirModal(novo?'Novo objetivo':'Editar objetivo','Defina o resultado esperado antes de detalhar as ações.',(c,fechar)=>{
+    const box=el('<div class="secao"></div>');formularioEstrategia(box,o,[
+      {k:'titulo',t:'Objetivo',full:true,req:true,ph:'Ex.: aumentar a recorrência de clientes'},
+      {k:'porque',t:'Por que este objetivo importa?',tipo:'textarea',full:true},
+      {k:'indicador',t:'Indicador de acompanhamento',full:true,ph:'Ex.: percentual de clientes que voltam a comprar'},
+      {k:'meta',t:'Meta esperada',ph:'Ex.: atingir 40% até dezembro'},
+      {k:'ate',t:'Prazo do objetivo',tipo:'date'}
+    ],'Salvar objetivo',v=>{if(plano?.encerrado)return;Object.assign(o,v);if(novo&&plano&&!plano.objetivos.some(x=>x.id===o.id))plano.objetivos.push(o);salvar();filtro.estrAba='plano';filtro.estrObjetivo=o.id;if(novo){filtro.estrFiltro='todas';filtro.estrBusca=''}fechar()});c.appendChild(box);
+  },()=>{if(novo&&!String(o.titulo||'').trim()){const dono=plano||(E.planejamentoEmpresas||[]).find(p=>p.objetivos?.includes(o));if(dono&&dono.objetivos.includes(o)){dono.objetivos=dono.objetivos.filter(x=>x!==o);salvar()}}aoSalvar&&aoSalvar()});
 }
+function modalAcaoEstrategia(est,o,a,r,status){
+  if(est.encerrado)return;
+  abrirModal(a?'Editar ação':'Nova ação',esc(o.titulo),(c,fechar)=>{const box=el('<div class="secao"></div>');
+    formularioEstrategia(box,{status:'A fazer',...a,...(status?{status}:{})},[
+      {k:'oque',t:'O que será feito?',req:true,full:true},{k:'quem',t:'Responsável'},{k:'ate',t:'Prazo',tipo:'date'},
+      {k:'status',t:'Situação',tipo:'select',opcoes:STATUS_ACAO},{k:'travaPor',t:'Impedimento, se houver',tipo:'textarea',full:true}
+    ],'Salvar ação',v=>{if(est.encerrado)return;if(v.status!=='Travada')v.travaPor='';if(a)Object.assign(a,v);else o.acoes.push({id:uid(),...v});salvar();filtro.estrObjetivo=o.id;fechar()});c.appendChild(box);
+  },r);
+}
+function modalResultadoEstrategia(est,o,r){
+  if(est.encerrado)return;
+  abrirModal('Registrar resultado',esc(o.titulo),(c,fechar)=>{const box=el('<div class="secao"></div>');box.appendChild(el('<p class="strategy-muted">Meta: '+esc(o.meta||o.indicador||'Ainda não definida')+'</p>'));formularioEstrategia(box,{...o,resultadoEm:o.resultadoEm||hoje()},[{k:'resultado',t:'Resultado observado e evidências',tipo:'textarea',req:true,full:true},{k:'resultadoEm',t:'Data da verificação',tipo:'date',req:true}],'Salvar resultado',v=>{if(v.resultadoEm>hoje())throw new Error('A data da verificação não pode estar no futuro.');if(est.encerrado)return;Object.assign(o,v);salvar();fechar()});c.appendChild(box)},r);
+}
+function modalDirecaoEstrategia(est,grupo,r){
+  if(est.encerrado)return;
+  const grupos={identidade:[['missao','Missão'],['visao','Visão']],diagnostico:[['diagnostico','Cenário atual'],['forcas','Forças'],['fragilidades','Pontos a melhorar'],['oportunidades','Oportunidades'],['ameacas','Riscos externos']],escolhas:[['posicionamento','Valor que entregamos ao cliente'],['naoFazer','O que fica fora das prioridades']],balanco:[['balanco','Resultados e decisões'],['aprendizados','Aprendizados para o próximo ano']]};
+  abrirModal(({identidade:'Identidade da empresa',diagnostico:'Diagnóstico do ano',escolhas:'Escolhas estratégicas',balanco:'Balanço do ano'})[grupo],String(est.ano),(c,fechar)=>{
+    const box=el('<div class="secao"></div>');const defs=grupos[grupo].map(([k,t])=>({k,t,tipo:'textarea',full:true}));
+    formularioEstrategia(box,est,defs,'Salvar alterações',v=>{if(est.encerrado)return;Object.assign(est,v);salvar();fechar()});c.appendChild(box);
 
+  },r);
+}
+function modalValorEstrategia(est,v,r){if(est.encerrado)return;abrirModal(v?'Editar valor':'Novo valor','Como esse princípio aparece na prática.',(c,fechar)=>{const b=el('<div class="secao"></div>');formularioEstrategia(b,v||{},[{k:'titulo',t:'Valor',req:true,full:true},{k:'oque',t:'O que significa na prática',tipo:'textarea',full:true}],'Salvar valor',dados=>{if(v)Object.assign(v,dados);else est.valores.push(dados);salvar();fechar()});if(v)b.appendChild(acao('Excluir valor',()=>{if(confirm('Excluir o valor “'+v.titulo+'”?')){est.valores=est.valores.filter(x=>x!==v);salvar();fechar()}},'ghost strategy-delete'));c.appendChild(b)},r)}
+
+function campoTatico(est,r){
+  const cx=el('<div class="strategy-team"></div>');
+  const semCobertura=(est.pecas||[]).filter(p=>p.chave&&!String(p.substituto||'').trim());
+  if(semCobertura.length)cx.appendChild(el('<div class="strategy-team-note"><b>'+semCobertura.length+' pessoa(s)-chave sem cobertura registrada</b><p>'+semCobertura.map(p=>esc(p.nome)).join(', ')+'. Defina quem pode assumir as responsabilidades em uma ausência.</p></div>'));
+  const ferramentas=el('<div class="strategy-team-tools"></div>');
+  if(!est.encerrado){ferramentas.appendChild(acao('+ Adicionar pessoa',()=>modalPeca(est,{id:uid(),zona:est.zonas[0]?.id||''},r,true)));ferramentas.appendChild(acao('Nova frente',()=>modalFrenteEstrategia(est,null,r),'ghost'))}cx.appendChild(ferramentas);
+  const grade=el('<div class="strategy-team-grid"></div>');cx.appendChild(grade);
+  const zonas=[...est.zonas];if(est.pecas.some(p=>!zonas.some(z=>z.id===p.zona)))zonas.push({id:'',nome:'Sem frente definida'});
+  zonas.forEach(z=>{const pessoas=est.pecas.filter(p=>z.id?p.zona===z.id:!est.zonas.some(x=>x.id===p.zona));const card=el('<section class="strategy-team-card"><header><div><h3>'+esc(z.nome)+'</h3><small>'+pessoas.length+' '+(pessoas.length===1?'pessoa':'pessoas')+'</small></div></header></section>');if(z.dica)card.appendChild(el('<p class="strategy-muted">'+esc(z.dica)+'</p>'));if(!est.encerrado&&z.id)card.querySelector('header').appendChild(acao('Editar frente',()=>modalFrenteEstrategia(est,z,r),'ghost'));
+    pessoas.forEach(p=>{const pe=acao('',()=>{if(!est.encerrado)modalPeca(est,p,r)},'ghost');pe.className='pecaT strategy-person';pe.innerHTML=avatar(p.nome||'?',34)+'<span><b>'+esc(p.nome||'Pessoa sem nome')+'</b><small>'+esc(p.funcao||'Função a definir')+'</small>'+(p.chave?'<small class="strategy-person-cover">Pessoa-chave · '+esc(p.substituto?'Cobertura: '+p.substituto:'Cobertura a definir')+'</small>':'')+'</span><span aria-hidden="true">'+(est.encerrado?'':'↗')+'</span>';pe.ondblclick=ev=>ev.stopPropagation();card.appendChild(pe)});
+    if(!pessoas.length)card.appendChild(el('<p class="strategy-team-empty">Nenhuma pessoa nesta frente.</p>'));grade.appendChild(card);
+  });return cx;
+}
 function modalPeca(est,p,aoSalvar,novo){
-  abrirModal((p.nome?avatar(p.nome,26):'')+esc(p.nome||'Nova peça'),esc(p.funcao||''),(c,fechar)=>{
-    const s1=el('<div class="secao"></div>');
-    s1.appendChild(campos(p,[
-      {k:'nome',t:'Quem',ph:'nome da pessoa',full:true},
-      {k:'funcao',t:'O que essa peça faz',ph:'ex.: fecha venda e cuida do cliente grande',full:true},
-      {k:'zona',t:'Em que frente',tipo:'select',opcoes:(est.zonas||[]).map(z=>z.nome)},
-    ],()=>{
-      // o select guarda o NOME da frente; aqui volta para o id
-      const z=(est.zonas||[]).find(x=>x.nome===p.zona);
-      if(z)p.zona=z.id;
-      aoSalvar&&aoSalvar();
-    }));
-    c.appendChild(s1);
-
-    const s2=el('<div class="secao"><h4>Se esta peça sair de cena</h4></div>');
-    s2.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin:-4px 0 9px">
-      Doença, proposta melhor, briga. A hora de responder isso é agora, não no dia.</p>`));
-    const chk=el(`<label style="display:flex;gap:9px;align-items:center;padding:8px 0;cursor:pointer">
-      <input type="checkbox" ${p.chave?'checked':''} style="width:17px;height:17px;accent-color:var(--tinta)">
-      <span style="font-size:13.5px"><b>⭐ É peça-chave</b> — sem ela a frente para</span></label>`);
-    const sub=el('<div></div>');
-    const pintaSub=()=>{
-      sub.innerHTML='';
-      if(!p.chave)return;
-      sub.appendChild(campos(p,[
-        {k:'substituto',t:'Quem cobre se ela faltar',ph:'nome — ou "ninguém", se for a verdade',full:true},
-      ],aoSalvar));
-      if(!String(p.substituto||'').trim())
-        sub.appendChild(el('<div class="aviso" style="background:var(--vermelho-cl);border-color:var(--vermelho)">⚠ Sem cobertura: essa é a peça que pode te parar.</div>'));
-    };
-    chk.querySelector('input').onchange=ev=>{p.chave=ev.target.checked;salvar();pintaSub();aoSalvar&&aoSalvar()};
-    pintaSub();
-    s2.appendChild(chk);s2.appendChild(sub);
-    c.appendChild(s2);
-
-    const s3=el('<div class="secao"></div>');
-    s3.appendChild(campos(p,[{k:'obs',t:'Anotações',tipo:'textarea',full:true,ph:'pontos fortes, o que precisa desenvolver, combinados'}],aoSalvar));
-    c.appendChild(s3);
-
-    const s4=el('<div class="secao" style="display:flex;gap:9px"></div>');
-    const del=el('<button class="btn ghost" style="color:var(--vermelho)">Tirar do campo</button>');
-    del.onclick=()=>{if(!confirm('Tirar "'+(p.nome||'esta peça')+'" do campo?'))return;
-      est.pecas=est.pecas.filter(x=>x.id!==p.id);salvar();fechar()};
-    s4.appendChild(del);s4.appendChild(el('<span class="cresce"></span>'));
-    const ok=el('<button class="btn">Pronto</button>');ok.onclick=fechar;s4.appendChild(ok);
-    c.appendChild(s4);
-  },()=>{
-    if(novo&&!String(p.nome||'').trim()){est.pecas=est.pecas.filter(x=>x.id!==p.id);salvar()}
-    aoSalvar&&aoSalvar();
-  });
+  if(est.encerrado)return;
+  abrirModal(novo?'Adicionar pessoa':'Editar pessoa','Responsabilidade, frente de trabalho e cobertura.',(c,fechar)=>{const b=el('<div class="secao"></div>');formularioEstrategia(b,{...p,chave:p.chave?'Sim':'Não'},[
+    {k:'nome',t:'Nome',req:true,full:true},{k:'funcao',t:'Responsabilidade',full:true},{k:'zona',t:'Frente de trabalho',tipo:'select',opcoes:est.zonas.map(z=>[z.id,z.nome])},
+    {k:'chave',t:'É pessoa-chave?',tipo:'select',opcoes:['Não','Sim']},{k:'substituto',t:'Quem cobre em uma ausência?',full:true},{k:'obs',t:'Anotações',tipo:'textarea',full:true}
+  ],'Salvar pessoa',v=>{if(est.encerrado)return;Object.assign(p,v,{chave:v.chave==='Sim'});if(novo&&!est.pecas.some(x=>x.id===p.id))est.pecas.push(p);salvar();fechar()});if(!novo)b.appendChild(acao('Remover da equipe',()=>{if(confirm('Remover “'+p.nome+'” da equipe deste ano?')){est.pecas=est.pecas.filter(x=>x!==p);salvar();fechar()}},'ghost strategy-delete'));c.appendChild(b)},aoSalvar);
 }
+function modalFrenteEstrategia(est,z,r){
+  if(est.encerrado)return;
+  abrirModal(z?'Editar frente':'Nova frente','Agrupe pessoas por responsabilidade.',(c,fechar)=>{const b=el('<div class="secao"></div>');formularioEstrategia(b,z||{},[{k:'nome',t:'Nome da frente',req:true,full:true},{k:'dica',t:'Responsabilidade desta frente',tipo:'textarea',full:true}],'Salvar frente',v=>{if(z)Object.assign(z,v);else est.zonas.push({id:uid(),...v});salvar();fechar()});if(z)b.appendChild(acao('Excluir frente',()=>{if(est.pecas.some(p=>p.zona===z.id)){alert('Mova as pessoas para outra frente antes de excluir.');return}if(est.zonas.length===1){alert('Mantenha pelo menos uma frente de trabalho.');return}if(confirm('Excluir a frente “'+z.nome+'”?')){est.zonas=est.zonas.filter(x=>x!==z);salvar();fechar()}},'ghost strategy-delete'));c.appendChild(b)},r);
+}
+
 
 /* ===================== OPORTUNIDADES =====================
    Um lugar para o que você AINDA não decidiu fazer. O trabalho aqui não é
@@ -8488,7 +8282,7 @@ function modalDoc(d){
 function prepararDesenvolvimento(d){
   if(!d.desenvolvimento||typeof d.desenvolvimento!=='object'||Array.isArray(d.desenvolvimento))d.desenvolvimento={};
   const x=d.desenvolvimento;
-  for(const k of ['fontes','leituras','revisoes','reflexoes','validacoes'])if(!Array.isArray(x[k]))x[k]=[];
+  for(const k of ['fontes','leituras','revisoes','reflexoes','validacoes','resultados'])if(!Array.isArray(x[k]))x[k]=[];
   if(!x.rodaAtual||typeof x.rodaAtual!=='object'||Array.isArray(x.rodaAtual))x.rodaAtual=Object.fromEntries(Object.entries(d.roda||{}).filter(([,v])=>typeof v==='number'&&v>0&&v<=10));
   return x;
 }
@@ -8556,12 +8350,79 @@ function devPainelLegado(){
   for(const k of ['disc','discAdaptado','big5','temperamentos','valores','lideranca'])if(C[k]&&Object.keys(C[k]).length)det.appendChild(el('<h4>'+({disc:'DISC natural',discAdaptado:'DISC adaptado',big5:'Big Five — origem a conferir',temperamentos:'Temperamentos — origem a conferir',valores:'Valores',lideranca:'Liderança'})[k]+'</h4><p>'+Object.entries(C[k]).map(([a,b])=>esc(a)+': '+esc(b)).join(' · ')+'</p>'));
   if(C.numerologia)det.appendChild(el('<h4>Referências simbólicas pessoais</h4><p>'+esc(C.numerologia)+'</p>'));c.appendChild(det);return c;
 }
+function devModalResultado(leitura){
+  const l=typeof leitura==='string'?devDados().leituras.find(x=>x.id===leitura):leitura;
+  abrirModal('Registrar resultado',l?esc(l.titulo):'Guarde uma mudança observada na prática.',(c,fechar)=>{
+    const b=el('<div class="secao"></div>');if(l?.medida)b.appendChild(el('<p class="dev-question">Como observar: '+esc(l.medida)+'</p>'));
+    devFormulario(b,[{k:'titulo',t:'Resultado ou mudança observada',req:true,full:true},{k:'data',t:'Data',tipo:'date',req:true,max:hoje()},
+      {k:'contexto',t:'O que eu coloquei em prática',tipo:'textarea',full:true},{k:'resultado',t:'O que aconteceu depois',tipo:'textarea',req:true,full:true},
+      {k:'evidencia',t:'Exemplo, número ou feedback que sustenta o resultado',tipo:'textarea',full:true},{k:'proximoPasso',t:'Próximo ajuste',tipo:'textarea',full:true}
+    ],{data:hoje(),titulo:l?.titulo||''},'Guardar resultado',v=>{if(v.data>hoje())throw new Error('Use uma data até hoje.');devDados().resultados.push({id:uid(),leituraId:l?.id||'',...v,criadoEm:new Date().toISOString()});salvar();filtro.devAba='resultados';filtro.devResultado='evolucao';fechar()});c.appendChild(b);
+  });
+}
+function devPainelResultados(host){
+  const d=devDados();
+  const header=el('<div class="dev-results-header"><div><span class="workspace-eyebrow">AVALIAÇÕES E APLICAÇÃO NA VIDA REAL</span><h3>Meus resultados</h3><p>O que foi registrado, como interpretar e o que mudou na prática.</p></div></div>');header.appendChild(acao('+ Registrar resultado',()=>devModalResultado(),'ghost'));host.appendChild(header);
+  const nav=el('<nav class="dev-result-tabs" aria-label="Tipos de resultado"></nav>'),paineis={};
+  const mostrar=id=>{if(!paineis[id])id='disc';Object.entries(paineis).forEach(([k,p])=>{p.hidden=k!==id;nav.querySelector('[data-result="'+k+'"]').setAttribute('aria-pressed',String(k===id))});filtro.devResultado=id};
+  for(const [id,t,sub] of [['disc','DISC','Comportamento'],['lideranca','Liderança','Estilos registrados'],['analises','Minhas análises','Leituras por tema'],['evolucao','Resultados na prática','Mudanças e evidências']]){
+    const b=acao('',()=>mostrar(id),'ghost');b.innerHTML='<b>'+t+'</b><small>'+sub+'</small>';b.dataset.result=id;b.id='dev-result-'+id;b.setAttribute('aria-controls','dev-result-pane-'+id);nav.appendChild(b);const pane=el('<section class="dev-result-pane" id="dev-result-pane-'+id+'" aria-labelledby="'+b.id+'"></section>');paineis[id]=pane;
+  }host.appendChild(nav);Object.values(paineis).forEach(p=>host.appendChild(p));
+  const ordem=(a,b)=>(b.dataDocumento||'').localeCompare(a.dataDocumento||'');
+  const fontes=d.fontes.filter(f=>f.revisado&&!f.pendente&&(f.disc||f.lideranca)).sort(ordem);
+  const baseFonte=(host,f)=>{const intro=el('<div class="dev-result-source"><span class="dev-tag">AVALIAÇÃO DOCUMENTADA</span><h4>'+esc(f.titulo)+'</h4><p>'+devData(f)+'</p></div>');intro.appendChild(devFontesLinks([f.id]));host.appendChild(intro)};
+  for(const tipo of ['disc','lideranca']){
+    const pane=paineis[tipo],disponiveis=fontes.filter(f=>f[tipo]);
+    if(!disponiveis.length){pane.appendChild(el('<div class="workspace-empty"><h3>Nenhum resultado documentado nesta categoria</h3><p>Os registros anteriores continuam no histórico. Para mostrar uma medição aqui, é necessário identificar o relatório original.</p></div>'));continue}
+    const select=seletor(disponiveis[0].id,disponiveis.map(f=>[f.id,f.titulo+' · '+(f.dataDocumento?fmtDataAno(f.dataDocumento):'Sem data de aplicação')]),()=>pintar(),'Avaliação de '+(tipo==='disc'?'DISC':'liderança'));
+    if(disponiveis.length>1){const label=el('<label class="dev-result-select">Escolher avaliação</label>');label.appendChild(select);pane.appendChild(label)}
+    const body=el('<div class="workspace-card dev-measured-result"></div>');pane.appendChild(body);
+    function pintar(){const f=disponiveis.find(x=>x.id===select.value)||disponiveis[0];body.innerHTML='';baseFonte(body,f);
+      if(tipo==='disc'){
+        const grid=el('<div class="dev-disc-comparison"></div>');
+        for(const [modo,titulo] of [['natural','Natural'],['adaptado','Adaptado']]){const box=el('<section><h4>'+titulo+'</h4></section>');for(const [k,nome] of [['D','Dominância'],['I','Influência'],['S','Estabilidade'],['C','Conformidade']]){const n=f.disc?.[modo]?.[k];if(!Number.isFinite(n)||n<0||n>100)continue;box.appendChild(el('<div class="dev-score"><div><span><b>'+k+'</b> '+nome+'</span><strong>'+n+'</strong></div><div class="dev-score-track"><i style="width:'+n+'%"></i></div></div>'))}grid.appendChild(box)}body.appendChild(grid);
+        body.appendChild(el('<p class="dev-result-caption">Pontuações do relatório. Natural e adaptado pertencem à mesma aplicação; esta comparação não mede evolução ao longo do tempo.</p>'));
+      }else{
+        const scores=Object.entries(f.lideranca||{}).filter(([,n])=>Number.isFinite(n)&&n>=0&&n<=100).sort((a,b)=>b[1]-a[1]);
+        scores.forEach(([t,n])=>body.appendChild(el('<div class="dev-score"><div><span>'+esc(t)+'</span><strong>'+n.toLocaleString('pt-BR',{maximumFractionDigits:2})+'%</strong></div><div class="dev-score-track"><i style="width:'+n+'%"></i></div></div>')));
+        body.appendChild(el('<p class="dev-result-caption">Distribuição dos estilos descrita nessa avaliação. Não é uma nota de competência ou qualidade da sua liderança.</p>'));
+      }
+      body.appendChild(el('<div class="dev-result-reading"><h4>O que o documento registra</h4><p>'+esc(f.resumo||'Consulte o original para conhecer a interpretação do instrumento.')+'</p></div>'));
+      const limites=el('<details class="dev-result-limits"><summary>Contexto e cuidados na leitura</summary><p>'+esc(f.limites||'Considere a data e as condições da aplicação.')+'</p></details>');body.appendChild(limites);
+      body.appendChild(acao('Ver análises relacionadas',()=>{filtro.devAnaliseFonte=f.id;mostrar('analises');pintarAnalises()},'ghost'));
+    }pintar();
+  }
+  const analises=paineis.analises,tools=el('<div class="dev-analyses-tools"></div>');
+  const areas=[...new Set(d.leituras.map(l=>l.area||'Pessoal'))];const area=seletor('',[['','Todos os temas'],...areas.map(x=>[x,x])],()=>{filtro.devAnaliseFonte='';pintarAnalises()},'Tema da análise');tools.appendChild(area);analises.appendChild(tools);const cards=el('<div class="dev-results-analyses"></div>');analises.appendChild(cards);
+  function pintarAnalises(){cards.innerHTML='';tools.querySelector('[data-limpar-fonte]')?.remove();
+    if(filtro.devAnaliseFonte){const b=acao('Mostrar todas as fontes',()=>{filtro.devAnaliseFonte='';pintarAnalises()},'ghost');b.dataset.limparFonte='';tools.appendChild(b)}
+    const leituras=d.leituras.filter(l=>(!area.value||l.area===area.value)&&(!filtro.devAnaliseFonte||(l.fontes||[]).includes(filtro.devAnaliseFonte)));
+    if(!leituras.length)cards.appendChild(el('<p class="workspace-note">Nenhuma análise neste filtro. Os documentos originais estão em Histórico e fontes.</p>'));
+    leituras.forEach(l=>{const c=el('<article class="workspace-card dev-analysis-result"><span class="dev-tag">'+esc(l.area||'Pessoal')+' · '+esc(l.tipo||'Leitura dos registros')+'</span><h4>'+esc(l.titulo)+'</h4><p>'+esc(l.texto)+'</p></article>');c.appendChild(devFontesLinks(l.fontes));
+      const quadro=el('<div class="dev-analysis-application"><div><b>Como aplicar</b><p>'+esc(l.passo||'Ainda sem aplicação definida.')+'</p></div><div><b>Como observar o resultado</b><p>'+esc(l.medida||'Defina um exemplo observável para acompanhar.')+'</p></div></div>');c.appendChild(quadro);
+      if(l.nota)c.appendChild(el('<p class="dev-my-reading"><b>Minha percepção:</b> '+esc(l.nota)+'</p>'));
+      const resultados=d.resultados.filter(x=>x.leituraId===l.id).sort((a,b)=>b.data.localeCompare(a.data));
+      c.appendChild(el('<p class="dev-analysis-status">'+esc(l.status||'A conferir')+' · '+(resultados.length?resultados.length+' resultado(s) registrado(s)':'Ainda sem resultado prático registrado')+'</p>'));
+      if(resultados.length)c.appendChild(el('<div class="dev-latest-result"><b>Último resultado · '+fmtDataAno(resultados[0].data)+'</b><p>'+esc(resultados[0].resultado)+'</p></div>'));
+      const actions=el('<div class="dev-card-actions"></div>');actions.appendChild(acao('Conferir análise',()=>devModalLeitura(l),'ghost'));actions.appendChild(acao('Registrar resultado',()=>devModalResultado(l),'ghost'));if(l.passo)actions.appendChild(acao('Levar ao plano',()=>devModalAcao(devCriarAcao(l)),'ghost'));c.appendChild(actions);cards.appendChild(c);
+    });
+    const documentos=d.fontes.filter(f=>f.revisado&&!f.pendente&&f.tipo==='Análise interpretativa'&&(!filtro.devAnaliseFonte||f.id===filtro.devAnaliseFonte));
+    if(documentos.length){const acervo=el('<details class="dev-result-limits"><summary>Outras análises preservadas nos documentos</summary></details>');documentos.forEach(f=>{const b=el('<article class="dev-document-reading"><h4>'+esc(f.titulo)+'</h4><small>'+devData(f)+'</small><p>'+esc(f.resumo)+'</p><p class="workspace-note">'+esc(f.limites||'')+'</p></article>');b.appendChild(devFontesLinks([f.id]));acervo.appendChild(b)});cards.appendChild(acervo)}
+  }pintarAnalises();
+  const evolucao=paineis.evolucao,registros=[...d.resultados].sort((a,b)=>b.data.localeCompare(a.data)||String(b.criadoEm||'').localeCompare(String(a.criadoEm||'')));
+  if(!registros.length){const c=el('<div class="workspace-empty"><h3>As análises já estão aqui. Agora vamos acompanhar a prática.</h3><p>Registre o que você aplicou, o que mudou e um exemplo que comprove esse resultado. Cada registro fica guardado com a data.</p></div>');c.appendChild(acao('Registrar primeiro resultado',()=>devModalResultado()));evolucao.appendChild(c)}
+  registros.forEach(x=>{const l=d.leituras.find(l=>l.id===x.leituraId);const c=el('<article class="workspace-card dev-practical-result"><span class="dev-tag">'+fmtDataAno(x.data)+' · Registro pessoal</span><h4>'+esc(x.titulo)+'</h4></article>');if(l)c.appendChild(el('<p class="workspace-note">Análise relacionada: '+esc(l.titulo)+'</p>'));for(const [k,t] of [['contexto','O que coloquei em prática'],['resultado','Resultado observado'],['evidencia','Evidência ou exemplo'],['proximoPasso','Próximo ajuste']])if(x[k])c.appendChild(el('<div><h5>'+t+'</h5><p>'+esc(x[k])+'</p></div>'));if(l)c.appendChild(devFontesLinks(l.fontes));evolucao.appendChild(c)});
+  const conquistas=d.reflexoes.filter(x=>x.tipo==='Conquista');if(conquistas.length){const c=el('<section class="workspace-card dev-practical-result"><h4>Conquistas já registradas</h4></section>');conquistas.forEach(x=>c.appendChild(el('<div><h5>'+esc(x.titulo)+' · '+fmtDataAno(x.data)+'</h5><p>'+esc(x.contexto||x.aprendizado||'')+'</p></div>')));evolucao.appendChild(c)}
+  mostrar(filtro.devResultado||'disc');
+}
+
+
 function organizarDesenvolvimento(host){
   const d=devDados(),blocos=[...host.querySelectorAll(':scope > [data-bid]')];host.querySelector('.workspace-heading')?.remove();
   const titulo=el('<div class="dev-title"><div><h2>Meu desenvolvimento</h2><p>Meu retrato, minha evolução e o que quero desenvolver.</p></div></div>');titulo.appendChild(acao('+ Registrar aprendizado',devModalReflexao,'ghost'));host.prepend(titulo);
   const nav=el('<nav class="dev-nav" aria-label="Meu desenvolvimento"></nav>'),panes={};
   const seleciona=id=>{if(!panes[id])id='retrato';Object.entries(panes).forEach(([k,p])=>{p.hidden=k!==id;nav.querySelector('[data-dev="'+k+'"]').setAttribute('aria-pressed',String(k===id))});filtro.devAba=id};
-  for(const [id,nome] of [['retrato','Meu retrato'],['acao','Plano de ação'],['acervo','Histórico e fontes'],['avaliacao','Autoavaliação']]){const b=acao(nome,()=>seleciona(id),'ghost');b.dataset.dev=id;b.id='dev-nav-'+id;b.setAttribute('aria-controls','dev-'+id);nav.appendChild(b);const p=el('<section class="dev-pane" id="dev-'+id+'" aria-labelledby="'+b.id+'"></section>');panes[id]=p}
+  for(const [id,nome] of [['retrato','Meu retrato'],['resultados','Resultados'],['acao','Plano de ação'],['acervo','Histórico e fontes'],['avaliacao','Autoavaliação']]){const b=acao(nome,()=>seleciona(id),'ghost');b.dataset.dev=id;b.id='dev-nav-'+id;b.setAttribute('aria-controls','dev-'+id);nav.appendChild(b);const p=el('<section class="dev-pane" id="dev-'+id+'" aria-labelledby="'+b.id+'"></section>');panes[id]=p}
   host.appendChild(nav);Object.values(panes).forEach(p=>host.appendChild(p));blocos.forEach(b=>panes[devAbaBloco(b.dataset.bid)].appendChild(b));
   const retrato=panes.retrato,relatorios=d.fontes.filter(f=>f.tipo==='Relatório'),ult=[...relatorios].filter(f=>f.dataDocumento).sort((a,b)=>b.dataDocumento.localeCompare(a.dataDocumento))[0];
   const hero=el('<div class="dev-hero"><div><span class="workspace-eyebrow">O QUE OS REGISTROS MOSTRAM</span><h3>'+esc(d.titulo||'Seu retrato começa com histórias reais.')+'</h3><p>'+esc(d.sintese||'Reúna uma avaliação, registre um feedback ou conte uma situação que ajudou você a se conhecer melhor.')+'</p></div><aside><span>Última avaliação documentada</span><b>'+(ult?devData(ult):'Ainda não cadastrada')+'</b><small>'+esc(ult?ult.titulo:'Você pode começar com uma reflexão.')+'</small></aside></div>');retrato.appendChild(hero);if(ult)hero.querySelector('aside').appendChild(acao('Ver avaliação original',()=>{seleciona('acervo');const item=[...host.querySelectorAll('[data-fonte]')].find(e=>e.dataset.fonte===ult.id);if(item){item.open=true;item.scrollIntoView({block:'start',behavior:'smooth'})}},'ghost'));
@@ -8591,6 +8452,8 @@ function organizarDesenvolvimento(host){
   const revisoes=[...d.revisoes].sort((a,b)=>b.data.localeCompare(a.data)||String(b.criadoEm||'').localeCompare(String(a.criadoEm||'')));
   if(!revisoes.length)h.appendChild(el('<p>Ainda não há avaliações datadas. Faça a primeira para começar seu histórico.</p>'));
   revisoes.forEach((r,i)=>{const box=el('<details class="dev-history-item"><summary><span><b>'+fmtDataAno(r.data)+'</b><small>'+devNotas(r.notas).length+' áreas avaliadas</small></span><span aria-hidden="true">+</span></summary><div class="dev-history-body"></div></details>');if(i===0)box.open=true;const b=box.querySelector('.dev-history-body');if(r.contexto)b.appendChild(el('<p>'+esc(r.contexto)+'</p>'));devComparar(r.notas,revisoes[i+1]?.notas).forEach(x=>b.appendChild(el('<div class="dev-rating"><span>'+esc(x.area)+'</span><b>'+x.nota+' / 10 <small>'+(x.delta==null?'Sem comparação':x.delta===0?'Sem mudança':(x.delta>0?'+':'')+x.delta+' vs. anterior')+'</small></b></div>')));h.appendChild(box)});
+  devPainelResultados(panes.resultados);
+  hero.querySelector('aside').prepend(acao('Ver meus resultados',()=>seleciona('resultados'),'ghost'));
   seleciona(filtro.devAba||'retrato');
 }
 function devDiscDocumento(f){const c=el('<section class="dev-disc"><h4>DISC registrado no documento</h4><p class="workspace-note">Natural e adaptado são duas leituras da mesma aplicação. A diferença não comprova desgaste nem evolução ao longo do tempo.</p></section>');for(const k of ['D','I','S','C']){const a=f.disc.natural?.[k],b=f.disc.adaptado?.[k];if(!Number.isFinite(a)||!Number.isFinite(b))continue;const x=el('<div class="dev-disc-row"><b>'+k+'</b><div><span>Natural '+a+'</span><i style="width:'+Math.max(0,Math.min(100,a))+'%"></i><span>Adaptado '+b+'</span><i class="adaptado" style="width:'+Math.max(0,Math.min(100,b))+'%"></i></div></div>');c.appendChild(x)}return c}
@@ -9607,7 +9470,7 @@ function validarBackup(j){
   for(const [col,camposLista] of Object.entries(listasInternas))for(const x of j[col]||[])for(const k of camposLista){
     if(x[k]!==undefined&&(!Array.isArray(x[k])||x[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))throw new Error('Lista inválida: '+col+'.'+k);
   }
-  if(j.desenvolvimento)for(const k of ['fontes','leituras','revisoes','reflexoes','validacoes'])if(j.desenvolvimento[k]!==undefined&&(!Array.isArray(j.desenvolvimento[k])||j.desenvolvimento[k].some(x=>!x||typeof x!=='object'||Array.isArray(x))))throw new Error('Lista inválida: desenvolvimento.'+k);
+  if(j.desenvolvimento)for(const k of ['fontes','leituras','revisoes','reflexoes','validacoes','resultados'])if(j.desenvolvimento[k]!==undefined&&(!Array.isArray(j.desenvolvimento[k])||j.desenvolvimento[k].some(x=>!x||typeof x!=='object'||Array.isArray(x))))throw new Error('Lista inválida: desenvolvimento.'+k);
   const chavesPlano=new Set();
   for(const p of j.planejamentoEmpresas||[]){
     if(!p.id||!p.empresaId||!Number.isInteger(p.ano)||p.ano<2027||p.ano>2200)throw new Error('Empresa ou ano inválido no planejamento.');
