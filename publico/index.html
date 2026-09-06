@@ -243,16 +243,13 @@ tr:hover .lixo{opacity:1}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css?v=dfa9af7f7405">
+<link rel="stylesheet" href="./refinamento.css?v=13f9c1c2a45c">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
 <div class="app">
   <aside class="side" aria-label="Navegação principal">
-    <div class="marca"><svg viewBox="0 0 64 64" width="30" height="30" style="flex:0 0 auto"><g fill="#3B45E5">
-      <rect x="4" y="4" width="13" height="56"/><rect x="23" y="4" width="37" height="13"/>
-      <rect x="23" y="26" width="37" height="12"/><rect x="47" y="26" width="13" height="34"/>
-      <rect x="30" y="47" width="17" height="13"/></g></svg><div><b>LEONARDO</b><small style="letter-spacing:.18em">GONÇALVES</small></div></div>
+    <div class="marca"><img class="logo-pessoal" src="./assets/logo-leonardo-goncalves.png" width="914" height="177" alt="Leonardo Gonçalves"></div>
     <div class="atalhos-topo"><button class="btn ghost" onclick="abrirBusca()" aria-label="Buscar em tudo">⌕ Buscar</button><button class="btn ghost menu-mobile" aria-expanded="false" aria-controls="nav" onclick="alternarMenu()">☰ Menu</button></div>
     <nav class="nav" id="nav" aria-label="Seções"></nav>
     <!-- A ponte para o lado da empresa. Fica aqui, e não no rodapé de ações,
@@ -9633,12 +9630,7 @@ function telaLogin(){
   document.querySelector('.app').style.display='none';
   const f=el(`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px">
     <form class="bloco" style="max-width:360px;width:100%;padding:30px 26px;text-align:center">
-      <svg viewBox="0 0 64 64" width="52" height="52" style="margin-bottom:10px"><g fill="#3B45E5">
-        <rect x="4" y="4" width="13" height="56"/><rect x="23" y="4" width="37" height="13"/>
-        <rect x="23" y="26" width="37" height="12"/><rect x="47" y="26" width="13" height="34"/>
-        <rect x="30" y="47" width="17" height="13"/></g></svg>
-      <h2 style="font-size:19px">LEONARDO</h2>
-      <div style="letter-spacing:.22em;font-size:12px;color:var(--suave);margin-bottom:18px">GONÇALVES</div>
+      <img class="logo-pessoal logo-login" src="./assets/logo-leonardo-goncalves.png" width="914" height="177" alt="Leonardo Gonçalves">
       <input type="text" class="usr" aria-label="Usuário" required placeholder="Usuário" autocomplete="username" value="leonardo" style="width:100%;border:1px solid var(--linha);background:var(--bg);color:inherit;font:inherit;padding:11px 13px;border-radius:10px;text-align:center;margin-bottom:9px">
       <input type="password" aria-label="Senha" required placeholder="Senha" autocomplete="current-password" style="width:100%;border:1px solid var(--linha);background:var(--bg);color:inherit;font:inherit;padding:11px 13px;border-radius:10px;text-align:center">
       <label style="display:flex;gap:8px;align-items:center;justify-content:center;font-size:12.5px;color:var(--suave);margin:13px 0">
