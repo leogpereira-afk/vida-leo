@@ -40,3 +40,18 @@ test('Gmail: consulta anexo sem gravar e importa somente após seleção',async(
  assert.equal(run('E.agenda.length'),1);assert.equal(run('E.agenda[0].hora'),'12:00');
  const second=await run('consultarConvitesGmail()');assert.equal(second.plano[0].acao,'existente');assert.equal(run('E.agenda.length'),1);
 });
+
+test('Gmail manual: data incompleta exige preenchimento e seleção',async()=>{
+ const {run,ctx,document}=setup();const body=Buffer.from('Vencimento: 10/09').toString('base64url');
+ ctx.gmailMock=async path=>path.startsWith('messages?')?{messages:[{id:'m2'}]}:{id:'m2',internalDate:'100',payload:{mimeType:'text/plain',headers:[{name:'Subject',value:'Boleto teste'}],body:{data:body}}};run('gmailApi=gmailMock');ctx.result=await run('consultarConvitesGmail()');assert.equal(ctx.result.plano.length,1);run('revisarConvitesGmail(result)');
+ const box=document.querySelector('.google-evento input[type=checkbox]'),date=document.querySelector('.google-evento input[type=date]');assert.equal(box.disabled,true);assert.equal(run('E.agenda.length'),0);
+ date.value='2099-09-10';date.dispatchEvent(new document.defaultView.Event('change'));assert.equal(box.disabled,false);box.checked=true;box.dispatchEvent(new document.defaultView.Event('change'));
+ [...document.querySelectorAll('button')].find(b=>b.textContent.startsWith('Importar 1')).click();assert.equal(run('E.agenda[0].data'),'2099-09-10');
+});
+test('Google manual: reenvio atualiza o mesmo evento sem convidados',async()=>{
+ const {run,ctx}=setup();let ids=[],posts=0,patches=0;ctx.googleMock=async(path,method='GET',body)=>{
+ if(path==='calendars')return {id:'cal-test'};
+ if(method==='POST'){ids.push(body.id);posts++;assert.equal(body.attendees,undefined);assert.equal(body.reminders.overrides.length,2);return posts===1?{htmlLink:'https://calendar.google.com/test'}:{conflict:true}}
+ if(method==='GET')return {extendedProperties:{private:{leoSource:ids[0]}}};if(method==='PATCH'){patches++;assert.equal(body.id,undefined);return {htmlLink:'https://calendar.google.com/test'}};throw Error(path)
+ };run("googleAgendaGravar=googleMock;E.agenda=[{id:'local',gid:'mail:1',gmailId:'1',data:'2099-09-10',ate:'2099-09-10',titulo:'Vencimento teste'}]");await run('enviarLembreteGoogle(E.agenda[0])');await run('enviarLembreteGoogle(E.agenda[0])');assert.equal(ids[0],ids[1]);assert.equal(patches,1);assert.equal(run('E.googleAgendaDestino'),'cal-test');
+});

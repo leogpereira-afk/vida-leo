@@ -279,6 +279,7 @@ tr:hover .lixo{opacity:1}
 <div id="modais"></div>
 
 <script src="./vendor/ical-2.2.1.min.js"></script>
+<script src="./google-datas.js?v=1"></script>
 <script>
 /* ============================================================
    Central do Léo — painel pessoal, um arquivo só.
@@ -2341,6 +2342,7 @@ function eventosDoEcossistema(){
   if(on('compromissos')) (E.agenda||[]).forEach(a=>{if(a.data)ev.push({
     data:a.data,ate:a.ate||a.data,hora:a.hora||'',titulo:a.titulo||'(sem título)',
     sub:[a.local,a.tipo].filter(Boolean).join(' · '),fonte:'compromissos',ic:'📅',proprio:true,ref:a});});
+
 
   if(on('documentos')) (E.documentos||[]).forEach(d=>{if(d.validade)ev.push({
     data:d.validade,hora:'',titulo:(d.nome||'Documento')+' vence',
@@ -5212,8 +5214,8 @@ const CONSULTA_GMAIL=
   '"reserva confirmada" OR "seu voo" OR itinerário OR itinerario) newer_than:1y';
 
 // Google: autorizações separadas, guardadas somente durante esta sessão.
-const GOOGLE_ESCOPOS={gmail:'https://www.googleapis.com/auth/gmail.readonly',agenda:'https://www.googleapis.com/auth/calendar.readonly'};
-const googleSessao={gmail:null,agenda:null};
+const GOOGLE_ESCOPOS={gmail:'https://www.googleapis.com/auth/gmail.readonly',agenda:'https://www.googleapis.com/auth/calendar.readonly',agendaEnviar:'https://www.googleapis.com/auth/calendar.app.created'};
+const googleSessao={gmail:null,agenda:null,agendaEnviar:null};
 let gisPendente=null;
 function carregarGis(){
   if(window.google?.accounts?.oauth2)return Promise.resolve();
@@ -5231,7 +5233,7 @@ async function conectarGoogle(servico){
     const cliente=google.accounts.oauth2.initTokenClient({client_id:GMAIL_CLIENT_ID,scope:GOOGLE_ESCOPOS[servico],include_granted_scopes:false,
       callback:r=>{
         if(r.error)return erro(new Error(r.error_description||r.error));
-        if(!r.access_token||!google.accounts.oauth2.hasGrantedAllScopes(r,GOOGLE_ESCOPOS[servico]))return erro(new Error('Autorize a leitura solicitada para concluir a conexão.'));
+        if(!r.access_token||!google.accounts.oauth2.hasGrantedAllScopes(r,GOOGLE_ESCOPOS[servico]))return erro(new Error('Autorize as permissões solicitadas para concluir a conexão.'));
         googleSessao[servico]={token:r.access_token,vence:Date.now()+(Number(r.expires_in)||3600)*1000};
         if(servico==='gmail')_gmailToken=r.access_token;
         ok(r.access_token);
@@ -5294,7 +5296,7 @@ function lerConvitesAgenda(txt,mensagem,lib=ICAL){
 function planejarConvitesAgenda(eventos,agenda,data=hoje()){
   const ultimos=new Map();
   eventos.forEach(e=>{const ant=ultimos.get(e.gid);if(!ant||e.seq>ant.seq||(e.seq===ant.seq&&e.emailEm>ant.emailEm))ultimos.set(e.gid,e)});
-  return [...ultimos.values()].filter(e=>e.cancelado||e.reg?.data>=data).map(e=>{
+  return [...ultimos.values()].filter(e=>e.cancelado||e.reg?.data>=data||(e.reg?.gmailRevisar&&!e.reg.data)).map(e=>{
     const existente=agenda.find(a=>a.gid===e.gid);
     const mesmaVersao=existente&&((existente.gmailSequencia??-1)>e.seq||((existente.gmailSequencia??-1)===e.seq&&(existente.gmailRecebidoEm||0)>=e.emailEm));
     return {...e,acao:e.cancelado?'cancelado':existente?.googleId?'google':mesmaVersao?'existente':existente?'atualizar':'adicionar'};
@@ -5302,7 +5304,7 @@ function planejarConvitesAgenda(eventos,agenda,data=hoje()){
 }
 async function consultarConvitesGmail(){
   const mensagens=[];let pagina='';
-  do{const q='newer_than:90d {filename:ics "convite" "invitation" "invite.ics"}';
+  do{const q=LeoGoogleDatas.gmailQuery(Math.floor(Date.now()/1000)-90*86400,Math.floor(Date.now()/1000)+1);
     const r=await gmailApi('messages?maxResults=100&q='+encodeURIComponent(q)+(pagina?'&pageToken='+encodeURIComponent(pagina):''));
     mensagens.push(...(r.messages||[]));pagina=r.nextPageToken||'';
     if(mensagens.length>=200&&pagina)throw new Error('Há mais de 200 mensagens candidatas nos últimos 90 dias. Use a importação do Google Agenda para este volume.');
@@ -5311,6 +5313,7 @@ async function consultarConvitesGmail(){
   for(const m of mensagens){
     const msg=await gmailApi('messages/'+encodeURIComponent(m.id)+'?format=full');
     const partes=[];const visitar=(p,n=0)=>{if(!p||n>12)return;if(p.mimeType==='text/calendar'||/\.ics$/i.test(p.filename||''))partes.push(p);(p.parts||[]).forEach(x=>visitar(x,n+1))};visitar(msg.payload);
+    if(!partes.length)LeoGoogleDatas.extractDates(msg,hoje()).forEach(x=>eventos.push({gid:x.key,seq:0,emailEm:Number(msg.internalDate)||0,reg:{gid:x.key,gmailId:msg.id,gmailSequencia:0,gmailRecebidoEm:Number(msg.internalDate)||0,gmailRevisar:true,data:x.date,ate:x.date,hora:'',titulo:x.title,tipo:x.kind,local:'',obs:x.reason+' · '+x.excerpt}}));
     for(const p of partes){
       if((p.body?.size||0)>1000000){avisos.push('Um convite excede o limite de leitura. Importe pelo Google Agenda.');continue}
       let cod=p.body?.data;
@@ -5322,7 +5325,7 @@ async function consultarConvitesGmail(){
   return {plano:planejarConvitesAgenda(eventos,E.agenda),avisos:[...new Set(avisos)],mensagens:mensagens.length};
 }
 function revisarConvitesGmail(resultado){
-  abrirModal('Compromissos recebidos no Gmail','Convites nos últimos 90 dias · novos compromissos a partir de hoje',(c,fechar)=>{
+  abrirModal('Compromissos recebidos no Gmail','E-mails dos últimos 90 dias · confira as datas antes de importar',(c,fechar)=>{
     const cx=el('<div class="secao"></div>'),selecionados=new Set();
     cx.appendChild(el('<p>Confira as datas e selecione o que deseja trazer. Atualizar substitui os campos importados da cópia local. Nenhuma resposta será enviada ao organizador.</p>'));
     const importar=acao('Importar selecionados',()=>{
@@ -5333,22 +5336,60 @@ function revisarConvitesGmail(resultado){
     resultado.plano.forEach(item=>{
       if(!['adicionar','atualizar'].includes(item.acao))return;
       const linha=el(`<label class="google-evento"><input type="checkbox"><span><b>${esc(item.reg.titulo)}</b><small>${fmtDataAno(item.reg.data)} · ${esc(item.reg.hora||'Dia inteiro')} · ${esc(item.reg.local||'Sem local')} · ${item.acao==='adicionar'?'Novo':'Atualização'}</small><small>${esc(item.reg.obs)}</small></span></label>`);
+      if(item.reg.gmailRevisar){const label=el(`<span><small>Confirme a data</small><input type="date" value="${esc(item.reg.data||'')}" aria-label="Data do compromisso"></span>`);linha.querySelector('span').appendChild(label);const date=label.querySelector('input');const box=linha.querySelector('input[type=checkbox]');box.disabled=!item.reg.data;date.onchange=()=>{item.reg.data=date.value;item.reg.ate=date.value;box.disabled=!date.value||date.value<hoje();if(box.disabled){box.checked=false;selecionados.delete(item);importar.disabled=!selecionados.size}};}
       linha.querySelector('input').onchange=e=>{if(e.target.checked)selecionados.add(item);else selecionados.delete(item);importar.disabled=!selecionados.size;importar.textContent='Importar '+selecionados.size+' selecionado(s)'};cx.appendChild(linha);
     });
     const novos=resultado.plano.filter(x=>['adicionar','atualizar'].includes(x.acao)).length;
-    if(!novos)cx.appendChild(el('<p class="vazio">Nenhum convite novo ou atualizado para importar. E-mails sem convite de calendário não são convertidos automaticamente.</p>'));
+    if(!novos)cx.appendChild(el('<p class="vazio">Nenhuma data ou convite novo para importar nesta busca. Datas em imagens e PDFs não são lidas.</p>'));
     resultado.plano.filter(x=>x.acao==='cancelado').forEach(x=>cx.appendChild(el(`<p class="aviso">Foi encontrado cancelamento de ${esc(E.agenda.find(a=>a.gid===x.gid)?.titulo||'um convite')}. Se já estiver na sua Agenda, revise a cópia; ela não foi apagada.</p>`)));
     if(resultado.plano.some(x=>x.acao==='google'))cx.appendChild(el('<p>Alguns convites já vieram pelo Google Agenda. Atualize-os pela conexão do Google Agenda.</p>'));
     resultado.avisos.forEach(a=>cx.appendChild(el('<p class="aviso">'+esc(a)+'</p>')));cx.appendChild(importar);c.appendChild(cx);
   });
 }
+async function googleAgendaGravar(caminho,method='GET',body){
+ if(!googleConectado('agendaEnviar'))throw Error('Conecte o Google Agenda para enviar.');
+ const r=await fetch('https://www.googleapis.com/calendar/v3/'+caminho,{method,headers:{authorization:'Bearer '+googleSessao.agendaEnviar.token,'content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(20000)});
+ if(r.status===409)return {conflict:true};
+ if(r.status===401){googleSessao.agendaEnviar=null;throw Error('O acesso ao Google venceu. Reconecte e tente novamente.');}
+ if(!r.ok)throw Error('O Google não confirmou o envio ('+r.status+'). Confira as permissões da conta e tente novamente.');
+ return r.json();
+}
+async function enviarLembreteGoogle(a){
+ if(!E.googleAgendaDestino){const cal=await googleAgendaGravar('calendars','POST',{summary:'Central do Léo · Gmail',timeZone:'America/Sao_Paulo'});E.googleAgendaDestino=cal.id;salvar();}
+ const id=await LeoGoogleDatas.eventId('manual:'+(a.gid||a.id));
+ const item={title:a.titulo,date:a.data,sourceId:a.gmailId,excerpt:a.obs||'',sender:'',reason:'Compromisso selecionado na Central',location:a.local||''};
+ if(a.hora){item.start={dateTime:a.data+'T'+a.hora+':00-03:00',timeZone:'America/Sao_Paulo'};const start=Date.parse(item.start.dateTime),end=Date.parse(a.googleFim||'');item.end={dateTime:new Date(end>start?end:start+3600e3).toISOString(),timeZone:'America/Sao_Paulo'}}
+ else if(a.ate&&a.ate>=a.data)item.end={date:LeoGoogleDatas.shift(a.ate,1)};
+ const body=LeoGoogleDatas.calendarEvent(item,id),path='calendars/'+encodeURIComponent(E.googleAgendaDestino)+'/events';
+ let result=await googleAgendaGravar(path+'?sendUpdates=none','POST',body);
+ if(result.conflict){const existing=await googleAgendaGravar(path+'/'+id);if(existing.extendedProperties?.private?.leoSource!==id)throw Error('Identificador já usado por outro evento; envio interrompido.');delete body.id;result=await googleAgendaGravar(path+'/'+id+'?sendUpdates=none','PATCH',body);}
+ a.gmailExportId=id;a.gmailExportLink=result.htmlLink||'';salvar();return result;
+}
+function revisarEnvioGoogle(){
+ abrirModal('Enviar ao Google Agenda','Selecione os compromissos importados do Gmail',(c,fechar)=>{
+  const cx=el('<div class="secao"></div>'),selected=new Set();
+  cx.appendChild(el('<p>Cria ou atualiza os itens escolhidos no calendário Central do Léo · Gmail, com avisos 1 dia e 1 hora antes. Permita as notificações do Google Agenda no aparelho. Nada é enviado sem apertar o botão abaixo.</p>'));
+  const list=E.agenda.filter(a=>a.gmailId&&a.data>=hoje());
+  const status=el('<p role="status"></p>');
+  const send=acao('Conectar Google Agenda e enviar selecionados',async()=>{
+   send.disabled=true;let n=0;
+   try{if(!googleConectado('agendaEnviar'))await conectarGoogle('agendaEnviar');for(const a of selected){await enviarLembreteGoogle(a);n++;status.textContent=n+' compromisso(s) enviado(s).';}status.textContent=n+' compromisso(s) confirmado(s) no Google Agenda.';}
+   catch(e){status.textContent=n+' compromisso(s) confirmado(s). '+e.message;}
+   finally{send.disabled=!selected.size;}
+  });send.disabled=true;
+  list.forEach(a=>{const row=el(`<label class="google-evento"><input type="checkbox"><span><b>${esc(a.titulo)}</b><small>${fmtDataAno(a.data)} ${esc(a.hora||'Dia inteiro')} · ${a.gmailExportId?'Atualizar lembrete':'Novo lembrete'}</small></span></label>`);row.querySelector('input').onchange=e=>{if(e.target.checked)selected.add(a);else selected.delete(a);send.disabled=!selected.size};cx.appendChild(row)});
+  if(!list.length)cx.appendChild(el('<p>Importe primeiro as datas pelo botão Buscar datas no Gmail.</p>'));
+  cx.appendChild(send);cx.appendChild(status);c.appendChild(cx);
+ });
+}
+
 function blocoAgendaGmail(){
   const cx=el('<div class="corpo"></div>');
-  cx.appendChild(el('<p class="google-nota">Traga novos convites recebidos no Gmail para esta Agenda. Consulte quando quiser e revise antes de importar. Não há sincronização com a página fechada.</p>'));
+  cx.appendChild(el('<p class="google-nota">Busque vencimentos, renovações e compromissos nos e-mails, além dos convites de calendário. Confira as datas e escolha o que importar. A busca só acontece quando você aperta o botão.</p>'));
   const status=el('<p role="status" class="google-nota"></p>');
-  const b=acao(googleConectado('gmail')?'Buscar novos convites':'Conectar Gmail e buscar convites',async()=>{b.disabled=true;status.textContent='Consultando convites…';try{if(!googleConectado('gmail'))await conectarGoogle('gmail');const resultado=await consultarConvitesGmail();status.textContent=resultado.mensagens+' mensagens consultadas.';revisarConvitesGmail(resultado)}catch(e){status.textContent=e.message||'Não foi possível consultar o Gmail.'}finally{b.disabled=false;b.textContent=googleConectado('gmail')?'Buscar novos convites':'Conectar Gmail e buscar convites'}});
-  cx.appendChild(b);cx.appendChild(status);
-  return bloco('ag-gmail','Compromissos pelo Gmail','Conexão somente de leitura · horários de Brasília',cx);
+  const b=acao(googleConectado('gmail')?'Buscar datas no Gmail':'Conectar Gmail e buscar datas',async()=>{b.disabled=true;status.textContent='Buscando datas e convites…';try{if(!googleConectado('gmail'))await conectarGoogle('gmail');const resultado=await consultarConvitesGmail();status.textContent=resultado.mensagens+' mensagens consultadas.';revisarConvitesGmail(resultado)}catch(e){status.textContent=e.message||'Não foi possível consultar o Gmail.'}finally{b.disabled=false;b.textContent=googleConectado('gmail')?'Buscar datas no Gmail':'Conectar Gmail e buscar datas'}});
+  cx.appendChild(b);cx.appendChild(acao('Enviar selecionados ao Google Agenda',revisarEnvioGoogle,'ghost'));cx.appendChild(status);
+  return bloco('ag-gmail','Datas e compromissos pelo Gmail','Busca manual · você revisa antes de importar',cx);
 }
 
 async function verEmailsGoogle(){

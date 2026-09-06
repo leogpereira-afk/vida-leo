@@ -1,3 +1,4 @@
+import '../publico/google-datas.js';
 import ICAL from 'ical.js';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
@@ -7,7 +8,7 @@ const html=readFileSync(new URL('../publico/index.html',import.meta.url),'utf8')
 const source=html.slice(html.indexOf('<script>')+8,html.lastIndexOf('</script>')).replace(/if\(temSessao\(\)\)\{menu\(\);tela\(\);puxarNuvem[\s\S]*$/,'');
 function app(date='2026-09-05T12:00:00-03:00'){
  const NativeDate=Date; class Clock extends NativeDate {constructor(...args){super(...(args.length?args:[date]))} static now(){return new NativeDate(date).getTime()}}
- const data=new Map();const ctx=vm.createContext({ICAL,atob,btoa,Date:Clock,structuredClone,console,setTimeout,clearTimeout,URL,Blob,TextEncoder,TextDecoder,location:{hostname:'localhost',hash:''},document:{addEventListener(){},getElementById(){return null}},window:{addEventListener(){}},localStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)},sessionStorage:{getItem:()=>null}});
+ const data=new Map();const ctx=vm.createContext({LeoGoogleDatas:globalThis.LeoGoogleDatas,ICAL,atob,btoa,Date:Clock,structuredClone,console,setTimeout,clearTimeout,URL,Blob,TextEncoder,TextDecoder,location:{hostname:'localhost',hash:''},document:{addEventListener(){},getElementById(){return null}},window:{addEventListener(){}},localStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)},sessionStorage:{getItem:()=>null}});
  vm.runInContext(source,ctx);return code=>vm.runInContext(code,ctx);
 }
 test('hoje respeita o dia local após 21h',()=>assert.equal(app('2026-09-05T23:30:00-03:00')('hoje()'),'2026-09-05'));
