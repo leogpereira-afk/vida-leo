@@ -138,3 +138,38 @@ body:has(.fundo){overflow:hidden}
 
 .finance-mobile-list{display:none}
 @media(max-width:600px){.finance-mobile-list{display:block;padding:0 14px}.financeiro [data-bid="gt-lista"] .rolagem:has(table){display:none}.finance-expense-row{border-bottom:1px solid var(--linha);padding:10px 0}.finance-expense-open{width:100%;display:flex;gap:12px;justify-content:space-between;text-align:left;padding:8px 0;color:var(--tinta);background:transparent;border:0;min-height:44px;font-size:14px}.finance-expense-open span{min-width:0;overflow-wrap:anywhere}.finance-expense-open small{display:block;color:var(--suave);font-size:11px;margin-top:3px}.finance-expense-open b{white-space:nowrap;font-size:13px}.finance-expense-row>.btn{font-size:11px;padding:3px 8px}}
+
+/* Health: clear records, compact actions and readable mobile forms. */
+.saude-layout .topo{margin-bottom:16px}.saude-layout h1,.saude-layout h2{font-family:Inter,system-ui,sans-serif;letter-spacing:-.035em}
+.saude-layout>.painel{padding:0;border:0;background:transparent;box-shadow:none;display:flex;gap:8px;margin-bottom:16px}
+.saude-layout>.painel select{flex:1;min-width:0;background:var(--verde);color:var(--card);border:0;border-radius:10px;padding:12px;font-weight:600;min-height:44px}
+.saude-layout>.painel .btn{font-size:12px;min-height:44px}.saude-pane[hidden]{display:none!important}
+.saude-resumo{border:1px solid var(--linha);background:var(--card);border-radius:18px;overflow:hidden;margin-bottom:18px}
+.saude-resumo-titulo{background:#173e35;color:#fff;padding:20px}.saude-resumo-titulo>span{font-size:10px;letter-spacing:.12em;color:#d3e5de}.saude-resumo-titulo h2{margin:6px 0;font-size:23px}.saude-resumo-titulo p{margin:0;color:#d3e5de;font-size:12px}
+.saude-resumo .grade{grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:0}.saude-resumo .kpi{border:0;border-radius:0;box-shadow:none;padding:14px 16px;border-bottom:1px solid var(--linha)}.saude-resumo .kpi .val{font-family:Inter,system-ui,sans-serif;font-size:21px;font-weight:650;margin:5px 0}.saude-resumo .kpi .rot{font-size:10px}.saude-resumo .kpi .sub{font-size:11px}
+.saude-layout .bloco{box-shadow:none;margin-bottom:16px;border-radius:14px}.saude-layout .bloco>header{padding:14px 16px}.saude-layout .bloco>header h2{font-size:16px}.saude-layout .bloco>header .dica{font-size:12px;line-height:1.5}
+.saude-lembretes{border:1px solid var(--linha);background:var(--card);border-radius:14px;padding:16px;margin-bottom:18px}.saude-lembretes h2{font-size:16px;margin:0}.saude-lembretes>p{font-size:12px;color:var(--suave);margin:5px 0 12px}.saude-lembretes button,.saude-exames-mobile button{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;width:100%;background:transparent;color:var(--tinta);border:0;border-bottom:1px solid var(--linha);padding:14px 0;min-height:48px;font-size:14px}.saude-lembretes button span,.saude-exames-mobile button>span{min-width:0;overflow-wrap:anywhere}.saude-lembretes small,.saude-exames-mobile small{display:block;color:var(--suave);font-size:11px;margin-top:4px}.saude-lembretes button>b{font-size:12px;white-space:nowrap}.saude-sem-dados{font-size:13px;color:var(--suave);padding:10px 0}.saude-exames-mobile{display:none}.saude-exame-valor{text-align:right;font-weight:650}
+@media(max-width:600px){
+ .saude-layout .topo p{font-size:13px}.saude-tabs button{font-size:12px;padding:7px 4px}
+ .saude-exames-mobile:not(:empty){display:block;padding:0 16px}.saude-layout [data-bid="sa-ex"] .rolagem:has(table){display:none}
+ .saude-layout .saude-pane>.bloco:not([data-bid="sa-ex"]) table,.saude-layout .saude-pane>.bloco:not([data-bid="sa-ex"]) tbody{display:block;width:100%}
+ .saude-layout .saude-pane>.bloco:not([data-bid="sa-ex"]) thead{display:none}
+ .saude-layout .saude-pane>.bloco:not([data-bid="sa-ex"]) tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:10px 12px 16px;padding:10px;border:1px solid var(--linha);border-radius:12px;background:var(--bg);gap:8px;box-shadow:none!important}
+ .saude-layout .saude-pane>.bloco:not([data-bid="sa-ex"]) td{display:block!important;padding:4px!important;min-width:0;width:auto!important;white-space:normal!important;text-align:left!important;border:0}
+ .saude-layout .saude-pane>.bloco:not([data-bid="sa-ex"]) td::before{content:attr(data-label);display:block;font-size:10px;color:var(--suave);font-weight:600;margin-bottom:5px}
+ .saude-layout td input,.saude-layout td select{width:100%;min-width:0!important;box-sizing:border-box;background:var(--card);border:1px solid var(--linha);border-radius:8px;padding:8px;min-height:44px}
+ .saude-layout [data-bid="sa-rast"] td:last-child{grid-column:1/-1}
+}
+@media print{.saude-pane[hidden]{display:block!important}.saude-tabs,.saude-layout>.painel{display:none!important}.saude-resumo-titulo{background:white;color:black}}
+
+/* Simple tables retain columns on desktop and expose labels on small screens. */
+@media(max-width:600px){
+ table.tabela-adaptavel,table.tabela-adaptavel>tbody{display:block;width:100%}
+ table.tabela-adaptavel>thead{display:none}
+ table.tabela-adaptavel>tbody>tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px;padding:12px;border:1px solid var(--linha);border-radius:12px}
+ table.tabela-adaptavel>tbody>tr>td{display:block;min-width:0;width:auto!important;border:0;padding:4px!important;text-align:left!important;white-space:normal!important;overflow-wrap:anywhere}
+ table.tabela-adaptavel>tbody>tr>td::before{content:attr(data-label);display:block;font-size:10px;font-weight:600;color:var(--suave);margin-bottom:5px}
+ table.tabela-adaptavel input,table.tabela-adaptavel select{width:100%;min-width:0!important;box-sizing:border-box;padding:8px;background:var(--card);border:1px solid var(--linha);border-radius:8px;min-height:44px}
+ table.tabela-adaptavel>tfoot{display:block;padding:10px;font-size:12px}table.tabela-adaptavel>tfoot tr{display:flex;flex-wrap:wrap;gap:8px}
+}
+.conferencia-item{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--linha)}.conferencia-item>span{min-width:0;overflow-wrap:anywhere}.conferencia-item small{display:block;color:var(--suave);font-size:12px}

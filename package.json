@@ -6,5 +6,9 @@
   },
   "scripts": {
     "test": "TZ=America/Sao_Paulo node --test tests/*.mjs"
+  },
+  "devDependencies": {
+    "ical.js": "2.2.1",
+    "linkedom": "0.18.12"
   }
 }

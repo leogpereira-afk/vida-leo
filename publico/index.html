@@ -243,7 +243,7 @@ tr:hover .lixo{opacity:1}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css?v=1ec0888f22d1">
+<link rel="stylesheet" href="./refinamento.css?v=ba037a363374">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -278,6 +278,7 @@ tr:hover .lixo{opacity:1}
 </div>
 <div id="modais"></div>
 
+<script src="./vendor/ical-2.2.1.min.js"></script>
 <script>
 /* ============================================================
    Central do Léo — painel pessoal, um arquivo só.
@@ -1231,11 +1232,26 @@ function rankingFinanceiro(itens,total,abrir){
   return lista;
 }
 
+function prepararTabelas(pagina){
+  pagina.querySelectorAll('table').forEach(t=>{
+    const linhas=[...t.querySelectorAll('tbody>tr')].filter(tr=>tr.closest('table')===t);
+    linhas.forEach(tr=>{if(typeof tr.onclick==='function'&&!tr.querySelector('button,input,select,textarea,a')){
+      tr.tabIndex=0;tr.setAttribute('role','button');tr.setAttribute('aria-label','Abrir '+tr.textContent.trim().replace(/\s+/g,' ').slice(0,100));
+      tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tr.click()}};
+    }});
+    if(pagina.classList.contains('financeiro')||pagina.classList.contains('saude-layout')||t.parentElement.closest('table'))return;
+    const ths=[...t.querySelectorAll('thead>tr>th')].filter(x=>x.closest('table')===t);
+    if(!ths.length||!linhas.length||linhas.some(tr=>tr.children.length!==ths.length||tr.querySelector('[colspan],table')))return;
+    t.classList.add('tabela-adaptavel');
+    linhas.forEach(tr=>[...tr.children].forEach((td,i)=>{td.dataset.label=ths[i].textContent||'Ações'}));
+  });
+}
+
 function tela(){
   const m=document.getElementById('main'),pagina=el('<div class="pagina"></div>');m.replaceChildren(pagina);
   const alvo=_alvoBloco;_alvoBloco=null;
   const mod=MODS.find(x=>x.id===atual&&!x.url);document.title=mod.nome+' · Central do Léo';
-  const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else indiceDaTela(pagina);if(alvo)rolaAlvo(pagina,alvo)};
+  const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else indiceDaTela(pagina);prepararTabelas(pagina);if(alvo)rolaAlvo(pagina,alvo)};
   const falhou=()=>{if(pagina.isConnected)pagina.appendChild(el('<p class="aviso" role="alert">Não foi possível concluir o carregamento. Abra esta seção novamente.</p>'))};
   try{const resultado=mod.render(pagina);if(resultado?.then)resultado.then(finalizar).catch(falhou);else finalizar()}catch(erro){falhou()}
   return !!alvo;
@@ -1261,7 +1277,7 @@ function rolaAlvo(pagina,id){
 }
 /* liga os cards marcados ao mapa de destinos da tela */
 function ligaKpis(cx,mapa){
-  cx.querySelectorAll('[data-kpi]').forEach(k=>{k.onclick=()=>{const f=mapa[k.dataset.kpi];if(f)f()};k.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();k.click()}}});
+  cx.querySelectorAll('[data-kpi]').forEach(k=>{k.onclick=()=>{const f=mapa[k.dataset.kpi];if(typeof f==='function')f();else if(typeof f==='string'){abreBloco(f);tela()}};k.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();k.click()}}});
   return cx;
 }
 /* ---- viagem internacional: detecção + conferência de documentos ---- */
@@ -1310,6 +1326,8 @@ function ordenarDemandas(lista){
 }
 function abrirRegistro(secao,col,registro){
   const detalhes={agenda:modalCompromisso,viagens:modalViagem,demandas:modalDemanda,documentos:modalDoc,patrimonio:modalBem,pessoas:modalPessoa,exames:modalExame,oportunidades:modalOport,rendimentos:modalRendimento};
+  const blocos={vacinas:'sa-vac',tratamentos:'sa-trat',bancos:'gu-bancos',empresasPJ:'gu-empresas',metas:'gu-metas',rituais:'gu-rituais',livros:'gu-livros',contas:'cx-contas',empreend:'cx-emp',reservas:'cx-res',seguros:'gt-seg',assinaturas:'gt-assin',casa:'gt-casa',planos:'gt-plano'};
+  if(!detalhes[col]&&blocos[col])abreBloco(blocos[col]);
   irTela(secao);
   if(registro&&detalhes[col])detalhes[col](registro,false);
 }
@@ -1334,7 +1352,7 @@ function radar(){
     if(n!=null&&n<60) add(n<0?0:1,'🩺',`Repetir ${x.exame||'exame'} ${n<0?'(atrasado desde '+fmtData(x.proximo)+')':fmtData(x.proximo)}`,n,'saude','exames',x)});
   // rastreios por idade
   (typeof rastreiosPendentes==='function'?rastreiosPendentes():[]).forEach(p=>
-    add(p.situacao==='Atrasado'?0:1,'🩺',`${p.nome} — ${p.situacao==='Nunca feito'?'nunca feito':p.situacao.toLowerCase()}`,p.venceEm,'saude'));
+    add(p.situacao==='Atrasado'?0:1,'🩺',`${p.nome} — ${p.situacao==='Sem registro'?'sem registro na Central':p.situacao.toLowerCase()}`,p.venceEm,'saude'));
   // vacinas
   E.vacinas.forEach(v=>{const n=dias(v.proxima);
     if(n!=null&&n<90) add(n<0?0:1,'💉',`Reforço de ${v.vacina||'vacina'} ${n<0?'atrasado':fmtData(v.proxima)}`,n,'saude')});
@@ -1398,7 +1416,7 @@ function vInicio(m){
   m.appendChild(bloco('ini-radar',`🔔 O que precisa de você${urgentes?' · '+urgentes+' atrasado(s)':''}`,'Pendências de atenção primeiro; depois, os demais avisos. Dentro de cada grupo, por data.',rc2));
   m.appendChild(ligaKpis(el(`<div class="grade inicio-grade">
     ${kpi('Ganhos do mês',brl(rendMes),mesAtual().split('-').reverse().join('/'),'v','rendimentos')}
-    ${kpi('Gastos do mês',brl(gastoMes),'despesas registradas','r','gastos')}
+    ${kpi('Gastos lançados',brl(gastoMes),'sem recorrentes estimados','r','gastos')}
     ${kpi('Custo fixo',brl2(fixo)+'/mês',nFixo+' contas recorrentes','a','gastos')}
     ${kpi('Demandas abertas',abertas,abertas?'em andamento':'tudo em dia','','demandas')}
     ${kpi('Peso atual',ult?ult.peso+' kg':'—',ult?fmtData(ult.data):'sem registro','','saude')}
@@ -1406,7 +1424,7 @@ function vInicio(m){
 
   // dash: entradas x saídas dos últimos 6 meses
   const ms=[];for(let i=5;i>=0;i--){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-i);ms.push(dataLocal(d).slice(0,7))}
-  m.appendChild(bloco('ini-dash','Saldo mensal','ganhos menos gastos registrados · últimos 6 meses',graficoEl(gBarras(
+  m.appendChild(bloco('ini-dash','Saldo dos lançamentos','rendimentos menos gastos lançados; não inclui recorrentes estimados · últimos 6 meses',graficoEl(gBarras(
     ms.map(mm=>({r:MESES[+mm.slice(5,7)-1],v:E.rendimentos.filter(x=>(x.data||'').startsWith(mm)).reduce((s,x)=>s+(+x.valor||0),0)
       -E.gastos.filter(g=>g.mes===mm).reduce((s,g)=>s+(+g.valor||0),0)})),{fmt:brl}))));
 
@@ -1492,7 +1510,7 @@ function vViagens(m) {
     tr.style.cursor = 'pointer';
     // o que ainda falta nesta viagem
     const falta = [];
-    if (!String(v.hotel || '').trim()) falta.push('hotel');
+    if (!temHotelViagem(v)) falta.push('hotel');
     if (!String(v.transporte || '').trim()) falta.push('transporte');
     if (dc.intl && !dc.ok) falta.push('documento');
     if (!['Confirmado', 'Realizado'].includes(v.status)) falta.push('confirmação');
@@ -1508,7 +1526,7 @@ function vViagens(m) {
         ${(v.custos || []).length ? `<span style="font-size:10.5px;color:var(--verde)"> · ${v.custos.length} custo(s)</span>` : ''}</td>
       <td style="padding:9px 10px">${esc(v.cidade || '—')}${dc.intl ? ' <span title="internacional">🌎</span>' : ''}</td>
       <td style="padding:9px 10px;font-size:12.5px;color:var(--suave);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(quem)}</td>
-      <td style="padding:9px 10px;color:${String(v.hotel || '').trim() ? 'inherit' : 'var(--areia)'}">${esc(v.hotel || '—')}</td>
+      <td style="padding:9px 10px;color:${temHotelViagem(v) ? 'inherit' : 'var(--areia)'}">${esc(v.hotel || (v.hoteis||[]).map(h=>h.nome).filter(Boolean).join(', ') || '—')}</td>
       <td style="padding:9px 10px">${esc(v.transporte || '—')}</td>
       <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums">${diasEntre(v.ida, v.volta) || '—'}</td>
       <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${custo ? brl(custo) : '—'}</td>
@@ -1646,7 +1664,7 @@ function imprimirViagem(v) {
     ${diasEntre(v.ida, v.volta) || '?'} dia(s)${v.tipo ? ' · ' + esc(v.tipo) : ''}</div>
   <div class="resumo">
     <div><b>Quem vai</b>${esc(quem)}</div>
-    <div><b>Hotel</b>${esc(v.hotel || '—')}</div>
+    <div><b>Hotel</b>${esc(v.hotel || (v.hoteis||[]).map(h=>h.nome).filter(Boolean).join(', ') || '—')}</div>
     <div><b>Transporte</b>${esc(v.transporte || '—')}</div>
     <div><b>Orçamento</b>${+v.gastos ? brl(+v.gastos) : '—'}</div>
     ${custo ? `<div><b>Já gasto</b>${brl(custo)}</div>` : ''}
@@ -2394,6 +2412,7 @@ function vAgenda(m){
   const fut=proximosCompromissos(E.agenda).length;
   const nova=()=>{E.agenda.push({id:uid(),data:hoje(),hora:'',titulo:'',local:'',tipo:CFG('tiposCompromisso')[0],obs:''});salvar();r()};
   m.appendChild(cab('Agenda','Tudo que tem data nesta Central, num lugar só.'));
+  m.appendChild(blocoAgendaGmail());
   if(filtro.agSo===undefined)filtro.agSo=null;
   const cont=t=>E.agenda.filter(a=>a.tipo===t).length;
   m.appendChild(painel('Agenda',
@@ -2503,7 +2522,7 @@ function exportarIcs(){
     linhas.push('BEGIN:VEVENT','UID:'+a.id+'@centralleo');
     if(a.hora){linhas.push('DTSTART:'+dt(a.data,a.hora));
       const fim=new Date(a.data+'T'+a.hora);fim.setHours(fim.getHours()+1);linhas.push('DTEND:'+dt(dataLocal(fim),z(fim.getHours())+':'+z(fim.getMinutes())))}
-    else{const fim=new Date(a.data+'T12:00');fim.setDate(fim.getDate()+1);linhas.push('DTSTART;VALUE=DATE:'+dt(a.data));linhas.push('DTEND;VALUE=DATE:'+dt(dataLocal(fim)))}
+    else{const ultimoDia=a.ate&&a.ate>=a.data?a.ate:a.data;const fim=new Date(ultimoDia+'T12:00');fim.setDate(fim.getDate()+1);linhas.push('DTSTART;VALUE=DATE:'+dt(a.data));linhas.push('DTEND;VALUE=DATE:'+dt(dataLocal(fim)))}
     linhas.push('SUMMARY:'+(a.titulo||'Compromisso').replace(/\n/g,' '));
     if(a.local)linhas.push('LOCATION:'+a.local.replace(/\n/g,' '));
     if(a.obs)linhas.push('DESCRIPTION:'+a.obs.replace(/\n/g,'\\n'));
@@ -2696,6 +2715,32 @@ function semaforo(x) {
 // "Alterado" = fora até do laudo, procurar médico. "Fora do alvo" = o laudo diz normal, mas dá para melhorar.
 const CHIP_SEM = { ok: ['var(--verde-cl)', 'var(--verde)', 'No alvo'], atencao: ['var(--areia-cl)', 'var(--areia)', 'Fora do alvo'], ruim: ['var(--vermelho-cl)', 'var(--vermelho)', 'Alterado'] };
 
+let abaSaude='resumo';
+function abaDoBlocoSaude(id){return ['sa-ex','sa-rast'].includes(id)?'exames':['sa-vit','sa-peso'].includes(id)?'medidas':['sa-trat','sa-vac','sa-fam'].includes(id)?'cuidados':'resumo'}
+function ultimoRegistroSaude(lista,campos){
+  return lista.filter(x=>x.data&&x.data<=hoje()&&campos.every(k=>Number.isFinite(+x[k])&&+x[k]>0)).slice().sort((a,b)=>b.data.localeCompare(a.data))[0]||null;
+}
+function organizarSaude(pagina,alvo){
+  pagina.classList.add('saude-layout');
+  const opcoes=[['resumo','Resumo'],['exames','Exames'],['medidas','Medidas'],['cuidados','Cuidados']];
+  const paineis=Object.fromEntries(opcoes.map(([id])=>[id,el('<div class="saude-pane"></div>')]));
+  const nav=el('<nav class="finance-tabs saude-tabs" aria-label="Áreas de saúde"></nav>');
+  [...pagina.children].forEach(no=>{if(no.classList.contains('topo')||no.classList.contains('painel'))return;paineis[abaDoBlocoSaude(no.dataset.bid)].appendChild(no)});
+  pagina.appendChild(nav);
+  function selecionar(id){abaSaude=id;opcoes.forEach(([k])=>{paineis[k].hidden=k!==id;nav.querySelector('[data-area="'+k+'"]').setAttribute('aria-pressed',String(k===id))})}
+  opcoes.forEach(([id,nome])=>{const bt=el('<button type="button"></button>');bt.textContent=nome;bt.dataset.area=id;bt.setAttribute('aria-controls','saude-'+id);paineis[id].id='saude-'+id;bt.onclick=()=>selecionar(id);nav.appendChild(bt);pagina.appendChild(paineis[id])});
+  const resumo=paineis.resumo.querySelector('.saude-resumo');if(resumo)paineis.resumo.prepend(resumo);
+  selecionar(alvo?abaDoBlocoSaude(alvo):abaSaude);
+  pagina.querySelectorAll('.bloco').forEach(b=>{b.classList.remove('fechado');b.querySelector('header')?.setAttribute('aria-expanded','true')});
+  pagina.querySelectorAll('table').forEach(t=>{const nomes=[...t.querySelectorAll('thead th')].map(x=>x.textContent);t.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>{td.dataset.label=nomes[i]||'Ações'}))});
+  const painel=pagina.querySelector('.painel');
+  if(painel){const botoes=[...painel.querySelectorAll('button')];const escolher=el('<select aria-label="Adicionar registro de saúde"><option value="">+ Adicionar registro</option></select>');
+    botoes.forEach((bt,i)=>{if(bt.textContent.trim().startsWith('+')){const op=document.createElement('option');op.value=String(i);op.textContent=bt.textContent.replace(/^\+\s*/,'');escolher.appendChild(op)}});
+    escolher.onchange=()=>{if(escolher.value==='')return;botoes[+escolher.value].click();escolher.value=''};
+    const sos=botoes.find(b=>b.textContent.includes('emergência'));painel.replaceChildren(escolher);if(sos){sos.textContent='Ficha de emergência';painel.appendChild(sos)}
+  }
+}
+
 function vSaude(m) {
   const r = rr('saude');
   const ord = E.peso.filter(x=>+x.peso>0).sort((a, b) => (a.data || '').localeCompare(b.data || ''));
@@ -2710,20 +2755,15 @@ function vSaude(m) {
 
   m.appendChild(cab('Saúde', 'Acompanhe medidas, exames, tratamentos e seu histórico de saúde.'));
   m.appendChild(painel(
-    acao('+ Pesagem', () => { E.peso.push({ id: uid(), data: hoje(), peso: '', altura: ult?.altura || '', cintura: '', gordura: '', obs: '' }); salvar(); r() }),
-    acao('+ Sinais vitais', () => { E.vitais.push({ id: uid(), data: hoje(), sis: '', dia: '', fc: '', glicemia: '', sono: '', passos: '', estresse: '', obs: '' }); salvar(); r() }, 'ghost'),
+    acao('+ Pesagem', () => { E.peso.push({ id: uid(), data: hoje(), peso: '', altura: ult?.altura || '', cintura: '', gordura: '', obs: '' }); salvar(); abreBloco('sa-peso'); r() }),
+    acao('+ Sinais vitais', () => { E.vitais.push({ id: uid(), data: hoje(), sis: '', dia: '', fc: '', glicemia: '', sono: '', passos: '', estresse: '', obs: '' }); salvar(); abreBloco('sa-vit'); r() }, 'ghost'),
     acao('+ Exame', () => { const x = { id: uid(), data: hoje(), exame: '', valor: '', medico: '', resultado: '', proximo: '', obs: '' }; E.exames.push(x); salvar(); modalExame(x) }, 'ghost'),
-    acao('+ Tratamento', () => { E.tratamentos.push({ id: uid(), oque: '', motivo: '', inicio: hoje(), fim: '', frequencia: '', medico: '', status: 'Em andamento' }); salvar(); r() }, 'ghost'),
-    acao('+ Vacina', () => { E.vacinas.push({ id: uid(), vacina: '', data: hoje(), proxima: '', viagem: 'Não', obs: '' }); salvar(); r() }, 'ghost'),
+    acao('+ Tratamento', () => { E.tratamentos.push({ id: uid(), oque: '', motivo: '', inicio: hoje(), fim: '', frequencia: '', medico: '', status: 'Em andamento' }); salvar(); abreBloco('sa-trat'); r() }, 'ghost'),
+    acao('+ Vacina', () => { E.vacinas.push({ id: uid(), vacina: '', data: hoje(), proxima: '', viagem: 'Não', obs: '' }); salvar(); abreBloco('sa-vac'); r() }, 'ghost'),
     acao('🆘 Ficha de emergência', () => modalSOS(), 'ghost'), '|'));
 
-  /* ---- alertas de rastreio ---- */
   const pend = rastreiosPendentes();
-  if (pend.length) m.appendChild(el(`<div class="aviso">🩺 <b>${pend.length} exame(s) para fazer:</b>
-    ${pend.slice(0, 4).map(p => esc(p.nome) + (p.venceEm != null ? ` <span style="opacity:.7">(${p.venceEm < 0 ? 'atrasado' : 'em ' + p.venceEm + ' dias'})</span>` : ' <span style="opacity:.7">(nunca feito)</span>')).join(' · ')}
-    ${pend.length > 4 ? ` e mais ${pend.length - 4}` : ''}</div>`));
-  if (!idade) m.appendChild(el(`<div class="aviso">📅 Informe sua <b>data de nascimento</b> em ⚙️ Configurações para eu calcular os rastreios certos para a sua idade.</div>`));
-
+  // Os lembretes por idade ficam em Exames, separados das datas cadastradas.
   /* ---- 1. exames: um por marcador, com a evolução dentro ---- */
   const cx = el('<div></div>');
   const rol = el('<div class="rolagem"></div>');
@@ -2780,6 +2820,9 @@ function vSaude(m) {
     });
     t.appendChild(tb); rol.appendChild(t);
   } else rol.innerHTML = '<div class="vazio">Nenhum exame ainda — clique em <b>+ Novo exame</b>.</div>';
+  const cards=el('<div class="saude-exames-mobile"></div>');
+  grupos.forEach(g=>{const bt=el(`<button type="button"><span><b>${esc(g.nome)}</b><small>${fmtDataAno(g.ult.data)} · ${g.itens.length} registro(s)</small></span><span class="saude-exame-valor">${esc(g.ult.valor||'—')}<small>${g.mk?esc(g.mk[1]):'Ver detalhes'} ›</small></span></button>`);bt.onclick=()=>modalMarcador(g.nome);cards.appendChild(bt)});
+  cx.appendChild(cards);
   cx.appendChild(rol);
   const pe = el('<div style="padding:0 17px 15px"></div>');
   const bt = el('<button class="mais">+ Novo exame</button>');
@@ -2796,18 +2839,18 @@ function vSaude(m) {
     const tb = document.createElement('tbody');
     listaR.forEach(x => {
       const tr = document.createElement('tr');
-      if (x.situacao === 'Atrasado' || x.situacao === 'Nunca feito') tr.style.boxShadow = 'inset 3px 0 0 var(--vermelho)';
+      if (x.situacao === 'Atrasado') tr.style.boxShadow = 'inset 3px 0 0 var(--vermelho)';
       else if (x.situacao === 'Em dia') tr.style.boxShadow = 'inset 3px 0 0 var(--verde)';
       tr.innerHTML = `<td style="padding:9px 10px"><b>${esc(x.nome)}</b></td>
         <td style="padding:9px 10px;color:var(--suave)">${x.cada >= 12 ? (x.cada / 12) + ' ano(s)' : x.cada + ' meses'}</td>
         <td style="padding:9px 10px;white-space:nowrap">${x.ultima ? fmtData(x.ultima) : '—'}</td>
-        <td style="padding:9px 10px">${chip(x.situacao === 'Em dia' ? 'Em dia' : x.situacao === 'Nunca feito' ? 'Vencido' : x.situacao === 'Atrasado' ? 'Vencido' : 'Vencendo')}</td>
+        <td style="padding:9px 10px">${chip(x.situacao === 'Em dia' ? 'Em dia' : x.situacao === 'Sem registro' ? 'Sem registro' : x.situacao === 'Atrasado' ? 'Vencido' : 'Vencendo')}</td>
         <td style="padding:9px 10px;color:var(--suave);font-size:12.5px">${esc(x.porque)}</td>`;
       tb.appendChild(tr);
     });
     t.appendChild(tb); rc.appendChild(t);
   } else rc.innerHTML = '<div class="vazio">Informe sua data de nascimento em ⚙️ Configurações.</div>';
-  m.appendChild(bloco('sa-rast', 'Rastreios para a sua idade' + (idade ? ` (${idade} anos)` : ''), 'referências para revisar com seu médico', rc));
+  m.appendChild(bloco('sa-rast', 'Histórico de acompanhamento' + (idade ? ` (${idade} anos)` : ''), 'Sem registro significa que não há uma data cadastrada. Os intervalos sugeridos precisam ser confirmados na consulta.', rc));
 
   /* ---- 3. sinais vitais ---- */
   // só o que vira número em algum lugar: pressão (KPI + rastreio) e batimento de repouso (KPI).
@@ -2855,21 +2898,22 @@ function vSaude(m) {
     { k: 'obs', t: 'Observação', ph: '—' },
   ], () => ({ parente: 'Pai', doenca: CFG('doencasFamilia')[0], idade: '', situacao: 'Vivo', obs: '' }), r));
 
-  /* ---- números e gráficos ---- */
-  m.appendChild(el(`<div class="grade">
-    ${kpi('Peso atual', ult ? ult.peso + ' kg' : '—', ult ? fmtData(ult.data) : 'sem registro')}
-    ${kpi('Variação', (dif > 0 ? '+' : '') + dif.toFixed(1) + ' kg', 'desde o 1º registro', dif > 0 ? 'r' : 'v')}
-    ${kpi('IMC', imc ? imc.toFixed(1) : '—', imc ? (imc < 18.5 ? 'abaixo' : imc < 25 ? 'saudável' : imc < 30 ? 'sobrepeso' : 'obesidade') : 'informe a altura')}
-    ${kpi('Cintura ÷ altura', cintAlt ? cintAlt.toFixed(2) : '—', cintAlt ? (cintAlt < 0.5 ? 'dentro do ideal' : 'acima de 0,5 — atenção') : 'informe a cintura', cintAlt && cintAlt >= 0.5 ? 'r' : 'v')}
-    ${kpi('Pressão', uv && uv.sis ? uv.sis + '/' + uv.dia : '—', uv && uv.sis ? fmtData(uv.data) : 'sem registro', uv && uv.sis >= 140 ? 'r' : uv && uv.sis >= 130 ? 'a' : uv && uv.sis ? 'v' : '')}
-    ${kpi('Batimento em repouso', uv && uv.fc ? uv.fc + ' bpm' : '—',
-      uv && uv.fc ? (uv.fc < 60 ? 'ótimo' : uv.fc <= 70 ? 'bom' : uv.fc <= 80 ? 'dá para melhorar' : 'alto — mais aeróbico') : 'sem registro',
-      uv && uv.fc ? (uv.fc <= 70 ? 'v' : uv.fc <= 80 ? 'a' : 'r') : '')}
-    ${kpi('Rastreios pendentes', pend.length, pend.length ? 'precisam de agendamento' : 'tudo em dia', pend.length ? 'a' : 'v')}
-    ${kpi('Tratamentos', emTrat, 'em andamento')}
-    ${kpi('Marcadores alterados', grupos.filter(g => g.sem === 'ruim').length, 'fora do laudo — ver médico', grupos.filter(g => g.sem === 'ruim').length ? 'r' : 'v')}
-    ${kpi('Fora do alvo ótimo', grupos.filter(g => g.sem === 'atencao').length, 'laudo normal, dá para melhorar', grupos.filter(g => g.sem === 'atencao').length ? 'a' : 'v')}
-    ${kpi('Marcadores acompanhados', grupos.length, E.exames.length + ' medições no histórico')}</div>`));
+  const pesoRecente=ultimoRegistroSaude(E.peso,['peso']);
+  const pressaoRecente=ultimoRegistroSaude(E.vitais,['sis','dia']);
+  const pulsoRecente=ultimoRegistroSaude(E.vitais,['fc']);
+  const resumo=el(`<div class="saude-resumo"><div class="saude-resumo-titulo"><span>SEU ACOMPANHAMENTO</span><h2>Últimos registros</h2><p>Cada medida mantém a data em que foi registrada.</p></div><div class="grade">
+    ${kpi('Peso',pesoRecente?esc(pesoRecente.peso)+' kg':'—',pesoRecente?fmtDataAno(pesoRecente.data):'Sem pesagem registrada')}
+    ${kpi('Pressão',pressaoRecente?esc(pressaoRecente.sis)+' / '+esc(pressaoRecente.dia):'—',pressaoRecente?fmtDataAno(pressaoRecente.data)+' · mmHg':'Sem medida completa')}
+    ${kpi('Batimentos',pulsoRecente?esc(pulsoRecente.fc)+' bpm':'—',pulsoRecente?fmtDataAno(pulsoRecente.data):'Sem medida registrada')}
+    ${kpi('Tratamentos',emTrat,'Em andamento ou contínuos')}
+  </div></div>`);
+  m.appendChild(resumo);
+  const datas=[...E.exames.filter(x=>x.proximo).map(x=>({data:x.proximo,nome:x.exame||'Exame',tipo:'Exame',abrir:()=>modalExame(x)})),
+    ...E.vacinas.filter(x=>x.proxima).map(x=>({data:x.proxima,nome:x.vacina||'Vacina',tipo:'Vacina',abrir:()=>{abreBloco('sa-vac');r()}}))].sort((a,b)=>a.data.localeCompare(b.data));
+  const lembretes=el('<section class="saude-lembretes"><h2>Datas para acompanhar</h2><p>Somente datas informadas nos seus registros.</p></section>');
+  if(!datas.length)lembretes.appendChild(el('<div class="saude-sem-dados">Nenhuma próxima data cadastrada. Você pode informá-la em um exame ou vacina.</div>'));
+  datas.forEach(x=>{const bt=el(`<button type="button"><span>${esc(x.nome)}<small>${x.tipo}${x.data<hoje()?' · Data passada — conferir registro':''}</small></span><b>${fmtDataAno(x.data)} ›</b></button>`);bt.onclick=x.abrir;lembretes.appendChild(bt)});
+  m.appendChild(lembretes);
 
   m.appendChild(bloco('sa-dash', 'Evolução do peso', '', graficoEl(gLinha(
     ord.filter(p => p.peso).map(p => ({ r: fmtData(p.data), v: +p.peso })), { fmt: v => v.toFixed(1) + 'kg' }))));
@@ -2892,14 +2936,14 @@ function rastreiosPendentes(todos) {
     if (fonte && fonte.vitais)
       (E.vitais || []).forEach(x => { if (String(x[fonte.vitais] ?? '').trim() !== '') datas.push(x.data) });
     const ultima = datas.filter(Boolean).sort().pop() || null;
-    let situacao = 'Nunca feito', venceEm = null;
+    let situacao = 'Sem registro', venceEm = null;
     if (ultima) {
       const prox = new Date(ultima + 'T12:00'); prox.setMonth(prox.getMonth() + cada);
       venceEm = Math.round((prox - new Date(h + 'T12:00')) / 864e5);
       situacao = venceEm < 0 ? 'Atrasado' : venceEm < 60 ? 'Chegando' : 'Em dia';
     }
     const item = { nome, cada, ultima, situacao, venceEm, porque };
-    if (todos || situacao === 'Nunca feito' || situacao === 'Atrasado' || situacao === 'Chegando') out.push(item);
+    if (todos || situacao === 'Sem registro' || situacao === 'Atrasado' || situacao === 'Chegando') out.push(item);
   });
   return todos ? out : out.sort((a, b) => (a.venceEm ?? -9999) - (b.venceEm ?? -9999));
 }
@@ -5012,6 +5056,12 @@ const FONTES_BUSCA=[
   {col:'tratamentos',tela:'saude',ic:'💊',rot:'Tratamento',
    campos:['oque','nome','motivo','medico','obs'],tit:x=>x.oque||x.nome||'tratamento',
    sub:x=>[x.medico,x.status].filter(Boolean).join(' · ')},
+  {col:'vacinas',tela:'saude',ic:'💉',rot:'Vacina',campos:['vacina','obs'],tit:x=>x.vacina||'vacina',sub:x=>[x.data,x.proxima].filter(Boolean).join(' · ')},
+  {col:'metas',tela:'guia',ic:'🎯',rot:'Meta',campos:['meta','titulo','area','obs'],tit:x=>x.meta||x.titulo||'meta',sub:x=>x.area||''},
+  {col:'rituais',tela:'guia',ic:'🔁',rot:'Ritual',campos:['ritual','comQuem','obs'],tit:x=>x.ritual||'ritual',sub:x=>x.frequencia||''},
+  {col:'contas',tela:'caixavgv',ic:'💰',rot:'Conta patrimonial',campos:['nome','instituicao','tipo','obs'],tit:x=>x.nome||x.instituicao||'conta',sub:x=>x.tipo||''},
+  {col:'empreend',tela:'caixavgv',ic:'🏗️',rot:'Empreendimento',campos:['nome','empresa','obs'],tit:x=>x.nome||'empreendimento',sub:x=>x.empresa||''},
+  {col:'reservas',tela:'caixavgv',ic:'📌',rot:'Reserva',campos:['nome','obs'],tit:x=>x.nome||'reserva',sub:x=>x.obs||''},
   {col:'livros',tela:'guia',ic:'📚',rot:'Livro',
    campos:['titulo','autor','obs'],tit:x=>x.titulo||'livro',
    sub:x=>[x.autor,x.status].filter(Boolean).join(' · ')},
@@ -5212,6 +5262,95 @@ function blocoGoogle(servico){
   const status=el('<p role="status" class="google-nota"></p>');cx.appendChild(a);cx.appendChild(status);
   return bloco(servico==='gmail'?'google-gmail':'google-agenda',servico==='gmail'?'📧 Gmail':'📅 Google Agenda','conexão e importação',cx);
 }
+function lerConvitesAgenda(txt,mensagem,lib=ICAL){
+  const raiz=new lib.Component(lib.parse(txt)),eventos=[],avisos=[];
+  const metodo=String(raiz.getFirstPropertyValue('method')||'').toUpperCase();
+  if(metodo&& !['REQUEST','PUBLISH','CANCEL'].includes(metodo))return {eventos,avisos};
+  for(const c of raiz.getAllSubcomponents('vevent')){
+    const gid=String(c.getFirstPropertyValue('uid')||'');if(!gid){avisos.push('Convite sem identificação: revisão manual necessária.');continue}
+    if(c.hasProperty('rrule')||c.hasProperty('recurrence-id')||c.hasProperty('rdate')){avisos.push('Convite recorrente: importe pelo Google Agenda para preservar a série.');continue}
+    const base={gid,seq:Number(c.getFirstPropertyValue('sequence'))||0,emailEm:Number(mensagem.internalDate)||0,gmailId:mensagem.id};
+    if(metodo==='CANCEL'||String(c.getFirstPropertyValue('status')).toUpperCase()==='CANCELLED'){eventos.push({...base,cancelado:true});continue}
+    const inicio=c.getFirstPropertyValue('dtstart');if(!inicio){avisos.push('Convite sem data de início.');continue}
+    const fim=c.getFirstPropertyValue('dtend');
+    try{
+      const converter=(t,prop)=>{
+        if(t.isDate)return {date:t.toString()};
+        const tz=c.getFirstProperty(prop)?.getParameter('tzid');
+        if(t.zone.tzid==='floating'){
+          if(tz&&tz!=='America/Sao_Paulo')throw new Error('Fuso não reconhecido no convite: '+tz+'. Use o Google Agenda.');
+          // Horário flutuante: preservado como horário local de Brasília na revisão.
+          return {dateTime:t.toString()+'-03:00'};
+        }
+        return {dateTime:t.toJSDate().toISOString()};
+      };
+      const normal=normalizarEventoGoogle({id:gid,start:converter(inicio,'dtstart'),end:fim?converter(fim,'dtend'):undefined,summary:c.getFirstPropertyValue('summary')||'Compromisso',location:c.getFirstPropertyValue('location')||''},'gmail');
+      const {googleId,googleCalendar,googleAtualizado,googleLink,...reg}=normal;
+      eventos.push({...base,reg:{...reg,gid,gmailId:mensagem.id,gmailSequencia:base.seq,gmailRecebidoEm:base.emailEm,obs:'Importado de convite recebido pelo Gmail. '+(!inicio.isDate&&inicio.zone.tzid==='floating'?'Horário interpretado como Brasília; confira.':'')}});
+    }catch(e){avisos.push(String(e.message||'Não foi possível ler um convite.'))}
+  }
+  return {eventos,avisos};
+}
+function planejarConvitesAgenda(eventos,agenda,data=hoje()){
+  const ultimos=new Map();
+  eventos.forEach(e=>{const ant=ultimos.get(e.gid);if(!ant||e.seq>ant.seq||(e.seq===ant.seq&&e.emailEm>ant.emailEm))ultimos.set(e.gid,e)});
+  return [...ultimos.values()].filter(e=>e.cancelado||e.reg?.data>=data).map(e=>{
+    const existente=agenda.find(a=>a.gid===e.gid);
+    const mesmaVersao=existente&&((existente.gmailSequencia??-1)>e.seq||((existente.gmailSequencia??-1)===e.seq&&(existente.gmailRecebidoEm||0)>=e.emailEm));
+    return {...e,acao:e.cancelado?'cancelado':existente?.googleId?'google':mesmaVersao?'existente':existente?'atualizar':'adicionar'};
+  });
+}
+async function consultarConvitesGmail(){
+  const mensagens=[];let pagina='';
+  do{const q='newer_than:90d {filename:ics "convite" "invitation" "invite.ics"}';
+    const r=await gmailApi('messages?maxResults=100&q='+encodeURIComponent(q)+(pagina?'&pageToken='+encodeURIComponent(pagina):''));
+    mensagens.push(...(r.messages||[]));pagina=r.nextPageToken||'';
+    if(mensagens.length>=200&&pagina)throw new Error('Há mais de 200 mensagens candidatas nos últimos 90 dias. Use a importação do Google Agenda para este volume.');
+  }while(pagina);
+  const eventos=[],avisos=[];
+  for(const m of mensagens){
+    const msg=await gmailApi('messages/'+encodeURIComponent(m.id)+'?format=full');
+    const partes=[];const visitar=(p,n=0)=>{if(!p||n>12)return;if(p.mimeType==='text/calendar'||/\.ics$/i.test(p.filename||''))partes.push(p);(p.parts||[]).forEach(x=>visitar(x,n+1))};visitar(msg.payload);
+    for(const p of partes){
+      if((p.body?.size||0)>1000000){avisos.push('Um convite excede o limite de leitura. Importe pelo Google Agenda.');continue}
+      let cod=p.body?.data;
+      if(!cod&&p.body?.attachmentId){const arq=await gmailApi('messages/'+encodeURIComponent(m.id)+'/attachments/'+encodeURIComponent(p.body.attachmentId));cod=arq.data}
+      if(!cod)continue;
+      try{const r=lerConvitesAgenda(deB64(cod),msg);eventos.push(...r.eventos);avisos.push(...r.avisos)}catch(e){avisos.push('Não foi possível interpretar um arquivo de convite. Nenhum evento desse arquivo foi importado.')}
+    }
+  }
+  return {plano:planejarConvitesAgenda(eventos,E.agenda),avisos:[...new Set(avisos)],mensagens:mensagens.length};
+}
+function revisarConvitesGmail(resultado){
+  abrirModal('Compromissos recebidos no Gmail','Convites nos últimos 90 dias · novos compromissos a partir de hoje',(c,fechar)=>{
+    const cx=el('<div class="secao"></div>'),selecionados=new Set();
+    cx.appendChild(el('<p>Confira as datas e selecione o que deseja trazer. Atualizar substitui os campos importados da cópia local. Nenhuma resposta será enviada ao organizador.</p>'));
+    const importar=acao('Importar selecionados',()=>{
+      let n=0;for(const item of selecionados){const atualPlano=planejarConvitesAgenda([item],E.agenda)[0];if(!atualPlano||!['adicionar','atualizar'].includes(atualPlano.acao))continue;
+        const existente=E.agenda.find(a=>a.gid===item.gid);if(existente)Object.assign(existente,item.reg);else E.agenda.push({id:uid(),...item.reg});n++}
+      if(n)salvar();fechar();abreBloco('ag-lista');irTela('agenda');
+    });importar.disabled=true;
+    resultado.plano.forEach(item=>{
+      if(!['adicionar','atualizar'].includes(item.acao))return;
+      const linha=el(`<label class="google-evento"><input type="checkbox"><span><b>${esc(item.reg.titulo)}</b><small>${fmtDataAno(item.reg.data)} · ${esc(item.reg.hora||'Dia inteiro')} · ${esc(item.reg.local||'Sem local')} · ${item.acao==='adicionar'?'Novo':'Atualização'}</small><small>${esc(item.reg.obs)}</small></span></label>`);
+      linha.querySelector('input').onchange=e=>{if(e.target.checked)selecionados.add(item);else selecionados.delete(item);importar.disabled=!selecionados.size;importar.textContent='Importar '+selecionados.size+' selecionado(s)'};cx.appendChild(linha);
+    });
+    const novos=resultado.plano.filter(x=>['adicionar','atualizar'].includes(x.acao)).length;
+    if(!novos)cx.appendChild(el('<p class="vazio">Nenhum convite novo ou atualizado para importar. E-mails sem convite de calendário não são convertidos automaticamente.</p>'));
+    resultado.plano.filter(x=>x.acao==='cancelado').forEach(x=>cx.appendChild(el(`<p class="aviso">Foi encontrado cancelamento de ${esc(E.agenda.find(a=>a.gid===x.gid)?.titulo||'um convite')}. Se já estiver na sua Agenda, revise a cópia; ela não foi apagada.</p>`)));
+    if(resultado.plano.some(x=>x.acao==='google'))cx.appendChild(el('<p>Alguns convites já vieram pelo Google Agenda. Atualize-os pela conexão do Google Agenda.</p>'));
+    resultado.avisos.forEach(a=>cx.appendChild(el('<p class="aviso">'+esc(a)+'</p>')));cx.appendChild(importar);c.appendChild(cx);
+  });
+}
+function blocoAgendaGmail(){
+  const cx=el('<div class="corpo"></div>');
+  cx.appendChild(el('<p class="google-nota">Traga novos convites recebidos no Gmail para esta Agenda. Consulte quando quiser e revise antes de importar. Não há sincronização com a página fechada.</p>'));
+  const status=el('<p role="status" class="google-nota"></p>');
+  const b=acao(googleConectado('gmail')?'Buscar novos convites':'Conectar Gmail e buscar convites',async()=>{b.disabled=true;status.textContent='Consultando convites…';try{if(!googleConectado('gmail'))await conectarGoogle('gmail');const resultado=await consultarConvitesGmail();status.textContent=resultado.mensagens+' mensagens consultadas.';revisarConvitesGmail(resultado)}catch(e){status.textContent=e.message||'Não foi possível consultar o Gmail.'}finally{b.disabled=false;b.textContent=googleConectado('gmail')?'Buscar novos convites':'Conectar Gmail e buscar convites'}});
+  cx.appendChild(b);cx.appendChild(status);
+  return bloco('ag-gmail','Compromissos pelo Gmail','Conexão somente de leitura · horários de Brasília',cx);
+}
+
 async function verEmailsGoogle(){
   const lista=await gmailApi('messages?maxResults=15&q='+encodeURIComponent('in:inbox'));
   const mensagens=await Promise.all((lista.messages||[]).map(m=>gmailApi('messages/'+encodeURIComponent(m.id)+'?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date')));
@@ -7243,9 +7382,9 @@ function vRendimentos(m){
     t2.appendChild(tf2); rol2.appendChild(t2);
   }
   lc2.appendChild(rol2);
-  const pe2=el('<div style="padding:0 17px 15px"></div>');
-  const bt2=el('<button class="mais">+ Novo lançamento</button>'); bt2.onclick=novoRend;
-  pe2.appendChild(bt2); lc2.appendChild(pe2);
+  const pe2=el('<div style="padding:15px 17px"></div>');
+  const bt2=el('<button class="btn">+ Novo lançamento</button>'); bt2.onclick=novoRend;
+  pe2.appendChild(bt2); lc2.prepend(pe2);
   m.appendChild(bloco('rd-lanc','Lançamentos de '+ano,doAno.length+' lançamento(s) — clique no mês para abrir; em Instituição ou Tipo para corrigir ali mesmo; no resto da linha para abrir a ficha',lc2));
   /* ORDEM DA TELA: o dono lê os LANÇAMENTOS primeiro e o resumo por empresa
      logo depois; o resto do painel é contexto. A troca é feita aqui, no fim,
@@ -7637,7 +7776,7 @@ function vPatrimonio(m){
     ${kpi('Patrimônio líquido',brl(liquido),'bruto menos dívida',liquido>=0?'v':'r')}</div>`));
 
   if(bens.some(x=>!valor(x))) m.appendChild(el(`<div class="aviso">💡 <b>${bens.filter(x=>!valor(x)).length} bem(ns) sem valor preenchido.</b>
-    Sem isso o patrimônio líquido fica menor do que é de verdade — vale colocar um valor aproximado.</div>`));
+    O total considera apenas os valores cadastrados; revise as avaliações que faltam.</div>`));
 
   /* ---- lista clicável ---- */
   const cx=el('<div></div>');
@@ -8068,7 +8207,7 @@ function vDocumentos(m){
       .sort((a,b)=>(a.validade||'9').localeCompare(b.validade||'9'));
     const vencidos=meus.filter(d=>st(d)==='Vencido').length;
     const vencendo=meus.filter(d=>st(d)==='Vencendo').length;
-    const proximo=meus.map(d=>d.validade).filter(Boolean).sort()[0]||'';
+    const proximo=meus.map(d=>d.validade).filter(d=>d&&d>=h).sort()[0]||'';
     return {dono,meus,vencidos,vencendo,proximo};
   }).sort((a,b)=>(mesmaPessoa(b.dono,'Léo')-mesmaPessoa(a.dono,'Léo'))
     ||(b.vencidos-a.vencidos)||(b.vencendo-a.vencendo)||a.dono.localeCompare(b.dono));
@@ -8077,7 +8216,7 @@ function vDocumentos(m){
     const aberto=!!filtro.docAbertos[p.dono];
     const sit=p.vencidos?chip('Vencido')+(p.vencidos>1?`<b style="font-size:11.5px">×${p.vencidos}</b>`:'')
       :p.vencendo?chip('Vencendo')+(p.vencendo>1?`<b style="font-size:11.5px">×${p.vencendo}</b>`:'')
-      :p.meus.length?chip('Em dia'):'';
+      :p.meus.some(d=>!d.validade)?'<span class="chip">Validade não informada</span>':p.meus.length?chip('Em dia'):'';
     const linha=el(`<div style="border:1px solid var(--linha);border-radius:var(--r);margin-bottom:10px;overflow:hidden;background:var(--card)">
       <button class="cabPessoa" style="width:100%;display:flex;align-items:center;gap:10px;padding:13px 15px;background:var(--bg);border:none;border-bottom:1px solid transparent;font:inherit;color:inherit;text-align:left;cursor:pointer">
         <span class="seta" style="color:var(--suave);font-size:12px;width:12px">${aberto?'▾':'▸'}</span>
@@ -8907,11 +9046,39 @@ function contarUso(chave,valor){
     default: return 0;
   }
 }
+function conferirCadastros(estado){
+  const problemas=[];
+  const datas=['data','ida','volta','inicio','fim','prazo','validade','proximo','proxima','renova'];
+  const dataValida=v=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;const d=new Date(v+'T12:00');return !isNaN(d)&&dataLocal(d)===v};
+  Object.entries(estado).forEach(([col,lista])=>{
+    if(!Array.isArray(lista))return;
+    const ids=new Set();
+    lista.forEach((x,i)=>{
+      if(!x||typeof x!=='object'||Array.isArray(x))return;
+      const nome=x.nome||x.titulo||x.oque||x.evento||x.exame||x.vacina||x.item||'Registro '+(i+1);
+      const add=texto=>problemas.push({col,ref:x,nome,texto});
+      if(x.id){if(ids.has(x.id))add('Identificador repetido nesta lista.');ids.add(x.id)}
+      datas.forEach(k=>{if(x[k]&&!dataValida(String(x[k])))add('Data inválida no campo '+k+'.')});
+      [['ida','volta'],['inicio','fim']].forEach(([a,b])=>{if(x[a]&&x[b]&&dataValida(String(x[a]))&&dataValida(String(x[b]))&&x[b]<x[a])add('A data final é anterior à inicial.')});
+      if(x.valor!==undefined&&x.valor!==''&&!Number.isFinite(Number(x.valor)))add('Valor não reconhecido como número.');
+    });
+  });
+  return problemas;
+}
+function blocoConferenciaCadastros(){
+  const lista=conferirCadastros(E),cx=el('<div class="corpo"></div>');
+  cx.appendChild(el('<p class="google-nota">Confere identificadores repetidos, datas e valores dos cadastros. Nada é alterado automaticamente. Esta checagem não verifica arquivos, contas externas nem a exatidão das informações.</p>'));
+  if(!lista.length)cx.appendChild(el('<p>Nenhuma inconsistência encontrada nestas verificações.</p>'));
+  lista.forEach(x=>{const fonte=FONTES_BUSCA.find(f=>f.col===x.col);const linha=el(`<div class="conferencia-item"><span><b>${esc(x.nome)}</b><small>${esc(fonte?.rot||'Cadastro')} · ${esc(x.texto)}</small></span></div>`);
+    if(fonte){const b=el('<button class="btn ghost mini">Revisar</button>');b.onclick=()=>abrirRegistro(fonte.tela,x.col,x.ref);linha.appendChild(b)}cx.appendChild(linha)});
+  return bloco('cf-conferencia','Conferência dos cadastros'+(lista.length?' · '+lista.length:''),'Verificações de consistência; revisão manual antes de corrigir.',cx);
+}
+
 async function vConfig(m){
   const r=rr('config');
   m.appendChild(cab('Configurações','Gerencie conexões, preferências, listas e cópias de segurança.'));
   m.appendChild(painel('Seções', 'Abra o assunto que deseja ajustar'));
-  m.appendChild(blocoGoogle('gmail'));m.appendChild(blocoGoogle('agenda'));
+  m.appendChild(blocoConferenciaCadastros());m.appendChild(blocoGoogle('gmail'));m.appendChild(blocoGoogle('agenda'));
   const t=await arqTotal();
   if(atual!=='config')return;
   m.appendChild(el(`<div class="grade">
