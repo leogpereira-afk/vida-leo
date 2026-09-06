@@ -243,7 +243,7 @@ tr:hover .lixo{opacity:1}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css?v=13f9c1c2a45c">
+<link rel="stylesheet" href="./refinamento.css?v=d2fd14c0f818">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -1286,7 +1286,7 @@ function tela(){
   const m=document.getElementById('main'),pagina=el('<div class="pagina"></div>');m.replaceChildren(pagina);
   const alvo=_alvoBloco;_alvoBloco=null;
   const mod=MODS.find(x=>x.id===atual&&!x.url);document.title=mod.nome+' · Central do Léo';
-  const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else indiceDaTela(pagina);prepararTabelas(pagina);if(alvo)rolaAlvo(pagina,alvo)};
+  const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else if(atual==='caixavgv')organizarCaixaVGV(pagina,alvo);else indiceDaTela(pagina);prepararTabelas(pagina);if(alvo)rolaAlvo(pagina,alvo)};
   const falhou=()=>{if(pagina.isConnected)pagina.appendChild(el('<p class="aviso" role="alert">Não foi possível concluir o carregamento. Abra esta seção novamente.</p>'))};
   try{const resultado=mod.render(pagina);if(resultado?.then)resultado.then(finalizar).catch(falhou);else finalizar()}catch(erro){falhou()}
   return !!alvo;
@@ -4602,10 +4602,43 @@ function avisosVGV(){
 
 
 /* ---------------- a tela Caixa e VGV ---------------- */
+let abaCaixaVGV='painel';
+function organizarCaixaVGV(pagina,alvo){
+ if(pagina.classList.contains('caixa-layout'))return;
+ pagina.classList.add('caixa-layout');
+ const topo=pagina.querySelector('.topo'),acoes=pagina.querySelector('[data-bid="cx-acoes"]');
+ const fonte=el('<section class="caixa-fonte" aria-label="Origem dos dados"></section>');
+ const meta=E.patrimonialImportacao;
+ const data=v=>v&&Number.isFinite(new Date(v).getTime())?new Date(v).toLocaleString('pt-BR'):'Não registrada';
+ fonte.appendChild(el(`<div><span class="caixa-eyebrow">BASE PATRIMONIAL</span><h2>Última importação: ${esc(data(meta?.importadoEm))}</h2><p>${meta?esc(meta.arquivo)+' · Os valores podem ser editados manualmente.':'Atualize pela sua planilha ou preencha os lançamentos manualmente.'}</p></div>`));
+ const botoes=acoes?.querySelector('.corpo > div');if(botoes)fonte.appendChild(botoes);acoes?.remove();
+ const manual=el('<button class="btn ghost" type="button">Editar lançamentos</button>');manual.onclick=()=>selecionar('lancamentos');fonte.lastElementChild.appendChild(manual);
+ topo.after(fonte);
+ const nav=el('<nav class="caixa-abas" aria-label="Seções de Caixa e VGV"></nav>'),panes={};
+ [['painel','Painel VGV'],['lancamentos','Lançamentos'],['casas','Casas e reservas'],['conferencia','Conferência e projeções']].forEach(([id,label])=>{
+  panes[id]=el(`<section class="caixa-pane" id="caixa-${id}" aria-label="${label}"></section>`);
+  const b=el(`<button type="button" data-caixa-aba="${id}" aria-controls="caixa-${id}">${label}</button>`);b.onclick=()=>selecionar(id);nav.appendChild(b);
+ });
+ let grades=0;
+ [...pagina.children].forEach(node=>{
+  if(node===topo||node===fonte)return;
+  const id=node.dataset.bid;
+  const dest=node.classList.contains('grade')?(++grades<=4?'painel':'conferencia'):['cx-contas','cx-emp'].includes(id)?'lancamentos':['cx-casas','cx-res','cx-gcasas'].includes(id)?'casas':['cx-rank','cx-gvgv'].includes(id)?'painel':'conferencia';
+  panes[dest].appendChild(node);
+ });
+ panes.painel.prepend(el('<div class="caixa-section-title"><h2>Painel VGV</h2><p>Mesma ordem e fórmulas da planilha Patrimonial.</p></div>'));
+ panes.lancamentos.prepend(el('<p class="caixa-ajuda">Edite os campos diretamente. Contas e empreendimentos são listas independentes.</p>'));
+ panes.conferencia.prepend(el('<p class="caixa-ajuda">As projeções abaixo acrescentam hipóteses à planilha. Confira possíveis duplicidades entre casas e empreendimentos e a natureza das dívidas antes de usar o saldo.</p>'));
+ pagina.appendChild(nav);Object.values(panes).forEach(p=>pagina.appendChild(p));
+ function selecionar(id){abaCaixaVGV=id;Object.entries(panes).forEach(([k,p])=>p.hidden=k!==id);nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.caixaAba===id)));}
+ const destino=alvo?Object.entries(panes).find(([,p])=>[...p.querySelectorAll('[data-bid]')].some(x=>x.dataset.bid===alvo))?.[0]:null;
+ selecionar(destino||abaCaixaVGV);
+ panes.lancamentos.querySelectorAll('.bloco').forEach(b=>b.classList.remove('fechado'));
+}
 function vCaixaVGV(m){
   const r=rr('caixavgv');
   const c=contasVGV();
-  m.appendChild(cab('Caixa e VGV','O que existe hoje, o que ainda entra e o que ainda sai. Tudo editável aqui.'));
+  m.appendChild(cab('Caixa e VGV','Seu patrimônio em números: capital, aportes e previsões de recebimento.'));
 
   /* O PAINEL É O DELE. Doze números em quatro blocos de três, com os nomes
      e as fórmulas da planilha — mexer nisso o obrigaria a reaprender o que
@@ -4703,8 +4736,9 @@ function vCaixaVGV(m){
     {k:'nome',t:'Conta / dívida',ph:'ex.: conta do banco, cheque, dívida'},
     {k:'valor',t:'Valor',tipo:'moeda',w:150},
     {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposConta'),w:130},
+    {k:'atualizacao',t:'Data da posição',tipo:'date',w:140},
   ],()=>({nome:'',valor:0,tipo:CFG('tiposConta')[0]}),r,
-    `<td>Total</td><td class="num">${brl(c.totalContas)}</td><td></td>`,E.contas));
+    `<td>Total</td><td class="num">${brl(c.totalContas)}</td><td></td><td></td>`,E.contas));
   m.appendChild(bloco('cx-contas','🏦 Contas e dívidas','o que existe hoje, por tipo',t1));
 
   /* ---- 2. empreendimentos ---- */
@@ -4717,9 +4751,10 @@ function vCaixaVGV(m){
       {k:'aporteResidual',t:'Aporte residual',tipo:'moeda',w:140},
       {k:'aporteTotal',t:'Aporte total',tipo:'moeda',w:130},
       {k:'previsao',t:'Previsão de receb.',tipo:'moeda',w:140},
+      {k:'obs',t:'Observações'},
     ],()=>({nome:'',ano:String(anoHoje),mes:'',vgv:0,aporteResidual:0,aporteTotal:0,previsao:0}),r,
       `<td colspan="3">Totais</td><td class="num">${brl(c.vgv)}</td><td class="num">${brl(c.aporteResidual)}</td>`+
-      `<td class="num">${brl(c.aporteTotal)}</td><td class="num">${brl(c.previsao)}</td>`,E.empreend)));
+      `<td class="num">${brl(c.aporteTotal)}</td><td class="num">${brl(c.previsao)}</td><td></td>`,E.empreend)));
 
   /* ---- V.G.V por empreendimento: onde está o dinheiro grande ---- */
   const comVgv=E.empreend.filter(x=>cxN(x.vgv)).sort((x,y)=>cxN(y.vgv)-cxN(x.vgv)).slice(0,10);
@@ -4729,7 +4764,7 @@ function vCaixaVGV(m){
         <p style="font-size:12px;color:var(--suave);margin-top:11px">V.G.V é o valor geral de vendas — quanto o empreendimento vale vendido, não quanto sobra para você.</p></div>`)));
 
   /* ---- 3. casas ---- */
-  m.appendChild(bloco('cx-casas','🏡 Casas','aporte feito, quanto falta e o V.G.V de cada uma',
+  m.appendChild(bloco('cx-casas','🏡 Casas','aporte previsto, quanto falta e o V.G.V de cada uma',
     tabelaBloco('cx-casas-t','','',E.casas,[
       {k:'nome',t:'Casa'},
       {k:'aporte',t:'Aporte',tipo:'moeda',w:140},
@@ -4776,10 +4811,10 @@ function vCaixaVGV(m){
   const acoes=el('<div class="corpo"></div>');
   acoes.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:0 0 11px">'+
     'Você pode lançar tudo à mão nas tabelas acima <b>ou</b> trazer da sua planilha Patrimonial. '+
-    'A importação <b>substitui</b> as quatro listas pelo que estiver no arquivo — o estado de agora fica guardado em Configurações → Versão descartada.</p>'));
+    'A importação pede confirmação e <b>substitui</b> as listas presentes no arquivo — o estado de agora fica guardado em Configurações → Versão descartada.</p>'));
   const lin=el('<div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center"></div>');
   const inp=el('<input type="file" accept=".xlsx,.xlsm" hidden>');
-  const bimp=el('<button class="btn">📥 Trazer da planilha</button>');
+  const bimp=el('<button class="btn">Atualizar pela planilha</button>');
   bimp.onclick=()=>inp.click();
   inp.onchange=()=>{if(inp.files[0])importarPatrimonial(inp.files[0],r);inp.value=''};
   const bpdf=el('<button class="btn ghost">🖨 Salvar em PDF</button>');
@@ -4845,21 +4880,22 @@ async function importarPatrimonial(f,r){
     if(!nLanc)throw new Error('não achei a aba "Lançamentos". Abas neste arquivo: '+Object.keys(abas).join(', '));
     const L=celulasDaAba(zip,abas[nLanc]);
     const C=nCasas?celulasDaAba(zip,abas[nCasas]):{};
-    const num=v=>{const x=parseFloat(String(v??'').replace(',','.'));return isNaN(x)?0:x};
+    const num=v=>{let t=String(v??'').trim().replace(/R\$|\s/g,'');if(t.includes(','))t=t.replace(/\./g,'').replace(',','.');const x=Number(t);return Number.isFinite(x)?x:0};
     const txt=v=>String(v??'').trim();
 
     /* As duas metades da aba Lançamentos são listas INDEPENDENTES: A-G são
        empreendimentos, H-J são contas. Percorrer as duas separadamente é o que
        impede o erro que a própria documentação da planilha adverte. */
     const empreend=[],contas=[];
-    for(let i=2;i<=400;i++){
+    const ultima=Math.max(2,...Object.keys(L).map(k=>Number(k.match(/\d+$/)?.[0])||0));
+    for(let i=2;i<=ultima;i++){
       const nome=txt(L['A'+i]);
       const vals=[num(L['D'+i]),num(L['E'+i]),num(L['F'+i]),num(L['G'+i])];
       if(nome||vals.some(v=>v))
         empreend.push({id:uid(),nome,ano:txt(L['B'+i]),mes:txt(L['C'+i]),
-          vgv:vals[0],aporteResidual:vals[1],aporteTotal:vals[2],previsao:vals[3]});
+          vgv:vals[0],aporteResidual:vals[1],aporteTotal:vals[2],previsao:vals[3],obs:['D','E','F','G'].filter(col=>txt(L[col+i])&&!num(L[col+i])&&/[a-záéíóú]/i.test(txt(L[col+i]))).map(col=>col+i+': '+txt(L[col+i])).join('; ')});
       const cn=txt(L['H'+i]), cv=num(L['I'+i]), ct=txt(L['J'+i]);
-      if(cn||cv||ct)contas.push({id:uid(),nome:cn,valor:cv,tipo:ct});
+      if(cn||cv||ct)contas.push({id:uid(),nome:cn,valor:cv,tipo:ct,atualizacao:Number(L['K'+i])>0?new Date(Date.UTC(1899,11,30)+Number(L['K'+i])*86400000).toISOString().slice(0,10):''});
     }
     // Casas: nome+aporte na linha 1, restante na 2, VGV na 3 — sete colunas
     const casas=[];
@@ -4883,10 +4919,12 @@ async function importarPatrimonial(f,r){
     const resumo=`Vou substituir o que está na tela por:\n\n`+
       `· ${empreend.length} empreendimento(s)\n· ${contas.length} conta(s) e dívida(s)\n`+
       `· ${casas.length} casa(s)\n· ${reservas.length} reserva(s)\n\n`+
+      `VGV: ${brl(empreend.reduce((t,x)=>t+x.vgv,0))}\nTotal Líquido: ${brl(contas.reduce((t,x)=>t+x.valor,0))}\n${nCasas?'':'Aba Casas ausente: casas e reservas atuais serão preservadas.\n'}${empreend.some(x=>x.obs)?'Textos em campos numéricos foram preservados em Observações.\n':''}\n`+
       `O que está aqui agora fica guardado em Configurações → Versão descartada. Continuar?`;
     if(!confirm(resumo))return;
     guardaDescartado();
-    E.empreend=empreend;E.contas=contas;E.casas=casas;E.reservas=reservas;
+    E.empreend=empreend;E.contas=contas;if(nCasas){E.casas=casas;E.reservas=reservas;}
+    E.patrimonialImportacao={arquivo:f.name,importadoEm:new Date().toISOString(),arquivoModificadoEm:f.lastModified?new Date(f.lastModified).toISOString():null};
     salvar();
     if(r)r();
     const c2=contasVGV();

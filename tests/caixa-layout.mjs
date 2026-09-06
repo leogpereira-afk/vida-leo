@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {setup} from './helpers/dom.mjs';
+test('Caixa: fonte no topo, quatro seções e edição acessível',()=>{
+ const {run,document}=setup();
+ run(`const p=document.createElement('main');document.body.appendChild(p);vCaixaVGV(p);organizarCaixaVGV(p);`);
+ const p=document.querySelector('.caixa-layout');
+ assert.equal(p.children[1].className,'caixa-fonte');
+ assert.match(p.children[1].textContent,/Não registrada/);
+ assert.equal(p.querySelectorAll('.caixa-abas button').length,4);
+ assert.equal(p.querySelectorAll('#caixa-painel > .grade').length,4);
+ [...p.querySelectorAll('button')].find(b=>b.textContent==='Editar lançamentos').onclick();
+ assert.equal(p.querySelector('#caixa-lancamentos').hidden,false);
+ assert.equal(p.querySelector('#caixa-painel').hidden,true);
+ assert.ok(p.querySelector('.caixa-fonte input[type=file]'));
+});
+test('Patrimonial: preserva casas ausentes, datas e textos, registra importação',async()=>{
+ const {run,ctx}=setup();
+ const enc=new TextEncoder();
+ const cell=(r,v)=>`<c r="${r}" t="inlineStr"><is><t>${v}</t></is></c>`;
+ ctx.zipTeste={'xl/workbook.xml':enc.encode('<workbook><sheet name="Lançamentos" r:id="r1"/></workbook>'),'xl/_rels/workbook.xml.rels':enc.encode('<Relationships><Relationship Id="r1" Target="worksheets/sheet1.xml"/></Relationships>'),'xl/worksheets/sheet1.xml':enc.encode('<worksheet>'+cell('A2','Projeto teste')+cell('D2','1.234,50')+cell('E2','recebido')+cell('H2','Banco teste')+cell('I2','200')+cell('J2','Dinheiro')+cell('K2','45000')+'</worksheet>')};
+ run(`lerZipAuto=async()=>zipTeste;confirm=()=>true;E.casas=[{nome:'Preservada'}];E.reservas=[{nome:'Reserva'}];`);
+ await run(`importarPatrimonial({name:'teste.xlsm',lastModified:1,arrayBuffer:async()=>new ArrayBuffer(0)})`);
+ assert.equal(run('E.empreend[0].vgv'),1234.5);
+ assert.match(run('E.empreend[0].obs'),/recebido/);
+ assert.equal(run('E.casas[0].nome'),'Preservada');
+ assert.equal(run('E.reservas.length'),1);
+ assert.match(run('E.contas[0].atualizacao'),/^2023-/);
+ assert.equal(run('E.patrimonialImportacao.arquivo'),'teste.xlsm');
+});

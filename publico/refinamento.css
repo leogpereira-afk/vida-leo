@@ -195,3 +195,10 @@ body:has(.fundo){overflow:hidden}
 .logo-login{max-width:280px;margin:0 auto 26px}
 @media(max-width:860px){.marca .logo-pessoal{max-width:210px}.marca{padding:0}}
 @media(max-width:420px){.side{grid-template-columns:minmax(0,1fr) auto}.marca .logo-pessoal{padding:3px}}
+
+/* Caixa e VGV: painel da Patrimonial, com origem e edição ao alcance. */
+.caixa-fonte{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:22px 24px;margin:22px 0;background:#fff;border:1px solid var(--linha);border-left:4px solid #433ff0;border-radius:16px}
+.caixa-eyebrow{font-size:11px;letter-spacing:.12em;color:#433ff0;font-weight:700}.caixa-fonte h2{font:600 17px/1.5 var(--fonte,system-ui);margin:5px 0}.caixa-fonte p,.caixa-section-title p,.caixa-ajuda{color:var(--suave);font-size:13px;line-height:1.6;margin:0}
+.caixa-abas{display:flex;gap:6px;border-bottom:1px solid var(--linha);margin:0 0 24px;overflow-x:auto;padding-bottom:8px}.caixa-abas button{white-space:nowrap;background:transparent;border:0;padding:12px 18px;border-radius:9px;font:600 14px system-ui;color:var(--suave);cursor:pointer}.caixa-abas button[aria-pressed=true]{background:#eeedff;color:#3730a3}.caixa-abas button:focus-visible{outline:2px solid #433ff0;outline-offset:2px}
+.caixa-pane[hidden]{display:none!important}.caixa-section-title{margin:0 0 18px}.caixa-section-title h2{font-size:21px;margin:0 0 4px}.caixa-pane>.grade{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:14px}.caixa-pane .kpi{min-width:0}.caixa-pane .kpi strong{font-variant-numeric:tabular-nums}.caixa-ajuda{margin-bottom:18px;padding:14px 18px;background:#f0f2f6;border-radius:10px}
+@media(max-width:700px){.caixa-fonte{align-items:stretch;flex-direction:column;gap:16px;padding:18px}.caixa-fonte h2{font-size:15px}.caixa-fonte .btn{flex:1}.caixa-pane>.grade{grid-template-columns:1fr;gap:10px;margin-bottom:10px}.caixa-abas button{padding:10px 13px}.caixa-fonte>div{min-width:0}.caixa-fonte p{overflow-wrap:anywhere}}
