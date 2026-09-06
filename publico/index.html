@@ -243,7 +243,7 @@ tr:hover .lixo{opacity:1}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css">
+<link rel="stylesheet" href="./refinamento.css?v=1ec0888f22d1">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -928,6 +928,7 @@ function btnRecolher(){
 
 /* ---------- blocos recolhíveis ---------- */
 function bloco(id,titulo,dica,conteudoEl){
+  if(!String(titulo||'').trim()){const c=el('<div class="tabela-interna"></div>');c.appendChild(conteudoEl);return c;}
   const recolhido=E.colapso[id]??id.startsWith('cf-');
   const fechado=recolhido?' fechado':'';
   const b=el(`<section class="bloco${fechado}" data-bid="${id}"><header tabindex="0" role="button" aria-expanded="${!recolhido}"><h2>${titulo}</h2><span class="dica">${dica||''}</span>
@@ -1166,8 +1167,80 @@ function menu(){
     nav.appendChild(b);
   });
 }
-function tela(){const m=document.getElementById('main');m.innerHTML='';MODS.find(x=>x.id===atual).render(m);return rolaAlvo()}
-const rr=id=>()=>{if(atual===id){const m=document.getElementById('main');m.innerHTML='';MODS.find(x=>x.id===id).render(m);rolaAlvo()}};
+function indiceDaTela(pagina){
+  const blocos=[...pagina.querySelectorAll('.bloco[data-bid]')].filter(b=>b.querySelector('header h2')?.textContent.trim());
+  if(!blocos.length)return;
+  const faixa=el('<div class="indice-tela"><label>Ir para um assunto</label><select><option value="">Escolha uma seção desta tela…</option></select></div>');
+  const seletor=faixa.querySelector('select');seletor.id=uid();faixa.querySelector('label').htmlFor=seletor.id;
+  blocos.forEach((b,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=b.querySelector('header h2').textContent;seletor.appendChild(o)});
+  seletor.onchange=()=>{if(seletor.value==='')return;const b=blocos[+seletor.value];b.classList.remove('fechado');E.colapso[b.dataset.bid]=false;salvar();const h=b.querySelector('header');h.setAttribute('aria-expanded','true');b.scrollIntoView({block:'start'});h.focus({preventScroll:true});seletor.value=''};
+  const prioridades={inicio:['ini-radar','ini-agenda'],rendimentos:['rd-lanc','rd-mes'],gastos:['gt-classe'],patrimonio:['pt-lista'],caixavgv:['cx-conf','cx-contas'],viagens:['vg-lista','google-gmail'],agenda:['ag-lista','google-agenda'],demandas:['dm-lista'],saude:['sa-ex','sa-rast'],estrategia:['es-plano'],fortemais:['fm-obras'],oportunidades:['op-rank','op-lista'],documentos:['dc-lista'],guia:['gu-metas','gu-plano','gu-pessoas'],config:['google-gmail','google-agenda','cf-copias']};
+  const rapidos=(prioridades[atual]||[]).map(id=>blocos.find(b=>b.dataset.bid===id)).filter(Boolean);
+  if(!rapidos.length)rapidos.push(...blocos.slice(0,2));
+  const atalhos=el('<nav class="atalhos-assuntos" aria-label="Acesso rápido nesta tela"></nav>');
+  rapidos.forEach(b=>{const bt=document.createElement('button');bt.className='btn ghost mini';bt.textContent=b.querySelector('header h2').textContent;bt.onclick=()=>{seletor.value=String(blocos.indexOf(b));seletor.onchange()};atalhos.appendChild(bt)});
+  faixa.appendChild(atalhos);
+  const topo=pagina.querySelector('.topo');if(topo)topo.after(faixa);
+}
+function resumoRendimentoFiltrado(hist,empresa,ano,todos=false){
+  const serie=empresa==='Todas'?hist.totalAno:(hist.empresas[empresa]||hist.anos.map(()=>0));
+  const i=hist.anos.indexOf(ano),total=todos?serie.reduce((a,b)=>a+(+b||0),0):(+serie[i]||0);
+  const anterior=i>0?(+serie[i-1]||0):0;
+  return {total,anterior,crescimento:!todos&&anterior?((total/anterior)-1)*100:null};
+}
+const abasFinanceiras={};
+function abaDoBlocoFinanceiro(id,secao){
+  if(id=== 'gt-lista'||id==='rd-lanc')return 'lancamentos';
+  if(/^gt-(casa|assin|seg|plano)$/.test(id))return 'recorrentes';
+  if(secao==='rendimentos'&&id==='rd-dash')return 'historico';
+  return 'resumo';
+}
+function organizarFinanceiro(pagina,secao,alvo){
+  pagina.classList.add('financeiro');
+  const opcoes=[['resumo','Resumo'],['lancamentos','Lançamentos'],[secao==='gastos'?'recorrentes':'historico',secao==='gastos'?'Recorrentes':'Histórico']];
+  const nav=el('<nav class="finance-tabs" aria-label="Visões financeiras"></nav>');
+  const paineis=Object.fromEntries(opcoes.map(([id])=>[id,el('<div class="finance-pane"></div>')]));
+  let atualGrupo='resumo';
+  [...pagina.children].forEach(no=>{
+    if(no.classList.contains('topo')||no.classList.contains('painel'))return;
+    const id=no.dataset.bid;
+    if(id)atualGrupo=abaDoBlocoFinanceiro(id,secao);
+    else if(no.textContent.trim().startsWith('Cadastros —')){atualGrupo='recorrentes';no.classList.add('finance-note')}
+    paineis[atualGrupo].appendChild(no);
+  });
+  pagina.appendChild(nav);
+  opcoes.forEach(([id,nome])=>{
+    const bt=el('<button type="button"></button>');bt.textContent=nome;bt.dataset.aba=id;nav.appendChild(bt);
+    bt.onclick=()=>selecionar(id);
+    paineis[id].id='finance-'+id;bt.setAttribute('aria-controls',paineis[id].id);pagina.appendChild(paineis[id]);
+  });
+  function selecionar(id){abasFinanceiras[secao]=id;opcoes.forEach(([chave])=>{paineis[chave].hidden=chave!==id;const bt=nav.querySelector('[data-aba="'+chave+'"]');bt.setAttribute('aria-pressed',String(chave===id))})}
+  selecionar(alvo?abaDoBlocoFinanceiro(alvo,secao):(abasFinanceiras[secao]||'resumo'));
+  // Conteúdo aparece ao escolher a visão; recolhimento antigo não esconde os dados.
+  pagina.querySelectorAll('.bloco').forEach(b=>{b.classList.remove('fechado');b.querySelector('header')?.setAttribute('aria-expanded','true')});
+  const principal=paineis.resumo.querySelector('.grade');principal?.classList.add('finance-metrics');
+  const painel=pagina.querySelector('.painel');
+  if(painel){const extra=el('<details class="finance-tools"><summary>Exportar e opções</summary></details>');
+    painel.querySelectorAll('button').forEach(bt=>{if(/recolher|Abrir tudo/i.test(bt.textContent))bt.remove();else if(/Excel|PDF/i.test(bt.textContent))extra.appendChild(bt)});
+    if(extra.children.length>1)painel.appendChild(extra);
+  }
+}
+function rankingFinanceiro(itens,total,abrir){
+  const lista=el('<div class="finance-ranking"></div>');
+  itens.forEach((item,i)=>{const bt=el(`<button type="button" class="finance-category"><span class="finance-rank">${i+1}</span><span class="finance-category-name">${esc(item.nome)}<span class="finance-bar"><i style="width:${Math.max(0,Math.min(100,total>0?item.valor/total*100:0))}%"></i></span></span><span class="finance-category-value">${brl(item.valor)}<small>${total>0?(item.valor/total*100).toFixed(1)+'%':'—'} · Ver itens ›</small></span></button>`);bt.onclick=()=>abrir(item);lista.appendChild(bt)});
+  return lista;
+}
+
+function tela(){
+  const m=document.getElementById('main'),pagina=el('<div class="pagina"></div>');m.replaceChildren(pagina);
+  const alvo=_alvoBloco;_alvoBloco=null;
+  const mod=MODS.find(x=>x.id===atual&&!x.url);document.title=mod.nome+' · Central do Léo';
+  const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else indiceDaTela(pagina);if(alvo)rolaAlvo(pagina,alvo)};
+  const falhou=()=>{if(pagina.isConnected)pagina.appendChild(el('<p class="aviso" role="alert">Não foi possível concluir o carregamento. Abra esta seção novamente.</p>'))};
+  try{const resultado=mod.render(pagina);if(resultado?.then)resultado.then(finalizar).catch(falhou);else finalizar()}catch(erro){falhou()}
+  return !!alvo;
+}
+const rr=id=>()=>{if(atual===id)tela()};
 // trocar de tela: sobe ao topo, a não ser que alguém tenha pedido um bloco
 function irTela(id){if(!MODS.some(m=>m.id===id&&!m.url))return;atual=id;if(location.hash!=='#'+id)history.pushState(null,'','#'+id);alternarMenu(false);menu();if(!tela())window.scrollTo(0,0);document.getElementById('main').focus({preventScroll:true})}
 window.addEventListener('popstate',()=>{const id=location.hash.slice(1)||'inicio';if(MODS.some(m=>m.id===id&&!m.url)){atual=id;menu();tela()}});
@@ -1178,18 +1251,12 @@ const kpi=(rot,val,sub,cl,ir)=>`<div class="kpi ${cl||''}${ir?' clic':''}"${ir?`
    acontece quando a tela termina de ser remontada. */
 let _alvoBloco=null;
 function abreBloco(id){if(E.colapso[id]){E.colapso[id]=false;salvar()}_alvoBloco=id;}
-function rolaAlvo(){
-  const id=_alvoBloco;_alvoBloco=null;
-  if(!id)return false;
-  setTimeout(()=>{
-    const b=document.querySelector(`[data-bid="${id}"]`);
-    if(!b)return;
-    b.classList.remove('fechado');b.querySelector('header')?.setAttribute('aria-expanded','true');
-    const alvoY=Math.max(0,window.scrollY+b.getBoundingClientRect().top-12);
-    window.scrollTo({top:alvoY,behavior:'smooth'});
-    // alguns navegadores engolem o 'smooth' e não saem do lugar — garante o pulo
-    setTimeout(()=>{if(Math.abs(window.scrollY-alvoY)>60)window.scrollTo(0,alvoY)},280);
-  },30);
+function rolaAlvo(pagina,id){
+  if(!pagina.isConnected)return false;
+  const b=[...pagina.querySelectorAll('[data-bid]')].find(x=>x.dataset.bid===id);
+  if(!b)return false;
+  b.classList.remove('fechado');b.querySelector('header')?.setAttribute('aria-expanded','true');
+  b.scrollIntoView({block:'start'});
   return true;
 }
 /* liga os cards marcados ao mapa de destinos da tela */
@@ -1230,19 +1297,29 @@ function docsViagem(v){
   return {intl:true,ok,itens};
 }
 // viagem "ok" = confirmada/realizada, hotel e transporte resolvidos e docs em dia
-const viagemOk=v=>['Confirmado','Realizado'].includes(v.status)&&String(v.hotel||'').trim()
+const viagemOk=v=>['Confirmado','Realizado'].includes(v.status)&&temHotelViagem(v)
   &&String(v.transporte||'').trim()&&docsViagem(v).ok;
 const custoViagem=v=>v.custos&&v.custos.length?v.custos.reduce((s,c)=>s+(+c.valor||0),0):(+v.gastos||0);
 
 /* ===================== INÍCIO ===================== */
 /* radar: varre TODAS as seções e junta o que precisa de atenção */
+function rotuloRadar(x){return x.quando==null?'Revisar':x.quando<0?'Prazo passado':x.quando===0?'Hoje':x.quando===1?'Amanhã':'Em '+x.quando+' dias'}
+function ordenarDemandas(lista){
+  const prioridade={Alta:0,'Média':1,Baixa:2};
+  return [...lista].sort((a,b)=>(a.status==='Concluída')-(b.status==='Concluída')||(a.prazo||'9999').localeCompare(b.prazo||'9999')||(prioridade[a.prioridade]??1)-(prioridade[b.prioridade]??1)||(a.titulo||'').localeCompare(b.titulo||'','pt-BR'));
+}
+function abrirRegistro(secao,col,registro){
+  const detalhes={agenda:modalCompromisso,viagens:modalViagem,demandas:modalDemanda,documentos:modalDoc,patrimonio:modalBem,pessoas:modalPessoa,exames:modalExame,oportunidades:modalOport,rendimentos:modalRendimento};
+  irTela(secao);
+  if(registro&&detalhes[col])detalhes[col](registro,false);
+}
 function radar(){
   const h=hoje(), out=[];
   const dias=d=>d?Math.round((new Date(d+'T12:00')-new Date(h+'T12:00'))/864e5):null;
-  const add=(g,ic,txt,quando,secao)=>out.push({g,ic,txt,quando,secao});
+  const add=(g,ic,txt,quando,secao,col=null,ref=null)=>out.push({g,ic,txt,quando,secao,col,ref});
   // documentos vencendo
   E.documentos.forEach(d=>{const n=dias(d.validade);
-    if(n!=null&&n<180) add(n<0?0:1,'🪪',`${d.nome||'Documento'}${d.dono&&d.dono!=='Léo'?' de '+d.dono:''} ${n<0?'venceu':'vence'} ${fmtDataAno(d.validade)}`,n,'documentos')});
+    if(n!=null&&n<180) add(n<0?0:1,'🪪',`${d.nome||'Documento'}${d.dono&&d.dono!=='Léo'?' de '+d.dono:''} ${n<0?'venceu':'vence'} ${fmtDataAno(d.validade)}`,n,'documentos','documentos',d)});
   // seguros renovando (cotar antes da renovação automática)
   (E.seguros||[]).filter(s=>s.status!=='Cancelado').forEach(s=>{const n=dias(s.renova);
     if(n!=null&&n<60) add(n<0?0:1,'🛡️',`Seguro ${s.item||s.tipo||''} ${n<0?'venceu':'renova'} ${fmtDataAno(s.renova)}`,n,'gastos')});
@@ -1254,7 +1331,7 @@ function radar(){
    if(falta) add(1,'🛡️',`Proteção da família: ${falta} item(ns) sem resolver (tutor, testamento, procuração…)`,null,'guia');}
   // exames a repetir
   E.exames.forEach(x=>{const n=dias(x.proximo);
-    if(n!=null&&n<60) add(n<0?0:1,'🩺',`Repetir ${x.exame||'exame'} ${n<0?'(atrasado desde '+fmtData(x.proximo)+')':fmtData(x.proximo)}`,n,'saude')});
+    if(n!=null&&n<60) add(n<0?0:1,'🩺',`Repetir ${x.exame||'exame'} ${n<0?'(atrasado desde '+fmtData(x.proximo)+')':fmtData(x.proximo)}`,n,'saude','exames',x)});
   // rastreios por idade
   (typeof rastreiosPendentes==='function'?rastreiosPendentes():[]).forEach(p=>
     add(p.situacao==='Atrasado'?0:1,'🩺',`${p.nome} — ${p.situacao==='Nunca feito'?'nunca feito':p.situacao.toLowerCase()}`,p.venceEm,'saude'));
@@ -1263,15 +1340,15 @@ function radar(){
     if(n!=null&&n<90) add(n<0?0:1,'💉',`Reforço de ${v.vacina||'vacina'} ${n<0?'atrasado':fmtData(v.proxima)}`,n,'saude')});
   // demandas
   E.demandas.filter(d=>d.status!=='Concluída').forEach(d=>{const n=dias(d.prazo);
-    if(n!=null&&n<15) add(n<0?0:1,'✅',`${d.titulo||'Demanda'} ${n<0?'atrasada':'vence '+fmtData(d.prazo)}`,n,'demandas')});
+    if(n!=null&&n<15) add(n<0?0:1,'✅',`${d.titulo||'Demanda'} ${n<0?'atrasada':'vence '+fmtData(d.prazo)}`,n,'demandas','demandas',d)});
   // compromissos dos próximos 7 dias
   E.agenda.forEach(a=>{const n=dias(a.data);
-    if(n!=null&&n>=0&&n<=7) add(2,'📅',`${a.titulo||'Compromisso'}${a.hora?' às '+a.hora:''} — ${n===0?'hoje':n===1?'amanhã':'em '+n+' dias'}`,n,'agenda')});
+    if(n!=null&&n>=0&&n<=7) add(2,'📅',`${a.titulo||'Compromisso'}${a.hora?' às '+a.hora:''} — ${n===0?'hoje':n===1?'amanhã':'em '+n+' dias'}`,n,'agenda','agenda',a)});
   // viagem chegando e sem hotel
   E.viagens.filter(v=>v.status!=='Cancelado').forEach(v=>{const n=dias(v.ida);
     if(n!=null&&n>=0&&n<=45){
-      add(2,'✈️',`${v.evento||'Viagem'} para ${v.cidade||''} em ${n} dia(s)`,n,'viagens');
-      if(!String(v.hotel||'').trim()) add(1,'🏨',`${v.evento||'Viagem'}: hotel ainda não definido`,n,'viagens');
+      add(2,'✈️',`${v.evento||'Viagem'} para ${v.cidade||''} em ${n} dia(s)`,n,'viagens','viagens',v);
+      if(!temHotelViagem(v)) add(1,'🏨',`${v.evento||'Viagem'}: hotel ainda não definido`,n,'viagens','viagens',v);
     }});
   // rituais atrasados
   const DF={'Semanal':7,'Quinzenal':15,'Mensal':30,'Trimestral':90,'Semestral':180,'Anual':365};
@@ -1303,20 +1380,22 @@ function vInicio(m){
 
   /* ---- RADAR: o que precisa de você ---- */
   const rd=radar();
-  const urgentes=rd.filter(x=>x.g===0).length;
+  const urgentes=rd.filter(x=>x.quando!=null&&x.quando<0).length;
   const rc2=el('<div class="corpo"></div>');
   if(rd.length){
     const COR=['var(--vermelho)','var(--areia)','var(--azul)'];
     const FUNDO=['var(--vermelho-cl)','var(--areia-cl)','var(--azul-cl)'];
-    rc2.innerHTML=rd.slice(0,12).map(x=>`<div style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--linha)">
-      <span style="font-size:16px">${x.ic}</span>
-      <span style="flex:1;font-size:13.5px">${esc(x.txt)}</span>
-      <span class="chip" style="background:${FUNDO[x.g]};color:${COR[x.g]}">${x.g===0?'atrasado':x.g===1?'atenção':'em breve'}</span>
-      <button class="btn ghost mini" data-ir="${x.secao}">ver</button></div>`).join('')
-      +(rd.length>12?`<div style="padding-top:9px;font-size:12.5px;color:var(--suave)">e mais ${rd.length-12} item(ns)…</div>`:'');
-    rc2.querySelectorAll('[data-ir]').forEach(b=>b.onclick=()=>irTela(b.dataset.ir));
+    const pintarRadar=(todos=false)=>{
+      const visiveis=todos?rd:rd.slice(0,12);
+      rc2.innerHTML=visiveis.map((x,i)=>`<div class="radar-item">
+        <span>${x.ic}</span><span class="radar-texto">${esc(x.txt)}</span>
+        <span class="chip" style="background:${FUNDO[x.g]};color:${COR[x.g]}">${rotuloRadar(x)}</span>
+        <button class="btn ghost mini" data-radar="${i}" aria-label="${esc('Ver '+x.txt)}">Ver</button></div>`).join('');
+      rc2.querySelectorAll('[data-radar]').forEach(b=>b.onclick=()=>{const x=visiveis[+b.dataset.radar];abrirRegistro(x.secao,x.col,x.ref)});
+      if(rd.length>12){const bt=el('<button class="btn ghost" style="margin-top:12px"></button>');bt.textContent=todos?'Mostrar os 12 primeiros':'Ver todos os '+rd.length+' avisos';bt.onclick=()=>pintarRadar(!todos);rc2.appendChild(bt)}
+    };pintarRadar();
   } else rc2.innerHTML='<div class="vazio">Nada pedindo atenção agora. 👏</div>';
-  m.appendChild(bloco('ini-radar',`🔔 O que precisa de você${urgentes?' · '+urgentes+' atrasado(s)':''}`,'documentos, exames, prazos, viagens e datas da família',rc2));
+  m.appendChild(bloco('ini-radar',`🔔 O que precisa de você${urgentes?' · '+urgentes+' atrasado(s)':''}`,'Pendências de atenção primeiro; depois, os demais avisos. Dentro de cada grupo, por data.',rc2));
   m.appendChild(ligaKpis(el(`<div class="grade inicio-grade">
     ${kpi('Ganhos do mês',brl(rendMes),mesAtual().split('-').reverse().join('/'),'v','rendimentos')}
     ${kpi('Gastos do mês',brl(gastoMes),'despesas registradas','r','gastos')}
@@ -1342,28 +1421,30 @@ function vInicio(m){
     :'<div class="vazio">Nenhuma viagem futura marcada.</div>';
   m.appendChild(bloco('ini-viagem','Próxima viagem','',pv));
 
-  const ag=E.agenda.filter(a=>a.data>=h).sort((a,b)=>a.data.localeCompare(b.data)).slice(0,6);
+  const ag=proximosCompromissos(E.agenda,h).slice(0,6);
   const ac=el('<div class="corpo"></div>');
-  ac.innerHTML=ag.length?ag.map(a=>`<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--linha)">
+  ac.innerHTML=ag.length?ag.map((a,i)=>`<div class="compromisso-resumo">
       <b style="min-width:52px;font-variant-numeric:tabular-nums">${fmtData(a.data)}</b><span style="flex:1">${esc(a.titulo)}</span>
-      <span style="color:var(--suave);font-size:12.5px">${esc(a.local||'')}</span></div>`).join('')
+      <span style="color:var(--suave);font-size:12.5px">${esc(a.hora||'')} ${esc(a.local||'')}</span><button class="btn ghost mini" data-compromisso="${i}" aria-label="${esc('Abrir '+a.titulo)}">Abrir</button></div>`).join('')
     :'<div class="vazio">Agenda livre.</div>';
-  m.appendChild(bloco('ini-agenda','Próximos compromissos','',ac));
+  ac.querySelectorAll('[data-compromisso]').forEach(bt=>bt.onclick=()=>abrirRegistro('agenda','agenda',ag[+bt.dataset.compromisso]));
+  m.appendChild(bloco('ini-agenda','Próximos compromissos','Inclui eventos em andamento; horários em ordem dentro de cada dia.',ac));
 }
 
 /* ===================== VIAGENS ===================== */
+const temHotelViagem=v=>!!String(v.hotel||'').trim()||(v.hoteis||[]).some(h=>!!String(h.nome||'').trim());
 function vViagens(m) {
   const r = rr('viagens');
   const ativos = E.viagens.filter(v => v.status !== 'Cancelado' && +(v.ida || '').slice(0, 4) >= 2026
     && (filtro.viagensAno == null || filtro.viagensAno === 'todos' || (v.ida || '').startsWith(filtro.viagensAno)));
   const tot = ativos.reduce((s, v) => s + custoViagem(v), 0);
   const dias = ativos.reduce((s, v) => s + (+diasEntre(v.ida, v.volta) || 0), 0);
-  const semHotel = E.viagens.filter(v => v.ida >= hoje() && v.status !== 'Cancelado' && !String(v.hotel || '').trim()).length;
+  const semHotel = E.viagens.filter(v => v.ida >= hoje() && v.status !== 'Cancelado' && !temHotelViagem(v)).length;
   const futIntl = E.viagens.filter(v => v.ida >= hoje() && v.status !== 'Cancelado' && ehInternacional(v));
   const comProblema = futIntl.filter(v => !docsViagem(v).ok);
   const novaViagem = () => { const v = { id: uid(), ida: hoje(), volta: hoje(), evento: '', cidade: '', hotel: '', transporte: '', gastos: 0, status: 'Em Planejamento', obs: '', custos: [], passagens: [], hoteis: [], tickets: [], viajantes: [], tipo: 'Trabalho', planejar: false, roteiro: [], lugares: [], carro: {} }; E.viagens.push(v); salvar(); modalViagem(v) };
 
-  m.appendChild(cab('Viagens', 'Verde = pronta para embarcar. Vermelha = ainda falta resolver. Clique para abrir.'));
+  m.appendChild(cab('Viagens', 'Planeje destinos, confira reservas e acompanhe as pendências de cada viagem.'));
   // o Gmail entra como PROPOSTA: acha as passagens e você decide o que grava
   {
     const bg=el('<button class="btn mini ghost">📧 Buscar passagens no Gmail</button>');
@@ -1373,6 +1454,7 @@ function vViagens(m) {
     cxg.appendChild(el('<span style="font-size:12px;color:var(--suave);margin-left:10px">só leitura · nada é gravado sem você confirmar</span>'));
     m.appendChild(cxg);
   }
+  m.appendChild(blocoGoogle('gmail'));
   // anos com viagem + o ano vigente sempre presente
   // o painel começa em 2026 — o que é mais antigo que isso não interessa mais
   const ANO_MIN = 2026;
@@ -2181,7 +2263,7 @@ function modalDia(iso,eventos){
           <div style="font-size:11px;color:var(--suave);opacity:.75;margin-top:3px">${esc((FONTES_AGENDA.find(f=>f.k===e.fonte)||{}).rot||'')}</div>
         </div>
         ${e.proprio||e.ir?'<span style="color:var(--suave)">›</span>':''}</div>`);
-      if(e.proprio) li.onclick=()=>{fechar();abreBloco('ag-lista');rr('agenda')()};
+      if(e.proprio) li.onclick=()=>{fechar();modalCompromisso(e.ref)};
       else if(e.ir) li.onclick=()=>{fechar();irTela(e.ir)};
       lista.appendChild(li);
     });
@@ -2207,6 +2289,30 @@ function proximoAniversario(nascISO){
 
 /* Junta tudo que tem data. Cada item: {data, hora, titulo, sub, fonte, ic, ir}
    O campo 'ir' é para onde o clique leva — o dono do dado. */
+function eventoNoMes(e,mes){
+  if(!/^\d{4}-\d{2}$/.test(mes)||!e.data)return false;
+  const inicio=mes+'-01',fim=new Date(+mes.slice(0,4),+mes.slice(5,7),0,12);
+  return e.data<=dataLocal(fim)&&(e.ate&&e.ate>=e.data?e.ate:e.data)>=inicio;
+}
+function eventoPendenteVencido(e,data=hoje()){
+  return ['documentos','acoes','oportunidades','demandas','seguros'].includes(e.fonte)&&!!e.data&&e.data<data;
+}
+function proximosCompromissos(lista,data=hoje()){
+  return lista.filter(a=>a.data&&(a.ate&&a.ate>=a.data?a.ate:a.data)>=data)
+    .sort((a,b)=>(a.data+(a.hora||'')).localeCompare(b.data+(b.hora||'')));
+}
+function modalCompromisso(a){
+  abrirModal(esc(a.titulo||'Compromisso'),'Alterações salvas automaticamente nesta Central.',(c,fechar)=>{
+    const sec=el('<div class="secao"></div>');
+    sec.appendChild(campos(a,[{k:'titulo',t:'O quê',full:true},{k:'data',t:'Data',tipo:'date'},
+      {k:'hora',t:'Hora',tipo:'time'},{k:'ate',t:'Último dia (opcional)',tipo:'date'},
+      {k:'local',t:'Onde'},{k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposCompromisso')},
+      {k:'obs',t:'Observações',tipo:'textarea',full:true}]));
+    if(a.googleId)sec.appendChild(el('<p class="aviso">A edição altera apenas a cópia na Central. Uma nova importação pode substituir estes campos.</p>'));
+    const pronto=el('<button class="btn">Pronto</button>');pronto.onclick=fechar;sec.appendChild(pronto);c.appendChild(sec);
+  });
+}
+
 function eventosDoEcossistema(){
   const ev=[];
   const h=hoje();
@@ -2215,7 +2321,7 @@ function eventosDoEcossistema(){
   const on=()=>true;
 
   if(on('compromissos')) (E.agenda||[]).forEach(a=>{if(a.data)ev.push({
-    data:a.data,hora:a.hora||'',titulo:a.titulo||'(sem título)',
+    data:a.data,ate:a.ate||a.data,hora:a.hora||'',titulo:a.titulo||'(sem título)',
     sub:[a.local,a.tipo].filter(Boolean).join(' · '),fonte:'compromissos',ic:'📅',proprio:true,ref:a});});
 
   if(on('documentos')) (E.documentos||[]).forEach(d=>{if(d.validade)ev.push({
@@ -2226,7 +2332,7 @@ function eventosDoEcossistema(){
   // e fim, e o calendário pinta a faixa de ponta a ponta. Ver "ida dia 12" e
   // "volta dia 16" em cantos opostos do mês não mostra que você passa cinco
   // dias fora — e é justamente isso que decide se cabe mais alguma coisa ali.
-  if(on('viagens')) (E.viagens||[]).forEach(v=>{
+  if(on('viagens')) (E.viagens||[]).filter(v=>v.status!=='Cancelado').forEach(v=>{
     const nome=[v.evento,v.cidade].filter(Boolean).join(' · ')||'Viagem';
     if(!v.ida&&!v.volta)return;
     const de=v.ida||v.volta, ate=v.volta||v.ida;
@@ -2285,8 +2391,7 @@ function eventosDoEcossistema(){
 
 function vAgenda(m){
   const r=rr('agenda');
-  E.agenda.sort((a,b)=>(a.data||'').localeCompare(b.data||''));
-  const fut=E.agenda.filter(a=>a.data>=hoje()).length;
+  const fut=proximosCompromissos(E.agenda).length;
   const nova=()=>{E.agenda.push({id:uid(),data:hoje(),hora:'',titulo:'',local:'',tipo:CFG('tiposCompromisso')[0],obs:''});salvar();r()};
   m.appendChild(cab('Agenda','Tudo que tem data nesta Central, num lugar só.'));
   if(filtro.agSo===undefined)filtro.agSo=null;
@@ -2302,7 +2407,7 @@ function vAgenda(m){
      mesma volta para tudo. É o gesto que a pessoa faz esperando ver, não sumir. */
   const todosEv=eventosDoEcossistema();
   const mesChip=filtro.agMes||hoje().slice(0,7);
-  const noMes=todosEv.filter(e=>e.data.startsWith(mesChip));
+  const noMes=todosEv.filter(e=>eventoNoMes(e,mesChip));
   const so=filtro.agSo||null;
 
   const chips=el('<div style="display:flex;gap:7px;flex-wrap:wrap;margin:0 0 14px;align-items:center"></div>');
@@ -2331,9 +2436,9 @@ function vAgenda(m){
   /* ---- a lista: o mesmo mês da grade, escrito, em ordem de data ---- */
   const h=hoje();
   const mesVisto=filtro.agMes||h.slice(0,7);
-  const doMes=visiveis.filter(e=>e.data.startsWith(mesVisto));
+  const doMes=visiveis.filter(e=>eventoNoMes(e,mesVisto));
   // o que já passou e ainda não foi resolvido segue cobrando, seja de que mês for
-  const vencidos=visiveis.filter(e=>e.data<h&&e.fonte!=='compromissos'&&e.fonte!=='aniversarios');
+  const vencidos=visiveis.filter(e=>eventoPendenteVencido(e,h));
 
   const cx=el('<div class="corpo"></div>');
   if(vencidos.length) cx.appendChild(el(`<div class="aviso" style="background:var(--vermelho-cl);border-color:var(--vermelho)">
@@ -2345,7 +2450,7 @@ function vAgenda(m){
   doMes.forEach(e=>{
     const cor=corFonte(e.fonte);
     const dias=Math.round((new Date(e.data+'T12:00')-new Date(h+'T12:00'))/864e5);
-    const quando=dias===0?'hoje':dias===1?'amanhã':dias===-1?'ontem':dias<0?Math.abs(dias)+' dias atrás':'em '+dias+' dias';
+    const quando=e.ate&&e.data<h&&e.ate>=h?'em andamento':dias===0?'hoje':dias===1?'amanhã':dias===-1?'ontem':dias<0?Math.abs(dias)+' dias atrás':'em '+dias+' dias';
     const rot=(FONTES_AGENDA.find(f=>f.k===e.fonte)||{}).rot||'';
     const li=el(`<div style="display:flex;align-items:center;gap:13px;padding:11px 13px;margin-bottom:8px;
       border:1px solid var(--linha);border-radius:var(--r);background:var(--card);
@@ -2362,35 +2467,32 @@ function vAgenda(m){
       </div>
       <div style="font-size:11.5px;white-space:nowrap;color:${dias<0?'var(--vermelho)':dias<=7?'var(--areia)':'var(--suave)'}">${quando}</div>
     </div>`);
-    if(e.proprio) li.onclick=()=>{abreBloco('ag-lista');r()};
+    if(e.proprio) li.onclick=()=>modalCompromisso(e.ref);
     else if(e.ir) li.onclick=()=>irTela(e.ir);
     cx.appendChild(li);
   });
   m.appendChild(bloco('ag-tudo','📋 Tudo de '+MESES_LONGO[+mesVisto.slice(5,7)-1],
     'lista completa do mês, em ordem de data — o que vem de outra tela leva até ela',cx));
 
-  const lista=E.agenda.slice();
-  m.appendChild(tabelaBloco('ag-lista','Meus compromissos','os que você digita aqui — o resto vem das outras telas',lista,[
+  const lista=E.agenda.slice().sort((a,b)=>((a.data||'9999')+(a.hora||'')).localeCompare((b.data||'9999')+(b.hora||'')));
+  m.appendChild(tabelaBloco('ag-lista','Meus compromissos','Compromissos cadastrados ou importados; use Abrir para ver os detalhes.',lista,[
     {k:'data',t:'Data',tipo:'date'},{k:'hora',t:'Hora',tipo:'time',w:100},
     {k:'titulo',t:'O quê',ph:'ex.: Jantar com a Pya'},{k:'local',t:'Onde',ph:'—'},
     {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposCompromisso')},
     {k:'obs',t:'Observação',ph:'—'},
-  ],()=>({data:hoje(),hora:'',titulo:'',local:'',tipo:CFG('tiposCompromisso')[0],obs:''}),r,null,E.agenda));
+  ],()=>({data:hoje(),hora:'',titulo:'',local:'',tipo:CFG('tiposCompromisso')[0],obs:''}),r,null,E.agenda,modalCompromisso));
 
   m.appendChild(el(`<div class="grade">
     ${kpi('Compromissos',E.agenda.length,'no total')}
-    ${kpi('Pela frente',fut,'ainda vão acontecer','a')}
+    ${kpi('Pela frente',fut,'hoje, em andamento ou futuros','a')}
     ${kpi('Neste mês',E.agenda.filter(a=>(a.data||'').startsWith(mesAtual())).length,mesAtual().split('-').reverse().join('/'))}</div>`));
 
   const c2={};E.agenda.forEach(a=>{const k=(a.data||'').slice(0,7);if(k)c2[k]=(c2[k]||0)+1});
   m.appendChild(bloco('ag-dash','Compromissos por mês','',graficoEl(gBarras(
     Object.keys(c2).sort().slice(-8).map(k=>({r:MESES[+k.slice(5,7)-1]+'/'+k.slice(2,4),v:c2[k]})),{fmt:v=>v}))));
 
-  const g=el(`<div class="corpo"><p style="font-size:12.5px;color:var(--suave);line-height:1.5">
-    <b>Como fazer:</b> exporte aqui e, no Google Agenda, use <i>Configurações → Importar e exportar → Importar</i>.
-    No sentido contrário, exporte lá e solte o arquivo aqui.<br>
-    <b>Sincronização automática</b> exige credenciais OAuth do Google Cloud — me avise que eu monto.</p></div>`);
-  m.appendChild(bloco('ag-gcal','Google Agenda','troca por arquivo',g));
+  m.appendChild(blocoGoogle('agenda'));
+
 }
 function exportarIcs(){
   const z=n=>String(n).padStart(2,'0');
@@ -2444,16 +2546,15 @@ function vDemandas(m){
   const atrasadas=E.demandas.filter(d=>d.status!=='Concluída'&&d.prazo&&d.prazo<hoje()).length;
   const nova=()=>{const d={id:uid(),titulo:'',area:CFG('areasDemanda')[0],criada:hoje(),prazo:'',prioridade:'Média',status:'Aberta',concluidoEm:'',obs:''};
     E.demandas.push(d);salvar();modalDemanda(d)};
-  m.appendChild(cab('Demandas em andamento','Clique numa linha para anexar arquivos e concluir.'));
+  m.appendChild(cab('Demandas','Organize prioridades, acompanhe prazos e conclua suas tarefas.'));
   const STS=['Aberta','Fazendo','Parada','Concluída'];
   m.appendChild(painel('Mostrar',
-    seletor(filtro.demandas,[['Todas','Todas ('+E.demandas.length+')'],...STS.map(st=>[st,st+' ('+por(st)+')'])],
+    seletor(filtro.demandas,[['Todas','Todas ('+E.demandas.length+')'],['Pendentes','Pendentes'],['Atrasadas','Atrasadas'],['Alta prioridade','Alta prioridade'],...STS.map(st=>[st,st+' ('+por(st)+')'])],
       v=>{filtro.demandas=v;r()}),
     acao('+ Nova demanda',nova),'|'));
   if(atrasadas) m.appendChild(el(`<div class="aviso">⏰ <b>${atrasadas} demanda(s) passaram do prazo.</b></div>`));
 
-  const lista=[...E.demandas].filter(d=>filtro.demandas==='Todas'||d.status===filtro.demandas)
-    .sort((a,b)=>(a.status==='Concluída')-(b.status==='Concluída')||(a.prazo||'9').localeCompare(b.prazo||'9'));
+  const lista=ordenarDemandas(E.demandas.filter(d=>filtro.demandas==='Todas'||d.status===filtro.demandas||(filtro.demandas==='Pendentes'&&d.status!=='Concluída')||(filtro.demandas==='Atrasadas'&&d.status!=='Concluída'&&d.prazo&&d.prazo<hoje())||(filtro.demandas==='Alta prioridade'&&d.status!=='Concluída'&&d.prioridade==='Alta')));
   const cx=el('<div></div>');
   const rol=el('<div class="rolagem"></div>');
   const t=document.createElement('table');
@@ -2474,7 +2575,7 @@ function vDemandas(m){
       <td style="padding:9px 10px;white-space:nowrap;color:var(--suave)">${d.concluidoEm?fmtData(d.concluidoEm):'—'}</td>
       <td style="padding:9px 10px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;${dd.cor?'color:'+dd.cor+';font-weight:600':'color:var(--suave)'}">${dd.txt}</td>
       <td style="padding:9px 10px;color:var(--suave);font-size:12.5px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.obs||'')}</td>`;
-    tr.onclick=()=>modalDemanda(d);
+    tr.onclick=()=>modalDemanda(d);tr.tabIndex=0;tr.setAttribute('aria-label','Abrir demanda '+(d.titulo||'sem título'));tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();modalDemanda(d)}};
     tb.appendChild(tr);
   });
   t.appendChild(tb);
@@ -2482,7 +2583,7 @@ function vDemandas(m){
   cx.appendChild(rol);
   const pe=el('<div style="padding:0 17px 15px"></div>');
   const bt=el('<button class="mais">+ Nova demanda</button>'); bt.onclick=nova; pe.appendChild(bt); cx.appendChild(pe);
-  m.appendChild(bloco('dm-lista','Lista de demandas','clique para abrir',cx));
+  m.appendChild(bloco('dm-lista','Lista de demandas','Pendentes primeiro, por prazo mais próximo. No mesmo prazo, maior prioridade; sem prazo depois e concluídas ao final.',cx));
 
   m.appendChild(el(`<div class="grade">
     ${kpi('Abertas',por('Aberta'),'não começaram','a')}
@@ -2597,7 +2698,7 @@ const CHIP_SEM = { ok: ['var(--verde-cl)', 'var(--verde)', 'No alvo'], atencao: 
 
 function vSaude(m) {
   const r = rr('saude');
-  const ord = [...E.peso].sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+  const ord = E.peso.filter(x=>+x.peso>0).sort((a, b) => (a.data || '').localeCompare(b.data || ''));
   const ult = ord[ord.length - 1], pri = ord[0];
   const dif = (ult && pri) ? (+ult.peso - +pri.peso) : 0;
   const imc = (ult && ult.altura) ? (+ult.peso / Math.pow(+ult.altura, 2)) : 0;
@@ -2607,7 +2708,7 @@ function vSaude(m) {
   const uv = vit[vit.length - 1];
   const idade = idadeLeo();
 
-  m.appendChild(cab('Saúde', 'Seu painel físico — peso, sinais vitais, exames com alvo e rastreios.'));
+  m.appendChild(cab('Saúde', 'Acompanhe medidas, exames, tratamentos e seu histórico de saúde.'));
   m.appendChild(painel(
     acao('+ Pesagem', () => { E.peso.push({ id: uid(), data: hoje(), peso: '', altura: ult?.altura || '', cintura: '', gordura: '', obs: '' }); salvar(); r() }),
     acao('+ Sinais vitais', () => { E.vitais.push({ id: uid(), data: hoje(), sis: '', dia: '', fc: '', glicemia: '', sono: '', passos: '', estresse: '', obs: '' }); salvar(); r() }, 'ghost'),
@@ -2706,7 +2807,7 @@ function vSaude(m) {
     });
     t.appendChild(tb); rc.appendChild(t);
   } else rc.innerHTML = '<div class="vazio">Informe sua data de nascimento em ⚙️ Configurações.</div>';
-  m.appendChild(bloco('sa-rast', 'Rastreios para a sua idade' + (idade ? ` (${idade} anos)` : ''), 'o que um médico lembraria de pedir', rc));
+  m.appendChild(bloco('sa-rast', 'Rastreios para a sua idade' + (idade ? ` (${idade} anos)` : ''), 'referências para revisar com seu médico', rc));
 
   /* ---- 3. sinais vitais ---- */
   // só o que vira número em algum lugar: pressão (KPI + rastreio) e batimento de repouso (KPI).
@@ -2720,7 +2821,7 @@ function vSaude(m) {
   ], () => ({ data: hoje(), sis: '', dia: '', fc: '', obs: '' }), r));
 
   /* ---- 4. peso e medidas ---- */
-  m.appendChild(tabelaBloco('sa-peso', 'Peso e medidas', 'cintura ÷ altura acima de 0,5 já é sinal de alerta', E.peso, [
+  m.appendChild(tabelaBloco('sa-peso', 'Peso e medidas', 'registros para acompanhar sua evolução', E.peso, [
     { k: 'data', t: 'Data', tipo: 'date' }, { k: 'peso', t: 'Peso (kg)', tipo: 'number', num: 1, w: 110 },
     { k: 'altura', t: 'Altura (m)', tipo: 'number', num: 1, w: 110 }, { k: 'cintura', t: 'Cintura (cm)', tipo: 'number', num: 1, w: 120 },
     { k: 'obs', t: 'Como me senti', ph: '—' },
@@ -2737,7 +2838,7 @@ function vSaude(m) {
   ], () => ({ oque: '', motivo: '', inicio: hoje(), fim: '', frequencia: '', medico: '', status: 'Em andamento' }), r));
 
   /* ---- 6. vacinas ---- */
-  m.appendChild(tabelaBloco('sa-vac', 'Vacinas', 'você viaja muito — reforço vencido barra embarque', E.vacinas, [
+  m.appendChild(tabelaBloco('sa-vac', 'Vacinas', 'histórico de doses e próximos reforços registrados', E.vacinas, [
     { k: 'vacina', t: 'Vacina', ph: 'ex.: Febre amarela' },
     { k: 'data', t: 'Última dose', tipo: 'date' },
     { k: 'proxima', t: 'Próximo reforço', tipo: 'date' },
@@ -2746,7 +2847,7 @@ function vSaude(m) {
   ], () => ({ vacina: '', data: hoje(), proxima: '', viagem: 'Não', obs: '' }), r));
 
   /* ---- 7. histórico familiar ---- */
-  m.appendChild(tabelaBloco('sa-fam', 'Histórico familiar', 'o dado que mais muda o seu risco — e que ninguém registra', E.histFamiliar, [
+  m.appendChild(tabelaBloco('sa-fam', 'Histórico familiar', 'informações familiares para compartilhar nas consultas', E.histFamiliar, [
     { k: 'parente', t: 'Parente', tipo: 'select', opcoes: ['Pai', 'Mãe', 'Avô paterno', 'Avó paterna', 'Avô materno', 'Avó materna', 'Irmão', 'Irmã', 'Outro'] },
     { k: 'doenca', t: 'Doença', tipo: 'select', opcoes: CFG('doencasFamilia') },
     { k: 'idade', t: 'Com que idade', tipo: 'number', num: 1, w: 130 },
@@ -2772,7 +2873,7 @@ function vSaude(m) {
 
   m.appendChild(bloco('sa-dash', 'Evolução do peso', '', graficoEl(gLinha(
     ord.filter(p => p.peso).map(p => ({ r: fmtData(p.data), v: +p.peso })), { fmt: v => v.toFixed(1) + 'kg' }))));
-  if (vit.filter(v => v.sis).length > 1) m.appendChild(bloco('sa-pa', 'Pressão arterial (máxima)', 'acima de 140 é sinal de alerta', graficoEl(gLinha(
+  if (vit.filter(v => v.sis).length > 1) m.appendChild(bloco('sa-pa', 'Pressão arterial (máxima)', 'histórico das medições registradas', graficoEl(gLinha(
     vit.filter(v => v.sis).map(v => ({ r: fmtData(v.data), v: +v.sis })), { fmt: v => v.toFixed(0) }))));
 }
 
@@ -3530,7 +3631,7 @@ async function vFortemais(m){
     m.appendChild(bloco('fm-comparar','📐 Comparar obras','o mesmo número, obra a obra',cp));
   }
 
-  m.appendChild(bloco('fm-importar','📥 Trazer do ERP','o arquivo que você exporta, do jeito que ele sai',blocoImportarObra()));
+  m.appendChild(bloco('fm-importar','📥 Importar custos do ERP','o arquivo que você exporta, do jeito que ele sai',blocoImportarObra()));
 }
 
 
@@ -4495,7 +4596,7 @@ function vCaixaVGV(m){
         ? `Se tudo acontecer como está lançado, sobram <b>${brl(c.saldo)}</b>. Mas o caixa que você tem <b>hoje</b> é ${brl(c.caixaLivre)} e o que precisa pagar é ${brl(c.pagar)} — ${c.pagar>c.caixaLivre?`faltam <b>${brl(c.pagar-c.caixaLivre)}</b>, que dependem do que está previsto entrar. O aperto é de PRAZO, não de valor.`:'o caixa de hoje já cobre.'}`
         : `Falta <b>${brl(-c.saldo)}</b>: mesmo recebendo tudo o que está previsto, o que você deve aportar é maior. Ou entra dinheiro novo, ou algum aporte precisa esperar.`}
     </p></div>`);
-  m.appendChild(bloco('cx-conta','🧮 A conta em uma linha','de onde vem e para onde vai',cxConta));
+  m.appendChild(bloco('cx-conta','🧮 Composição do resultado','de onde vem e para onde vai',cxConta));
 
   /* ---- OS DOIS RANKINGS QUE A PLANILHA JÁ TINHA ----
      A aba Painel VGV tem dois gráficos: "Ranking — Total Líquido por conta" e
@@ -4570,7 +4671,7 @@ function vCaixaVGV(m){
       `<td class="num">${brl(c.casasRestante)}</td><td class="num">${brl(c.casasVgv)}</td>`,E.casas)));
 
   /* ---- 4. reservas líquidas ---- */
-  m.appendChild(bloco('cx-res','💧 Reservas líquidas','o que ainda entra, miúdo',
+  m.appendChild(bloco('cx-res','💧 Reservas líquidas','valores previstos a receber',
     tabelaBloco('cx-res-t','','',E.reservas,[
       {k:'nome',t:'De onde vem'},
       {k:'valor',t:'Valor',tipo:'moeda',w:150},
@@ -4616,7 +4717,7 @@ function vCaixaVGV(m){
   bpdf.onclick=()=>imprimirCaixaVGV();
   lin.appendChild(bimp);lin.appendChild(bpdf);lin.appendChild(inp);
   acoes.appendChild(lin);
-  m.appendChild(bloco('cx-acoes','📥 Planilha e PDF','trazer da Patrimonial, ou levar tudo para o papel',acoes));
+  m.appendChild(bloco('cx-acoes','📥 Importar e exportar','trazer da Patrimonial, ou levar tudo para o papel',acoes));
 }
 
 
@@ -4906,10 +5007,10 @@ const FONTES_BUSCA=[
    tit:x=>[x.pessoa,x.operadora].filter(Boolean).join(' · ')||'plano',
    sub:x=>[x.plano,x.carteirinha].filter(Boolean).join(' · ')},
   {col:'exames',tela:'saude',ic:'🩺',rot:'Exame',
-   campos:['marcador','obs'],tit:x=>x.marcador||'exame',
+   campos:['exame','marcador','medico','resultado','obs'],tit:x=>x.exame||x.marcador||'exame',
    sub:x=>[x.data?fmtDataAno(x.data):'',x.valor].filter(Boolean).join(' · ')},
   {col:'tratamentos',tela:'saude',ic:'💊',rot:'Tratamento',
-   campos:['nome','medico','obs'],tit:x=>x.nome||'tratamento',
+   campos:['oque','nome','motivo','medico','obs'],tit:x=>x.oque||x.nome||'tratamento',
    sub:x=>[x.medico,x.status].filter(Boolean).join(' · ')},
   {col:'livros',tela:'guia',ic:'📚',rot:'Livro',
    campos:['titulo','autor','obs'],tit:x=>x.titulo||'livro',
@@ -4952,7 +5053,7 @@ function buscarEmTudo(q){
     ];
     itens.forEach(it=>{
       if(!partes.every(p=>normaliza(it.rot+' '+it.txt).includes(p)))return;
-      achados.push({f:{tela:'viagens',ic:it.ic,rot:it.rot},x:v,tit:it.tit,sub:it.sub});
+      achados.push({f:{col:'viagens',tela:'viagens',ic:it.ic,rot:it.rot},x:v,tit:it.tit,sub:it.sub});
     });
   });
   return achados.slice(0,60);
@@ -4986,7 +5087,7 @@ function abrirBusca(){
           '<span style="flex:1;min-width:0"><b style="font-size:13.5px;display:block">'+esc(a.tit)+'</b>'+
           (a.sub?'<span style="font-size:12px;color:var(--suave)">'+esc(a.sub)+'</span>':'')+'</span>'+
           '<span style="color:var(--suave)">&rsaquo;</span></button>');
-        li.onclick=()=>{fechar();irTela(a.f.tela)};
+        li.onclick=()=>{fechar();abrirRegistro(a.f.tela,a.f.col,a.x)};
         res.appendChild(li);
       });
     };
@@ -5060,41 +5161,112 @@ const CONSULTA_GMAIL=
   '"boarding pass" OR "e-ticket" OR "bilhete eletrônico" OR "confirmação de reserva" OR '+
   '"reserva confirmada" OR "seu voo" OR itinerário OR itinerario) newer_than:1y';
 
+// Google: autorizações separadas, guardadas somente durante esta sessão.
+const GOOGLE_ESCOPOS={gmail:'https://www.googleapis.com/auth/gmail.readonly',agenda:'https://www.googleapis.com/auth/calendar.readonly'};
+const googleSessao={gmail:null,agenda:null};
+let gisPendente=null;
 function carregarGis(){
-  return new Promise((ok,erro)=>{
-    if(window.google&&window.google.accounts&&google.accounts.oauth2)return ok();
-    const sc=document.createElement('script');
-    sc.src='https://accounts.google.com/gsi/client';sc.async=true;sc.defer=true;
-    sc.onload=()=>ok();
-    sc.onerror=()=>erro(new Error('Não consegui carregar o login do Google — sem internet?'));
-    document.head.appendChild(sc);
-  });
+  if(window.google?.accounts?.oauth2)return Promise.resolve();
+  if(gisPendente)return gisPendente;
+  gisPendente=new Promise((ok,erro)=>{
+    const sc=document.createElement('script');sc.src='https://accounts.google.com/gsi/client';sc.async=true;
+    const limite=setTimeout(()=>{sc.remove();erro(new Error('O login do Google demorou para carregar. Tente novamente.'))},15000);
+    sc.onload=()=>{clearTimeout(limite);ok()};sc.onerror=()=>{clearTimeout(limite);sc.remove();erro(new Error('Não foi possível carregar o Google. Confira a conexão.'))};document.head.appendChild(sc);
+  }).catch(e=>{gisPendente=null;throw e});return gisPendente;
 }
-
-async function pedirTokenGmail(forcar){
+function googleConectado(servico){return !!googleSessao[servico]?.token&&googleSessao[servico].vence>Date.now()+30000}
+async function conectarGoogle(servico){
   await carregarGis();
   return new Promise((ok,erro)=>{
-    const tc=google.accounts.oauth2.initTokenClient({
-      client_id:GMAIL_CLIENT_ID, scope:GMAIL_ESCOPO,
-      callback:resp=>{
-        if(resp.error)return erro(new Error(resp.error_description||resp.error));
-        _gmailToken=resp.access_token; ok(resp.access_token);
-      },
-      error_callback:e=>erro(new Error(e&&e.type==='popup_closed'
-        ? 'Você fechou a janela do Google antes de autorizar.'
-        : 'O Google não autorizou. Confira se o seu e-mail está como usuário de teste no projeto.')),
-    });
-    tc.requestAccessToken({prompt:forcar?'consent':''});
+    const cliente=google.accounts.oauth2.initTokenClient({client_id:GMAIL_CLIENT_ID,scope:GOOGLE_ESCOPOS[servico],include_granted_scopes:false,
+      callback:r=>{
+        if(r.error)return erro(new Error(r.error_description||r.error));
+        if(!r.access_token||!google.accounts.oauth2.hasGrantedAllScopes(r,GOOGLE_ESCOPOS[servico]))return erro(new Error('Autorize a leitura solicitada para concluir a conexão.'));
+        googleSessao[servico]={token:r.access_token,vence:Date.now()+(Number(r.expires_in)||3600)*1000};
+        if(servico==='gmail')_gmailToken=r.access_token;
+        ok(r.access_token);
+      },error_callback:e=>erro(new Error(e?.type==='popup_closed'?'A janela foi fechada antes de concluir.':'Permita a janela do Google e tente novamente.'))});
+    cliente.requestAccessToken({prompt:''});
   });
 }
-
-async function gmailApi(caminho){
-  const r=await fetch('https://gmail.googleapis.com/gmail/v1/users/me/'+caminho,
-    {headers:{authorization:'Bearer '+_gmailToken}});
-  if(r.status===401){_gmailToken='';throw Object.assign(new Error('A autorização do Google venceu — clique de novo para renovar.'),{status:401})}
-  if(r.status===403)throw new Error('O Google recusou o acesso. Confira se a API do Gmail está ativada e se você está como usuário de teste.');
-  if(!r.ok)throw new Error('O Gmail respondeu '+r.status+'.');
+async function pedirTokenGmail(){return conectarGoogle('gmail')}
+async function googleLer(servico,caminho){
+  if(!googleConectado(servico))throw new Error('Conecte ou renove o acesso ao Google antes de consultar.');
+  const base=servico==='gmail'?'https://gmail.googleapis.com/gmail/v1/users/me/':'https://www.googleapis.com/calendar/v3/';
+  const r=await fetch(base+caminho,{headers:{authorization:'Bearer '+googleSessao[servico].token},signal:AbortSignal.timeout(20000)});
+  if(r.status===401){googleSessao[servico]=null;if(servico==='gmail')_gmailToken='';throw new Error('O acesso venceu. Clique em Conectar para renovar.')}
+  if(r.status===403)throw new Error('O Google recusou o acesso. Confira a permissão e se a API deste serviço está ativada no projeto Google Cloud.');
+  if(!r.ok)throw new Error('Não foi possível consultar o Google (código '+r.status+').');
   return r.json();
+}
+async function gmailApi(caminho){return googleLer('gmail',caminho)}
+function desligarGoogle(servico){googleSessao[servico]=null;if(servico==='gmail')_gmailToken='';tela()}
+function blocoGoogle(servico){
+  const cx=el('<div class="corpo google-conexao"></div>');
+  const conectado=googleConectado(servico);
+  cx.appendChild(el(`<p><b>${conectado?'Conectado nesta sessão':'Conectar sua conta Google'}</b></p><p class="google-nota">${servico==='gmail'?'Consulte e-mails recentes ou busque passagens para revisar e importar.':'Escolha um calendário e revise os compromissos antes de trazê-los para a Central.'} A autorização é somente de leitura. Ao fechar ou recarregar a página, pode ser necessário conectar novamente.</p>`));
+  const a=el('<div class="google-acoes"></div>');
+  const b=acao(conectado?'Renovar conexão':'Conectar '+(servico==='gmail'?'Gmail':'Google Agenda'),async()=>{b.disabled=true;try{await conectarGoogle(servico);tela()}catch(e){status.textContent=e.message}finally{b.disabled=false}});
+  a.appendChild(b);
+  if(conectado){a.appendChild(acao(servico==='gmail'?'Ver e-mails recentes':'Escolher calendário',async()=>{try{if(servico==='gmail')await verEmailsGoogle();else await escolherCalendarioGoogle()}catch(e){status.textContent=e.message}},'ghost'));a.appendChild(acao('Desconectar desta sessão',()=>desligarGoogle(servico),'ghost'))}
+  const status=el('<p role="status" class="google-nota"></p>');cx.appendChild(a);cx.appendChild(status);
+  return bloco(servico==='gmail'?'google-gmail':'google-agenda',servico==='gmail'?'📧 Gmail':'📅 Google Agenda','conexão e importação',cx);
+}
+async function verEmailsGoogle(){
+  const lista=await gmailApi('messages?maxResults=15&q='+encodeURIComponent('in:inbox'));
+  const mensagens=await Promise.all((lista.messages||[]).map(m=>gmailApi('messages/'+encodeURIComponent(m.id)+'?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date')));
+  abrirModal('E-mails recentes','Até 15 mensagens da caixa de entrada. Nenhum e-mail será enviado ou alterado.',c=>{
+    const cx=el('<div class="secao"></div>');
+    if(!mensagens.length)cx.appendChild(el('<p class="vazio">Nenhum e-mail na caixa de entrada.</p>'));
+    mensagens.forEach(m=>{const h=n=>(m.payload?.headers||[]).find(x=>x.name.toLowerCase()===n.toLowerCase())?.value||'';const card=el(`<div class="google-email"><b>${esc(h('Subject')||'(sem assunto)')}</b><p>${esc(h('From'))}</p><small>${esc(h('Date'))}</small><p>${esc(m.snippet||'')}</p></div>`);cx.appendChild(card)});c.appendChild(cx);
+  });
+}
+async function escolherCalendarioGoogle(){
+  const calendarios=[];let pagina='';
+  do{const r=await googleLer('agenda','users/me/calendarList?maxResults=250'+(pagina?'&pageToken='+encodeURIComponent(pagina):''));calendarios.push(...(r.items||[]));pagina=r.nextPageToken||''}while(pagina);
+  abrirModal('Escolher calendário','Importação de compromissos: últimos 30 dias e próximos 12 meses.',c=>{
+    const cx=el('<div class="secao"></div>');
+    const permitidos=calendarios.filter(x=>['owner','writer','reader'].includes(x.accessRole));
+    if(!permitidos.length)cx.appendChild(el('<p class="vazio">Nenhum calendário com permissão de leitura.</p>'));
+    permitidos.forEach(cal=>{const b=acao(cal.summary||'Calendário',async()=>{b.disabled=true;try{await revisarAgendaGoogle(cal)}catch(e){status.textContent=e.message}finally{b.disabled=false}},'ghost');cx.appendChild(b)});
+    const status=el('<p role="status"></p>');cx.appendChild(status);c.appendChild(cx);
+  });
+}
+function normalizarEventoGoogle(e,calId,fuso='America/Sao_Paulo'){
+  if(!e.id||e.status==='cancelled'||!e.start)return null;
+  let data,hora='',ate;
+  if(e.start.date){data=e.start.date;const fim=new Date((e.end?.date||e.start.date)+'T12:00');if(e.end?.date)fim.setDate(fim.getDate()-1);ate=dataLocal(fim)}
+  else{const inicio=new Date(e.start.dateTime);if(!Number.isFinite(inicio.getTime()))return null;
+    const partes=new Intl.DateTimeFormat('en-CA',{timeZone:fuso,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(inicio);const p=Object.fromEntries(partes.map(x=>[x.type,x.value]));data=p.year+'-'+p.month+'-'+p.day;hora=p.hour+':'+p.minute;}
+  return {googleId:calId+':'+e.id,googleCalendar:calId,googleAtualizado:e.updated||'',gid:e.iCalUID||'',data,hora,ate:ate||data,titulo:e.summary||'(sem título)',local:e.location||'',tipo:'Pessoal',obs:'Importado do Google Agenda',googleLink:e.htmlLink||'',googleInicio:e.start.dateTime||e.start.date,googleFim:e.end?.dateTime||e.end?.date||''};
+}
+function prepararAgendaGoogle(eventos,calId,fuso,agenda){
+  const vistos=new Set();return eventos.map(e=>normalizarEventoGoogle(e,calId,fuso)).filter(x=>{if(!x||vistos.has(x.googleId))return false;vistos.add(x.googleId);return true}).map(reg=>{
+    const existente=agenda.find(a=>a.googleId===reg.googleId);
+    // Não fundir eventos só por título/data: podem ser compromissos distintos.
+    return {reg,idLocal:existente?.id,acao:existente?'atualizar':'adicionar'};
+  });
+}
+async function revisarAgendaGoogle(cal){
+  const inicio=new Date();inicio.setDate(inicio.getDate()-30);const fim=new Date();fim.setFullYear(fim.getFullYear()+1);
+  const eventos=[];let pagina='',paginas=0;
+  do{const q=new URLSearchParams({singleEvents:'true',orderBy:'startTime',maxResults:'250',timeMin:inicio.toISOString(),timeMax:fim.toISOString(),timeZone:'America/Sao_Paulo'});if(pagina)q.set('pageToken',pagina);
+    const r=await googleLer('agenda','calendars/'+encodeURIComponent(cal.id)+'/events?'+q);eventos.push(...(r.items||[]));pagina=r.nextPageToken||'';
+    if(++paginas>=20&&pagina)throw new Error('Há mais de 5.000 eventos no período. A importação foi interrompida sem gravar dados.');
+  }while(pagina);
+  const plano=prepararAgendaGoogle(eventos,cal.id,'America/Sao_Paulo',E.agenda);
+  abrirModal('Revisar compromissos',esc(cal.summary||'Google Agenda')+' · horários de Brasília',(c,fechar)=>{
+    const cx=el('<div class="secao"></div>');
+    cx.appendChild(el('<p>Escolha o que trazer. Eventos já importados podem ser atualizados; isso substitui data, título e local da cópia na Central. Nada será alterado no Google. Eventos cancelados ou ausentes no Google não são apagados automaticamente daqui.</p>'));
+    const selecionados=new Set();
+    plano.forEach((item,i)=>{const l=el(`<label class="google-evento"><input type="checkbox"><span><b>${esc(item.reg.titulo)}</b><small>${fmtDataAno(item.reg.data)} ${esc(item.reg.hora||'dia inteiro')} · ${item.acao==='adicionar'?'novo':'atualizar cópia existente'}</small></span></label>`);l.querySelector('input').onchange=e=>{if(e.target.checked)selecionados.add(i);else selecionados.delete(i);atualizar()};cx.appendChild(l)});
+    if(!plano.length)cx.appendChild(el('<p class="vazio">Nenhum compromisso no período.</p>'));
+    const todos=acao('Selecionar todos',()=>{cx.querySelectorAll('input[type=checkbox]').forEach((b,i)=>{b.checked=true;selecionados.add(i)});atualizar()},'ghost');cx.appendChild(todos);
+    const aplicar=acao('Importar selecionados',()=>{
+      for(const i of selecionados){const item=plano[i];const existente=E.agenda.find(a=>a.googleId===item.reg.googleId);if(existente)Object.assign(existente,item.reg);else E.agenda.push({id:uid(),...item.reg})}
+      salvar();fechar();
+    });const atualizar=()=>{aplicar.disabled=!selecionados.size;aplicar.textContent='Importar '+selecionados.size+' selecionado(s)'};atualizar();cx.appendChild(aplicar);c.appendChild(cx);
+  });
 }
 
 // base64url do Gmail, com acento preservado
@@ -5227,7 +5399,7 @@ async function buscarPassagensGmail(botao){
   const diz=x=>{if(botao){botao.disabled=true;botao.textContent=x}};
   try{
     diz('Conectando…');
-    if(!_gmailToken)await pedirTokenGmail(true);
+    if(!googleConectado('gmail'))await pedirTokenGmail();
     diz('Procurando…');
     const lista=await gmailApi('messages?maxResults=30&q='+encodeURIComponent(CONSULTA_GMAIL));
     const ids=(lista.messages||[]).map(x=>x.id);
@@ -5235,7 +5407,7 @@ async function buscarPassagensGmail(botao){
     const trechos=[];
     for(let i=0;i<ids.length;i++){
       diz('Lendo '+(i+1)+' de '+ids.length+'…');
-      let msg; try{ msg=await gmailApi('messages/'+ids[i]+'?format=full') }catch(e){continue}
+      const msg=await gmailApi('messages/'+ids[i]+'?format=full');
       const {txt,html}=corpoDoEmail(msg.payload);
       const exatos=voosEstruturados(html);
       (exatos.length?exatos:voosPorPadrao(txt||html.replace(/<[^>]+>/g,' '))).forEach(v=>trechos.push(v));
@@ -5777,7 +5949,7 @@ function vOportunidades(m){
     porque:'',proximoPasso:'',ate:'',links:[],obs:'',mexido:hoje(),criada:hoje()};
     E.oportunidades.push(o);salvar();modalOport(o,true)};
 
-  m.appendChild(cab('Oportunidades','O que você ainda não decidiu fazer — e a régua para decidir.'));
+  m.appendChild(cab('Oportunidades','Compare ideias, avalie prioridades e acompanhe as próximas decisões.'));
 
   const tipos=[...new Set([...CFG('tipoOportunidade'),...L.map(o=>o.tipo)])].filter(Boolean);
   m.appendChild(painel('Ver',
@@ -5885,7 +6057,7 @@ function vOportunidades(m){
     const gx=el('<div></div>');
     gx.appendChild(el(`<div class="grafico">${gRosca(Object.entries(porEst).map(([r2,v])=>({r:r2,v})),{fmt:v=>v})}</div>`));
     gx.appendChild(el(`<div class="grafico">${gBarras(Object.entries(porTipo).map(([r2,v])=>({r:r2,v})).sort((a,b)=>b.v-a.v),{fmt:v=>v})}</div>`));
-    m.appendChild(bloco('op-dash','Onde a sua cabeça está','por estágio e por tipo',gx));
+    m.appendChild(bloco('op-dash','Oportunidades por estágio e tipo','por estágio e por tipo',gx));
   }
 }
 
@@ -6402,11 +6574,11 @@ function vRendimentos(m){
   const porMes=MESES.map((_,i)=>doAno.filter(x=>+((x.data||'').slice(5,7))===i+1).reduce((s,x)=>s+(+x.valor||0),0));
   const mesN=new Date().getMonth();
 
-  m.appendChild(cab('Rendimentos','De onde vem o seu dinheiro — e o que mais deu lucro.'));
+  m.appendChild(cab('Rendimentos','Acompanhe seus rendimentos por empresa, mês e ano.'));
   m.appendChild(painel('Ano',
     seletor(filtro.rendAno,[...anosR.map(a=>[a,String(a)]),['todos','Todos os anos']],
       v=>{filtro.rendAno=(v==='todos'?'todos':+v);filtro.rendEmp='Todas';filtro.rendAnoSel=-1;r()}),
-    seletor(empSel,[['Todas','Todas as empresas ('+doAnoTudo.length+')'],
+    seletor(empSel,[['Todas','Todas as empresas'],
       ...empresasR.map(e=>[e,e+' ('+doAnoTudo.filter(x=>x.empresa===e).length+')'])],
       v=>{filtro.rendEmp=v;r()}),
     seletor(filtro.rendVisao,[['Anual','Visão anual'],['Mensal','Visão mensal']],
@@ -6419,7 +6591,8 @@ function vRendimentos(m){
   const mA = { appendChild: x => { if (vAnual) m.appendChild(x) } };
 
   /* ---- números do recorte escolhido ---- */
-  const totalSel=todos?H.totalGeral:(H.totalAno[iAno]||0);
+  const resumoFiltrado=resumoRendimentoFiltrado(H,empSel,ano,todos);
+  const totalSel=resumoFiltrado.total,anteriorSel=resumoFiltrado.anterior;
   // Os meses que contam para a média são os que têm lançamento — antes isso era
   // um "6" cravado (a planilha ia até junho), e julho não entrava na conta.
   // Sem lançamento nenhum no ano, cai no calendário e na marcação da planilha.
@@ -6427,33 +6600,33 @@ function vRendimentos(m){
   const ehParcial=!todos&&(mesesLanc.length?mesesLanc.length<12:parciais.includes(ano));
   const mesesDecorridos=mesesLanc.length||(ano===anoHoje?mesN+1:12);
   // fontes: empresa (sempre) e negócio (quando há detalhe)
-  const fontesEmp=Object.entries(H.empresas)
+  const fontesEmp=Object.entries(H.empresas).filter(([n])=>empSel==='Todas'||n===empSel)
     .map(([n,v])=>({r:n,v:todos?v.reduce((a,b)=>a+b,0):(v[iAno]||0)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
   const maior=fontesEmp[0];
   const conc=maior&&totalSel?maior.v/totalSel*100:0;
   // crescimento contra o ano anterior (só faz sentido em ano específico)
-  const cresc=(!todos&&iAno>0&&H.totalAno[iAno-1])?((H.totalAno[iAno]/H.totalAno[iAno-1])-1)*100:null;
+  const cresc=resumoFiltrado.crescimento;
   // Quanto da queda contra o ano passado é de empresa que deixou de existir.
   // Sem isso o painel diz "-40%" e parece que o negócio encolheu, quando na
   // verdade uma fonte foi vendida — susto que não corresponde a nada.
   const saíram=(!todos&&iAno>0)?Object.entries(H.empresas||{})
-    .filter(([nm,v])=>encerrada(nm)&&(v[iAno-1]||0)>0&&!(v[iAno]||0))
+    .filter(([nm,v])=>(empSel==='Todas'||nm===empSel)&&encerrada(nm)&&(v[iAno-1]||0)>0&&!(v[iAno]||0))
     .map(([nm,v])=>({nome:nm,valor:v[iAno-1]||0})):[];
   const totalSaiu=saíram.reduce((a,x)=>a+x.valor,0);
 
   const anoIni=H.anos[0],anoFim=H.anos[H.anos.length-1];
   m.appendChild(ligaKpis(el(`<div class="grade">
     ${kpi(todos?('Total '+anoIni+'–'+anoFim):'Ganho em '+ano,brl(totalSel),
-      (todos?'tudo somado':(ehParcial?'ano parcial':'no ano inteiro'))+' · ver mês a mês','v','mes')}
-    ${kpi('Média por mês',brl(totalSel/(todos?H.anos.length*12:mesesDecorridos)),
+      (todos?'tudo somado':(ehParcial?'acumulado parcial':'no ano inteiro'))+' · ver mês a mês','v','mes')}
+    ${kpi('Média do período',brl(totalSel/(todos?H.anos.length*12:mesesDecorridos)),
       (todos?('nos '+H.anos.length+' anos'):mesesDecorridos+' meses')+' · ver mês a mês',null,'mes')}
     ${kpi('Maior fonte',maior?avatar(maior.r,22)+esc(maior.r):'—',maior?brl(maior.v)+' · '+conc.toFixed(0)+'% do total':'','a',maior?'fonte':null)}
-    ${(()=>{const ls=todos?E.rendimentos:doAnoTudo;
+    ${(()=>{const ls=(todos?E.rendimentos:doAnoTudo).filter(x=>empSel==='Todas'||x.empresa===empSel);
       const ult=[...ls].sort((a,b)=>(a.data||'').localeCompare(b.data||'')).map(y=>y.data).pop();
       return kpi('Lançamentos',ls.length,ult?'último em '+fmtDataAno(ult):'nenhum ainda',null,'lanc')})()}
-    ${cresc==null?kpi('Média anual',brl(H.mediaAnual),'anos completos','','evol')
-      :kpi('Contra '+(ano-1),(cresc>=0?'+':'')+cresc.toFixed(0)+'%',
-        brl(Math.abs(H.totalAno[iAno]-H.totalAno[iAno-1]))+(cresc>=0?' a mais':' a menos')
+    ${cresc==null?kpi('Recorte',esc(empSel==='Todas'?'Todas as fontes':empSel),'Filtro aplicado ao resumo','','evol')
+      :kpi('Vs. total de '+(ano-1),(cresc>=0?'+':'')+cresc.toFixed(0)+'%',
+        brl(Math.abs(totalSel-anteriorSel))+(cresc>=0?' a mais':' a menos')
           +(totalSaiu?' · '+brl(totalSaiu)+' era de empresa encerrada':''),cresc>=0?'v':'r','evol')}</div>`),{
     // dinheiro do período -> o mês a mês, que é onde o número se destrincha
     mes:()=>{if(todos)filtro.rendAno=anoFim;filtro.rendVisao='Mensal';abreBloco('rd-mes');r()},
@@ -6467,8 +6640,7 @@ function vRendimentos(m){
     ${saíram.length===1?'uma empresa que não existe mais':'empresas que não existem mais'}:</b>
     ${saíram.map(x=>esc(x.nome)+' ('+esc(rotuloEncerrada(x.nome))+', '+brl(x.valor)+')').join('; ')}.
     A comparação com ${ano-1} carrega isso — não é queda de operação, é fonte que saiu de cena.</div>`));
-  if(ehParcial) m.appendChild(el(`<div class="aviso">📌 <b>${ano} é ano parcial</b> — ${mesesDecorridos} ${mesesDecorridos===1?'mês lançado':'meses lançados'}
-    (${brl(totalSel)}). No ritmo atual, o ano fecharia perto de <b>${brl(totalSel/mesesDecorridos*12)}</b>.</div>`));
+  if(ehParcial) m.appendChild(el(`<div class="finance-insight"><b>Acumulado parcial de ${ano}</b><p>${brl(totalSel)} no recorte selecionado. A média divide o total por ${mesesDecorridos} meses usados como base. A variação exibida compara com o total do ano anterior, não com o mesmo período.</p></div>`));
   // parte do ano que ainda não sabemos de qual empresa veio
   const naoIdent=todos
     ? (H.empresas['A identificar']||[]).reduce((a,b)=>a+b,0)
@@ -6575,7 +6747,7 @@ function vRendimentos(m){
   lc.appendChild(tl);
   if(!temDetalhe&&!todos) lc.appendChild(el(`<div style="padding:11px 17px 2px;font-size:12px;color:var(--suave)">
     Sem detalhe por negócio em ${ano} — a planilha desse ano trazia só o total por empresa.</div>`));
-  mA.appendChild(bloco('rd-rank','🏆 O que mais deu lucro',
+  mA.appendChild(bloco('rd-rank','🏆 Rendimentos por empresa',
     temDetalhe?(todos?`por empresa nos 7 anos — clique para abrir os negócios`:`por empresa em ${ano} — clique para abrir os negócios`):(todos?'somando os 7 anos':'por empresa em '+ano),lc));
 
   /* ---- conferência: o lançado bate com o histórico? — com o dedo no que destoa ---- */
@@ -7456,7 +7628,7 @@ function vPatrimonio(m){
   const novo=()=>{const x={id:uid(),tipo:CFG('tiposBem')[0],nome:'',onde:'',valor:0,falta:0,
     situacao:'Quitado',documento:'',obs:''};E.patrimonio.push(x);salvar();modalBem(x)};
 
-  m.appendChild(cab('Patrimônio','O que é seu, quanto vale e quanto ainda deve. Clique para abrir e anexar escritura ou contrato.'));
+  m.appendChild(cab('Patrimônio','Organize seus bens, acompanhe valores e dívidas e guarde os documentos.'));
   m.appendChild(painel('',acao('+ Novo bem',novo),'|'));
 
   m.appendChild(el(`<div class="grade">
@@ -7569,9 +7741,20 @@ function modalItemGasto(x, titulo, sub, ref, dica){
   });
 }
 
+function modalLancamentoGasto(g){
+  abrirModal(esc(g.oque||'Novo gasto'),'Preencha os campos. As alterações são salvas automaticamente.',(c,fechar)=>{
+    const sec=el('<div class="secao"></div>');
+    sec.appendChild(campos(g,[{k:'oque',t:'Descrição',full:true},{k:'valor',t:'Valor',tipo:'moeda'},
+      {k:'mes',t:'Mês',tipo:'month'},{k:'classe',t:'Categoria',tipo:'select',opcoes:['Sem categoria',...CFG('catGasto')]},
+      {k:'pago',t:'Pago com',tipo:'select',opcoes:['',...CFG('formasPagto')]},{k:'obs',t:'Observações',tipo:'textarea',full:true}]));
+    const arquivos=el('<button class="btn ghost">Comprovantes</button>');arquivos.onclick=()=>modalItemGasto(g,g.oque,'Comprovantes','gasto','Nota fiscal, recibo, comprovante');sec.appendChild(arquivos);
+    c.appendChild(sec);
+  });
+}
+
 function vGastos(m){
   const r=rr('gastos');
-  const meses=[...new Set(E.gastos.map(g=>g.mes))].filter(Boolean).sort();
+  const meses=[...new Set([...E.gastos.map(g=>g.mes),...E.rendimentos.map(x=>(x.data||'').slice(0,7))])].filter(Boolean).sort();
   if(!filtro.gastosMes) filtro.gastosMes=mesAtual();
   const mes=filtro.gastosMes, todos=mes==='todos';
   const doMes=todos?E.gastos:E.gastos.filter(g=>g.mes===mes);
@@ -7587,19 +7770,19 @@ function vGastos(m){
   const rot=mm=>mm.split('-').reverse().join('/');
   const novoLanc=()=>({mes:todos?mesAtual():mes,classe:CFG('catGasto')[0],oque:'',valor:0,pago:''});
 
-  m.appendChild(cab('Gastos','Um lugar só para lançar. A classificação é que separa e mostra para onde vai o dinheiro.'));
+  m.appendChild(cab('Gastos','Registre despesas, revise custos recorrentes e acompanhe os gastos por categoria.'));
   m.appendChild(painel('Mês',
     seletor(mes,[...meses.slice().reverse().map(mm=>[mm,rot(mm)]),
       ...(meses.includes(mesAtual())?[]:[[mesAtual(),rot(mesAtual())+' (atual)']]),['todos','Todos os meses']],
       v=>{filtro.gastosMes=v;r()}),
-    acao('+ Novo lançamento',()=>{E.gastos.push({id:uid(),...novoLanc()});salvar();r()}),'|'));
+    acao('+ Novo gasto',()=>{const g={id:uid(),...novoLanc()};E.gastos.push(g);salvar();abreBloco('gt-lista');r();modalLancamentoGasto(g)}),'|'));
 
   m.appendChild(ligaKpis(el(`<div class="grade">
-    ${kpi(todos?'Saída total':'Saída do mês',brl(tot),'variável + fixo · ver para onde vai','r','classe')}
-    ${kpi('Variável',brl(varTot),doMes.length+' lançamento(s)',null,'lanc')}
-    ${kpi('Fixo',brl2(fixo)+'/mês',FIXOS().reduce((s,f)=>s+f.lista.length,0)+' cadastros','a','fixo')}
+    ${kpi(todos?'Custo estimado do período':'Custo estimado do mês',brl(tot),'Lançamentos + recorrentes cadastrados','r','classe')}
+    ${kpi('Lançado',brl(varTot),doMes.length+' lançamento(s)',null,'lanc')}
+    ${kpi('Recorrente mensal',brl2(fixo),FIXOS().reduce((s,f)=>s+f.lista.length,0)+' cadastros','a','fixo')}
     ${kpi('Ganho',brl(rendMes),'de Rendimentos','v','rend')}
-    ${kpi('Sobrou',brl(sobra),sobra>=0?'no azul':'no vermelho',sobra>=0?'v':'r','classe')}</div>`),{
+    ${kpi('Saldo estimado',brl(sobra),'Rendimentos menos custo estimado',sobra>=0?'v':'r','classe')}</div>`),{
     classe:()=>{abreBloco('gt-classe');r()},
     lanc:()=>{abreBloco('gt-lista');r()},
     fixo:()=>{abreBloco('gt-casa');r()},
@@ -7612,15 +7795,15 @@ function vGastos(m){
   // as classes dos cadastros fixos entram sempre, mesmo que a config salva seja antiga —
   // senão o valor conta no total e some do detalhamento
   const classes=[...new Set([...CFG('catGasto'),...FIXOS().map(f=>f.classe),
-    ...doMes.map(g=>g.classe||g.categoria)])].filter(Boolean);
+    ...doMes.map(g=>g.classe||g.categoria||'Sem categoria')])].filter(Boolean);
   const grupos=classes.map(cl=>{
     const itens=[];
-    doMes.filter(g=>(g.classe||g.categoria)===cl).forEach(g=>
+    doMes.filter(g=>(g.classe||g.categoria||'Sem categoria')===cl).forEach(g=>
       itens.push({nome:g.oque||g.obs||'(sem descrição)',v:+g.valor||0,fixo:false,extra:g.mes&&todos?rot(g.mes):''}));
     FIXOS().filter(f=>f.classe===cl).forEach(f=>f.lista.forEach(x=>
       itens.push({nome:f.nome(x),v:valorMensal(x)*nMeses,fixo:true,extra:f.extra(x)})));
     return {classe:cl,total:itens.reduce((s,i)=>s+i.v,0),itens:itens.sort((a,b)=>b.v-a.v)};
-  }).filter(g=>g.total>0).sort((a,b)=>b.total-a.total);
+  }).filter(g=>g.itens.length).sort((a,b)=>b.total-a.total);
 
   // serie mensal de uma classificacao: o variavel varia mes a mes, o fixo se repete igual
   const mesesTodos=[...new Set(E.gastos.map(g=>g.mes).filter(Boolean))].sort();
@@ -7629,7 +7812,7 @@ function vGastos(m){
       .reduce((a,f)=>a+f.lista.reduce((b,x)=>b+valorMensal(x),0),0);
     return mesesTodos.map(mm=>({
       mes:mm,
-      variavel:E.gastos.filter(g=>g.mes===mm&&(g.classe||g.categoria)===cl)
+      variavel:E.gastos.filter(g=>g.mes===mm&&(g.classe||g.categoria||'Sem categoria')===cl)
         .reduce((a,g)=>a+(+g.valor||0),0),
       fixo:fixoCl,
     })).map(x=>({...x,total:x.variavel+x.fixo}));
@@ -7713,7 +7896,16 @@ function vGastos(m){
       <td style="text-align:right">${brl(tot)}</td><td style="text-align:right">100%</td></tr>`;
     tg.appendChild(tf);tl.appendChild(tg);lc.appendChild(tl);
   }
-  m.appendChild(bloco('gt-classe','💸 Para onde vai o dinheiro','clique na classificação para abrir o mês a mês e os itens — e clique num mês para ir até ele',lc));
+  const ranking=rankingFinanceiro(grupos.map(g=>({nome:g.classe,valor:g.total,itens:g.itens})),tot,g=>{
+    abrirModal(esc(g.nome),g.itens.length+' itens · '+brl(g.valor),(c)=>{
+      const lista=el('<div class="corpo finance-item-list"></div>');
+      g.itens.forEach(it=>lista.appendChild(el(`<div><span>${esc(it.nome)}<small>${it.fixo?'Recorrente estimado':'Lançamento'}${it.extra?' · '+esc(it.extra):''}</small></span><b>${brl(it.v)}</b></div>`)));c.appendChild(lista);
+    });
+  });
+  if(!grupos.length)ranking.appendChild(el('<p class="vazio">Nenhum gasto neste período.</p>'));
+  const completo=el('<details class="finance-detail"><summary>Comparar mês a mês e abrir tabela completa</summary></details>');completo.appendChild(lc);ranking.appendChild(completo);
+  m.appendChild(bloco('gt-classe','Onde você mais gasta','Categorias em ordem de valor. Toque para entender cada uma.',ranking));
+  m.appendChild(el(`<div class="finance-insight"><b>Como ler este resumo</b><p>${brl(varTot)} em lançamentos + ${brl(fixoPer)} em recorrentes estimados${todos?' em '+nMeses+' meses com registros':''}. O cadastro atual de recorrentes não comprova pagamentos passados. Se uma conta já está nos recorrentes, lançá-la novamente soma o valor duas vezes.</p></div>`));
 
   /* ---- mês vazio e o anterior tem lançamento: oferece clonar ---- */
   if(!todos&&!doMes.length){
@@ -7741,6 +7933,15 @@ function vGastos(m){
   ],novoLanc,r,
     `<td colspan="3">Total variável</td><td style="text-align:right">${brl(varTot)}</td><td></td><td></td>`,E.gastos,
     g=>modalItemGasto(g,g.oque||'Lançamento',(g.classe||'')+' · '+brl(+g.valor||0),'gasto','Nota fiscal, recibo, comprovante')));
+
+  const cartoesLanc=el('<div class="finance-mobile-list"></div>');
+  doMes.slice().sort((a,b)=>(+b.valor||0)-(+a.valor||0)).forEach(g=>{
+    const linha=el(`<div class="finance-expense-row"><button class="finance-expense-open"><span>${esc(g.oque||'Sem descrição')}<small>${esc(g.classe||g.categoria||'Sem categoria')} · ${esc(g.mes||'Sem mês')}</small></span><b>${brl(+g.valor||0)} ›</b></button><button class="btn ghost mini" aria-label="${esc('Excluir '+(g.oque||'gasto'))}">Excluir</button></div>`);
+    linha.querySelector('.finance-expense-open').onclick=()=>modalLancamentoGasto(g);
+    linha.querySelector('.btn').onclick=()=>{if(!confirm('Excluir este lançamento?'))return;const i=E.gastos.indexOf(g);if(i>=0)E.gastos.splice(i,1);salvar();r()};
+    cartoesLanc.appendChild(linha);
+  });
+  m.querySelector('[data-bid="gt-lista"] .conteudo')?.prepend(cartoesLanc);
 
   /* ================= CADASTROS FIXOS ================= */
   m.appendChild(el(`<div style="padding:20px 4px 4px;font-size:12.5px;color:var(--suave);letter-spacing:.04em;text-transform:uppercase">
@@ -7840,7 +8041,7 @@ function vDocumentos(m){
   const st=d=>{if(!d.validade)return '—';const dd=Math.round((new Date(d.validade)-new Date(h))/864e5);
     return dd<0?'Vencido':dd<180?'Vencendo':'Em dia'};
   const alerta=E.documentos.filter(d=>['Vencido','Vencendo'].includes(st(d))).length;
-  m.appendChild(cab('Documentos e validades','Clique num documento para anexar o arquivo digitalizado.'));
+  m.appendChild(cab('Documentos','Consulte arquivos, acompanhe validades e organize os documentos por pessoa.'));
   const novoDoc=()=>{const d={id:uid(),nome:'',dono:'Léo',numero:'',validade:'',onde:'',obs:''};E.documentos.push(d);salvar();modalDoc(d)};
   // a lista vem de Minha gente, não só de quem já tem documento — assim dá para ver quem está sem nada
   const donos=[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...E.documentos.map(d=>d.dono||'Léo')])];
@@ -8079,7 +8280,7 @@ function vGuia(m) {
   const media = dadas.length ? dadas.reduce((s, v) => s + v, 0) / dadas.length : 0;
   const pior = AR.reduce((p, a, i) => (notas[i] > 0 && (p == null || notas[i] < notas[p.i])) ? { a, i } : p, null);
 
-  m.appendChild(cab('Guia de vida', 'Seu norte, suas metas e o que você quer deixar para eles.'));
+  m.appendChild(cab('Guia de vida', 'Reúna objetivos pessoais, planos, relações e informações importantes da família.'));
   m.appendChild(painel(
     acao('+ Meta', () => { const x = { id: uid(), meta: '', area: CFG('areasMeta')[0], horizonte: CFG('horizonteMeta')[0], prazo: '', status: 'Aberta', obs: '', passos: [] }; E.metas.push(x); salvar(); modalMeta(x) }),
     acao('+ Pessoa', () => { const p = { id: uid(), nome: '', relacao: CFG('relacoes')[0], nascimento: '', gosta: '', obs: '' }; E.pessoas.push(p); salvar(); modalPessoa(p) }, 'ghost'),
@@ -8480,7 +8681,7 @@ function vGuia(m) {
     <div class="sug"><b>💰 Saldo por banco</b><p>Em Rendimentos falta o quanto está aplicado em cada banco. Sem isso dá pra ver quem rendeu mais em reais, mas não quem rendeu melhor.</p></div>
     <div class="sug"><b>🛡️ Reserva de emergência</b><p>Marque seus gastos essenciais e eu calculo quantos meses você aguenta sem fechar negócio nenhum.</p></div>
   </div>`;
-  m.appendChild(bloco('gu-sug', '💡 Sugestões minhas', 'olhando seus dados', s));
+  m.appendChild(bloco('gu-sug', '💡 Pontos para revisar', 'com base nos registros do painel', s));
 }
 
 // pessoa com anexo de documentos
@@ -8708,8 +8909,9 @@ function contarUso(chave,valor){
 }
 async function vConfig(m){
   const r=rr('config');
-  m.appendChild(cab('Configurações','Tudo que aparece como opção nos formulários — cada lista com seu título.'));
+  m.appendChild(cab('Configurações','Gerencie conexões, preferências, listas e cópias de segurança.'));
   m.appendChild(painel('Seções', 'Abra o assunto que deseja ajustar'));
+  m.appendChild(blocoGoogle('gmail'));m.appendChild(blocoGoogle('agenda'));
   const t=await arqTotal();
   if(atual!=='config')return;
   m.appendChild(el(`<div class="grade">
