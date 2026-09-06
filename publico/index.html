@@ -243,7 +243,7 @@ tr:hover .lixo{opacity:1}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css?v=ba037a363374">
+<link rel="stylesheet" href="./refinamento.css?v=edbd80e01ac5">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -1233,6 +1233,42 @@ function rankingFinanceiro(itens,total,abrir){
   return lista;
 }
 
+let abaAgenda='compromissos';
+function organizarAgenda(pagina,alvo){
+ if(pagina.classList.contains('agenda-layout'))return;
+ pagina.classList.add('agenda-layout');
+ const calendario=pagina.querySelector('[data-bid="ag-mes"]'),topo=pagina.querySelector('.topo');
+ if(!calendario||!topo)return;
+ const painel=pagina.querySelector('.painel');
+ const novo=painel?.querySelector('button');if(novo)topo.appendChild(novo);
+ const arquivos=el('<div class="agenda-arquivos"><h3>Arquivos de calendário</h3></div>');
+ painel?.querySelectorAll('button').forEach(b=>{if(/\.ics/.test(b.textContent))arquivos.appendChild(b)});painel?.remove();
+ const filtros=el('<details class="agenda-filtros"><summary>Filtrar calendário por assunto</summary></details>');
+ if(filtro.agSo)filtros.open=true;
+ const chips=pagina.querySelector('.agenda-categorias');if(chips)filtros.appendChild(chips);
+ const aviso=pagina.querySelector('.agenda-filtro-aviso');if(aviso)filtros.appendChild(aviso);
+ calendario.querySelector('.conteudo').prepend(filtros);
+ calendario.classList.remove('fechado');
+ const header=calendario.querySelector('header');header.onclick=null;header.onkeydown=null;header.removeAttribute('role');header.removeAttribute('tabindex');header.removeAttribute('aria-expanded');header.querySelector('.seta')?.remove();
+ topo.after(calendario);
+ const nav=el('<nav class="agenda-abas" aria-label="Detalhes da agenda"></nav>');
+ const panes={};
+ [['compromissos','Compromissos'],['integracoes','Gmail e importações'],['resumo','Resumo']].forEach(([id,label])=>{
+  const pane=el(`<section class="agenda-pane" id="agenda-${id}" aria-label="${label}"></section>`);panes[id]=pane;
+  const button=el(`<button type="button" data-agenda-aba="${id}" aria-controls="agenda-${id}">${label}</button>`);button.onclick=()=>selecionar(id);nav.appendChild(button);
+ });
+ [...pagina.children].forEach(node=>{
+  if(node===topo||node===calendario)return;
+  const id=node.dataset.bid;
+  const pane=id==='ag-gmail'||id==='google-agenda'?'integracoes':id==='ag-dash'||node.classList.contains('grade')?'resumo':'compromissos';
+  panes[pane].appendChild(node);
+ });
+ panes.integracoes.appendChild(arquivos);pagina.appendChild(nav);Object.values(panes).forEach(p=>pagina.appendChild(p));
+ function selecionar(id){abaAgenda=id;Object.entries(panes).forEach(([k,p])=>p.hidden=k!==id);nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.agendaAba===id)))}
+ const destino=alvo?Object.entries(panes).find(([,p])=>[...p.querySelectorAll('[data-bid]')].some(x=>x.dataset.bid===alvo))?.[0]:null;
+ selecionar(destino||abaAgenda);
+}
+
 function prepararTabelas(pagina){
   pagina.querySelectorAll('table').forEach(t=>{
     const linhas=[...t.querySelectorAll('tbody>tr')].filter(tr=>tr.closest('table')===t);
@@ -1252,7 +1288,7 @@ function tela(){
   const m=document.getElementById('main'),pagina=el('<div class="pagina"></div>');m.replaceChildren(pagina);
   const alvo=_alvoBloco;_alvoBloco=null;
   const mod=MODS.find(x=>x.id===atual&&!x.url);document.title=mod.nome+' · Central do Léo';
-  const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else indiceDaTela(pagina);prepararTabelas(pagina);if(alvo)rolaAlvo(pagina,alvo)};
+  const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else indiceDaTela(pagina);prepararTabelas(pagina);if(alvo)rolaAlvo(pagina,alvo)};
   const falhou=()=>{if(pagina.isConnected)pagina.appendChild(el('<p class="aviso" role="alert">Não foi possível concluir o carregamento. Abra esta seção novamente.</p>'))};
   try{const resultado=mod.render(pagina);if(resultado?.then)resultado.then(finalizar).catch(falhou);else finalizar()}catch(erro){falhou()}
   return !!alvo;
@@ -2431,7 +2467,7 @@ function vAgenda(m){
   const noMes=todosEv.filter(e=>eventoNoMes(e,mesChip));
   const so=filtro.agSo||null;
 
-  const chips=el('<div style="display:flex;gap:7px;flex-wrap:wrap;margin:0 0 14px;align-items:center"></div>');
+  const chips=el('<div class="agenda-categorias" style="display:flex;gap:7px;flex-wrap:wrap;margin:0 0 14px;align-items:center"></div>');
   const bTudo=el(`<button class="btn mini ${so?'ghost':''}">${so?'↺ Ver tudo':'Tudo ('+noMes.length+')'}</button>`);
   bTudo.onclick=()=>{filtro.agSo=null;r()};
   chips.appendChild(bTudo);
@@ -2445,7 +2481,7 @@ function vAgenda(m){
     chips.appendChild(b);
   });
   m.appendChild(chips);
-  if(so) m.appendChild(el(`<div style="font-size:12.5px;color:var(--suave);margin:-6px 0 12px">
+  if(so) m.appendChild(el(`<div class="agenda-filtro-aviso" style="font-size:12.5px;color:var(--suave);margin:-6px 0 12px">
     Vendo só <b>${esc((FONTES_AGENDA.find(f=>f.k===so)||{}).rot||'')}</b> — clique no chip de novo, ou em "Ver tudo", para voltar.</div>`));
 
   // A grade é o retrato do mês; a lista logo abaixo é o mesmo mês escrito, em

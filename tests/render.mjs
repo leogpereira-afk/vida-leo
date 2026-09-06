@@ -8,7 +8,7 @@ async function render(id,populated=true){
  if(populated)dados(run);
  run(`atual='${id}';document.getElementById('main').replaceChildren();`);
  await run(`MODS.find(x=>x.id==='${id}').render(document.getElementById('main'))`);
- run(`if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(document.getElementById('main'),atual);else if(atual==='saude')organizarSaude(document.getElementById('main'));else indiceDaTela(document.getElementById('main'));prepararTabelas(document.getElementById('main'))`);
+ run(`if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(document.getElementById('main'),atual);else if(atual==='saude')organizarSaude(document.getElementById('main'));else if(atual==='agenda')organizarAgenda(document.getElementById('main'));else indiceDaTela(document.getElementById('main'));prepararTabelas(document.getElementById('main'))`);
  return {...app,main:document.getElementById('main')};
 }
 for(const populated of [false,true])for(const id of IDS)test(`${id}: monta ${populated?'com registros':'vazia'} e cartões respondem`,async()=>{
@@ -67,3 +67,6 @@ test('Gmail: busca pagina e examina texto de e-mail com convite',async()=>{
 test('Gmail: descartar não reaparece ao repetir o mesmo lote',()=>{
  const {run,document}=setup();run("var lote={plano:[{gid:'dispensar',seq:0,emailEm:1,reg:{gid:'dispensar',data:'2099-10-01',titulo:'Teste'}}],avisos:[],mensagens:1};revisarConvitesGmail(guardarAprovacoesGmail(lote))");[...document.querySelectorAll('button')].find(b=>b.textContent==='Descartar').click();run('guardarAprovacoesGmail(lote)');assert.equal(run('E.gmailPendentes.length'),0);assert.equal(run('E.agenda.length'),0);
 });
+
+test('Agenda: calendário vem primeiro e continua visível ao abrir Gmail',async()=>{const {main}=await render('agenda');assert.equal(main.children[1].dataset.bid,'ag-mes');assert.equal(main.querySelector('.indice-tela'),null);main.querySelector('[data-agenda-aba="integracoes"]').click();assert.equal(main.querySelector('#agenda-integracoes').hidden,false);assert.equal(main.querySelector('#agenda-compromissos').hidden,true);assert.equal(main.querySelector('[data-bid="ag-mes"]').classList.contains('fechado'),false);assert.ok(main.querySelector('#agenda-integracoes [data-bid="ag-gmail"]'))});
+test('Agenda: atalho abre a área de destino e calendário ignora recolhimento antigo',()=>{const {run,document}=setup();run("E.colapso['ag-mes']=true;atual='agenda';vAgenda(document.getElementById('main'));organizarAgenda(document.getElementById('main'),'ag-gmail')");assert.equal(document.querySelector('[data-bid="ag-mes"]').classList.contains('fechado'),false);assert.equal(document.querySelector('#agenda-integracoes').hidden,false);assert.equal(document.querySelector('[data-bid="ag-mes"] header').getAttribute('role'),null)});
