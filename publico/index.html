@@ -243,7 +243,7 @@ tr:hover .lixo{opacity:1}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css?v=de06a77ee860">
+<link rel="stylesheet" href="./refinamento.css?v=2d4ddd254aa3">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -630,7 +630,7 @@ const SEED={
   sos:{sangue:'',alergias:'',doencas:'',cirurgias:'',plano:'',carteirinha:'',contato1:'',contato2:'',medico:'',obs:''},
   // guia de vida ampliado
   norte:{proposito:'',valores:'',legado:''},
-  roda:{},rituais:[],instrucoes:[],protecao:[],planoAno:[],pdi:[],livros:[],bancos:[],empresasPJ:[],patrimonio:[],
+  roda:{},desenvolvimento:{fontes:[],leituras:[],revisoes:[],reflexoes:[],validacoes:[]},rituais:[],instrucoes:[],protecao:[],planoAno:[],pdi:[],livros:[],bancos:[],empresasPJ:[],patrimonio:[],
   oportunidades:[],
   estrategia:{},planejamentoEmpresas:[],
   comportamento:{temperamentos:{},disc:{},discAdaptado:{},big5:{},valores:{},lideranca:{},
@@ -748,6 +748,7 @@ function carregar(){
     d.config.tiposContaBanco=[...new Set([...d.config.tiposContaBanco,...d.config.tiposConta])];
     d.config.tiposConta=[...capital];
   }
+  prepararDesenvolvimento(d);
   return d;
 }
 const salvar=()=>{E._mt=Math.max(Date.now(),(+E._mt||0)+1);localStorage.setItem(CHAVE,JSON.stringify(E));agendaPush()};
@@ -1336,7 +1337,7 @@ const kpi=(rot,val,sub,cl,ir)=>`<div class="kpi ${cl||''}${ir?' clic':''}"${ir?`
    re-renderizar antes de rolar, então o alvo fica guardado e a rolagem
    acontece quando a tela termina de ser remontada. */
 let _alvoBloco=null;
-function abreBloco(id){if(id.startsWith('gu-'))filtro.guiaAba=grupoGuia(id);if(id.startsWith('es-'))filtro.estrAba=abaEstrategia(id);if(id==='op-rank')filtro.oportView='comparar';if(E.colapso[id]){E.colapso[id]=false;salvar()}_alvoBloco=id;}
+function abreBloco(id){if(id.startsWith('gu-')){filtro.guiaAba=grupoGuia(id);if(filtro.guiaAba==='desenvolvimento')filtro.devAba=devAbaBloco(id);}if(id.startsWith('es-'))filtro.estrAba=abaEstrategia(id);if(id==='op-rank')filtro.oportView='comparar';if(E.colapso[id]){E.colapso[id]=false;salvar()}_alvoBloco=id;}
 function rolaAlvo(pagina,id){
   if(!pagina.isConnected)return false;
   const b=[...pagina.querySelectorAll('[data-bid]')].find(x=>x.dataset.bid===id);
@@ -8483,121 +8484,116 @@ function modalDoc(d){
   });
 }
 
-/* ---- Como eu funciono: escalas com nota, e o que dá para escolher em vez de escrever ---- */
-const TEMPERAMENTOS = [
-  ['Colérico', 'decide rápido, vai pra cima, lidera sem pedir licença'],
-  ['Sanguíneo', 'gosta de gente, anima o ambiente, se entedia com rotina'],
-  ['Melancólico', 'analisa fundo, exige precisão, sente as coisas por dentro'],
-  ['Fleumático', 'calmo sob pressão, evita conflito à toa, constante'],
-];
-const DISC4 = [
-  ['D — Dominância', 'resultado, velocidade, controle'],
-  ['I — Influência', 'pessoas, entusiasmo, persuasão'],
-  ['S — Estabilidade', 'constância, apoio, paciência'],
-  ['C — Conformidade', 'precisão, dado, qualidade'],
-];
-const BIG5 = [
-  ['Conscienciosidade', 'disciplina e execução'],
-  ['Abertura', 'gosto por novidade e ideia nova'],
-  ['Extroversão', 'energia vinda das pessoas'],
-  ['Amabilidade', 'quanto você cede para agradar'],
-  ['Estabilidade emocional', 'quanto NÃO se abala (inverso do neuroticismo)'],
-];
-const ENEAGRAMA = ['', '1 — Perfeccionista', '2 — Prestativo', '3 — Realizador', '4 — Individualista',
-  '5 — Investigador', '6 — Leal', '7 — Entusiasta', '8 — Desafiador', '9 — Pacificador'];
-
-const VALORES6 = [
-  ['Econômico — utilidade', 'retorno, resultado prático, ROI'],
-  ['Político — poder', 'comando, prestígio, influência'],
-  ['Teórico — conhecimento', 'entender a fundo, verdade técnica'],
-  ['Estético — harmonia', 'beleza, forma, equilíbrio'],
-  ['Religioso — princípios', 'tradição e um sistema de vida'],
-  ['Social — altruísmo', 'ajudar o outro, causa social'],
-];
-const LIDERANCA = [
-  ['Executivo', 'comanda, impõe prazo, decide rápido'],
-  ['Motivador', 'envolve pelo diálogo, anima a equipe'],
-  ['Sistemático', 'analítico, exigente, detalhista'],
-  ['Metódico', 'paciente, ouve, busca consenso'],
-];
-
-// DISC natural x adaptado lado a lado — a diferença é o que o ambiente está te cobrando
-function blocoDisc(C, r) {
-  const c = el('<div style="margin-bottom:18px"></div>');
-  c.appendChild(el('<h4 style="margin:0 0 4px">DISC — natural e adaptado</h4>'));
-  c.appendChild(el(`<div style="font-size:11.5px;color:var(--suave);margin-bottom:8px">
-    <b>Natural</b> é como você é quando ninguém está pedindo nada. <b>Adaptado</b> é como você está se comportando
-    para atender o que sente que exigem de você. A distância entre os dois é o desgaste.</div>`));
-  C.disc = C.disc || {}; C.discAdaptado = C.discAdaptado || {};
-  DISC4.forEach(([nome, dica]) => {
-    const nat = +(C.disc[nome] || 0), ad = +(C.discAdaptado[nome] || 0);
-    const dif = ad - nat;
-    const linha = el(`<div style="padding:9px 0;border-bottom:1px solid var(--linha)">
-      <div style="display:flex;align-items:baseline;gap:8px">
-        <b style="font-size:13.5px;flex:1">${esc(nome)}</b>
-        <span style="font-size:11px;color:var(--suave)">natural</span>
-        <span style="font-variant-numeric:tabular-nums;font-weight:700;min-width:26px;text-align:right">${nat || '—'}</span>
-        <span style="font-size:11px;color:var(--suave);margin-left:8px">adaptado</span>
-        <span style="font-variant-numeric:tabular-nums;font-weight:700;min-width:26px;text-align:right">${ad || '—'}</span>
-        ${nat && ad && Math.abs(dif) >= 15 ? `<span class="chip" style="background:var(--areia-cl);color:var(--areia)">${dif > 0 ? '+' : ''}${dif}</span>` : ''}
-      </div>
-      <div style="font-size:11.5px;color:var(--suave);margin:1px 0 6px">${esc(dica)}</div>
-      <div style="position:relative;height:16px">
-        <div style="position:absolute;inset:0;background:var(--linha);border-radius:8px"></div>
-        <div style="position:absolute;left:0;top:0;height:7px;width:${nat}%;background:var(--verde);border-radius:8px"></div>
-        <div style="position:absolute;left:0;bottom:0;height:7px;width:${ad}%;background:var(--azul);border-radius:8px"></div>
-      </div>
-    </div>`);
-    c.appendChild(linha);
+/* Desenvolvimento: fontes preservadas, hipóteses revisáveis e evolução registrada. */
+function prepararDesenvolvimento(d){
+  if(!d.desenvolvimento||typeof d.desenvolvimento!=='object'||Array.isArray(d.desenvolvimento))d.desenvolvimento={};
+  const x=d.desenvolvimento;
+  for(const k of ['fontes','leituras','revisoes','reflexoes','validacoes'])if(!Array.isArray(x[k]))x[k]=[];
+  if(!x.rodaAtual||typeof x.rodaAtual!=='object'||Array.isArray(x.rodaAtual))x.rodaAtual=Object.fromEntries(Object.entries(d.roda||{}).filter(([,v])=>typeof v==='number'&&v>0&&v<=10));
+  return x;
+}
+function devDados(){return prepararDesenvolvimento(E)}
+function devAbaBloco(id){return ({'gu-roda':'avaliacao','gu-comport':'acervo','gu-pdi':'acao','gu-livros':'acao','gu-dash':'avaliacao'})[id]||'retrato'}
+function devURL(url){try{const u=new URL(url);return u.protocol==='https:'?u.href:''}catch{return ''}}
+function devData(f){return f.dataDocumento?fmtDataAno(f.dataDocumento):'Documento sem data'+(f.atualizadoEm?' · arquivo de '+fmtDataAno(f.atualizadoEm.slice(0,10)):'')}
+function devNotas(n){return Object.entries(n||{}).filter(([,v])=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=10)}
+function devComparar(a,b){return devNotas(a).map(([area,nota])=>({area,nota,anterior:typeof b?.[area]==='number'?b[area]:null,delta:typeof b?.[area]==='number'?nota-b[area]:null}))}
+function devSalvarRevisao(n,contexto,data){
+  const notas=Object.fromEntries(devNotas(n));if(!Object.keys(notas).length)throw new Error('Avalie pelo menos uma área.');
+  if(!data||data>hoje())throw new Error('Informe uma data até hoje.');
+  const d=devDados(),x={id:uid(),data,criadoEm:new Date().toISOString(),notas:structuredClone(notas),contexto:String(contexto||'')};d.revisoes.push(x);
+  const ultima=[...d.revisoes].sort((a,b)=>b.data.localeCompare(a.data)||b.criadoEm.localeCompare(a.criadoEm))[0];
+  d.rodaAtual=structuredClone(ultima.notas);E.roda=structuredClone(ultima.notas);salvar();return x;
+}
+function devValidar(l,status,nota=''){
+  if(!['A conferir','Reconheço','Quero trabalhar','Não me representa'].includes(status))throw new Error('Situação inválida.');
+  devDados().validacoes.push({id:uid(),leituraId:l.id,status,nota,data:hoje(),criadoEm:new Date().toISOString()});l.status=status;l.nota=nota;l.revistoEm=hoje();salvar();
+}
+function devCriarAcao(l){
+  let p=E.pdi.find(p=>p.leituraId===l.id&&p.status!=='Dominado');if(p)return p;
+  p={id:uid(),habilidade:l.titulo,area:l.area||'Pessoal',porque:l.texto,como:l.passo||'',medida:l.medida||'',ate:'',status:'A desenvolver',leituraId:l.id};E.pdi.push(p);salvar();return p;
+}
+function devFormulario(c,defs,obj,rotulo,gravar){
+  const form=el('<form class="dev-form"><div class="campos"></div><p role="alert" class="dev-erro" hidden></p></form>');
+  const controles={};for(const d of defs){const wrap=el('<div class="campo"></div>');if(d.full)wrap.style.gridColumn='1/-1';
+    const label=el('<label></label>');label.textContent=d.t;const inp=d.tipo==='textarea'?el('<textarea rows="3"></textarea>'):d.opcoes?el('<select></select>'):el('<input>');
+    if(d.opcoes)d.opcoes.forEach(v=>{const o=el('<option></option>');o.value=v;o.textContent=v;inp.appendChild(o)});else if(d.tipo!=='textarea')inp.type=d.tipo||'text';
+    inp.id=uid();inp.name=d.k;label.htmlFor=inp.id;inp.value=obj[d.k]??d.opcoes?.[0]??'';if(d.opcoes)[...inp.options].forEach(o=>o.selected=o.value===(obj[d.k]??d.opcoes[0]));inp.required=!!d.req;if(d.max)inp.max=d.max;if(d.ph)inp.placeholder=d.ph;
+    controles[d.k]=inp;wrap.append(label,inp);form.querySelector('.campos').appendChild(wrap);
+  }
+  const btn=el('<button type="submit" class="btn"></button>');btn.textContent=rotulo;form.appendChild(btn);
+  form.onsubmit=e=>{e.preventDefault();const v=Object.fromEntries(Object.entries(controles).map(([k,i])=>[k,String(i.value??'').trim()]));try{for(const d of defs)if(d.req&&!v[d.k])throw new Error('Preencha '+d.t.toLowerCase()+'.');gravar(v)}catch(err){const p=form.querySelector('[role=alert]');p.textContent=err.message;p.hidden=false}};
+  c.appendChild(form);return form;
+}
+function devModalRevisao(){
+  abrirModal('Como estou hoje','Uma nova avaliação fica guardada no histórico.',(c,fechar)=>{
+    const notas=structuredClone(devDados().rodaAtual),body=el('<div class="secao"></div>');
+    body.appendChild(el('<p class="workspace-note">De 0 (muito insatisfeito) a 10 (muito satisfeito). Deixe em branco o que não quer avaliar.</p>'));
+    const grid=el('<div class="dev-rating-grid"></div>');CFG('areasRoda').forEach(area=>{const row=el('<label class="dev-rating"></label>');const n=el('<span></span>');n.textContent=area;const s=el('<select><option value="">Não avaliar</option>'+Array.from({length:11},(_,i)=>'<option value="'+i+'">'+i+' / 10</option>').join('')+'</select>');s.setAttribute('aria-label','Nota para '+area);s.value=notas[area]??'';s.onchange=()=>{if(s.value==='')delete notas[area];else notas[area]=+s.value};row.append(n,s);grid.appendChild(row)});body.appendChild(grid);
+    devFormulario(body,[{k:'data',t:'Data da avaliação',tipo:'date',req:true,max:hoje()},{k:'contexto',t:'O que explica este momento?',tipo:'textarea',full:true}],{data:hoje()},'Guardar avaliação',v=>{devSalvarRevisao(notas,v.contexto,v.data);fechar()});c.appendChild(body);
   });
-  c.appendChild(el(`<div style="font-size:11.5px;color:var(--suave);padding-top:8px">
-    <span style="display:inline-block;width:10px;height:7px;background:var(--verde);border-radius:4px"></span> natural &nbsp;
-    <span style="display:inline-block;width:10px;height:7px;background:var(--azul);border-radius:4px"></span> adaptado</div>`));
-  // o desgaste, dito em português
-  const difs = DISC4.map(([n]) => ({ n, d: (+(C.discAdaptado[n] || 0)) - (+(C.disc[n] || 0)) }))
-    .filter(x => Math.abs(x.d) >= 15).sort((a, b) => Math.abs(b.d) - Math.abs(a.d));
-  if (difs.length) c.appendChild(el(`<div class="aviso" style="margin:12px 0 0">⚖️ <b>Onde você está se forçando:</b>
-    ${difs.map(x => esc(x.n.split(' — ')[1] || x.n) + (x.d > 0 ? ' bem <b>acima</b>' : ' bem <b>abaixo</b>') + ' do natural (' + (x.d > 0 ? '+' : '') + x.d + ')').join('; ')}.
-    Manter isso por muito tempo cansa — vale ver se é o momento ou se virou rotina.</div>`));
-  return c;
 }
-
-// barra de nota 0–100 que se preenche ao clicar/arrastar
-function escalaNota(titulo, dica, valor, aoMudar) {
-  const v = Math.max(0, Math.min(100, +valor || 0));
-  const cor = v >= 70 ? 'var(--verde)' : v >= 40 ? 'var(--azul)' : v > 0 ? 'var(--areia)' : 'var(--suave)';
-  const w = el(`<div style="padding:9px 0;border-bottom:1px solid var(--linha)">
-    <div style="display:flex;align-items:baseline;gap:8px">
-      <b style="font-size:13.5px;flex:1">${esc(titulo)}</b>
-      <span style="font-variant-numeric:tabular-nums;font-weight:700;font-size:14px;color:${cor}">${v || '—'}</span>
-    </div>
-    <div style="font-size:11.5px;color:var(--suave);margin:1px 0 6px">${esc(dica)}</div>
-    <input type="range" aria-label="${esc(titulo)}" min="0" max="100" step="5" value="${v}" style="width:100%;accent-color:${cor}">
-  </div>`);
-  const inp = w.querySelector('input');
-  inp.addEventListener('input', () => {
-    w.querySelector('span').textContent = inp.value;
-    const c2 = +inp.value >= 70 ? 'var(--verde)' : +inp.value >= 40 ? 'var(--azul)' : +inp.value > 0 ? 'var(--areia)' : 'var(--suave)';
-    w.querySelector('span').style.color = c2; inp.style.accentColor = c2;
-  });
-  inp.addEventListener('change', () => aoMudar(+inp.value));
-  return w;
+function devModalReflexao(){abrirModal('Registrar aprendizado','Uma situação concreta ajuda a entender seu jeito de agir.',(c,fechar)=>{const b=el('<div class="secao"></div>');devFormulario(b,[{k:'titulo',t:'O que aconteceu?',req:true,full:true},{k:'data',t:'Data',tipo:'date',req:true,max:hoje()},{k:'tipo',t:'Tipo de registro',opcoes:['Reflexão','Feedback recebido','Conquista']},{k:'contexto',t:'Situação e minha reação',tipo:'textarea',full:true},{k:'aprendizado',t:'O que aprendi sobre mim',tipo:'textarea',full:true},{k:'proximoPasso',t:'O que vou experimentar diferente',tipo:'textarea',full:true}],{data:hoje(),tipo:'Reflexão'},'Guardar no histórico',v=>{if(v.data>hoje())throw new Error('Use uma data até hoje.');devDados().reflexoes.push({id:uid(),...v});salvar();fechar()});c.appendChild(b)})}
+function devModalLeitura(l){abrirModal(esc(l.titulo),l.tipo||'Leitura dos registros',(c,fechar)=>{const b=el('<div class="secao dev-reading"></div>');b.appendChild(el('<p>'+esc(l.texto)+'</p>'));
+  if(l.pergunta)b.appendChild(el('<p class="dev-question">'+esc(l.pergunta)+'</p>'));
+  b.appendChild(devFontesLinks(l.fontes));devFormulario(b,[{k:'status',t:'Isso me representa hoje?',opcoes:['A conferir','Reconheço','Quero trabalhar','Não me representa']},{k:'nota',t:'Meu exemplo ou correção',tipo:'textarea',full:true}],l,'Guardar minha percepção',v=>{devValidar(l,v.status,v.nota);fechar()});c.appendChild(b);
+})}
+function devModalAcao(p){abrirModal(p?'Editar desenvolvimento':'Novo desenvolvimento','Defina a prática e como vai perceber o avanço.',(c,fechar)=>{const b=el('<div class="secao"></div>');devFormulario(b,[{k:'habilidade',t:'O que quero desenvolver',req:true,full:true},{k:'area',t:'Área',opcoes:CFG('areasPDI')},{k:'status',t:'Situação',opcoes:['A desenvolver','Praticando','Dominado']},{k:'como',t:'Próximo passo concreto',tipo:'textarea',full:true},{k:'medida',t:'Como vou perceber a evolução',tipo:'textarea',full:true},{k:'ate',t:'Data de revisão',tipo:'date'},{k:'porque',t:'Por que isso importa',tipo:'textarea',full:true}],p||{},'Salvar desenvolvimento',v=>{if(p)Object.assign(p,v);else E.pdi.push({id:uid(),...v});salvar();fechar()});c.appendChild(b)})}
+function devModalFonte(){abrirModal('Adicionar fonte','Guarde a referência de um relatório, feedback ou documento.',(c,fechar)=>{const b=el('<div class="secao"></div>');devFormulario(b,[{k:'titulo',t:'Nome do documento',req:true,full:true},{k:'tipo',t:'Tipo',opcoes:['Relatório','Plano pessoal','Análise interpretativa','Referência pessoal']},{k:'dataDocumento',t:'Data do documento',tipo:'date',max:hoje()},{k:'url',t:'Link do original (opcional)',tipo:'url',full:true},{k:'resumo',t:'O que este documento registra',tipo:'textarea',full:true},{k:'limites',t:'O que ainda preciso conferir',tipo:'textarea',full:true}],{},'Guardar fonte',v=>{if(v.url&&!devURL(v.url))throw new Error('Use um link HTTPS válido.');if(v.dataDocumento>hoje())throw new Error('Use uma data até hoje.');devDados().fontes.push({id:uid(),...v,importadoEm:new Date().toISOString(),origem:'Cadastro manual'});salvar();fechar()});c.appendChild(b)})}
+function devFontesLinks(ids){const w=el('<div class="dev-sources-links"></div>');(ids||[]).forEach(id=>{const f=devDados().fontes.find(f=>f.id===id);if(!f)return;const u=devURL(f.url);const a=el(u?'<a target="_blank" rel="noopener noreferrer"></a>':'<span></span>');if(u)a.href=u;a.textContent=f.titulo;w.appendChild(a)});return w}
+function devPainelRoda(){
+  const d=devDados(),c=el('<div class="corpo"></div>'),notas=devNotas(d.rodaAtual);
+  c.appendChild(el('<p class="workspace-note">Sua satisfação neste momento. As notas são pessoais e não medem sua personalidade.</p>'));
+  const grid=el('<div class="dev-rating-grid"></div>');CFG('areasRoda').forEach(a=>{const v=d.rodaAtual[a];grid.appendChild(el('<div class="dev-rating"><span>'+esc(a)+'</span><b>'+(typeof v==='number'?v+' / 10':'Não avaliada')+'</b></div>'))});c.appendChild(grid);
+  if(notas.length)c.appendChild(el('<p class="workspace-note">'+notas.length+' de '+CFG('areasRoda').length+' áreas avaliadas. Escolha o que faz sentido priorizar para você.</p>'));
+  c.appendChild(acao('Fazer nova avaliação',devModalRevisao));return c;
 }
-
-function blocoEscalas(titulo, lista, obj, chave, r) {
-  const c = el('<div style="margin-bottom:18px"></div>');
-  c.appendChild(el(`<h4 style="margin:0 0 4px">${titulo}</h4>`));
-  obj[chave] = obj[chave] || {};
-  lista.forEach(([nome, dica]) => c.appendChild(
-    escalaNota(nome, dica, obj[chave][nome], v => { obj[chave][nome] = v; salvar(); r() })));
-  // quem ficou mais alto explica o comportamento no dia a dia
-  const ord = lista.map(([n]) => ({ n, v: +(obj[chave][n] || 0) })).filter(x => x.v).sort((a, b) => b.v - a.v);
-  if (ord.length >= 2) c.appendChild(el(`<div style="font-size:12.5px;color:var(--suave);padding-top:9px">
-    Predominante: <b style="color:var(--tinta)">${esc(ord[0].n)}</b> (${ord[0].v})${ord[1].v >= ord[0].v - 15
-      ? ' com <b style="color:var(--tinta)">' + esc(ord[1].n) + '</b> (' + ord[1].v + ') logo atrás — é uma combinação, não um rótulo só.'
-      : ', bem à frente do segundo.'}</div>`));
-  return c;
+function devPainelLegado(){
+  const c=el('<div class="corpo"></div>');c.appendChild(el('<p class="workspace-note">Cadastro anterior preservado para consulta. As notas sem instrumento e data de aplicação não são apresentadas como teste medido.</p>'));
+  const C=E.comportamento||{};
+  for(const [k,t] of [['fonteLaudo','Origem informada anteriormente'],['comoDecido','Como eu decido'],['oQueMeMove','O que me move'],['comoMeRecarrego','Como eu recarrego'],['comoMeAjudar','Como me ajudar'],['meusPontosCegos','Pontos para reflexão']])if(C[k])c.appendChild(el('<h3>'+t+'</h3><p>'+esc(C[k])+'</p>'));
+  const det=el('<details class="workspace-editor"><summary>Consultar números e referências anteriores</summary></details>');
+  for(const k of ['disc','discAdaptado','big5','temperamentos','valores','lideranca'])if(C[k]&&Object.keys(C[k]).length)det.appendChild(el('<h4>'+({disc:'DISC natural',discAdaptado:'DISC adaptado',big5:'Big Five — origem a conferir',temperamentos:'Temperamentos — origem a conferir',valores:'Valores',lideranca:'Liderança'})[k]+'</h4><p>'+Object.entries(C[k]).map(([a,b])=>esc(a)+': '+esc(b)).join(' · ')+'</p>'));
+  if(C.numerologia)det.appendChild(el('<h4>Referências simbólicas pessoais</h4><p>'+esc(C.numerologia)+'</p>'));c.appendChild(det);return c;
 }
+function organizarDesenvolvimento(host){
+  const d=devDados(),blocos=[...host.querySelectorAll(':scope > [data-bid]')];host.querySelector('.workspace-heading')?.remove();
+  const titulo=el('<div class="dev-title"><div><h2>Meu desenvolvimento</h2><p>Meu retrato, minha evolução e o que quero desenvolver.</p></div></div>');titulo.appendChild(acao('+ Registrar aprendizado',devModalReflexao,'ghost'));host.prepend(titulo);
+  const nav=el('<nav class="dev-nav" aria-label="Meu desenvolvimento"></nav>'),panes={};
+  const seleciona=id=>{if(!panes[id])id='retrato';Object.entries(panes).forEach(([k,p])=>{p.hidden=k!==id;nav.querySelector('[data-dev="'+k+'"]').setAttribute('aria-pressed',String(k===id))});filtro.devAba=id};
+  for(const [id,nome] of [['retrato','Meu retrato'],['acao','Plano de ação'],['acervo','Histórico e fontes'],['avaliacao','Autoavaliação']]){const b=acao(nome,()=>seleciona(id),'ghost');b.dataset.dev=id;b.id='dev-nav-'+id;b.setAttribute('aria-controls','dev-'+id);nav.appendChild(b);const p=el('<section class="dev-pane" id="dev-'+id+'" aria-labelledby="'+b.id+'"></section>');panes[id]=p}
+  host.appendChild(nav);Object.values(panes).forEach(p=>host.appendChild(p));blocos.forEach(b=>panes[devAbaBloco(b.dataset.bid)].appendChild(b));
+  const retrato=panes.retrato,relatorios=d.fontes.filter(f=>f.tipo==='Relatório'),ult=[...relatorios].filter(f=>f.dataDocumento).sort((a,b)=>b.dataDocumento.localeCompare(a.dataDocumento))[0];
+  const hero=el('<div class="dev-hero"><div><span class="workspace-eyebrow">O QUE OS REGISTROS MOSTRAM</span><h3>'+esc(d.titulo||'Seu retrato começa com histórias reais.')+'</h3><p>'+esc(d.sintese||'Reúna uma avaliação, registre um feedback ou conte uma situação que ajudou você a se conhecer melhor.')+'</p></div><aside><span>Última avaliação documentada</span><b>'+(ult?devData(ult):'Ainda não cadastrada')+'</b><small>'+esc(ult?ult.titulo:'Você pode começar com uma reflexão.')+'</small></aside></div>');retrato.appendChild(hero);if(ult)hero.querySelector('aside').appendChild(acao('Ver avaliação original',()=>{seleciona('acervo');const item=[...host.querySelectorAll('[data-fonte]')].find(e=>e.dataset.fonte===ult.id);if(item){item.open=true;item.scrollIntoView({block:'start',behavior:'smooth'})}},'ghost'));
+  if(d.ultimaConsultaDrive)retrato.appendChild(el('<p class="dev-sync">Consulta ao Drive: '+fmtDataAno(d.ultimaConsultaDrive.slice(0,10))+' · '+d.fontes.filter(f=>f.revisado).length+' documentos lidos'+(d.fontes.some(f=>f.pendente)?' · há conteúdo pendente no acervo':'')+'</p>'));
+  const grid=el('<div class="dev-insights"></div>');retrato.appendChild(grid);
+  d.leituras.filter(l=>l.status!=='Não me representa').forEach(l=>{const card=el('<article class="workspace-card dev-insight"><span class="dev-tag">'+esc(l.tipo||'Síntese')+' · '+esc(l.area||'Pessoal')+'</span><h3>'+esc(l.titulo)+'</h3><p>'+esc(l.texto)+'</p></article>');card.appendChild(devFontesLinks(l.fontes));const a=el('<div class="dev-card-actions"></div>');a.appendChild(acao(l.status&&l.status!=='A conferir'?l.status:'Conferir comigo',()=>devModalLeitura(l),'ghost'));if(l.passo)a.appendChild(acao('Levar ao plano',()=>{devModalAcao(devCriarAcao(l))},'ghost'));card.appendChild(a);grid.appendChild(card)});
+  if(!d.leituras.length){const v=el('<div class="workspace-empty"><h3>Traga contexto para seu desenvolvimento.</h3><p>Uma nota isolada não explica sua história. Registre uma situação ou adicione um relatório para organizar a leitura.</p></div>');v.appendChild(acao('Adicionar fonte',devModalFonte));grid.appendChild(v)}
+  const proximos=el('<div class="workspace-card dev-next"><h3>O que acompanhar agora</h3></div>');
+  const ps=E.pdi.filter(x=>x.habilidade&&x.status!=='Dominado').sort((a,b)=>(a.ate||'9999').localeCompare(b.ate||'9999')).slice(0,3);
+  ps.forEach(p=>{const b=el('<button class="workspace-row"><span><b>'+esc(p.habilidade)+'</b><small>'+esc(p.como||'Definir o próximo passo')+'</small></span><span>→</span></button>');b.onclick=()=>devModalAcao(p);proximos.appendChild(b)});
+  if(!ps.length)proximos.appendChild(el('<p class="workspace-note">Escolha uma das leituras acima para experimentar na rotina. Depois registre o que aconteceu.</p>'));retrato.appendChild(proximos);
+  // Plano de ação mantém IDs e conteúdo antigos, com leitura em cartões.
+  const pdi=panes.acao.querySelector('[data-bid="gu-pdi"]');if(pdi){const body=pdi.querySelector('.conteudo');body.replaceChildren();const top=el('<div class="corpo dev-pdi"></div>');top.appendChild(acao('+ Desenvolvimento',()=>devModalAcao()));
+    const validos=E.pdi.filter(x=>x.habilidade||x.como||x.porque);validos.sort((a,b)=>(a.status==='Dominado')-(b.status==='Dominado')||(a.ate||'9999').localeCompare(b.ate||'9999')).forEach(p=>{const b=el('<button class="workspace-row"><span><b>'+esc(p.habilidade||'Desenvolvimento sem título')+'</b><small>'+esc(p.como||'Defina o próximo passo')+'</small><small>'+esc(p.medida||'Defina como perceber o avanço')+'</small></span><span>'+esc(p.status||'A desenvolver')+(p.ate?'<small>'+fmtDataAno(p.ate)+'</small>':'')+'</span></button>');b.onclick=()=>devModalAcao(p);top.appendChild(b)});if(!validos.length)top.appendChild(el('<p class="vazio">Seu próximo avanço pode começar pequeno: uma habilidade, uma prática e uma data de revisão.</p>'));const vazios=E.pdi.filter(x=>!validos.includes(x));if(vazios.length){const b=acao(vazios.length+' cadastro(s) sem título — completar',()=>devModalAcao(vazios[0]),'ghost');top.appendChild(b)}body.appendChild(top);abrirSecaoWorkspace(pdi)}
+  // Acervo mostra a cronologia da fonte sem chamar data de atualização de nova avaliação.
+  const acervo=panes.acervo,atop=el('<div class="dev-acervo-top"><h3>Histórico e fontes</h3></div>');atop.appendChild(acao('+ Adicionar fonte',devModalFonte,'ghost'));const folder=devURL(d.pastaDrive);if(folder){const a=el('<a class="btn ghost mini" target="_blank" rel="noopener noreferrer">Abrir pasta no Drive ↗</a>');a.href=folder;atop.appendChild(a)}acervo.prepend(atop);
+  const hist=el('<div class="dev-timeline"></div>');atop.after(hist);
+  const entries=[...d.fontes.map(f=>({kind:'fonte',data:f.dataDocumento||f.atualizadoEm?.slice(0,10)||'',x:f})),...d.reflexoes.map(x=>({kind:'reflexao',data:x.data,x})),...d.validacoes.map(x=>({kind:'validacao',data:x.data,x}))].sort((a,b)=>b.data.localeCompare(a.data));
+  entries.forEach(({kind,x})=>{const item=el('<details class="dev-history-item"></details>');if(kind==='fonte'){item.dataset.fonte=x.id;
+    const s=el('<summary><span><b>'+esc(x.titulo)+'</b><small>'+esc(x.tipo||'Documento')+' · '+devData(x)+(x.pendente?' · Pendente de leitura':'')+'</small></span><span aria-hidden="true">+</span></summary>');item.appendChild(s);item.appendChild(el('<div class="dev-history-body"><p>'+esc(x.resumo||'Resumo ainda não registrado.')+'</p><p class="workspace-note">'+esc(x.limites||'Confira o contexto e a data antes de aplicar à sua vida atual.')+'</p>'+(x.atualizadoEm?'<small>Arquivo atualizado no Drive em '+fmtDataAno(x.atualizadoEm.slice(0,10))+'. Essa não é necessariamente a data da avaliação.</small>':'')+'</div>'));const body=item.querySelector('.dev-history-body');body.appendChild(devFontesLinks([x.id]));if(x.disc)body.appendChild(devDiscDocumento(x));
+  }else if(kind==='reflexao'){item.appendChild(el('<summary><span><b>'+esc(x.titulo)+'</b><small>'+fmtDataAno(x.data)+' · '+esc(x.tipo)+'</small></span><span aria-hidden="true">+</span></summary><div class="dev-history-body"><p>'+esc(x.contexto)+'</p><h4>Aprendizado</h4><p>'+esc(x.aprendizado||'Não informado')+'</p><h4>Próximo passo</h4><p>'+esc(x.proximoPasso||'Não informado')+'</p></div>'));
+  }else{const l=d.leituras.find(l=>l.id===x.leituraId);item.appendChild(el('<summary><span><b>'+esc(l?.titulo||'Percepção registrada')+'</b><small>'+fmtDataAno(x.data)+' · '+esc(x.status)+'</small></span><span aria-hidden="true">+</span></summary><div class="dev-history-body"><p>'+esc(x.nota||'Sem observação adicional')+'</p></div>'))}hist.appendChild(item)});
+  if(d.leituras.length){const percep=el('<details class="workspace-editor"><summary>Revisar minhas percepções</summary></details>');d.leituras.forEach(l=>{const b=el('<button class="workspace-row"><span><b>'+esc(l.titulo)+'</b><small>'+esc(l.status||'A conferir')+'</small></span><span>→</span></button>');b.onclick=()=>devModalLeitura(l);percep.appendChild(b)});hist.appendChild(percep)}
+  if(!entries.length)hist.appendChild(el('<p class="vazio">Suas fontes, reflexões e revisões aparecerão aqui em ordem de data.</p>'));
+  const avaliacao=panes.avaliacao;avaliacao.querySelector('[data-bid="gu-dash"]')?.remove();const roda=avaliacao.querySelector('[data-bid="gu-roda"]');if(roda)abrirSecaoWorkspace(roda);
+  const h=el('<div class="workspace-card dev-wheel-history"><h3>Minha evolução por área</h3><p class="workspace-note">Comparação entre suas avaliações. Mudanças de contexto também podem mudar as notas.</p></div>');avaliacao.appendChild(h);
+  const revisoes=[...d.revisoes].sort((a,b)=>b.data.localeCompare(a.data)||String(b.criadoEm||'').localeCompare(String(a.criadoEm||'')));
+  if(!revisoes.length)h.appendChild(el('<p>Ainda não há avaliações datadas. Faça a primeira para começar seu histórico.</p>'));
+  revisoes.forEach((r,i)=>{const box=el('<details class="dev-history-item"><summary><span><b>'+fmtDataAno(r.data)+'</b><small>'+devNotas(r.notas).length+' áreas avaliadas</small></span><span aria-hidden="true">+</span></summary><div class="dev-history-body"></div></details>');if(i===0)box.open=true;const b=box.querySelector('.dev-history-body');if(r.contexto)b.appendChild(el('<p>'+esc(r.contexto)+'</p>'));devComparar(r.notas,revisoes[i+1]?.notas).forEach(x=>b.appendChild(el('<div class="dev-rating"><span>'+esc(x.area)+'</span><b>'+x.nota+' / 10 <small>'+(x.delta==null?'Sem comparação':x.delta===0?'Sem mudança':(x.delta>0?'+':'')+x.delta+' vs. anterior')+'</small></b></div>')));h.appendChild(box)});
+  seleciona(filtro.devAba||'retrato');
+}
+function devDiscDocumento(f){const c=el('<section class="dev-disc"><h4>DISC registrado no documento</h4><p class="workspace-note">Natural e adaptado são duas leituras da mesma aplicação. A diferença não comprova desgaste nem evolução ao longo do tempo.</p></section>');for(const k of ['D','I','S','C']){const a=f.disc.natural?.[k],b=f.disc.adaptado?.[k];if(!Number.isFinite(a)||!Number.isFinite(b))continue;const x=el('<div class="dev-disc-row"><b>'+k+'</b><div><span>Natural '+a+'</span><i style="width:'+Math.max(0,Math.min(100,a))+'%"></i><span>Adaptado '+b+'</span><i class="adaptado" style="width:'+Math.max(0,Math.min(100,b))+'%"></i></div></div>');c.appendChild(x)}return c}
 
 /* ===================== GUIA DE VIDA ===================== */
 const CAMINHOS={
@@ -8630,7 +8626,7 @@ function organizarGuia(m,atrasoRitual){
   const topo=m.querySelector('.topo');topo.appendChild(botoes[0]);painel.remove();
   m.querySelector(':scope > .grade')?.remove();m.querySelector('[data-bid="gu-sug"]')?.remove();
   const partes=[...m.querySelectorAll(':scope > [data-bid]')];
-  const gu=abasWorkspace(m,'guia',[['resumo','Visão geral'],['planos','Meus planos'],['familia','Família'],['cadastros','Cadastros'],['desenvolvimento','Desenvolvimento']],filtro.guiaAba||'resumo',v=>filtro.guiaAba=v);
+  const gu=abasWorkspace(m,'guia',[['resumo','Visão geral'],['planos','Meus planos'],['familia','Família'],['cadastros','Cadastros'],['desenvolvimento','Desenvolvimento']],filtro.guiaAba||'resumo',v=>{filtro.guiaAba=v;botoes[0].hidden=v==='desenvolvimento'});botoes[0].hidden=filtro.guiaAba==='desenvolvimento';
   m.querySelectorAll(':scope > .guia-aviso-bancos').forEach(a=>m.querySelector('[data-bid="gu-bancos"] .conteudo').prepend(a));
   const textos={planos:['Meus planos','Propósito, metas e planejamento pessoal de cada ano.'],familia:['Pessoas que importam','Relações, momentos e informações para cuidar da família.'],cadastros:['Empresas e contas','Uma base única, também usada no planejamento das empresas.'],desenvolvimento:['Meu desenvolvimento','Equilíbrio, habilidades e aprendizados para acompanhar.']};
   Object.entries(textos).forEach(([k,[t,s]])=>gu.paineis[k].appendChild(tituloWorkspace(t,s)));
@@ -8641,7 +8637,7 @@ function organizarGuia(m,atrasoRitual){
     const a=m.querySelector('[data-bid="'+resumo+'"]'),b=m.querySelector('[data-bid="'+ed+'"]');
     if(a&&b){const d=el('<details class="workspace-editor"><summary>'+rotulo+'</summary></details>');d.appendChild(b);a.querySelector('.conteudo').appendChild(d);abrirSecaoWorkspace(b)}
   }
-  for(const id of ['gu-metas','gu-pessoas','gu-empresas','gu-roda']){const b=m.querySelector('[data-bid="'+id+'"]');if(b)abrirSecaoWorkspace(b)}
+  for(const id of ['gu-metas','gu-pessoas','gu-empresas']){const b=m.querySelector('[data-bid="'+id+'"]');if(b)abrirSecaoWorkspace(b)}
   const resumo=gu.paineis.resumo,metas=E.metas.filter(x=>x.status!=='Concluída'),rituais=E.rituais.filter(x=>(atrasoRitual(x)??-1)>0);
   const ir=id=>{abreBloco(id);rr('guia')()};
   const hero=el(`<div class="workspace-hero"><div><span class="workspace-eyebrow">SEU ESPAÇO PESSOAL</span><h2>Mais clareza para o que importa.</h2><p>${esc(E.norte.proposito||'Organize seus objetivos, cuide das relações e acompanhe seus próximos passos.')}</p></div></div>`);
@@ -8657,6 +8653,7 @@ function organizarGuia(m,atrasoRitual){
   [['Família e momentos',rituais.length?rituais.length+' ritual(is) para retomar':'Pessoas, rituais e ideias para viver juntos',()=>ir('gu-pessoas')],['Documentos','Arquivos e vencimentos da família',()=>irTela('documentos')],['Planejamento das empresas','Planos anuais a partir de 2027',()=>irTela('estrategia')]].forEach(([t,s,fn])=>{
     const b=el(`<button class="workspace-row"><span><b>${t}</b><small>${s}</small></span><span aria-hidden="true">→</span></button>`);b.onclick=fn;rel.appendChild(b)});
   col.appendChild(rel);resumo.appendChild(col);
+  organizarDesenvolvimento(gu.paineis.desenvolvimento);
 }
 
 function vGuia(m) {
@@ -8710,25 +8707,7 @@ function vGuia(m) {
     m.appendChild(bloco('gu-norte', '🧭 Meu norte', 'escreva uma vez, revise uma vez por ano — depois ele fica fixo aqui em cima', nc));
   }
 
-  /* ---- 2. RODA DA VIDA ---- */
-  const rc = el('<div class="corpo"></div>');
-  const grade = el('<div style="display:grid;gap:9px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))"></div>');
-  AR.forEach((a, i) => {
-    const v = notas[i];
-    const cor = v >= 8 ? 'var(--verde)' : v >= 5 ? 'var(--areia)' : v > 0 ? 'var(--vermelho)' : 'var(--suave)';
-    const it = el(`<div style="background:var(--bg);border:1px solid var(--linha);border-radius:11px;padding:10px 12px">
-      <div style="display:flex;align-items:baseline;gap:8px"><b style="font-size:13.5px">${esc(a)}</b>
-        <span style="margin-left:auto;font-family:Fraunces,serif;font-size:17px;color:${cor}">${v || '—'}</span></div>
-      <div class="barra" style="margin-top:7px"><i style="width:${v * 10}%;background:${cor}"></i></div>
-      <input type="range" aria-label="${esc(a)}" min="0" max="10" step="1" value="${v}" style="width:100%;margin-top:7px;accent-color:var(--verde)"></div>`);
-    it.querySelector('input').onchange = e => { E.roda[a] = +e.target.value; salvar(); r() };
-    grade.appendChild(it);
-  });
-  rc.appendChild(grade);
-  if (media > 0) rc.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin-top:11px">
-    Média geral <b style="color:var(--tinta)">${media.toFixed(1)}</b>.
-    ${pior ? `A área mais baixa é <b>${esc(pior.a)}</b> (${notas[pior.i]}) — se for para escolher uma meta agora, comece por ela.` : ''}</p>`));
-  m.appendChild(bloco('gu-roda', '⚖️ Roda da vida', 'dê uma nota de 0 a 10 para cada área — leva 1 minuto', rc));
+  m.appendChild(bloco('gu-roda','Como estou hoje','Satisfação por área, com histórico preservado',devPainelRoda()));
 
   /* ---- 3. METAS por horizonte ---- */
   const HOR = CFG('horizonteMeta');
@@ -8970,53 +8949,7 @@ function vGuia(m) {
     ], () => ({ ano: anoPlan, area: CFG('areasMeta')[0], oque: '', medida: '', ate: '', status: 'Ideia' }), r,
     '', E.planoAno));
 
-  /* ---- 9. COMO EU FUNCIONO ---- */
-  const C = E.comportamento;
-  const cf = el('<div class="corpo"></div>');
-  cf.appendChild(el('<div style="font-size:12.5px;color:var(--suave);margin-bottom:14px">Dê a sua nota em cada escala — arraste. Não existe nota certa: o valor está em ver a combinação.</div>'));
-  cf.appendChild(blocoEscalas('Temperamentos', TEMPERAMENTOS, C, 'temperamentos', r));
-  cf.appendChild(blocoDisc(C, r));
-  cf.appendChild(blocoEscalas('Big Five', BIG5, C, 'big5', r));
-  cf.appendChild(blocoEscalas('Hierarquia de valores', VALORES6, C, 'valores', r));
-  cf.appendChild(blocoEscalas('Estilo de liderança', LIDERANCA, C, 'lideranca', r));
-
-  // o que dá para escolher, virou escolha
-  const cesc = el('<div style="margin-bottom:6px"></div>');
-  cesc.appendChild(el('<h4 style="margin:0 0 4px">Em poucas palavras</h4>'));
-  cesc.appendChild(campos(C, [
-    { k: 'eneagramaTipo', t: 'Eneagrama', tipo: 'select', opcoes: ENEAGRAMA },
-    { k: 'tipoJung', t: 'Tipo psicológico (Jung)', ph: 'ex.: ENT' },
-    { k: 'tracoPrincipal', t: 'Traço principal', ph: 'do laudo' },
-    { k: 'motivadorPrincipal', t: 'Motivador principal', ph: 'do laudo' },
-    { k: 'motivadorSecundario', t: 'Motivador secundário', ph: 'do laudo' },
-    { k: 'comoDecido', t: 'Como eu decido', tipo: 'select', opcoes: ['', ...CFG('comoDecido')] },
-    { k: 'oQueMeMove', t: 'O que mais me move', tipo: 'select', opcoes: ['', ...CFG('oQueMeMove')] },
-    { k: 'comoMeRecarrego', t: 'Como eu recarrego', tipo: 'select', opcoes: ['', ...CFG('comoRecarrego')] },
-  ], () => salvar()));
-  cf.appendChild(cesc);
-
-  // o que só faz sentido escrito
-  cf.appendChild(el('<h4 style="margin:16px 0 4px">Do meu jeito</h4>'));
-  cf.appendChild(campos(C, [
-    { k: 'medos', t: '😰 Meus medos — o que me trava por baixo', tipo: 'textarea', full: true, ph: 'do laudo ou do que você reconhece em si' },
-    { k: 'meusPontosCegos', t: '⚠️ Meus pontos cegos — onde eu erro sempre', tipo: 'textarea', full: true, ph: 'o que as pessoas próximas já te falaram mais de uma vez' },
-    { k: 'comoMeAjudar', t: 'Como me ajudar — mostre para quem convive com você', tipo: 'textarea', full: true, ph: 'ex.: me traga o número antes da opinião; não me interrompa de manhã' },
-    { k: 'numerologia', t: 'Numerologia e outros mapas', tipo: 'textarea', full: true },
-    { k: 'fonteLaudo', t: 'De onde vieram estes números', tipo: 'textarea', full: true, ph: 'qual laudo, quem aplicou, quando' },
-  ], () => salvar()));
-
-  // leitura do conjunto, para não virar um monte de número solto
-  const alto = (obj, lista) => lista.map(([x]) => ({ x, v: +((obj || {})[x] || 0) })).filter(y => y.v).sort((a, b) => b.v - a.v)[0];
-  const aT = alto(C.temperamentos, TEMPERAMENTOS), aD = alto(C.disc, DISC4), aB = alto(C.big5, BIG5);
-  const aV = alto(C.valores, VALORES6), aL = alto(C.lideranca, LIDERANCA);
-  if (aV || aL) cf.appendChild(el(`<div style="font-size:12.5px;color:var(--suave);margin-top:14px">
-    ${aV ? 'Seu valor mais forte é <b style="color:var(--tinta)">' + esc(aV.x.split(' — ')[1] || aV.x) + '</b> (' + aV.v + ').' : ''}
-    ${aL ? ' Você lidera no estilo <b style="color:var(--tinta)">' + esc(aL.x) + '</b> (' + aL.v + ').' : ''}</div>`));
-  if (aT || aD || aB) cf.appendChild(el(`<div class="aviso" style="margin:16px 0 0">🧠 <b>Seu retrato em uma linha:</b>
-    ${[aT && aT.x, aD && aD.x.split(' — ')[1], aB && aB.x.toLowerCase(), C.eneagramaTipo && 'eneagrama ' + C.eneagramaTipo.split(' — ')[0]]
-      .filter(Boolean).join(' · ')}.
-    ${C.meusPontosCegos ? 'Releia seus pontos cegos antes de decidir algo grande.' : 'Falta escrever seus pontos cegos — é a parte que mais serve.'}</div>`));
-  m.appendChild(bloco('gu-comport', '🧠 Como eu funciono', 'seu manual de instruções — releia quando estiver decidindo algo grande', cf));
+  m.appendChild(bloco('gu-comport','Meu cadastro anterior','Informações preservadas para consulta',devPainelLegado()));
 
   /* ---- 10. PDI ---- */
   const pdiAb = E.pdi.filter(x => x.status !== 'Dominado').length;
@@ -9674,6 +9607,7 @@ function validarBackup(j){
   for(const [col,camposLista] of Object.entries(listasInternas))for(const x of j[col]||[])for(const k of camposLista){
     if(x[k]!==undefined&&(!Array.isArray(x[k])||x[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))throw new Error('Lista inválida: '+col+'.'+k);
   }
+  if(j.desenvolvimento)for(const k of ['fontes','leituras','revisoes','reflexoes','validacoes'])if(j.desenvolvimento[k]!==undefined&&(!Array.isArray(j.desenvolvimento[k])||j.desenvolvimento[k].some(x=>!x||typeof x!=='object'||Array.isArray(x))))throw new Error('Lista inválida: desenvolvimento.'+k);
   const chavesPlano=new Set();
   for(const p of j.planejamentoEmpresas||[]){
     if(!p.id||!p.empresaId||!Number.isInteger(p.ano)||p.ano<2027||p.ano>2200)throw new Error('Empresa ou ano inválido no planejamento.');
