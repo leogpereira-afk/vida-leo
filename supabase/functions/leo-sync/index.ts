@@ -317,16 +317,19 @@ Deno.serve(async (req: Request) => {
       const balde = sb.storage.from("leo-arquivos");
 
       if (acao === "arqListar") {
-        // sem `refs` = o índice inteiro (a tela precisa saber quem tem anexo)
-        let q = sb.from("leo_arquivos").select("id, ref, nome, tipo, tam, em");
         const refs = Array.isArray(corpo.refs) ? corpo.refs.map(String) : null;
-        if (refs) {
-          if (!refs.length) return json({ arquivos: [] });
-          q = q.in("ref", refs);
+        if (refs && !refs.length) return json({ arquivos: [] });
+        const arquivos: Record<string, unknown>[] = [];
+        for (let de = 0; ; de += 1000) {
+          let q = sb.from("leo_arquivos").select("id, ref, nome, tipo, tam, em");
+          if (refs) q = q.in("ref", refs);
+          const { data, error } = await q.order("criado_em", { ascending: true })
+            .order("id", { ascending: true }).range(de, de + 999);
+          if (error) return json({ erro: error.message }, 500);
+          arquivos.push(...(data ?? []));
+          if (!data || data.length < 1000) break;
         }
-        const { data, error } = await q.order("criado_em", { ascending: true });
-        if (error) return json({ erro: error.message }, 500);
-        return json({ arquivos: data ?? [] });
+        return json({ arquivos });
       }
 
       if (acao === "arqSubirUrl") {
@@ -376,9 +379,13 @@ Deno.serve(async (req: Request) => {
       // último a cair, e o erro dele é reportado.
       const id = String(corpo.id ?? "").trim();
       if (!id) return json({ erro: "sem id" }, 400);
-      const { data: reg } = await sb.from("leo_arquivos")
+      const { data: reg, error: leituraErro } = await sb.from("leo_arquivos")
         .select("caminho").eq("id", id).maybeSingle();
-      if (reg?.caminho) await balde.remove([reg.caminho]);
+      if (leituraErro) return json({ erro: leituraErro.message }, 500);
+      if (reg?.caminho) {
+        const { error: remocaoErro } = await balde.remove([reg.caminho]);
+        if (remocaoErro) return json({ erro: remocaoErro.message }, 500);
+      }
       const { error } = await sb.from("leo_arquivos").delete().eq("id", id);
       if (error) return json({ erro: error.message }, 500);
       return json({ ok: true });
@@ -434,14 +441,15 @@ Deno.serve(async (req: Request) => {
 
   if (req.method === "PUT") {
     const { dados, base } = await req.json().catch(() => ({}));
-    if (!dados || typeof dados !== "object") return json({ erro: "dados ausentes" }, 400);
+    if (!dados || typeof dados !== "object" || Array.isArray(dados) || !Array.isArray(dados.viagens)) return json({ erro: "estado inválido" }, 400);
     // Gravação CONDICIONAL (compare-and-swap): o cliente diz qual versão do
     // servidor ele viu ("base"); só gravamos se ela ainda for a atual. Isso
     // fecha a corrida de dois lados salvando quase juntos E corta os clientes
     // antigos (sem "base"), que eram exatamente os que atropelavam correções.
     if (base === undefined || base === null)
       return json({ erro: "cliente desatualizado — recarregue a página" }, 428);
-    const mt = Date.now();
+    if (!Number.isSafeInteger(base) || base < 0) return json({ erro: "base inválida" }, 400);
+    const mt = Math.max(Date.now(), base + 1);
     const atual = await sb.from("leo_estado").select("mt").eq("id", true).maybeSingle();
     if (atual.error) return json({ erro: atual.error.message }, 500);
     if (!atual.data) {
@@ -449,7 +457,7 @@ Deno.serve(async (req: Request) => {
       if (Number(base) !== 0) return json({ erro: "conflito", mt: 0 }, 409);
       const { error } = await sb.from("leo_estado").insert(
         { id: true, mt, dados, atualizado_em: new Date().toISOString() });
-      if (error) return json({ erro: error.message }, 500);
+      if (error) return json({ erro: error.message }, error.code === "23505" ? 409 : 500);
       return json({ mt });
     }
     const { data, error } = await sb.from("leo_estado")

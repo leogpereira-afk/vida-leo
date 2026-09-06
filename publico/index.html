@@ -410,6 +410,7 @@ async function arqAdd(ref,file){
 async function arqDel(id){
   const local=await arqPorLocal(id);
   const idx=await arqIndice();
+  if(naNuvem()&&!idx)throw new Error('não foi possível conferir o índice remoto');
   const estaNaNuvem=idx&&[...idx.values()].some(l=>l.some(x=>x.id===id));
   // Nem no aparelho nem no índice que eu consegui ler: quase sempre é o índice
   // que não chegou. Repintar como se tivesse apagado seria mentira.
@@ -738,9 +739,16 @@ function carregar(){
   // configurações: garante que toda lista exista mesmo em backup antigo
   d.config={...structuredClone(SEED.config),...(d.config||{})};
   for(const k in SEED.config) if(!Array.isArray(d.config[k])||!d.config[k].length) d.config[k]=[...SEED.config[k]];
+  // Versões antigas usaram a lista de tipos de capital para cadastrar bancos.
+  // Recupera a separação sem trocar a classificação de nenhum lançamento.
+  const capital=['Dinheiro','Cheque','Permuta','Dívida'];
+  if(!d.config.tiposConta.some(t=>capital.includes(t))&&d.config.tiposConta.every(t=>SEED.config.tiposContaBanco.includes(t))){
+    d.config.tiposContaBanco=[...new Set([...d.config.tiposContaBanco,...d.config.tiposConta])];
+    d.config.tiposConta=[...capital];
+  }
   return d;
 }
-const salvar=()=>{E._mt=Date.now();localStorage.setItem(CHAVE,JSON.stringify(E));agendaPush()};
+const salvar=()=>{E._mt=Math.max(Date.now(),(+E._mt||0)+1);localStorage.setItem(CHAVE,JSON.stringify(E));agendaPush()};
 
 /* ---------------- visual ---------------- */
 const CORES_STATUS={'Realizado':['var(--verde-cl)','var(--verde)'],'Confirmado':['var(--azul-cl)','var(--azul)'],
@@ -1067,11 +1075,12 @@ function campos(obj,defs,aoMudar){
    mais alcança — não sobra ficha apontando para eles. */
 async function apagarAnexosDe(ref){
   try{
+    if(naNuvem()&&!await arqIndice())throw new Error('não foi possível conferir os anexos na nuvem');
     const todos = await arqPor(ref);
     for (const x of todos) await arqDel(x.id);
     return true;
   }catch(e){ alert('Não consegui apagar os anexos no servidor: '+(e.message||e)+
-    '\n\nNada foi apagado. Tente de novo quando a conexão voltar.'); return false }
+    '\n\nO registro foi preservado. Alguns anexos podem já ter sido removidos; confira antes de tentar novamente.'); return false }
 }
 
 /* área de arquivos de um registro */
@@ -1087,17 +1096,18 @@ function areaArquivos(ref,dica){
     catch(e){ lista.innerHTML='<div style="color:var(--suave);font-size:12.5px">Não consegui ler os anexos.</div>';return }
     lista.innerHTML=as.length?'':'<div style="color:var(--suave);font-size:12.5px">Nenhum arquivo ainda.</div>';
     as.forEach(a=>{
+      const podeVisualizar=/^(application\/pdf|image\/(png|jpeg|webp|gif|bmp))$/i.test(a.tipo||'');
       const it=el(`<div class="arq"><span>${/pdf/.test(a.tipo)?'📄':/image/.test(a.tipo)?'🖼️':'📎'}</span>
         <span class="nome">${esc(a.nome)}</span><span class="tam">${tamanho(a.tam)}</span>
         ${a.pendente?'<span class="tam" title="ainda não subiu — sobe sozinho quando houver internet">⏳ neste aparelho</span>':''}
-        <a href="#" class="abrir">abrir</a>
+        ${podeVisualizar?'<a href="#" class="abrir">abrir</a>':''}
         <a href="#" class="baixar">baixar</a>
         <button class="lixo">✕</button></div>`);
       // A janela é aberta ANTES do await: depois de uma espera o navegador
       // trata window.open como pop-up e bloqueia.
-      it.querySelector('.abrir').onclick=async e=>{
+      if(podeVisualizar)it.querySelector('.abrir').onclick=async e=>{
         e.preventDefault();
-        const j=window.open('','_blank');
+        const j=window.open('','_blank');if(j)j.opener=null;
         try{ const u=await arqUrlDe(a.id,false); if(j)j.location=u; else location.href=u }
         catch(err){ if(j)j.close(); alert('Não consegui abrir: '+(err.message||err)) }
       };
@@ -1109,8 +1119,9 @@ function areaArquivos(ref,dica){
         catch(err){ alert('Não consegui baixar: '+(err.message||err)) }
       };
       it.querySelector('.lixo').onclick=async()=>{
+        if(!confirm('Apagar o arquivo '+a.nome+'?'))return;
         try{ await arqDel(a.id);pintar() }
-        catch(err){ alert('Não consegui apagar no servidor: '+(err.message||err)+'\nO anexo continua lá.') }
+        catch(err){ alert('Não consegui apagar no servidor: '+(err.message||err)+'\nConfira a lista antes de tentar novamente.') }
       };
       lista.appendChild(it);
     });
@@ -2733,11 +2744,11 @@ function semaforo(x) {
   const m = MARCADORES.find(y => y[0] === x.exame);
   const v = parseFloat(String(x.valor).replace(',', '.'));
   if (!m || isNaN(v)) return x.resultado === 'Alterado' ? 'ruim' : x.resultado === 'Atenção' ? 'atencao' : x.resultado === 'Normal' ? 'ok' : '';
-  if (m[4](v)) return 'ruim';          // fora até do laudo do laboratório
-  if (m[5] && m[5](v)) return 'atencao'; // o laudo diz normal, mas ainda não é o alvo
+  if (m[4](v)) return 'ruim';          // fora da referência cadastrada no painel
+  if (m[5] && m[5](v)) return 'atencao'; // dentro da referência cadastrada, fora do alvo do painel
   return 'ok';
 }
-// "Alterado" = fora até do laudo, procurar médico. "Fora do alvo" = o laudo diz normal, mas dá para melhorar.
+// As faixas do painel são referências cadastradas; o laudo e a avaliação clínica são independentes.
 const CHIP_SEM = { ok: ['var(--verde-cl)', 'var(--verde)', 'No alvo'], atencao: ['var(--areia-cl)', 'var(--areia)', 'Fora do alvo'], ruim: ['var(--vermelho-cl)', 'var(--vermelho)', 'Alterado'] };
 
 let abaSaude='resumo';
@@ -3039,8 +3050,8 @@ function modalExame(x) {
       const sem = semaforo(x), cc = CHIP_SEM[sem];
       alvo.innerHTML = mk
         ? `<h4>Referência</h4><div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px">
-             <div><div style="color:var(--suave);font-size:11.5px">Laboratório diz normal</div><b>${esc(mk[2])} ${esc(mk[1])}</b></div>
-             <div><div style="color:var(--suave);font-size:11.5px">Alvo para viver mais</div><b style="color:var(--verde)">${esc(mk[3])} ${esc(mk[1])}</b></div>
+             <div><div style="color:var(--suave);font-size:11.5px">Referência cadastrada</div><b>${esc(mk[2])} ${esc(mk[1])}</b></div>
+             <div><div style="color:var(--suave);font-size:11.5px">Alvo cadastrado</div><b style="color:var(--verde)">${esc(mk[3])} ${esc(mk[1])}</b></div>
              ${cc ? `<div><div style="color:var(--suave);font-size:11.5px">Sua situação</div><span class="chip" style="background:${cc[0]};color:${cc[1]}">${cc[2]}</span></div>` : ''}
            </div>`
         : `<h4>Referência</h4><p style="font-size:12.5px;color:var(--suave)">Escolha um marcador da lista para eu mostrar a faixa normal e o alvo ótimo.</p>`;
@@ -3358,7 +3369,8 @@ async function fmCustos(obraId){
    Negativo = dinheiro que saiu; positivo = que voltou. Devolve % ao ano,
    ou null quando não há resposta (tudo saiu e nada voltou, ou vice-versa). */
 function tirAnual(fluxos){
-  const fs=fluxos.filter(f=>f.v&&f.d).map(f=>({t:new Date(f.d+'T12:00').getTime(),v:f.v}));
+  if(fluxos.some(f=>!dataISOValida(f.d)||!Number.isFinite(Number(f.v))))return null;
+  const fs=fluxos.filter(f=>Number(f.v)&&f.d).map(f=>({t:new Date(f.d+'T12:00').getTime(),v:Number(f.v)}));
   if(fs.length<2||!fs.some(f=>f.v<0)||!fs.some(f=>f.v>0))return null;
   const t0=Math.min(...fs.map(f=>f.t));
   // tudo no mesmo dia: não existe "ao ano" — a bisseção despencaria para −100%
@@ -3426,10 +3438,10 @@ function contasObra(o,r){
      comprovante. Ele sai do custo da obra e entra como dedução da venda —
      nunca nos dois. O campo digitado na ficha só vale quando NÃO existe
      lançamento vinculado (senão seria o mesmo dinheiro duas vezes). */
-  let impostoLanc=0,comissaoLanc=0;
+  let impostoLanc=0,comissaoLanc=0,temImpostoLanc=false,temComissaoLanc=false;
   if(r)for(const [k,v] of Object.entries(r.centros||{})){
-    if(ehImpostoVenda(k))impostoLanc+=v.total;
-    else if(ehComissaoVenda(k))comissaoLanc+=v.total;
+    if(ehImpostoVenda(k)){impostoLanc+=Number(v.total)||0;temImpostoLanc=true;}
+    else if(ehComissaoVenda(k)){comissaoLanc+=Number(v.total)||0;temComissaoLanc=true;}
   }
   /* SEM RESUMO NÃO HÁ CONTA. Quando o servidor não responde, `r` vem null e
      o custo virava 0 — e o lucro, "venda inteira", em verde. Zero que na
@@ -3439,8 +3451,8 @@ function contasObra(o,r){
   const custo=((r&&r.total)||0)-impostoLanc-comissaoLanc;
   const aporte=E.obraAportes.filter(x=>x.obra===o.id).reduce((s,x)=>s+(+x.valor||0),0);
   const venda=+o.vendaValor||0;
-  const imposto=impostoLanc||(+o.impostoValor||0);
-  const comissao=comissaoLanc||(+o.comissaoValor||0);
+  const imposto=temImpostoLanc?impostoLanc:(+o.impostoValor||0);
+  const comissao=temComissaoLanc?comissaoLanc:(+o.comissaoValor||0);
   const outras=+o.outrasDeducoes||0;
   const liquido=venda-imposto-comissao-outras;
   const podeLucro=!!venda&&!semDados;      // sem custo conhecido não existe lucro
@@ -4324,33 +4336,40 @@ async function fichaObraEm(c,o,fechar){
    os dois caminhos estão cobertos: deflate via DecompressionStream, que é
    do próprio navegador. Nenhuma biblioteca externa. */
 async function lerZipAuto(u8){
-  const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);
+  const limite=64*1024*1024;
+  if(u8.length>limite)throw new Error('arquivo maior que 64 MB');
+  const dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength),dec=new TextDecoder();
+  const exige=(pos,tam)=>{if(pos<0||pos+tam>u8.length)throw new Error('arquivo ZIP incompleto');};
   let fim=-1;
-  for(let i=u8.length-22;i>=0&&i>u8.length-65558;i--)
-    if(dv.getUint32(i,true)===0x06054b50){fim=i;break}
+  for(let i=u8.length-22;i>=0&&i>=u8.length-65557;i--)if(dv.getUint32(i,true)===0x06054b50){fim=i;break}
   if(fim<0)throw new Error('não parece um arquivo .xlsx');
-  const n=dv.getUint16(fim+10,true);let off=dv.getUint32(fim+16,true);
-  const out={};
+  const n=dv.getUint16(fim+10,true);let off=dv.getUint32(fim+16,true),total=0;
+  if(n===65535||dv.getUint16(fim+4,true)!==0)throw new Error('formato ZIP64 ou dividido não suportado');
+  const out=Object.create(null);
   for(let e=0;e<n;e++){
-    if(dv.getUint32(off,true)!==0x02014b50)break;
-    const metodo=dv.getUint16(off+10,true);
-    const tamComp=dv.getUint32(off+20,true);
-    const nomeLen=dv.getUint16(off+28,true),extraLen=dv.getUint16(off+30,true),comLen=dv.getUint16(off+32,true);
-    const local=dv.getUint32(off+42,true);
-    const nome=new TextDecoder().decode(u8.subarray(off+46,off+46+nomeLen));
-    const ln=dv.getUint16(local+26,true),le=dv.getUint16(local+28,true);
-    const ini=local+30+ln+le;
-    const bruto=u8.subarray(ini,ini+tamComp);
-    if(metodo===0)out[nome]=bruto;
-    else if(metodo===8){
-      const ds=new DecompressionStream('deflate-raw');
-      const r=new Response(new Blob([bruto]).stream().pipeThrough(ds));
-      out[nome]=new Uint8Array(await r.arrayBuffer());
+    exige(off,46);if(dv.getUint32(off,true)!==0x02014b50)throw new Error('índice ZIP inválido');
+    const flags=dv.getUint16(off+8,true),metodo=dv.getUint16(off+10,true),crc=dv.getUint32(off+16,true);
+    const tamComp=dv.getUint32(off+20,true),tam=dv.getUint32(off+24,true);
+    const nomeLen=dv.getUint16(off+28,true),extraLen=dv.getUint16(off+30,true),comLen=dv.getUint16(off+32,true),local=dv.getUint32(off+42,true);
+    exige(off,46+nomeLen+extraLen+comLen);const nome=dec.decode(u8.subarray(off+46,off+46+nomeLen));off+=46+nomeLen+extraLen+comLen;
+    if(flags&1)throw new Error('planilha protegida por senha: salve uma cópia sem senha');
+    if(metodo!==0&&metodo!==8)throw new Error('compressão ZIP não suportada');
+    if(tam>limite-total)throw new Error('planilha descompactada maior que 64 MB');
+    exige(local,30);if(dv.getUint32(local,true)!==0x04034b50)throw new Error('entrada ZIP inválida');
+    const ini=local+30+dv.getUint16(local+26,true)+dv.getUint16(local+28,true);exige(ini,tamComp);
+    const bruto=u8.subarray(ini,ini+tamComp);let dados=bruto;
+    if(metodo===8){
+      const reader=new Blob([bruto]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+      const partes=[];let tamanho=0;
+      try{while(true){const {done,value}=await reader.read();if(done)break;tamanho+=value.length;if(tamanho>tam||tamanho>limite-total){await reader.cancel();throw new Error('tamanho descompactado inválido');}partes.push(value);}}finally{reader.releaseLock();}
+      dados=new Uint8Array(tamanho);let p=0;for(const parte of partes){dados.set(parte,p);p+=parte.length;}
     }
-    off+=46+nomeLen+extraLen+comLen;
+    if(dados.length!==tam||crc32(dados)!==crc)throw new Error('arquivo corrompido: '+nome);
+    total+=dados.length;if(Object.hasOwn(out,nome))throw new Error('entrada ZIP duplicada: '+nome);out[nome]=dados;
   }
   return out;
 }
+
 function linhasDoXlsx(zip){
   const dec=b=>new TextDecoder().decode(b);
   // strings compartilhadas (Excel salva assim; o export do ERP não usa)
@@ -4368,8 +4387,8 @@ function linhasDoXlsx(zip){
        padrão não fechava ali e ia varrendo até o próximo </c> — engolindo as
        células seguintes e colocando o valor de uma coluna na outra, calado.
        A alternância abaixo aceita as duas formas. */
-    for(const mc of mr[1].matchAll(/<c r="([A-Z]+)\d+"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)){
-      const col=mc[1],attrs=mc[2],corpo=mc[3]||'';
+    for(const mc of mr[1].matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)){
+      const attrs=mc[1],corpo=mc[2]||'',col=(attrs.match(/\br="([A-Z]+)\d+"/)||[])[1];if(!col)continue;
       let v='';
       const t=(attrs.match(/t="(\w+)"/)||[])[1]||'';
       if(t==='inlineStr'){v=[...corpo.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(x=>x[1]).join('')}
@@ -4383,12 +4402,20 @@ function linhasDoXlsx(zip){
 }
 const colLetra=i=>{let s2='';i++;while(i>0){s2=String.fromCharCode(65+(i-1)%26)+s2;i=Math.floor((i-1)/26)}return s2};
 /* data do ERP vem "23/02/2022"; salvo pelo Excel pode virar número de série */
+function numeroPlanilha(v){
+  let t=String(v??'').trim().replace(/R\$|\s/g,'');if(!t)return null;
+  if(t.includes(','))t=t.replace(/\./g,'').replace(',','.');
+  if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(t))return null;
+  const n=Number(t);return Number.isFinite(n)?n:null;
+}
+function dataISOValida(v){return typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v+'T12:00:00Z'))&&new Date(v+'T12:00:00Z').toISOString().slice(0,10)===v;}
 function dataPlan(v){
-  const t=String(v||'').trim();
-  let m=t.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); if(m)return m[3]+'-'+m[2]+'-'+m[1];
-  m=t.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m)return m[0].slice(0,10);
-  const n=+t; if(n>25569&&n<73050)return new Date(Math.round((n-25569)*86400000)).toISOString().slice(0,10);
-  return '';
+  const t=String(v??'').trim();let iso='';
+  const m=t.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(m)iso=m[3]+'-'+m[2]+'-'+m[1];
+  else if(/^\d{4}-\d{2}-\d{2}(?:T|$)/.test(t))iso=t.slice(0,10);
+  else {const n=Number(t);if(n>25569&&n<73050)iso=new Date(Math.floor(n-25569)*86400000).toISOString().slice(0,10);}
+  return dataISOValida(iso)?iso:'';
 }
 
 function blocoImportarObra(){
@@ -4424,7 +4451,13 @@ function blocoImportarObra(){
         throw new Error('cancelado — o arquivo não tem todas as colunas');
       const g=c=>cab[c]||null;
       const pega=(l,c)=>{const k=g(c);return k?String(l[k]??'').trim():''};
-      const num=v=>{const x=+String(v).replace(',','.');return isNaN(x)?0:x};
+      const num=v=>{if(!String(v??'').trim())return 0;const n=numeroPlanilha(v);if(n===null)throw new Error('valor de parcela inválido: '+String(v));return n};
+
+      // Valida o arquivo inteiro antes de criar obras ou enviar qualquer lote.
+      for(const l of linhas.slice(1))if(pega(l,'ID Parcela')){
+        num(pega(l,'Valor parcela'));
+        const data=pega(l,'Data de competência');if(data&&!dataPlan(data))throw new Error('data inválida na parcela '+pega(l,'ID Parcela'));
+      }
 
       /* O SINAL IMPORTA. No export do ERP, despesa vem NEGATIVA; um estorno
          (devolução) vem POSITIVO. Math.abs transformaria a devolução em custo
@@ -4474,11 +4507,12 @@ function blocoImportarObra(){
           if(ehAporte){
             /* APORTE NÃO É CUSTO NEM VENDA: vira linha de aporte na ficha.
                A identidade do ERP fica guardada para reimportar sem duplicar. */
-            if(!E.obraAportes.some(x=>x.erp===id)){
-              E.obraAportes.push({id:uid(),erp:id,obra:o.id,data:dataPlan(pega(l,'Data de competência')),
-                quem:pega(l,'Cliente')||pega(l,'Nome').replace(/^aporte\s*/i,''),valor:Math.abs(valor),obs:'do ERP'});
-              aportesTot++;
-            }
+            const existente=E.obraAportes.find(x=>x.erp===id);
+            const dados={erp:id,obra:o.id,data:dataPlan(pega(l,'Data de competência')),
+              quem:pega(l,'Cliente')||pega(l,'Nome').replace(/^aporte\s*/i,''),valor:Math.abs(valor)};
+            if(existente)Object.assign(existente,dados);
+            else E.obraAportes.push({id:uid(),...dados,obs:'do ERP'});
+            aportesTot++;
             continue;
           }
           if(tipo==='Receita'){receitas.push({obra:o.nome,nome:pega(l,'Nome'),valor});continue}
@@ -4494,6 +4528,8 @@ function blocoImportarObra(){
             E.config.centrosObra.push(centro);
           }
         }
+        // A ficha precisa existir na nuvem antes dos custos que apontam para ela.
+        salvar();if(!await enviarNuvem())throw new Error('a ficha da obra não foi sincronizada; confira a conexão antes de reenviar o arquivo');
         st.textContent='Gravando '+o.nome+' ('+lote.length+' lançamentos)…';
         for(let i=0;i<lote.length;i+=1000){
           const d2=await apiSync('POST',{acao:'obraCustosGravar',linhas:lote.slice(i,i+1000)});
@@ -4505,7 +4541,7 @@ function blocoImportarObra(){
       st.textContent='';
       alert('Pronto.\n\n'+
         '· '+custosTot+' lançamentos de custo gravados no servidor\n'+
-        '· '+aportesTot+' aportes levados para a ficha\n'+
+        '· '+aportesTot+' aportes criados ou atualizados na ficha\n'+
         (criadas?'· '+criadas+' obra(s) criada(s): confira área (m²) e status na ficha\n':'')+
         (receitas.length?'\n⚠️ '+receitas.length+' RECEITAS que não são aporte vieram no arquivo (ex.: "'+receitas[0].nome+'"). Receita de venda não entra no custo: lance a venda na ficha da obra.':''));
       tela();
@@ -4540,7 +4576,7 @@ function contasVGV(){
   const dinheiro=porTipo('Dinheiro'), cheque=porTipo('Cheque');
   const permuta=porTipo('Permuta'), divida=porTipo('Dívida');
   const totalContas=E.contas.reduce((s2,x)=>s2+cxN(x.valor),0);
-  const semTipo=E.contas.filter(x=>!CFG('tiposConta').includes(x.tipo||'')).reduce((s2,x)=>s2+cxN(x.valor),0);
+  const semTipo=E.contas.filter(x=>!['Dinheiro','Cheque','Permuta','Dívida'].includes(x.tipo||'')).reduce((s2,x)=>s2+cxN(x.valor),0);
   const vgv=E.empreend.reduce((s2,x)=>s2+cxN(x.vgv),0);
   const aporteResidual=E.empreend.reduce((s2,x)=>s2+cxN(x.aporteResidual),0);
   const aporteTotal=E.empreend.reduce((s2,x)=>s2+cxN(x.aporteTotal),0);
@@ -4859,8 +4895,8 @@ function celulasDaAba(zip,caminho){
   const cel={};
   const xml=zip[caminho]; if(!xml)return cel;
   // mesma armadilha da célula autofechada — ver o comentário em linhasDoXlsx
-  for(const mc of dec(xml).matchAll(/<c r="([A-Z]+\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)){
-    const end=mc[1],attrs=mc[2],corpo=mc[3]||'';
+  for(const mc of dec(xml).matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)){
+    const attrs=mc[1],corpo=mc[2]||'',end=(attrs.match(/\br="([A-Z]+\d+)"/)||[])[1];if(!end)continue;
     const t=(attrs.match(/t="(\w+)"/)||[])[1]||'';
     let v='';
     if(t==='inlineStr')v=[...corpo.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(x=>x[1]).join('');
@@ -4880,14 +4916,14 @@ async function importarPatrimonial(f,r){
     if(!nLanc)throw new Error('não achei a aba "Lançamentos". Abas neste arquivo: '+Object.keys(abas).join(', '));
     const L=celulasDaAba(zip,abas[nLanc]);
     const C=nCasas?celulasDaAba(zip,abas[nCasas]):{};
-    const num=v=>{let t=String(v??'').trim().replace(/R\$|\s/g,'');if(t.includes(','))t=t.replace(/\./g,'').replace(',','.');const x=Number(t);return Number.isFinite(x)?x:0};
+    const num=v=>numeroPlanilha(v)??0;
     const txt=v=>String(v??'').trim();
 
     /* As duas metades da aba Lançamentos são listas INDEPENDENTES: A-G são
        empreendimentos, H-J são contas. Percorrer as duas separadamente é o que
        impede o erro que a própria documentação da planilha adverte. */
     const empreend=[],contas=[];
-    const ultima=Math.max(2,...Object.keys(L).map(k=>Number(k.match(/\d+$/)?.[0])||0));
+    const ultima=Object.keys(L).reduce((maior,k)=>Math.max(maior,Number(k.match(/\d+$/)?.[0])||0),2);
     for(let i=2;i<=ultima;i++){
       const nome=txt(L['A'+i]);
       const vals=[num(L['D'+i]),num(L['E'+i]),num(L['F'+i]),num(L['G'+i])];
@@ -4895,7 +4931,9 @@ async function importarPatrimonial(f,r){
         empreend.push({id:uid(),nome,ano:txt(L['B'+i]),mes:txt(L['C'+i]),
           vgv:vals[0],aporteResidual:vals[1],aporteTotal:vals[2],previsao:vals[3],obs:['D','E','F','G'].filter(col=>txt(L[col+i])&&!num(L[col+i])&&/[a-záéíóú]/i.test(txt(L[col+i]))).map(col=>col+i+': '+txt(L[col+i])).join('; ')});
       const cn=txt(L['H'+i]), cv=num(L['I'+i]), ct=txt(L['J'+i]);
-      if(cn||cv||ct)contas.push({id:uid(),nome:cn,valor:cv,tipo:ct,atualizacao:Number(L['K'+i])>0?new Date(Date.UTC(1899,11,30)+Number(L['K'+i])*86400000).toISOString().slice(0,10):''});
+      if(txt(L['I'+i])&&numeroPlanilha(L['I'+i])===null)throw new Error('valor inválido na célula I'+i);
+      if(txt(L['K'+i])&&(cn||cv||ct)&&!dataPlan(L['K'+i]))throw new Error('data inválida na célula K'+i);
+      if(cn||cv||ct)contas.push({id:uid(),nome:cn,valor:cv,tipo:ct,atualizacao:dataPlan(L['K'+i])});
     }
     // Casas: nome+aporte na linha 1, restante na 2, VGV na 3 — sete colunas
     const casas=[];
@@ -4909,10 +4947,10 @@ async function importarPatrimonial(f,r){
         aporte,restante:num(C[col+'2']),vgv:num(C[col+'3'])});
     }
     // Reservas líquidas: descrição em C, valor em D, a partir da linha 8
-    const reservas=[];
-    for(let i=6;i<=60;i++){
+    const reservas=[],ultimaReserva=Object.keys(C).reduce((n,k)=>Math.max(n,Number(k.match(/\d+$/)?.[0])||0),8);
+    for(let i=8;i<=ultimaReserva;i++){
       const n2=txt(C['C'+i]), v2=num(C['D'+i]);
-      if(n2&&v2)reservas.push({id:uid(),nome:n2,valor:v2});
+      if(n2&&txt(C['D'+i])!==''&&numeroPlanilha(C['D'+i])!==null)reservas.push({id:uid(),nome:n2,valor:v2});
     }
     if(!empreend.length&&!contas.length)throw new Error('a aba Lançamentos veio vazia');
 
@@ -6773,30 +6811,27 @@ function abrirSistema(sis){
    histórico VIVO — em cada ANO que tem lançamento, quem manda é a soma dos
    lançamentos; anos sem lançamento seguem com o valor da planilha. A planilha
    original continua acessível em _raw, que é o que a Conferência compara. */
-let _hvCache=null,_hvMt=-2;
+let _hvCache=null,_hvMt=-2,_hvEstado=null;
 function histVivo(){
   const R=E.rendHist||{};
-  if(_hvMt===E._mt&&_hvCache) return _hvCache;
-  const L=E.rendimentos||[];
-  const anosLanc=[...new Set(L.map(x=>+String(x.data||'').slice(0,4)).filter(Boolean))];
-  const temL={};anosLanc.forEach(a=>temL[a]=true);
-  const anos=[...new Set([...(R.anos||[]),...anosLanc])].filter(Boolean).sort((a,b)=>a-b);
-  const iR=a=>(R.anos||[]).indexOf(a);
-  const somaAno=a=>L.filter(x=>String(x.data||'').startsWith(a)).reduce((s2,x)=>s2+(+x.valor||0),0);
-  const totalAno=anos.map(a=>temL[a]?somaAno(a):(iR(a)>=0?(R.totalAno[iR(a)]||0):0));
-  const nomes=[...new Set([...Object.keys(R.empresas||{}),...L.map(x=>x.empresa)])].filter(Boolean);
-  const empresas={};
-  nomes.forEach(nm=>{empresas[nm]=anos.map(a=>temL[a]
-    ? L.filter(x=>String(x.data||'').startsWith(a)&&x.empresa===nm).reduce((s2,x)=>s2+(+x.valor||0),0)
-    : (iR(a)>=0?(((R.empresas||{})[nm]||[])[iR(a)]||0):0))});
-  const totalGeral=totalAno.reduce((s2,v)=>s2+v,0);
-  const parciais=R.parciais||R.incompletos||[];
-  const completos=anos.filter(a=>!parciais.includes(a));
-  _hvCache={...R,anos,totalAno,empresas,totalGeral,parciais,
-    mediaAnual:completos.length?anos.reduce((s2,a,i)=>s2+(parciais.includes(a)?0:totalAno[i]),0)/completos.length:0,
-    _raw:R};
-  _hvMt=E._mt;
-  return _hvCache;
+  if(_hvEstado===E&&_hvMt===E._mt&&_hvCache)return _hvCache;
+  const numero=v=>Number.isFinite(Number(v))?Number(v):0;
+  const anosBase=(R.anos||[]).map(Number),indiceBase=new Map(anosBase.map((a,i)=>[a,i]));
+  const porAno=new Map(),porEmpresa=new Map();
+  // Uma passagem pelos lançamentos substitui uma varredura para cada empresa/ano.
+  for(const x of E.rendimentos||[]){
+    const a=Number(String(x.data||'').slice(0,4));if(!Number.isInteger(a)||a<1000||a>9999)continue;
+    const v=numero(x.valor);porAno.set(a,(porAno.get(a)||0)+v);
+    if(x.empresa){if(!porEmpresa.has(x.empresa))porEmpresa.set(x.empresa,new Map());const ea=porEmpresa.get(x.empresa);ea.set(a,(ea.get(a)||0)+v);}
+  }
+  const anos=[...new Set([...anosBase,...porAno.keys()])].filter(a=>Number.isInteger(a)&&a>0).sort((a,b)=>a-b);
+  const totalAno=anos.map(a=>porAno.has(a)?porAno.get(a):numero(R.totalAno?.[indiceBase.get(a)]));
+  const empresas=Object.create(null);
+  for(const nm of new Set([...Object.keys(R.empresas||{}),...porEmpresa.keys()]))
+    empresas[nm]=anos.map(a=>porAno.has(a)?(porEmpresa.get(nm)?.get(a)||0):numero(R.empresas?.[nm]?.[indiceBase.get(a)]));
+  const totalGeral=totalAno.reduce((s,v)=>s+v,0),parciais=(R.parciais||R.incompletos||[]).map(Number),completos=anos.filter(a=>!parciais.includes(a));
+  _hvCache={...R,anos,totalAno,empresas,totalGeral,parciais,mediaAnual:completos.length?anos.reduce((s,a,i)=>s+(parciais.includes(a)?0:totalAno[i]),0)/completos.length:0,_raw:R};
+  _hvEstado=E;_hvMt=E._mt;return _hvCache;
 }
 
 function vRendimentos(m){
@@ -9161,23 +9196,30 @@ function contarUso(chave,valor){
 }
 function conferirCadastros(estado){
   const problemas=[];
-  const datas=['data','ida','volta','inicio','fim','prazo','validade','proximo','proxima','renova'];
-  const dataValida=v=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;const d=new Date(v+'T12:00');return !isNaN(d)&&dataLocal(d)===v};
-  Object.entries(estado).forEach(([col,lista])=>{
-    if(!Array.isArray(lista))return;
-    const ids=new Set();
-    lista.forEach((x,i)=>{
-      if(!x||typeof x!=='object'||Array.isArray(x))return;
-      const nome=x.nome||x.titulo||x.oque||x.evento||x.exame||x.vacina||x.item||'Registro '+(i+1);
-      const add=texto=>problemas.push({col,ref:x,nome,texto});
-      if(x.id){if(ids.has(x.id))add('Identificador repetido nesta lista.');ids.add(x.id)}
-      datas.forEach(k=>{if(x[k]&&!dataValida(String(x[k])))add('Data inválida no campo '+k+'.')});
-      [['ida','volta'],['inicio','fim']].forEach(([a,b])=>{if(x[a]&&x[b]&&dataValida(String(x[a]))&&dataValida(String(x[b]))&&x[b]<x[a])add('A data final é anterior à inicial.')});
-      if(x.valor!==undefined&&x.valor!==''&&!Number.isFinite(Number(x.valor)))add('Valor não reconhecido como número.');
-    });
-  });
+  const datas=new Set(['data','ida','volta','inicio','fim','prazo','validade','proximo','proxima','renova','atualizacao','entrada','saida','nascimento','vendaData','recebidoEm','ate','emissao']);
+  const numeros=new Set(['valor','vgv','aporte','aporteResidual','aporteTotal','previsao','restante','falta','vendaValor','impostoValor','comissaoValor','outrasDeducoes','area','areaTerreno','gastos','peso','sis','dia','pulso','cintura']);
+  function visitar(obj,col,ref,caminho){
+    if(!obj||typeof obj!=='object')return;
+    if(Array.isArray(obj)){
+      const ids=new Set();obj.forEach((x,i)=>{
+        const raiz=ref||x,path=caminho+'['+(i+1)+']';
+        if(x&&typeof x==='object'&&!Array.isArray(x)&&x.id){if(ids.has(x.id))add(col,raiz,path,'Identificador repetido nesta lista.');ids.add(x.id)}
+        visitar(x,col,raiz,path);
+      });return;
+    }
+    for(const [k,v] of Object.entries(obj)){
+      if(datas.has(k)&&v!==''&&v!=null&&!dataISOValida(v))add(col,ref||obj,caminho+'.'+k,'Data inválida no campo '+k+'.');
+      // Exames aceitam resultado textual e decimal com vírgula; não são valores monetários.
+      if(numeros.has(k)&&!(col==='exames'&&k==='valor')&&!(k==='area'&&col!=='obras')&&v!==''&&v!=null&&(typeof v==='object'||typeof v==='boolean'||!Number.isFinite(Number(v))))add(col,ref||obj,caminho+'.'+k,'Valor não reconhecido como número no campo '+k+'.');
+      if(v&&typeof v==='object')visitar(v,col,ref||obj,caminho+'.'+k);
+    }
+    for(const [a,b] of [['ida','volta'],['inicio','fim'],['entrada','saida'],['data','ate']])if(dataISOValida(obj[a])&&dataISOValida(obj[b])&&obj[b]<obj[a])add(col,ref||obj,caminho,'A data final é anterior à inicial.');
+  }
+  function add(col,ref,caminho,texto){const nome=ref?.nome||ref?.titulo||ref?.oque||ref?.evento||ref?.exame||ref?.vacina||ref?.item||caminho;problemas.push({col,ref,nome,texto,caminho});}
+  for(const [col,valor] of Object.entries(estado||{}))if(valor&&typeof valor==='object'&&col!=='rendHist'&&col!=='config'&&col!=='colapso')visitar(valor,col,null,col);
   return problemas;
 }
+
 function blocoConferenciaCadastros(){
   const lista=conferirCadastros(E),cx=el('<div class="corpo"></div>');
   cx.appendChild(el('<p class="google-nota">Confere identificadores repetidos, datas e valores dos cadastros. Nada é alterado automaticamente. Esta checagem não verifica arquivos, contas externas nem a exatidão das informações.</p>'));
@@ -9422,8 +9464,7 @@ async function vConfig(m){
     const b1=el('<button class="btn ghost">⬇ Baixar (JSON)</button>');
     b1.onclick=()=>baixar(new Blob([JSON.stringify(desc.dados,null,1)],{type:'application/json'}),'central-leo-descartado.json');
     const b2=el('<button class="btn ghost" style="color:var(--vermelho)">Restaurar por cima</button>');
-    b2.onclick=()=>{if(!confirm('Substituir os dados atuais deste aparelho pela versão descartada? A próxima sincronização tenta gravá-la no servidor.'))return;
-      localStorage.setItem(CHAVE,JSON.stringify(desc.dados));E=carregar();salvar();tela()};
+    b2.onclick=()=>restaurarBackup({text:async()=>JSON.stringify(desc.dados)});
     bb.appendChild(b1);bb.appendChild(b2);dx.appendChild(bb);
   }
   m.appendChild(bloco('cf-descartado','🗂 Versão descartada','o que saiu de cena no último conflito de sincronização',dx));
@@ -9549,6 +9590,10 @@ function validarBackup(j){
       if(!Array.isArray(j[k])||j[k].some(x=>k==='obraM2Fora'?typeof x!=='string':(!x||typeof x!=='object'||Array.isArray(x))))throw new Error('Lista inválida: '+k);
     }else if(v&&typeof v==='object'&&(!j[k]||typeof j[k]!=='object'||Array.isArray(j[k])))throw new Error('Seção inválida: '+k);
   }
+  const listasInternas={viagens:['custos','passagens','hoteis','tickets','roteiro','lugares'],metas:['passos'],oportunidades:['links']};
+  for(const [col,camposLista] of Object.entries(listasInternas))for(const x of j[col]||[])for(const k of camposLista){
+    if(x[k]!==undefined&&(!Array.isArray(x[k])||x[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))throw new Error('Lista inválida: '+col+'.'+k);
+  }
   return j;
 }
 async function restaurarBackup(f){
@@ -9610,6 +9655,7 @@ function guardaDescartado(){
   try{localStorage.setItem('cl_descartado',JSON.stringify({em:Date.now(),dados:JSON.parse(localStorage.getItem(CHAVE))}))}catch(_){}
 }
 function adotaNuvem(r,avisar){
+  validarBackup(r.dados);
   guardaDescartado();
   // modal aberto sobre o estado antigo viraria órfão e comeria o que fosse digitado
   const mo=document.getElementById('modais'); if(mo) mo.innerHTML='';
@@ -9644,17 +9690,24 @@ async function executarEnvio(){if(DEV&&!window.__testeSync)return true;
       marcaBase(r&&r.mt||0);
     }
     pintaSync('enviando…');
+    const versaoEnviada=E._mt;
     const p=await apiPut();
     if(p.status===409){const r=await apiSync('GET');adotaNuvem(r,true);return false}
     if(p.status===428){pintaSync('recarregue a página');return false}
     if(p.status<200||p.status>=300)throw new Error('HTTP '+p.status);
-    marcaBase(p.j&&p.j.mt);pintaSync('sincronizado');return true;
+    marcaBase(p.j&&p.j.mt);pintaSync(E._mt===versaoEnviada?'sincronizado':'alterações pendentes');return true;
   }catch(e){pintaSync('não enviado — tente sincronizar');return false}}
 async function puxarNuvem(){if(DEV&&!window.__testeSync){pintaSync('modo local');return}
+  if(envioEmCurso)await envioEmCurso;
   try{pintaSync('baixando…');
+    const baseDaLeitura=_tabBase;
     const r=await apiSync('GET');
-    marcaBase(r&&r.mt);
+    if(_tabBase!==baseDaLeitura)return; // Um envio ou outra leitura já avançou a versão.
     const remoto=r&&r.dados;
+    if(remoto)validarBackup(remoto);
+    // Uma leitura não pode autorizar a gravação de alterações feitas sobre outra base.
+    if(remoto&&_tabBase&&r.mt!==_tabBase){adotaNuvem(r,true);return}
+    marcaBase(r&&r.mt);
     if(remoto&&(remoto._mt||0)>(E._mt||0)){
       guardaDescartado();              // até o caminho normal deixa rastro do que saiu
       localStorage.setItem(CHAVE,JSON.stringify(remoto));E=carregar();

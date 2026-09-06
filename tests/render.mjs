@@ -8,7 +8,7 @@ async function render(id,populated=true){
  if(populated)dados(run);
  run(`atual='${id}';document.getElementById('main').replaceChildren();`);
  await run(`MODS.find(x=>x.id==='${id}').render(document.getElementById('main'))`);
- run(`if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(document.getElementById('main'),atual);else if(atual==='saude')organizarSaude(document.getElementById('main'));else if(atual==='agenda')organizarAgenda(document.getElementById('main'));else indiceDaTela(document.getElementById('main'));prepararTabelas(document.getElementById('main'))`);
+ run(`if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(document.getElementById('main'),atual);else if(atual==='saude')organizarSaude(document.getElementById('main'));else if(atual==='agenda')organizarAgenda(document.getElementById('main'));else if(atual==='caixavgv')organizarCaixaVGV(document.getElementById('main'));else indiceDaTela(document.getElementById('main'));prepararTabelas(document.getElementById('main'))`);
  return {...app,main:document.getElementById('main')};
 }
 for(const populated of [false,true])for(const id of IDS)test(`${id}: monta ${populated?'com registros':'vazia'} e cartões respondem`,async()=>{

@@ -1,0 +1,15 @@
+import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {webcrypto,createHmac} from 'node:crypto';
+const source=stripTypeScriptTypes(readFileSync(new URL('../supabase/functions/leo-sync/index.ts',import.meta.url),'utf8').replace(/^import .*;$/m,''));
+function backend({query=()=>({data:null,error:null}),remove=async()=>({error:null}),now=1000}={}){
+ let handler;const calls=[];
+ const mock={from(table){const q={table,op:'select',args:{}};for(const m of ['select','eq','order','range','in','limit','maybeSingle','update','insert','upsert','delete'])q[m]=(...a)=>{q.args[m]=a;if(['update','insert','upsert','delete'].includes(m))q.op=m;return q};q.then=(ok,err)=>{calls.push(q);return Promise.resolve(query(q)).then(ok,err)};return q},storage:{from:()=>({remove})}};
+ const NativeDate=Date;class Clock extends NativeDate{static now(){return now}}
+ vm.runInNewContext(source,{createClient:()=>mock,Deno:{env:{get:n=>n==='EQUIPE_JWT_SECRET'?'teste':'configurado'},serve:h=>handler=h},crypto:webcrypto,TextEncoder,TextDecoder,atob,Response,Date:Clock,setTimeout});
+ const head=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url'),body=Buffer.from(JSON.stringify({sis:'central',exp:9999999999})).toString('base64url');const unsigned=head+'.'+body;const token=unsigned+'.'+createHmac('sha256','teste').update(unsigned).digest('base64url');
+ return {calls,request:(method,payload,auth=true)=>handler(new Request('https://teste.example/leo-sync',{method,headers:auth?{authorization:'Bearer '+token,'content-type':'application/json'}:{},body:payload?JSON.stringify(payload):undefined}))};
+}
+test('Servidor: sem sessão não consulta dados',async()=>{const b=backend();assert.equal((await b.request('GET',null,false)).status,401);assert.equal(b.calls.length,0)});
+test('Servidor: rejeita estado malformado antes de gravar',async()=>{const b=backend();assert.equal((await b.request('PUT',{dados:[],base:0})).status,400);assert.equal(b.calls.length,0)});
+test('Servidor: versão avança mesmo quando relógio fica atrás da base',async()=>{const b=backend({query:q=>q.op==='update'?{data:[{mt:q.args.update[0].mt}],error:null}:{data:{mt:2000},error:null}});const r=await b.request('PUT',{dados:{viagens:[]},base:2000});assert.equal(r.status,200);assert.ok((await r.json()).mt>2000)});
+test('Servidor: falha ao remover arquivo preserva seu índice',async()=>{const b=backend({query:q=>({data:{caminho:'teste/arquivo'},error:null}),remove:async()=>({error:{message:'offline'}})});assert.equal((await b.request('POST',{acao:'arqApagar',id:'teste'})).status,500);assert.equal(b.calls.filter(q=>q.op==='delete').length,0)});
+test('Servidor: índice de anexos ultrapassa mil linhas sem truncar',async()=>{const b=backend({query:q=>({data:Array.from({length:q.args.range?.[0]===1000?1:1000},(_,i)=>({id:String((q.args.range?.[0]||0)+i)})),error:null})});const r=await b.request('POST',{acao:'arqListar'});assert.equal((await r.json()).arquivos.length,1001)});
