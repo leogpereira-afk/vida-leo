@@ -55,3 +55,15 @@ test('Google manual: reenvio atualiza o mesmo evento sem convidados',async()=>{
  if(method==='GET')return {extendedProperties:{private:{leoSource:ids[0]}}};if(method==='PATCH'){patches++;assert.equal(body.id,undefined);return {htmlLink:'https://calendar.google.com/test'}};throw Error(path)
  };run("googleAgendaGravar=googleMock;E.agenda=[{id:'local',gid:'mail:1',gmailId:'1',data:'2099-09-10',ate:'2099-09-10',titulo:'Vencimento teste'}]");await run('enviarLembreteGoogle(E.agenda[0])');await run('enviarLembreteGoogle(E.agenda[0])');assert.equal(ids[0],ids[1]);assert.equal(patches,1);assert.equal(run('E.googleAgendaDestino'),'cal-test');
 });
+
+test('Gmail: fila de aprovação preserva pendentes sem criar compromissos',async()=>{
+ const {run,document}=setup();run("var loteTeste={plano:[{gid:'teste-pendente',seq:0,emailEm:1,reg:{gid:'teste-pendente',gmailId:'m',gmailRevisar:true,data:'2099-09-10',ate:'2099-09-10',titulo:'Data para aprovar'}}],avisos:[],mensagens:1};guardarAprovacoesGmail(loteTeste);guardarAprovacoesGmail(loteTeste)");
+ assert.equal(run('E.gmailPendentes.length'),1);assert.equal(run('E.agenda.length'),0);run('revisarConvitesGmail({plano:E.gmailPendentes,avisos:[],mensagens:0})');
+ const box=document.querySelector('.google-evento input[type=checkbox]');assert.ok(!box.checked);box.checked=true;box.dispatchEvent(new document.defaultView.Event('change'));[...document.querySelectorAll('button')].find(b=>b.textContent.startsWith('Importar 1')).click();assert.equal(run('E.agenda.length'),1);assert.equal(run('E.gmailPendentes.length'),0);
+});
+test('Gmail: busca pagina e examina texto de e-mail com convite',async()=>{
+ const {run,ctx}=setup();const paths=[];ctx.gmailMock=async p=>{paths.push(p);return p.startsWith('messages?')?{messages:[{id:'antigo'}],nextPageToken:'pagina2'}:{id:'antigo',internalDate:'1',payload:{parts:[{mimeType:'text/plain',body:{data:Buffer.from('Entrega especial 10/09/2099').toString('base64url')}},{mimeType:'text/calendar',body:{}}]}}};run('gmailApi=gmailMock');const r=await run("consultarConvitesGmail('pagina1')");assert.equal(r.proximaPagina,'pagina2');assert.equal(r.plano.length,1);assert.match(paths[0],/pageToken=pagina1/);assert.doesNotMatch(decodeURIComponent(paths[0]),/after:|before:|newer_than:/);assert.equal(run('E.agenda.length'),0);
+});
+test('Gmail: descartar não reaparece ao repetir o mesmo lote',()=>{
+ const {run,document}=setup();run("var lote={plano:[{gid:'dispensar',seq:0,emailEm:1,reg:{gid:'dispensar',data:'2099-10-01',titulo:'Teste'}}],avisos:[],mensagens:1};revisarConvitesGmail(guardarAprovacoesGmail(lote))");[...document.querySelectorAll('button')].find(b=>b.textContent==='Descartar').click();run('guardarAprovacoesGmail(lote)');assert.equal(run('E.gmailPendentes.length'),0);assert.equal(run('E.agenda.length'),0);
+});
