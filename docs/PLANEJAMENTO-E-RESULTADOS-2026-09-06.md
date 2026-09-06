@@ -38,3 +38,9 @@ Na prévia em 390 × 844, nenhuma das cinco abas do planejamento nem dos quatro 
 Minhas análises passa a incluir todos os campos de `comportamento`, com os textos integrais, números, listas e objetos. Os assuntos são agrupados para consulta e os campos desconhecidos também são preservados na exibição. O mesmo leitor completo atende à consulta do histórico. Registros sem origem comprovada permanecem identificados como anteriores; referências simbólicas não são promovidas a medições.
 
 Corrigida a montagem de fragmentos HTML com mais de uma raiz: o helper `el` mantinha somente o título e descartava o parágrafo seguinte na tela. A reprodução com a versão anterior confirmou a ausência do texto, e o novo leitor mostrou tanto o texto quanto campos antes omitidos. Testes verificam cobertura dos campos, ausência de mutação dos dados, zeros, falsos, estruturas aninhadas, texto longo, escape de HTML e independência dos filtros. 248 testes passaram. Prévia móvel em 390 × 844 sem excesso de largura e console sem erros. Nenhuma alteração da base privada foi necessária.
+
+## Leitura contínua dos resultados
+
+A pedido do usuário, os quatro tipos de resultado foram reunidos na mesma tela, em sequência vertical. DISC, liderança, cadastro anterior, análises e resultados práticos possuem títulos e ícones. Os grupos do cadastro anterior permanecem abertos e os filtros internos foram retirados. Quando há mais de uma avaliação documentada, todas aparecem na sequência. Os dados não foram alterados.
+
+Verificação: 249 testes passaram. Conferidos os cartões em 1440 × 1000 e 390 × 844, sem largura excedente no celular; todas as seções permanecem visíveis simultaneamente e os campos antigos não dependem de expansão.

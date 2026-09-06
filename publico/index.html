@@ -243,7 +243,7 @@ tr:hover .lixo{opacity:1}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css?v=a827d3e15332">
+<link rel="stylesheet" href="./refinamento.css?v=ecea1edff489">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -8385,21 +8385,20 @@ function devModalResultado(leitura){
 function devPainelResultados(host){
   const d=devDados();
   const header=el('<div class="dev-results-header"><div><span class="workspace-eyebrow">AVALIAÇÕES E APLICAÇÃO NA VIDA REAL</span><h3>Meus resultados</h3><p>O que foi registrado, como interpretar e o que mudou na prática.</p></div></div>');header.appendChild(acao('+ Registrar resultado',()=>devModalResultado(),'ghost'));host.appendChild(header);
-  const nav=el('<nav class="dev-result-tabs" aria-label="Tipos de resultado"></nav>'),paineis={};
-  const mostrar=id=>{if(!paineis[id])id='disc';Object.entries(paineis).forEach(([k,p])=>{p.hidden=k!==id;nav.querySelector('[data-result="'+k+'"]').setAttribute('aria-pressed',String(k===id))});filtro.devResultado=id};
-  for(const [id,t,sub] of [['disc','DISC','Comportamento'],['lideranca','Liderança','Estilos registrados'],['analises','Minhas análises','Leituras por tema'],['evolucao','Resultados na prática','Mudanças e evidências']]){
-    const b=acao('',()=>mostrar(id),'ghost');b.innerHTML='<b>'+t+'</b><small>'+sub+'</small>';b.dataset.result=id;b.id='dev-result-'+id;b.setAttribute('aria-controls','dev-result-pane-'+id);nav.appendChild(b);const pane=el('<section class="dev-result-pane" id="dev-result-pane-'+id+'" aria-labelledby="'+b.id+'"></section>');paineis[id]=pane;
-  }host.appendChild(nav);Object.values(paineis).forEach(p=>host.appendChild(p));
+  host.classList.add('dev-results-stream');
+  const paineis={};
+  const mostrar=id=>{paineis[id]?.scrollIntoView({block:'start',behavior:'smooth'})};
+  for(const [id,t,sub,icone] of [['disc','DISC','Comportamento registrado na avaliação','📊'],['lideranca','Liderança','Estilos registrados no relatório','🎯'],['analises','Minhas análises completas','Todo o cadastro anterior e as leituras dos documentos','🧭'],['evolucao','Resultados na prática','Mudanças, exemplos e evidências ao longo do tempo','🌱']]){
+    const pane=el('<section class="dev-result-pane dev-stream-section" id="dev-result-pane-'+id+'" aria-labelledby="dev-stream-title-'+id+'"><header class="dev-stream-heading"><span class="dev-stream-icon" aria-hidden="true">'+icone+'</span><div><h3 id="dev-stream-title-'+id+'">'+t+'</h3><p>'+sub+'</p></div></header></section>');paineis[id]=pane;host.appendChild(pane);
+  }
   const ordem=(a,b)=>(b.dataDocumento||'').localeCompare(a.dataDocumento||'');
   const fontes=d.fontes.filter(f=>f.revisado&&!f.pendente&&(f.disc||f.lideranca)).sort(ordem);
   const baseFonte=(host,f)=>{const intro=el('<div class="dev-result-source"><span class="dev-tag">AVALIAÇÃO DOCUMENTADA</span><h4>'+esc(f.titulo)+'</h4><p>'+devData(f)+'</p></div>');intro.appendChild(devFontesLinks([f.id]));host.appendChild(intro)};
   for(const tipo of ['disc','lideranca']){
     const pane=paineis[tipo],disponiveis=fontes.filter(f=>f[tipo]);
     if(!disponiveis.length){pane.appendChild(el('<div class="workspace-empty"><h3>Nenhum resultado documentado nesta categoria</h3><p>Os registros anteriores continuam no histórico. Para mostrar uma medição aqui, é necessário identificar o relatório original.</p></div>'));continue}
-    const select=seletor(disponiveis[0].id,disponiveis.map(f=>[f.id,f.titulo+' · '+(f.dataDocumento?fmtDataAno(f.dataDocumento):'Sem data de aplicação')]),()=>pintar(),'Avaliação de '+(tipo==='disc'?'DISC':'liderança'));
-    if(disponiveis.length>1){const label=el('<label class="dev-result-select">Escolher avaliação</label>');label.appendChild(select);pane.appendChild(label)}
-    const body=el('<div class="workspace-card dev-measured-result"></div>');pane.appendChild(body);
-    function pintar(){const f=disponiveis.find(x=>x.id===select.value)||disponiveis[0];body.innerHTML='';baseFonte(body,f);
+    for(const f of disponiveis){
+      const body=el('<div class="workspace-card dev-measured-result"></div>');pane.appendChild(body);baseFonte(body,f);
       if(tipo==='disc'){
         const grid=el('<div class="dev-disc-comparison"></div>');
         for(const [modo,titulo] of [['natural','Natural'],['adaptado','Adaptado']]){const box=el('<section><h4>'+titulo+'</h4></section>');for(const [k,nome] of [['D','Dominância'],['I','Influência'],['S','Estabilidade'],['C','Conformidade']]){const n=f.disc?.[modo]?.[k];if(!Number.isFinite(n)||n<0||n>100)continue;box.appendChild(el('<div class="dev-score"><div><span><b>'+k+'</b> '+nome+'</span><strong>'+n+'</strong></div><div class="dev-score-track"><i style="width:'+n+'%"></i></div></div>'))}grid.appendChild(box)}body.appendChild(grid);
@@ -8411,17 +8410,16 @@ function devPainelResultados(host){
       }
       body.appendChild(el('<div class="dev-result-reading"><h4>O que o documento registra</h4><p>'+esc(f.resumo||'Consulte o original para conhecer a interpretação do instrumento.')+'</p></div>'));
       const limites=el('<details class="dev-result-limits"><summary>Contexto e cuidados na leitura</summary><p>'+esc(f.limites||'Considere a data e as condições da aplicação.')+'</p></details>');body.appendChild(limites);
-      body.appendChild(acao('Ver análises relacionadas',()=>{filtro.devAnaliseFonte=f.id;mostrar('analises');pintarAnalises()},'ghost'));
-    }pintar();
+      body.appendChild(acao('Ver análises relacionadas',()=>mostrar('analises'),'ghost'));
+    }
   }
-  const analises=paineis.analises,tools=el('<div class="dev-analyses-tools"></div>');
+  const analises=paineis.analises;
   analises.appendChild(devPainelLegado());
   analises.appendChild(el('<h3 class="dev-current-analyses-title">Análises dos documentos e aplicação prática</h3>'));
-  const areas=[...new Set(d.leituras.map(l=>l.area||'Pessoal'))];const area=seletor('',[['','Todos os temas'],...areas.map(x=>[x,x])],()=>{filtro.devAnaliseFonte='';pintarAnalises()},'Tema da análise');tools.appendChild(area);analises.appendChild(tools);const cards=el('<div class="dev-results-analyses"></div>');analises.appendChild(cards);
-  function pintarAnalises(){cards.innerHTML='';tools.querySelector('[data-limpar-fonte]')?.remove();
-    if(filtro.devAnaliseFonte){const b=acao('Mostrar todas as fontes',()=>{filtro.devAnaliseFonte='';pintarAnalises()},'ghost');b.dataset.limparFonte='';tools.appendChild(b)}
-    const leituras=d.leituras.filter(l=>(!area.value||l.area===area.value)&&(!filtro.devAnaliseFonte||(l.fontes||[]).includes(filtro.devAnaliseFonte)));
-    if(!leituras.length)cards.appendChild(el('<p class="workspace-note">Nenhuma análise neste filtro. Os documentos originais estão em Histórico e fontes.</p>'));
+  const cards=el('<div class="dev-results-analyses"></div>');analises.appendChild(cards);
+  function pintarAnalises(){cards.innerHTML='';
+    const leituras=d.leituras;
+    if(!leituras.length)cards.appendChild(el('<p class="workspace-note">Ainda não há análises dos documentos registradas.</p>'));
     leituras.forEach(l=>{const c=el('<article class="workspace-card dev-analysis-result"><span class="dev-tag">'+esc(l.area||'Pessoal')+' · '+esc(l.tipo||'Leitura dos registros')+'</span><h4>'+esc(l.titulo)+'</h4><p>'+esc(l.texto)+'</p></article>');c.appendChild(devFontesLinks(l.fontes));
       const quadro=el('<div class="dev-analysis-application"><div><b>Como aplicar</b><p>'+esc(l.passo||'Ainda sem aplicação definida.')+'</p></div><div><b>Como observar o resultado</b><p>'+esc(l.medida||'Defina um exemplo observável para acompanhar.')+'</p></div></div>');c.appendChild(quadro);
       if(l.nota)c.appendChild(el('<p class="dev-my-reading"><b>Minha percepção:</b> '+esc(l.nota)+'</p>'));
@@ -8430,14 +8428,22 @@ function devPainelResultados(host){
       if(resultados.length)c.appendChild(el('<div class="dev-latest-result"><b>Último resultado · '+fmtDataAno(resultados[0].data)+'</b><p>'+esc(resultados[0].resultado)+'</p></div>'));
       const actions=el('<div class="dev-card-actions"></div>');actions.appendChild(acao('Conferir análise',()=>devModalLeitura(l),'ghost'));actions.appendChild(acao('Registrar resultado',()=>devModalResultado(l),'ghost'));if(l.passo)actions.appendChild(acao('Levar ao plano',()=>devModalAcao(devCriarAcao(l)),'ghost'));c.appendChild(actions);cards.appendChild(c);
     });
-    const documentos=d.fontes.filter(f=>f.revisado&&!f.pendente&&f.tipo==='Análise interpretativa'&&(!filtro.devAnaliseFonte||f.id===filtro.devAnaliseFonte));
+    const documentos=d.fontes.filter(f=>f.revisado&&!f.pendente&&f.tipo==='Análise interpretativa');
     if(documentos.length){const acervo=el('<details class="dev-result-limits"><summary>Outras análises preservadas nos documentos</summary></details>');documentos.forEach(f=>{const b=el('<article class="dev-document-reading"><h4>'+esc(f.titulo)+'</h4><small>'+devData(f)+'</small><p>'+esc(f.resumo)+'</p><p class="workspace-note">'+esc(f.limites||'')+'</p></article>');b.appendChild(devFontesLinks([f.id]));acervo.appendChild(b)});cards.appendChild(acervo)}
   }pintarAnalises();
   const evolucao=paineis.evolucao,registros=[...d.resultados].sort((a,b)=>b.data.localeCompare(a.data)||String(b.criadoEm||'').localeCompare(String(a.criadoEm||'')));
   if(!registros.length){const c=el('<div class="workspace-empty"><h3>As análises já estão aqui. Agora vamos acompanhar a prática.</h3><p>Registre o que você aplicou, o que mudou e um exemplo que comprove esse resultado. Cada registro fica guardado com a data.</p></div>');c.appendChild(acao('Registrar primeiro resultado',()=>devModalResultado()));evolucao.appendChild(c)}
   registros.forEach(x=>{const l=d.leituras.find(l=>l.id===x.leituraId);const c=el('<article class="workspace-card dev-practical-result"><span class="dev-tag">'+fmtDataAno(x.data)+' · Registro pessoal</span><h4>'+esc(x.titulo)+'</h4></article>');if(l)c.appendChild(el('<p class="workspace-note">Análise relacionada: '+esc(l.titulo)+'</p>'));for(const [k,t] of [['contexto','O que coloquei em prática'],['resultado','Resultado observado'],['evidencia','Evidência ou exemplo'],['proximoPasso','Próximo ajuste']])if(x[k])c.appendChild(el('<div><h5>'+t+'</h5><p>'+esc(x[k])+'</p></div>'));if(l)c.appendChild(devFontesLinks(l.fontes));evolucao.appendChild(c)});
   const conquistas=d.reflexoes.filter(x=>x.tipo==='Conquista');if(conquistas.length){const c=el('<section class="workspace-card dev-practical-result"><h4>Conquistas já registradas</h4></section>');conquistas.forEach(x=>c.appendChild(el('<div><h5>'+esc(x.titulo)+' · '+fmtDataAno(x.data)+'</h5><p>'+esc(x.contexto||x.aprendizado||'')+'</p></div>')));evolucao.appendChild(c)}
-  mostrar(filtro.devResultado||'disc');
+  // Todos os assuntos e textos ficam abertos nesta leitura vertical.
+  const icones=['💬','📊','🧠','💎','✨','📎','🗂️'];
+  host.querySelectorAll('.dev-legacy-group').forEach((grupo,i)=>{
+    const titulo=grupo.querySelector('summary b').textContent;
+    const secao=el('<section class="dev-legacy-visible"><header><span class="dev-stream-icon" aria-hidden="true">'+(icones[i]||'🗂️')+'</span><h4>'+esc(titulo)+'</h4></header></section>');
+    secao.appendChild(grupo.querySelector('.dev-legacy-fields'));grupo.replaceWith(secao);
+  });
+  host.querySelectorAll('.dev-result-limits').forEach(d=>d.open=true);
+
 }
 
 
