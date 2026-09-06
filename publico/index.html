@@ -243,7 +243,7 @@ tr:hover .lixo{opacity:1}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css?v=edbd80e01ac5">
+<link rel="stylesheet" href="./refinamento.css?v=dfa9af7f7405">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -1170,6 +1170,7 @@ function menu(){
   });
 }
 function indiceDaTela(pagina){
+  if(pagina.classList.contains('viagens-layout'))return;
   const blocos=[...pagina.querySelectorAll('.bloco[data-bid]')].filter(b=>b.querySelector('header h2')?.textContent.trim());
   if(!blocos.length)return;
   const faixa=el('<div class="indice-tela"><label>Ir para um assunto</label><select><option value="">Escolha uma seção desta tela…</option></select></div>');
@@ -1489,6 +1490,7 @@ function vInicio(m){
 /* ===================== VIAGENS ===================== */
 const temHotelViagem=v=>!!String(v.hotel||'').trim()||(v.hoteis||[]).some(h=>!!String(h.nome||'').trim());
 function vViagens(m) {
+  m.classList.add('viagens-layout');
   const r = rr('viagens');
   const ativos = E.viagens.filter(v => v.status !== 'Cancelado' && +(v.ida || '').slice(0, 4) >= 2026
     && (filtro.viagensAno == null || filtro.viagensAno === 'todos' || (v.ida || '').startsWith(filtro.viagensAno)));
@@ -1499,17 +1501,8 @@ function vViagens(m) {
   const comProblema = futIntl.filter(v => !docsViagem(v).ok);
   const novaViagem = () => { const v = { id: uid(), ida: hoje(), volta: hoje(), evento: '', cidade: '', hotel: '', transporte: '', gastos: 0, status: 'Em Planejamento', obs: '', custos: [], passagens: [], hoteis: [], tickets: [], viajantes: [], tipo: 'Trabalho', planejar: false, roteiro: [], lugares: [], carro: {} }; E.viagens.push(v); salvar(); modalViagem(v) };
 
-  m.appendChild(cab('Viagens', 'Planeje destinos, confira reservas e acompanhe as pendências de cada viagem.'));
-  // o Gmail entra como PROPOSTA: acha as passagens e você decide o que grava
-  {
-    const bg=el('<button class="btn mini ghost">📧 Buscar passagens no Gmail</button>');
-    bg.onclick=()=>buscarPassagensGmail(bg);
-    const cxg=el('<div style="margin:0 0 14px"></div>');
-    cxg.appendChild(bg);
-    cxg.appendChild(el('<span style="font-size:12px;color:var(--suave);margin-left:10px">só leitura · nada é gravado sem você confirmar</span>'));
-    m.appendChild(cxg);
-  }
-  m.appendChild(blocoGoogle('gmail'));
+  const topo=cab('Viagens', 'Destinos, reservas e pendências em um só lugar.');
+  topo.appendChild(acao('+ Nova viagem',novaViagem));m.appendChild(topo);
   // anos com viagem + o ano vigente sempre presente
   // o painel começa em 2026 — o que é mais antigo que isso não interessa mais
   const ANO_MIN = 2026;
@@ -1520,12 +1513,12 @@ function vViagens(m) {
   const doAnoV = x => (+(x.ida || '').slice(0, 4) >= ANO_MIN) && (anoV === 'todos' || (x.ida || '').startsWith(anoV));
   const noAno = E.viagens.filter(doAnoV);
   const cont = st => noAno.filter(v => v.status === st).length;
-  m.appendChild(painel('Ano',
-    seletor(anoV, [...anosV.map(a => [a, a + ' (' + E.viagens.filter(v => (v.ida || '').startsWith(a)).length + ')']),
-      ['todos', 'Todos os anos (' + E.viagens.filter(v => +(v.ida || '').slice(0, 4) >= ANO_MIN).length + ')']], v => { filtro.viagensAno = v; r() }),
-    seletor(filtro.viagens, [['Todas', 'Todas (' + noAno.length + ')'],
-      ...CFG('statusViagem').map(st => [st, st + ' (' + cont(st) + ')'])], v => { filtro.viagens = v; r() }),
-    acao('+ Nova viagem', novaViagem), '|'));
+  const controles=el('<div class="viagens-filtros"></div>');
+  const anoLabel=el('<label>Ano</label>'),statusLabel=el('<label>Situação</label>');
+  anoLabel.appendChild(seletor(anoV,[...anosV.map(a=>[a,a+' ('+E.viagens.filter(v=>(v.ida||'').startsWith(a)).length+')']),['todos','Todos os anos']],v=>{filtro.viagensAno=v;r()}));
+  statusLabel.appendChild(seletor(filtro.viagens,[['Todas','Todas ('+noAno.length+')'],...CFG('statusViagem').map(st=>[st,st+' ('+cont(st)+')'])],v=>{filtro.viagens=v;r()}));
+  controles.appendChild(anoLabel);controles.appendChild(statusLabel);m.appendChild(controles);
+
 
   if (comProblema.length) m.appendChild(el(`<div class="aviso">🛂 <b>${comProblema.length} viagem(ns) internacional(is) com pendência de documento:</b>
     ${comProblema.map(v => esc(v.evento || v.cidade)).join(', ')}. Abra a viagem para ver o que falta.</div>`));
@@ -1583,9 +1576,6 @@ function vViagens(m) {
     tv.appendChild(tfv); rol.appendChild(tv);
   }
   cx.appendChild(rol);
-  const pe = el('<div style="padding:0 17px 15px"></div>');
-  const bt = el('<button class="mais">+ Nova viagem</button>'); bt.onclick = novaViagem;
-  pe.appendChild(bt); cx.appendChild(pe);
   m.appendChild(bloco('vg-lista', 'Todas as viagens', 'em ordem de data — verde = pronta para embarcar', cx));
 
   m.appendChild(el(`<div class="grade">
