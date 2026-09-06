@@ -243,7 +243,7 @@ tr:hover .lixo{opacity:1}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css?v=3468fc9ca399">
+<link rel="stylesheet" href="./refinamento.css?v=a827d3e15332">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -8342,14 +8342,36 @@ function devPainelRoda(){
   if(notas.length)c.appendChild(el('<p class="workspace-note">'+notas.length+' de '+CFG('areasRoda').length+' áreas avaliadas. Escolha o que faz sentido priorizar para você.</p>'));
   c.appendChild(acao('Fazer nova avaliação',devModalRevisao));return c;
 }
-function devPainelLegado(){
-  const c=el('<div class="corpo"></div>');c.appendChild(el('<p class="workspace-note">Cadastro anterior preservado para consulta. As notas sem instrumento e data de aplicação não são apresentadas como teste medido.</p>'));
-  const C=E.comportamento||{};
-  for(const [k,t] of [['fonteLaudo','Origem informada anteriormente'],['comoDecido','Como eu decido'],['oQueMeMove','O que me move'],['comoMeRecarrego','Como eu recarrego'],['comoMeAjudar','Como me ajudar'],['meusPontosCegos','Pontos para reflexão']])if(C[k])c.appendChild(el('<h3>'+t+'</h3><p>'+esc(C[k])+'</p>'));
-  const det=el('<details class="workspace-editor"><summary>Consultar números e referências anteriores</summary></details>');
-  for(const k of ['disc','discAdaptado','big5','temperamentos','valores','lideranca'])if(C[k]&&Object.keys(C[k]).length)det.appendChild(el('<h4>'+({disc:'DISC natural',discAdaptado:'DISC adaptado',big5:'Big Five — origem a conferir',temperamentos:'Temperamentos — origem a conferir',valores:'Valores',lideranca:'Liderança'})[k]+'</h4><p>'+Object.entries(C[k]).map(([a,b])=>esc(a)+': '+esc(b)).join(' · ')+'</p>'));
-  if(C.numerologia)det.appendChild(el('<h4>Referências simbólicas pessoais</h4><p>'+esc(C.numerologia)+'</p>'));c.appendChild(det);return c;
+function devValorAnterior(valor){
+  if(valor===null||valor===undefined||valor==='')return '<p class="workspace-note">Não informado no cadastro anterior.</p>';
+  if(Array.isArray(valor))return valor.length?'<ol>'+valor.map(x=>'<li>'+devValorAnterior(x)+'</li>').join('')+'</ol>':'<p class="workspace-note">Nenhum item registrado.</p>';
+  if(typeof valor==='object')return Object.keys(valor).length?'<dl>'+Object.entries(valor).map(([k,v])=>'<div><dt>'+esc(k)+'</dt><dd>'+devValorAnterior(v)+'</dd></div>').join('')+'</dl>':'<p class="workspace-note">Nenhum item registrado.</p>';
+  return '<p>'+esc(typeof valor==='boolean'?(valor?'Sim':'Não'):String(valor))+'</p>';
 }
+function devPainelLegado(){
+  const C=E.comportamento||{},c=el('<section class="corpo dev-complete-profile"><h3>Meu cadastro anterior completo</h3><p class="workspace-note">Textos, números e referências preservados como foram cadastrados. Valores sem origem e data identificadas continuam como registros anteriores; referências simbólicas permanecem identificadas.</p></section>');
+  const grupos=[
+    ['Como eu funciono',[['comoDecido','Como eu decido'],['oQueMeMove','O que me move'],['comoMeRecarrego','Como eu me recarrego'],['comoMeAjudar','Como me ajudar'],['meusPontosCegos','Meus pontos cegos'],['medos','Medos'],['tracoPrincipal','Traço principal']]],
+    ['DISC e liderança',[['perfilDisc','Análise do perfil DISC'],['disc','DISC natural — números anteriores'],['discAdaptado','DISC adaptado — números anteriores'],['lideranca','Estilos de liderança — números anteriores']]],
+    ['Big Five, temperamentos e Jung',[['bigfive','Análise Big Five'],['big5','Big Five — números anteriores'],['temperamentos','Temperamentos'],['tipoJung','Tipo Jung']]],
+    ['Motivadores, valores e percepções',[['motivadorPrincipal','Motivador principal'],['motivadorSecundario','Motivador secundário'],['valores','Valores'],['positividade','Positividade'],['estima','Estima'],['flexibilidade','Flexibilidade']]],
+    ['Eneagrama e referências simbólicas',[['eneagramaTipo','Tipo de Eneagrama registrado'],['eneagrama','Texto do Eneagrama'],['numerologia','Numerologia — referência simbólica']]],
+    ['Origem do cadastro',[['fonteLaudo','Fonte ou laudo informado']]]
+  ];
+  const conhecidos=new Set(grupos.flatMap(([,xs])=>xs.map(([k])=>k))),extras=Object.keys(C).filter(k=>!conhecidos.has(k));
+  if(extras.length)grupos.push(['Outros dados preservados',extras.map(k=>[k,k.replace(/([a-z])([A-Z])/g,'$1 $2')])]);
+  let total=0;
+  grupos.forEach(([titulo,campos],i)=>{
+    const presentes=campos.filter(([k])=>Object.prototype.hasOwnProperty.call(C,k));if(!presentes.length)return;
+    const grupo=el('<details class="dev-legacy-group"><summary><b>'+esc(titulo)+'</b><span>'+presentes.length+' '+(presentes.length===1?'campo':'campos')+'</span></summary><div class="dev-legacy-fields"></div></details>');
+    if(i===0)grupo.open=true;
+    presentes.forEach(([k,t])=>{const item=el('<article class="dev-legacy-field" data-legacy-field="'+esc(k)+'"><h4>'+esc(t)+'</h4>'+devValorAnterior(C[k])+'</article>');grupo.querySelector('.dev-legacy-fields').appendChild(item);total++});c.appendChild(grupo);
+  });
+  c.querySelector('h3').after(el('<p class="dev-legacy-count">'+total+' campos preservados · conteúdo integral, sem resumo</p>'));
+  if(!total)c.appendChild(el('<p class="workspace-note">Não há dados neste cadastro anterior.</p>'));
+  return c;
+}
+
 function devModalResultado(leitura){
   const l=typeof leitura==='string'?devDados().leituras.find(x=>x.id===leitura):leitura;
   abrirModal('Registrar resultado',l?esc(l.titulo):'Guarde uma mudança observada na prática.',(c,fechar)=>{
@@ -8393,6 +8415,8 @@ function devPainelResultados(host){
     }pintar();
   }
   const analises=paineis.analises,tools=el('<div class="dev-analyses-tools"></div>');
+  analises.appendChild(devPainelLegado());
+  analises.appendChild(el('<h3 class="dev-current-analyses-title">Análises dos documentos e aplicação prática</h3>'));
   const areas=[...new Set(d.leituras.map(l=>l.area||'Pessoal'))];const area=seletor('',[['','Todos os temas'],...areas.map(x=>[x,x])],()=>{filtro.devAnaliseFonte='';pintarAnalises()},'Tema da análise');tools.appendChild(area);analises.appendChild(tools);const cards=el('<div class="dev-results-analyses"></div>');analises.appendChild(cards);
   function pintarAnalises(){cards.innerHTML='';tools.querySelector('[data-limpar-fonte]')?.remove();
     if(filtro.devAnaliseFonte){const b=acao('Mostrar todas as fontes',()=>{filtro.devAnaliseFonte='';pintarAnalises()},'ghost');b.dataset.limparFonte='';tools.appendChild(b)}
