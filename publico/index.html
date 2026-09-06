@@ -243,7 +243,7 @@ tr:hover .lixo{opacity:1}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css?v=d2fd14c0f818">
+<link rel="stylesheet" href="./refinamento.css?v=e448eae0058d">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -917,10 +917,10 @@ function painel(...itens){
   return p;
 }
 const acao=(txt,fn,cls='')=>{const b=el(`<button class="btn mini ${cls}">${esc(txt)}</button>`);b.onclick=fn;return b};
-function seletor(valor,opcoes,aoMudar){
+function seletor(valor,opcoes,aoMudar,rotulo){
   const s=el(`<select>${opcoes.map(o=>{const [v,t]=Array.isArray(o)?o:[o,o];
     return `<option value="${esc(v)}"${String(v)===String(valor)?' selected':''}>${esc(t)}</option>`}).join('')}</select>`);
-  s.onchange=()=>aoMudar(s.value);return s;
+  if(rotulo)s.setAttribute('aria-label',rotulo);s.onchange=()=>aoMudar(s.value);return s;
 }
 function btnRecolher(){
   const b=el('<button class="btn ghost mini">⇕ Abrir / recolher tudo</button>');
@@ -966,7 +966,7 @@ function tabela(lista,colunas,aoMudar,rodape,alvo,abrir){
       const tipo=c.tipo||'text';
       return `<td class="${c.num?'num':''}"><input type="${tipo}" data-i="${i}" data-k="${c.k}" value="${esc(v)}"${c.ph?` placeholder="${c.ph}"`:''}></td>`;
     }).join('')+(abrir?`<td><button class="btn ghost mini" data-abrir="${i}">abrir</button></td>`:'')
-      +`<td><button class="lixo" data-del="${i}" title="Apagar">✕</button></td>`;
+      +`<td><button class="lixo" data-del="${i}" title="Apagar" aria-label="Apagar registro da linha ${i+1}">✕</button></td>`;
     tb.appendChild(tr);
   });
   t.appendChild(tb);
@@ -1008,12 +1008,21 @@ function tabelaBloco(id,titulo,dica,lista,colunas,novo,render,rodape,alvo,abrir)
 }
 
 /* ---------- modal ---------- */
+function atualizarCamadasModais(){
+  const fundos=[...document.querySelectorAll('#modais .fundo')];
+  const app=document.querySelector('.app');
+  app?.toggleAttribute('inert',fundos.length>0);
+  if(fundos.length)app?.setAttribute('aria-hidden','true');else app?.removeAttribute('aria-hidden');
+  fundos.forEach((f,i)=>{const inativo=i<fundos.length-1;f.toggleAttribute('inert',inativo);if(inativo)f.setAttribute('aria-hidden','true');else f.removeAttribute('aria-hidden')});
+}
 function abrirModal(titulo,sub,montar,aoFechar){
   const anterior=document.activeElement, id=uid();
-  const f=el(`<div class="fundo"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="${id}" tabindex="-1"><header><div><h3 id="${id}">${titulo}</h3><p>${sub||''}</p></div>
+  const nomeAnterior=anterior?.getAttribute('aria-label')||anterior?.textContent?.trim();
+  const devolverFoco=()=>{const substituto=nomeAnterior?[...document.querySelectorAll('button,select,[role=button]')].find(x=>x.tagName===anterior?.tagName&&(x.getAttribute('aria-label')||x.textContent.trim())===nomeAnterior):null;(anterior?.isConnected?anterior:substituto||document.querySelector('#modais .fundo:last-child .modal, #main'))?.focus({preventScroll:true})};
+  const f=el(`<div class="fundo"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="${id}" aria-describedby="${id}-descricao" tabindex="-1"><header><div><h3 id="${id}">${titulo}</h3><p id="${id}-descricao">${sub||''}</p></div>
     <button class="fechar" aria-label="Fechar janela">✕</button></header><div class="mcorpo"></div></div></div>`);
   let fechado=false;
-  const fechar=()=>{if(fechado)return;fechado=true;if(f.contains(document.activeElement))document.activeElement.blur();document.removeEventListener('keydown',teclas);f.remove();aoFechar&&aoFechar();tela();if(anterior?.isConnected)anterior.focus();else document.querySelector('#modais .fundo:last-child .modal, #main')?.focus({preventScroll:true})};
+  const fechar=()=>{if(fechado)return;fechado=true;if(f.contains(document.activeElement))document.activeElement.blur();document.removeEventListener('keydown',teclas);f.remove();atualizarCamadasModais();aoFechar&&aoFechar();if(!document.querySelector('#modais .fundo'))tela();devolverFoco()};
   const teclas=ev=>{
     if(!f.isConnected){document.removeEventListener('keydown',teclas);return}
     if(f!==document.querySelector('#modais .fundo:last-child'))return;
@@ -1029,9 +1038,13 @@ function abrirModal(titulo,sub,montar,aoFechar){
   f.querySelector('.fechar').onclick=fechar;
   f.onclick=ev=>{if(ev.target===f)fechar()};
   montar(f.querySelector('.mcorpo'),fechar);
+  prepararTabelas(f);
+  const rodape=f.querySelector('.mcorpo').lastElementChild;
+  if(rodape?.classList.contains('secao')&&rodape.querySelector('button')&&!rodape.querySelector('input,select,textarea,h4,p,table'))rodape.classList.add('modal-acoes');
   document.getElementById('modais').appendChild(f);
   document.addEventListener('keydown',teclas);
   f.querySelector('.fechar').focus();
+  atualizarCamadasModais();
 }
 function campos(obj,defs,aoMudar){
   const c=el('<div class="campos"></div>');
@@ -1086,7 +1099,7 @@ async function apagarAnexosDe(ref){
 /* área de arquivos de um registro */
 function areaArquivos(ref,dica){
   const c=el(`<div><div class="arqs" style="margin-bottom:9px"></div>
-    <div class="solta">📎 ${dica||'Clique ou arraste arquivos aqui'}</div>
+    <button type="button" class="solta">📎 ${dica||'Clique ou arraste arquivos aqui'}</button>
     <input type="file" multiple hidden></div>`);
   const lista=c.querySelector('.arqs'),solta=c.querySelector('.solta'),inp=c.querySelector('input');
   const pintar=async()=>{
@@ -1102,7 +1115,9 @@ function areaArquivos(ref,dica){
         ${a.pendente?'<span class="tam" title="ainda não subiu — sobe sozinho quando houver internet">⏳ neste aparelho</span>':''}
         ${podeVisualizar?'<a href="#" class="abrir">abrir</a>':''}
         <a href="#" class="baixar">baixar</a>
-        <button class="lixo">✕</button></div>`);
+        <button class="lixo" aria-label="${esc('Apagar arquivo '+a.nome)}">✕</button></div>`);
+      it.querySelector('.abrir')?.setAttribute('aria-label','Abrir arquivo '+a.nome);
+      it.querySelector('.baixar').setAttribute('aria-label','Baixar arquivo '+a.nome);
       // A janela é aberta ANTES do await: depois de uma espera o navegador
       // trata window.open como pop-up e bloqueia.
       if(podeVisualizar)it.querySelector('.abrir').onclick=async e=>{
@@ -1127,9 +1142,12 @@ function areaArquivos(ref,dica){
     });
   };
   const receber=async fs=>{
+    if(solta.disabled)return;
+    solta.disabled=true;solta.setAttribute('aria-busy','true');
     solta.classList.add('ocupado');const antes=solta.textContent;solta.textContent='Enviando…';
     const ruins=[];
     for(const f of fs){ try{ await arqAdd(ref,f) }catch(e){ ruins.push(e.message||String(e)) } }
+    solta.disabled=false;solta.removeAttribute('aria-busy');
     solta.classList.remove('ocupado');solta.textContent=antes;pintar();
     if(ruins.length)alert('Não subiu:\n\n· '+ruins.join('\n· '));
   };
@@ -1180,17 +1198,11 @@ function menu(){
 function indiceDaTela(pagina){
   if(pagina.classList.contains('viagens-layout'))return;
   const blocos=[...pagina.querySelectorAll('.bloco[data-bid]')].filter(b=>b.querySelector('header h2')?.textContent.trim());
-  if(!blocos.length)return;
-  const faixa=el('<div class="indice-tela"><label>Ir para um assunto</label><select><option value="">Escolha uma seção desta tela…</option></select></div>');
+  if(blocos.length<2)return;
+  const faixa=el('<div class="indice-tela"><label>Ir para um assunto</label><select><option value="">Ir para uma seção…</option></select></div>');
   const seletor=faixa.querySelector('select');seletor.id=uid();faixa.querySelector('label').htmlFor=seletor.id;
   blocos.forEach((b,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=b.querySelector('header h2').textContent;seletor.appendChild(o)});
   seletor.onchange=()=>{if(seletor.value==='')return;const b=blocos[+seletor.value];b.classList.remove('fechado');E.colapso[b.dataset.bid]=false;salvar();const h=b.querySelector('header');h.setAttribute('aria-expanded','true');b.scrollIntoView({block:'start'});h.focus({preventScroll:true});seletor.value=''};
-  const prioridades={inicio:['ini-radar','ini-agenda'],rendimentos:['rd-lanc','rd-mes'],gastos:['gt-classe'],patrimonio:['pt-lista'],caixavgv:['cx-conf','cx-contas'],viagens:['vg-lista','google-gmail'],agenda:['ag-lista','google-agenda'],demandas:['dm-lista'],saude:['sa-ex','sa-rast'],estrategia:['es-plano'],fortemais:['fm-obras'],oportunidades:['op-rank','op-lista'],documentos:['dc-lista'],guia:['gu-metas','gu-plano','gu-pessoas'],config:['google-gmail','google-agenda','cf-copias']};
-  const rapidos=(prioridades[atual]||[]).map(id=>blocos.find(b=>b.dataset.bid===id)).filter(Boolean);
-  if(!rapidos.length)rapidos.push(...blocos.slice(0,2));
-  const atalhos=el('<nav class="atalhos-assuntos" aria-label="Acesso rápido nesta tela"></nav>');
-  rapidos.forEach(b=>{const bt=document.createElement('button');bt.className='btn ghost mini';bt.textContent=b.querySelector('header h2').textContent;bt.onclick=()=>{seletor.value=String(blocos.indexOf(b));seletor.onchange()};atalhos.appendChild(bt)});
-  faixa.appendChild(atalhos);
   const topo=pagina.querySelector('.topo');if(topo)topo.after(faixa);
 }
 function resumoRendimentoFiltrado(hist,empresa,ano,todos=false){
@@ -1225,7 +1237,7 @@ function organizarFinanceiro(pagina,secao,alvo){
     bt.onclick=()=>selecionar(id);
     paineis[id].id='finance-'+id;bt.setAttribute('aria-controls',paineis[id].id);pagina.appendChild(paineis[id]);
   });
-  function selecionar(id){abasFinanceiras[secao]=id;opcoes.forEach(([chave])=>{paineis[chave].hidden=chave!==id;const bt=nav.querySelector('[data-aba="'+chave+'"]');bt.setAttribute('aria-pressed',String(chave===id))})}
+  function selecionar(id){abasFinanceiras[secao]=id;opcoes.forEach(([chave])=>{paineis[chave].hidden=chave!==id;paineis[chave].setAttribute('aria-hidden',String(chave!==id));const bt=nav.querySelector('[data-aba="'+chave+'"]');bt.setAttribute('aria-pressed',String(chave===id))})}
   selecionar(alvo?abaDoBlocoFinanceiro(alvo,secao):(abasFinanceiras[secao]||'resumo'));
   // Conteúdo aparece ao escolher a visão; recolhimento antigo não esconde os dados.
   pagina.querySelectorAll('.bloco').forEach(b=>{b.classList.remove('fechado');b.querySelector('header')?.setAttribute('aria-expanded','true')});
@@ -1273,7 +1285,7 @@ function organizarAgenda(pagina,alvo){
   panes[pane].appendChild(node);
  });
  panes.integracoes.appendChild(arquivos);pagina.appendChild(nav);Object.values(panes).forEach(p=>pagina.appendChild(p));
- function selecionar(id){abaAgenda=id;Object.entries(panes).forEach(([k,p])=>p.hidden=k!==id);nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.agendaAba===id)))}
+ function selecionar(id){abaAgenda=id;Object.entries(panes).forEach(([k,p])=>{p.hidden=k!==id;p.setAttribute('aria-hidden',String(k!==id))});nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.agendaAba===id)))}
  const destino=alvo?Object.entries(panes).find(([,p])=>[...p.querySelectorAll('[data-bid]')].some(x=>x.dataset.bid===alvo))?.[0]:null;
  selecionar(destino||abaAgenda);
 }
@@ -1281,6 +1293,12 @@ function organizarAgenda(pagina,alvo){
 function prepararTabelas(pagina){
   pagina.querySelectorAll('table').forEach(t=>{
     const linhas=[...t.querySelectorAll('tbody>tr')].filter(tr=>tr.closest('table')===t);
+    const cabecalhos=[...t.querySelectorAll('thead>tr>th')].filter(x=>x.closest('table')===t);
+    linhas.forEach((tr,linha)=>{if(tr.children.length!==cabecalhos.length)return;
+      [...tr.children].forEach((td,i)=>td.querySelectorAll('input,select,textarea').forEach(campo=>{
+        if(!campo.hasAttribute('aria-label')&&!campo.hasAttribute('aria-labelledby')&&!campo.closest('label'))campo.setAttribute('aria-label',(cabecalhos[i].textContent.trim()||'Valor')+' · linha '+(linha+1));
+      }));
+    });
     linhas.forEach(tr=>{if(typeof tr.onclick==='function'&&!tr.querySelector('button,input,select,textarea,a')){
       tr.tabIndex=0;tr.setAttribute('role','button');tr.setAttribute('aria-label','Abrir '+tr.textContent.trim().replace(/\s+/g,' ').slice(0,100));
       tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tr.click()}};
@@ -2218,12 +2236,12 @@ function gradeMes(eventos,r){
   const anos=[];for(let y=minA;y<=maxA;y++)anos.push(y);
 
   const topo=el('<div style="display:flex;align-items:center;gap:9px;margin-bottom:12px;flex-wrap:wrap"></div>');
-  const bAnt=el('<button class="btn ghost mini" title="mês anterior">‹</button>');
+  const bAnt=el('<button class="btn ghost mini" title="Mês anterior" aria-label="Mês anterior">‹</button>');
   bAnt.onclick=()=>passo(-1);
   topo.appendChild(bAnt);
-  topo.appendChild(seletor(String(am),MESES_LONGO.map((nm,i)=>[String(i+1),nm]),v=>irPara(ay,+v)));
-  topo.appendChild(seletor(String(ay),anos.map(y=>[String(y),String(y)]),v=>irPara(+v,am)));
-  const bProx=el('<button class="btn ghost mini" title="próximo mês">›</button>');
+  topo.appendChild(seletor(String(am),MESES_LONGO.map((nm,i)=>[String(i+1),nm]),v=>irPara(ay,+v),'Mês do calendário'));
+  topo.appendChild(seletor(String(ay),anos.map(y=>[String(y),String(y)]),v=>irPara(+v,am),'Ano do calendário'));
+  const bProx=el('<button class="btn ghost mini" title="Próximo mês" aria-label="Próximo mês">›</button>');
   bProx.onclick=()=>passo(1);
   topo.appendChild(bProx);
   const bHoje=el('<button class="btn ghost mini">Hoje</button>');
@@ -2605,7 +2623,7 @@ function vDemandas(m){
   const STS=['Aberta','Fazendo','Parada','Concluída'];
   m.appendChild(painel('Mostrar',
     seletor(filtro.demandas,[['Todas','Todas ('+E.demandas.length+')'],['Pendentes','Pendentes'],['Atrasadas','Atrasadas'],['Alta prioridade','Alta prioridade'],...STS.map(st=>[st,st+' ('+por(st)+')'])],
-      v=>{filtro.demandas=v;r()}),
+      v=>{filtro.demandas=v;r()},'Situação das demandas'),
     acao('+ Nova demanda',nova),'|'));
   if(atrasadas) m.appendChild(el(`<div class="aviso">⏰ <b>${atrasadas} demanda(s) passaram do prazo.</b></div>`));
 
@@ -2763,7 +2781,7 @@ function organizarSaude(pagina,alvo){
   const nav=el('<nav class="finance-tabs saude-tabs" aria-label="Áreas de saúde"></nav>');
   [...pagina.children].forEach(no=>{if(no.classList.contains('topo')||no.classList.contains('painel'))return;paineis[abaDoBlocoSaude(no.dataset.bid)].appendChild(no)});
   pagina.appendChild(nav);
-  function selecionar(id){abaSaude=id;opcoes.forEach(([k])=>{paineis[k].hidden=k!==id;nav.querySelector('[data-area="'+k+'"]').setAttribute('aria-pressed',String(k===id))})}
+  function selecionar(id){abaSaude=id;opcoes.forEach(([k])=>{paineis[k].hidden=k!==id;paineis[k].setAttribute('aria-hidden',String(k!==id));nav.querySelector('[data-area="'+k+'"]').setAttribute('aria-pressed',String(k===id))})}
   opcoes.forEach(([id,nome])=>{const bt=el('<button type="button"></button>');bt.textContent=nome;bt.dataset.area=id;bt.setAttribute('aria-controls','saude-'+id);paineis[id].id='saude-'+id;bt.onclick=()=>selecionar(id);nav.appendChild(bt);pagina.appendChild(paineis[id])});
   const resumo=paineis.resumo.querySelector('.saude-resumo');if(resumo)paineis.resumo.prepend(resumo);
   selecionar(alvo?abaDoBlocoSaude(alvo):abaSaude);
@@ -2990,7 +3008,7 @@ function modalMarcador(nome) {
   const itens = E.exames.filter(x => (x.exame || '').trim() === nome)
     .sort((a, b) => (a.data || '').localeCompare(b.data || ''));
   const ult = itens[itens.length - 1];
-  abrirModal(esc(nome), mk ? 'alvo ótimo ' + esc(mk[3]) + ' · laboratório ' + esc(mk[2]) : itens.length + ' medição(ões)', (c, fechar) => {
+  abrirModal(esc(nome), mk ? 'Alvo cadastrado: ' + esc(mk[3]) + ' · referência: ' + esc(mk[2]) : itens.length + ' medição(ões)', (c, fechar) => {
     const pts = itens.filter(x => !isNaN(parseFloat(String(x.valor).replace(',', '.'))))
       .map(x => ({ r: fmtDataAno(x.data).slice(0, 5) + '/' + (x.data || '').slice(2, 4), v: parseFloat(String(x.valor).replace(',', '.')) }));
     if (pts.length > 1) {
@@ -3003,7 +3021,7 @@ function modalMarcador(nome) {
       c.appendChild(el(`<div class="aviso" style="margin:0 0 12px;background:${sem === 'ruim' ? 'var(--vermelho-cl)' : sem === 'atencao' ? 'var(--areia-cl)' : 'var(--verde-cl)'};
         border-color:${sem === 'ruim' ? 'var(--vermelho)' : sem === 'atencao' ? 'var(--areia)' : 'var(--verde)'}">
         <b>${ch ? ch[2] : '—'}</b> — último: ${esc(ult.valor)}${mk ? ' ' + esc(mk[1]) : ''} em ${fmtDataAno(ult.data)}.
-        ${mk ? 'Alvo ótimo: <b>' + esc(mk[3]) + '</b>. O laboratório considera normal ' + esc(mk[2]) + '.' : ''}</div>`));
+        ${mk ? 'Alvo cadastrado: <b>' + esc(mk[3]) + '</b>. Referência cadastrada: ' + esc(mk[2]) + '.' : ''}</div>`));
     }
     const s2 = el('<div class="secao"><h4>Todas as medições</h4></div>');
     const rl = el('<div class="rolagem"></div>');
@@ -3054,7 +3072,7 @@ function modalExame(x) {
              <div><div style="color:var(--suave);font-size:11.5px">Alvo cadastrado</div><b style="color:var(--verde)">${esc(mk[3])} ${esc(mk[1])}</b></div>
              ${cc ? `<div><div style="color:var(--suave);font-size:11.5px">Sua situação</div><span class="chip" style="background:${cc[0]};color:${cc[1]}">${cc[2]}</span></div>` : ''}
            </div>`
-        : `<h4>Referência</h4><p style="font-size:12.5px;color:var(--suave)">Escolha um marcador da lista para eu mostrar a faixa normal e o alvo ótimo.</p>`;
+        : `<h4>Referência</h4><p style="font-size:12.5px;color:var(--suave)">Selecione um marcador para consultar as referências e os alvos cadastrados.</p>`;
       // histórico do mesmo exame
       const hist = E.exames.filter(y => y.exame === x.exame && y.valor !== '' && y.valor != null)
         .sort((a, b) => (a.data || '').localeCompare(b.data || ''));
@@ -3630,7 +3648,7 @@ async function vFortemais(m){
 
   m.appendChild(painel('Ano',
     seletor(filtro.fmAno,[['todas','Todas'],...(temAberta?[['aberto','Em aberto']]:[]),...anos.map(a2=>[a2,a2])],
-      v=>{filtro.fmAno=v;r()}),
+      v=>{filtro.fmAno=v;r()},'Ano das obras'),
     acao('+ Nova obra',novaObra),'|'));
 
   const visiveis=contas.filter(x=>{
@@ -3662,6 +3680,8 @@ async function vFortemais(m){
       <span style="color:${c.podeLucro?(c.lucro>=0?'var(--verde)':'var(--vermelho)'):'var(--suave)'};font-variant-numeric:tabular-nums;font-weight:600;min-width:104px;text-align:right">${c.podeLucro?brl(c.lucro):'—'}</span>
       <span class="seta" style="transform:rotate(${aberta?0:-90}deg);transition:transform .15s">▼</span>
     </div>`);
+    linha.setAttribute('role','button');linha.tabIndex=0;linha.setAttribute('aria-expanded',String(aberta));
+    linha.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();linha.click()}};
     linha.onclick=()=>{filtro.fmAberta=aberta?null:o.id;r()};
     cont.appendChild(linha);
     if(aberta){
@@ -3750,6 +3770,8 @@ async function fichaObraEm(c,o,fechar){
         <span class="cresce"></span>
         ${(fechada&&dica)?`<span class="resumo">${dica}</span>`:''}
         <span class="seta" style="transform:rotate(${fechada?-90:0}deg)">▼</span></h4>`);
+      h.setAttribute('role','button');h.tabIndex=0;h.setAttribute('aria-expanded',String(!fechada));
+      h.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();h.click()}};
       h.onclick=()=>{E.colapso[id]=!E.colapso[id];salvar();pinta()};
       sc.appendChild(h);
       return sc;
@@ -4425,10 +4447,11 @@ function blocoImportarObra(){
     dele (Projeto, Centro de custo, Fornecedor, Valor parcela…), crio a obra que ainda não existir,
     separo os <b>aportes</b> das despesas e gravo tudo no servidor. Trazer o mesmo arquivo duas vezes
     <b>não duplica</b> — cada parcela tem uma identidade e é atualizada, não repetida.</p>`));
-  const solta=el('<div class="solta">📥 Clique ou arraste o arquivo do ERP aqui</div>');
+  const solta=el('<button type="button" class="solta">📥 Clique ou arraste o arquivo do ERP aqui</button>');
   const inp=el('<input type="file" accept=".xlsx" hidden>');
   const st=el('<div style="font-size:12.5px;color:var(--suave);margin-top:9px"></div>');
   const receber=async f=>{
+    if(solta.disabled)return;solta.disabled=true;solta.setAttribute('aria-busy','true');
     solta.classList.add('ocupado');st.textContent='Lendo o arquivo…';
     try{
       const zip=await lerZipAuto(new Uint8Array(await f.arrayBuffer()));
@@ -4546,7 +4569,7 @@ function blocoImportarObra(){
         (receitas.length?'\n⚠️ '+receitas.length+' RECEITAS que não são aporte vieram no arquivo (ex.: "'+receitas[0].nome+'"). Receita de venda não entra no custo: lance a venda na ficha da obra.':''));
       tela();
     }catch(e){st.textContent='';alert('Não consegui importar: '+(e.message||e))}
-    finally{solta.classList.remove('ocupado')}
+    finally{solta.classList.remove('ocupado');solta.disabled=false;solta.removeAttribute('aria-busy')}
   };
   solta.onclick=()=>inp.click();
   inp.onchange=()=>{if(inp.files[0])receber(inp.files[0]);inp.value=''};
@@ -4647,7 +4670,7 @@ function organizarCaixaVGV(pagina,alvo){
  const meta=E.patrimonialImportacao;
  const data=v=>v&&Number.isFinite(new Date(v).getTime())?new Date(v).toLocaleString('pt-BR'):'Não registrada';
  fonte.appendChild(el(`<div><span class="caixa-eyebrow">BASE PATRIMONIAL</span><h2>Última importação: ${esc(data(meta?.importadoEm))}</h2><p>${meta?esc(meta.arquivo)+' · Os valores podem ser editados manualmente.':'Atualize pela sua planilha ou preencha os lançamentos manualmente.'}</p></div>`));
- const botoes=acoes?.querySelector('.corpo > div');if(botoes)fonte.appendChild(botoes);acoes?.remove();
+ const botoes=acoes?.querySelector('.corpo > div');if(botoes){botoes.classList.add('caixa-fonte-acoes');fonte.appendChild(botoes)};acoes?.remove();
  const manual=el('<button class="btn ghost" type="button">Editar lançamentos</button>');manual.onclick=()=>selecionar('lancamentos');fonte.lastElementChild.appendChild(manual);
  topo.after(fonte);
  const nav=el('<nav class="caixa-abas" aria-label="Seções de Caixa e VGV"></nav>'),panes={};
@@ -4666,7 +4689,7 @@ function organizarCaixaVGV(pagina,alvo){
  panes.lancamentos.prepend(el('<p class="caixa-ajuda">Edite os campos diretamente. Contas e empreendimentos são listas independentes.</p>'));
  panes.conferencia.prepend(el('<p class="caixa-ajuda">As projeções abaixo acrescentam hipóteses à planilha. Confira possíveis duplicidades entre casas e empreendimentos e a natureza das dívidas antes de usar o saldo.</p>'));
  pagina.appendChild(nav);Object.values(panes).forEach(p=>pagina.appendChild(p));
- function selecionar(id){abaCaixaVGV=id;Object.entries(panes).forEach(([k,p])=>p.hidden=k!==id);nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.caixaAba===id)));}
+ function selecionar(id){abaCaixaVGV=id;Object.entries(panes).forEach(([k,p])=>{p.hidden=k!==id;p.setAttribute('aria-hidden',String(k!==id))});nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.caixaAba===id)));}
  const destino=alvo?Object.entries(panes).find(([,p])=>[...p.querySelectorAll('[data-bid]')].some(x=>x.dataset.bid===alvo))?.[0]:null;
  selecionar(destino||abaCaixaVGV);
  panes.lancamentos.querySelectorAll('.bloco').forEach(b=>b.classList.remove('fechado'));
@@ -5213,7 +5236,7 @@ function buscarEmTudo(q){
 function abrirBusca(){
   abrirModal('🔎 Buscar em tudo','o que você lembra — o nome, a cidade, o número',(c,fechar)=>{
     const s1=el('<div class="secao"></div>');
-    const campo=el('<input type="search" placeholder="seguro, Guangzhou, passaporte, localizador…" style="width:100%;border:1px solid var(--linha);background:var(--bg);color:inherit;font:inherit;padding:12px 14px;border-radius:10px">');
+    const campo=el('<input type="search" aria-label="O que você procura" placeholder="Busque por nome, documento, cidade…" style="width:100%;border:1px solid var(--linha);background:var(--bg);color:inherit;font:inherit;padding:12px 14px;border-radius:10px">');
     const res=el('<div style="margin-top:14px"></div>');
     const pinta=()=>{
       const q=campo.value.trim();
@@ -6245,9 +6268,9 @@ function vOportunidades(m){
   m.appendChild(painel('Ver',
     seletor(filtro.oportEstagio,[['Ativas','Ativas ('+L.filter(o=>o.estagio!=='Arquivada').length+')'],
       ...ESTAGIOS.map(e=>[e,e+' ('+L.filter(o=>o.estagio===e).length+')']),['Todas','Todas ('+L.length+')']],
-      v=>{filtro.oportEstagio=v;r()}),
+      v=>{filtro.oportEstagio=v;r()},'Estágio da oportunidade'),
     seletor(filtro.oportTipo,[['Todos','Todos os tipos'],...tipos.map(x=>[x,x])],
-      v=>{filtro.oportTipo=v;r()}),
+      v=>{filtro.oportTipo=v;r()},'Tipo de oportunidade'),
     acao('+ Nova oportunidade',novo),'|'));
 
   const ativas=L.filter(o=>o.estagio!=='Arquivada');
@@ -8061,7 +8084,7 @@ function vGastos(m){
   m.appendChild(painel('Mês',
     seletor(mes,[...meses.slice().reverse().map(mm=>[mm,rot(mm)]),
       ...(meses.includes(mesAtual())?[]:[[mesAtual(),rot(mesAtual())+' (atual)']]),['todos','Todos os meses']],
-      v=>{filtro.gastosMes=v;r()}),
+      v=>{filtro.gastosMes=v;r()},'Mês dos gastos'),
     acao('+ Novo gasto',()=>{const g={id:uid(),...novoLanc()};E.gastos.push(g);salvar();abreBloco('gt-lista');r();modalLancamentoGasto(g)}),'|'));
 
   m.appendChild(ligaKpis(el(`<div class="grade">
@@ -8513,19 +8536,19 @@ function blocoDisc(C, r) {
 // barra de nota 0–100 que se preenche ao clicar/arrastar
 function escalaNota(titulo, dica, valor, aoMudar) {
   const v = Math.max(0, Math.min(100, +valor || 0));
-  const cor = v >= 70 ? 'var(--verde)' : v >= 40 ? 'var(--azul)' : v > 0 ? 'var(--areia)' : 'var(--linha)';
+  const cor = v >= 70 ? 'var(--verde)' : v >= 40 ? 'var(--azul)' : v > 0 ? 'var(--areia)' : 'var(--suave)';
   const w = el(`<div style="padding:9px 0;border-bottom:1px solid var(--linha)">
     <div style="display:flex;align-items:baseline;gap:8px">
       <b style="font-size:13.5px;flex:1">${esc(titulo)}</b>
       <span style="font-variant-numeric:tabular-nums;font-weight:700;font-size:14px;color:${cor}">${v || '—'}</span>
     </div>
     <div style="font-size:11.5px;color:var(--suave);margin:1px 0 6px">${esc(dica)}</div>
-    <input type="range" min="0" max="100" step="5" value="${v}" style="width:100%;accent-color:${cor}">
+    <input type="range" aria-label="${esc(titulo)}" min="0" max="100" step="5" value="${v}" style="width:100%;accent-color:${cor}">
   </div>`);
   const inp = w.querySelector('input');
   inp.addEventListener('input', () => {
     w.querySelector('span').textContent = inp.value;
-    const c2 = +inp.value >= 70 ? 'var(--verde)' : +inp.value >= 40 ? 'var(--azul)' : +inp.value > 0 ? 'var(--areia)' : 'var(--linha)';
+    const c2 = +inp.value >= 70 ? 'var(--verde)' : +inp.value >= 40 ? 'var(--azul)' : +inp.value > 0 ? 'var(--areia)' : 'var(--suave)';
     w.querySelector('span').style.color = c2; inp.style.accentColor = c2;
   });
   inp.addEventListener('change', () => aoMudar(+inp.value));
@@ -8612,12 +8635,12 @@ function vGuia(m) {
   const grade = el('<div style="display:grid;gap:9px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))"></div>');
   AR.forEach((a, i) => {
     const v = notas[i];
-    const cor = v >= 8 ? 'var(--verde)' : v >= 5 ? 'var(--areia)' : v > 0 ? 'var(--vermelho)' : 'var(--linha)';
+    const cor = v >= 8 ? 'var(--verde)' : v >= 5 ? 'var(--areia)' : v > 0 ? 'var(--vermelho)' : 'var(--suave)';
     const it = el(`<div style="background:var(--bg);border:1px solid var(--linha);border-radius:11px;padding:10px 12px">
       <div style="display:flex;align-items:baseline;gap:8px"><b style="font-size:13.5px">${esc(a)}</b>
         <span style="margin-left:auto;font-family:Fraunces,serif;font-size:17px;color:${cor}">${v || '—'}</span></div>
       <div class="barra" style="margin-top:7px"><i style="width:${v * 10}%;background:${cor}"></i></div>
-      <input type="range" min="0" max="10" step="1" value="${v}" style="width:100%;margin-top:7px;accent-color:var(--verde)"></div>`);
+      <input type="range" aria-label="${esc(a)}" min="0" max="10" step="1" value="${v}" style="width:100%;margin-top:7px;accent-color:var(--verde)"></div>`);
     it.querySelector('input').onchange = e => { E.roda[a] = +e.target.value; salvar(); r() };
     grade.appendChild(it);
   });
@@ -8838,7 +8861,7 @@ function vGuia(m) {
   selAno.appendChild(el('<span style="font-size:11.5px;color:var(--suave);text-transform:uppercase;letter-spacing:.05em">Ano</span>'));
   selAno.appendChild(seletor(String(anoPlan),
     anosPlano.map(a => [String(a), a + (E.planoAno.filter(x => +x.ano === a).length ? ' (' + E.planoAno.filter(x => +x.ano === a).length + ')' : ' — vazio')]),
-    v => { filtro.planoAno = +v; r() }));
+    v => { filtro.planoAno = +v; r() }, 'Ano do planejamento'));
   const proximo = anoPlan + 1;
   const btNovo = el('<button class="btn mini ghost">+ Começar ' + proximo + '</button>');
   btNovo.onclick = () => { filtro.planoAno = proximo; r() };
@@ -9031,6 +9054,7 @@ function modalInstrucoes() {
       const s = el(`<div class="secao"><h4>${esc(titulo)}</h4>
         <p style="font-size:12px;color:var(--suave);margin:-4px 0 8px">${esc(dica)}</p></div>`);
       const ta = el('<textarea class="inp" style="width:100%;min-height:64px;resize:vertical"></textarea>');
+      ta.setAttribute('aria-label', titulo);
       ta.value = f.texto || '';
       ta.onchange = () => { f.texto = ta.value; salvar() };
       s.appendChild(ta); c.appendChild(s);
@@ -9076,11 +9100,12 @@ function modalMeta(x){
       const v=s2.querySelector('.passos');if(v)v.remove();
       const cont=el('<div class="passos"></div>');
       (x.passos||[]).forEach((p,i)=>{
-        const it=el(`<div class="passo${p.feito?' ok':''}"><input type="checkbox"${p.feito?' checked':''}>
-          <span class="tx"><input type="text" value="${esc(p.texto)}" placeholder="passo…"></span>
+        const it=el(`<div class="passo${p.feito?' ok':''}"><input type="checkbox" aria-label="Concluir passo ${i+1}"${p.feito?' checked':''}>
+          <span class="tx"><input type="text" aria-label="Descrição do passo ${i+1}" value="${esc(p.texto)}" placeholder="Descreva o passo"></span>
           <button class="lixo">✕</button></div>`);
         it.querySelector('input[type=checkbox]').onchange=e=>{p.feito=e.target.checked;salvar();pintar()};
         it.querySelector('input[type=text]').onchange=e=>{p.texto=e.target.value;salvar()};
+        it.querySelector('.lixo').setAttribute('aria-label','Apagar passo '+(i+1));
         it.querySelector('.lixo').onclick=()=>{x.passos.splice(i,1);salvar();pintar()};
         cont.appendChild(it);
       });
@@ -9727,7 +9752,7 @@ function telaLogin(){
       <label style="display:flex;gap:8px;align-items:center;justify-content:center;font-size:12.5px;color:var(--suave);margin:13px 0">
         <input type="checkbox" checked style="accent-color:var(--verde)"> Manter conectado neste aparelho</label>
       <button class="btn" style="width:100%">Entrar</button>
-      <div class="erro" style="color:var(--vermelho);font-size:12.5px;margin-top:10px;min-height:16px"></div>
+      <div class="erro" role="alert" aria-live="polite" style="color:var(--vermelho);font-size:12.5px;margin-top:10px;min-height:16px"></div>
     </form></div>`);
   const usr=f.querySelector('.usr'),senha=f.querySelector('input[type=password]'),manter=f.querySelector('input[type=checkbox]'),erroEl=f.querySelector('.erro');
   f.querySelector('form').onsubmit=async ev=>{

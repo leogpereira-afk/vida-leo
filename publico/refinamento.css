@@ -202,3 +202,62 @@ body:has(.fundo){overflow:hidden}
 .caixa-abas{display:flex;gap:6px;border-bottom:1px solid var(--linha);margin:0 0 24px;overflow-x:auto;padding-bottom:8px}.caixa-abas button{white-space:nowrap;background:transparent;border:0;padding:12px 18px;border-radius:9px;font:600 14px system-ui;color:var(--suave);cursor:pointer}.caixa-abas button[aria-pressed=true]{background:#eeedff;color:#3730a3}.caixa-abas button:focus-visible{outline:2px solid #433ff0;outline-offset:2px}
 .caixa-pane[hidden]{display:none!important}.caixa-section-title{margin:0 0 18px}.caixa-section-title h2{font-size:21px;margin:0 0 4px}.caixa-pane>.grade{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:14px}.caixa-pane .kpi{min-width:0}.caixa-pane .kpi strong{font-variant-numeric:tabular-nums}.caixa-ajuda{margin-bottom:18px;padding:14px 18px;background:#f0f2f6;border-radius:10px}
 @media(max-width:700px){.caixa-fonte{align-items:stretch;flex-direction:column;gap:16px;padding:18px}.caixa-fonte h2{font-size:15px}.caixa-fonte .btn{flex:1}.caixa-pane>.grade{grid-template-columns:1fr;gap:10px;margin-bottom:10px}.caixa-abas button{padding:10px 13px}.caixa-fonte>div{min-width:0}.caixa-fonte p{overflow-wrap:anywhere}}
+
+/* Revisão visual: leitura, formulários e navegação consistentes em todo o painel. */
+:root{--suave:#5f645c;--controle:#858a80;--foco:#2854c5}
+.topo h1,.bloco>header h2,.modal h3,.caixa-section-title h2{font-family:Inter,system-ui,sans-serif;letter-spacing:-.025em}
+.topo h1{font-weight:700}.topo p{font-size:14px}
+button{cursor:pointer}.cartao{color:var(--tinta)}
+button:disabled{cursor:not-allowed}button[aria-busy=true]{cursor:wait}
+.btn,.mais,.fechar{min-height:44px}.fechar{min-width:44px;flex-shrink:0}
+.indice-tela{justify-content:flex-end;margin:-8px 0 20px;gap:8px}
+.indice-tela label{font-size:12px}.indice-tela select{min-width:190px;font-size:13px;background:transparent}
+.campo{min-width:0}.campos{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.campo label{font-size:13px;color:var(--tinta)}
+.campo input,.campo select,.campo textarea,.painel input,.painel select,.indice-tela select,.inp{border-color:var(--controle)}
+.campo input,.campo select,.campo textarea{background:var(--card)}
+.campo textarea{min-height:96px;line-height:1.6}
+input::placeholder,textarea::placeholder{color:var(--suave);opacity:1}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible,[tabindex]:focus-visible,summary:focus-visible{outline:3px solid var(--foco)!important;outline-offset:3px}
+input[type=range]{min-height:44px;cursor:pointer}
+.modal{display:flex;flex-direction:column;max-height:calc(100dvh - 68px);min-width:0}
+.modal>header{flex-shrink:0;background:var(--card);gap:16px}.modal>header>div{min-width:0}.modal>header h3,.modal>header p{overflow-wrap:anywhere}
+.mcorpo{overflow:auto;overscroll-behavior:contain;min-height:0;scroll-padding:16px}
+.modal .secao{padding:22px 24px}.modal .secao h4{font-size:12px;letter-spacing:.04em}
+.modal .modal-acoes{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--linha);z-index:2;flex-wrap:wrap;padding-top:14px;padding-bottom:14px}
+.modal .solta{display:block;width:100%;min-height:64px;background:var(--bg);border-color:var(--controle);font:inherit;font-size:13px;line-height:1.6}
+.solta:focus-visible,.solta:hover{border-color:var(--verde);background:var(--verde-cl)}
+.arq{flex-wrap:wrap}.arq .nome{flex-basis:180px;white-space:normal;overflow-wrap:anywhere}.arq a{display:inline-flex;align-items:center;min-height:44px;padding:0 5px}
+.mcorpo .inp{font:inherit;line-height:1.6;color:var(--tinta);background:var(--card);border:1px solid var(--controle);border-radius:9px;padding:12px}
+.passo .tx{min-width:0}.passo input[type=text]{min-height:44px}
+.saude-layout>.painel select{flex:0 1 260px}.saude-layout>.painel .btn{margin-left:auto}
+.caixa-fonte{background:var(--card)}.caixa-ajuda{background:var(--azul-cl)}
+@media(prefers-color-scheme:dark){
+ :root{--suave:#b6bcb3;--controle:#818a94;--foco:#a9baff}
+ .caixa-eyebrow{color:#b9b5ff}.caixa-abas button[aria-pressed=true]{background:#302c51;color:#ddd9ff}
+ .finance-tabs,.agenda-abas{background:#30343a}.saude-layout>.painel select{color:#10251f}
+ .diaCel>div:first-child{color:var(--tinta)}
+}
+@media(max-width:600px){
+ .topo{gap:12px}.indice-tela{justify-content:stretch;gap:6px}.indice-tela label{flex-basis:100%}
+ .indice-tela select{width:100%;font-size:16px}.main{padding:22px 14px 48px}
+ .fundo{padding:8px}.modal{max-height:calc(100dvh - 16px);border-radius:14px}.modal>header{padding:14px 16px}.modal .secao{padding:18px 16px}
+ .modal .modal-acoes{padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+ .campos{grid-template-columns:minmax(0,1fr);gap:16px}.modal .secao h4{margin-bottom:14px}
+ .btn,.mais,.nav button,.painel input,.painel select,.viagens-filtros select{min-height:44px}
+ .painel select,.viagens-filtros select,.financeiro .painel select{font-size:16px}
+ .saude-layout>.painel select{flex:1 1 180px}.saude-layout>.painel .btn{margin-left:0}
+ .caixa-abas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible;gap:6px}.caixa-abas button{white-space:normal;min-height:44px;padding:10px 8px}
+ .finance-tabs,.agenda-abas{flex-wrap:wrap}.finance-tabs button,.agenda-abas button{min-width:0;overflow-wrap:anywhere}
+}
+@media(max-width:360px){.grade,.inicio-grade{grid-template-columns:minmax(0,1fr)}.side{padding:10px}.atalhos-topo>.btn{font-size:11px}.saude-tabs button{font-size:11px}.modal .btn{white-space:normal}}
+@media print{.modal{max-height:none}.mcorpo{overflow:visible}.modal .modal-acoes{position:static}.indice-tela{display:none}}
+.solta{background:var(--bg);width:100%;font-family:inherit}
+@media(min-width:1200px){.grade:not(.finance-metrics):has(>.kpi:nth-child(5):last-child){grid-template-columns:repeat(5,minmax(0,1fr))}.grade:has(>.kpi:nth-child(5):last-child) .val{font-size:23px}}
+@media(max-width:600px){.grade:not(.finance-metrics):has(>.kpi:nth-child(5):last-child)>.kpi:first-child{grid-column:1/-1}}
+
+@media(max-width:600px){.caixa-fonte-acoes{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px!important}.caixa-fonte-acoes>.btn:first-child{grid-column:1/-1}.caixa-fonte-acoes>.btn{margin:0;min-height:44px}}
+
+:root{color-scheme:light}
+@media(prefers-color-scheme:dark){:root{color-scheme:dark}}
+.modal-acoes>.btn:last-child{margin-left:auto}
