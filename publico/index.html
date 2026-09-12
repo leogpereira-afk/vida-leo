@@ -243,7 +243,7 @@ tr:hover .lixo{opacity:1}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css?v=ecea1edff489">
+<link rel="stylesheet" href="./refinamento.css?v=b29b168837af">
 <link rel="stylesheet" href="empresas.css?v=2">
 <link rel="stylesheet" href="organograma.css?v=1">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
@@ -7178,7 +7178,7 @@ function vRendimentos(m){
   const temDetalhe=grupos.some(g=>g.itens.length);
   const lc=el('<div></div>');
   lc.appendChild(el(`<div class="grafico">${gBarras(
-    fontesEmp.map(e=>({r:e.r,v:e.v})),{fmt:brl})}</div>`));
+    fontesEmp.slice().sort((a,b)=>a.v-b.v).map(e=>({r:e.r,v:e.v})),{fmt:brl})}</div>`));
 
   const tl=el('<div class="rolagem"></div>');
   const tg=document.createElement('table');
@@ -8560,6 +8560,7 @@ function modalBem(x,novo=false){
 
 /* ===================== GASTOS ===================== */
 /* ---- custo fixo: o que debita sozinho todo mês (cadastro, não lançamento) ---- */
+const categoriasGasto=()=>[...new Set(['Casa','Filhos','Esposa',...CFG('catGasto')])];
 const valorMensal=x=>x.ciclo==='Anual'?(+x.valor||0)/12:(+x.valor||0);
 const ativos=l=>(l||[]).filter(x=>x.status!=='Cancelar'&&x.status!=='Cancelado');
 // cada cadastro fixo cai numa classificação do mesmo dicionário dos lançamentos
@@ -8585,9 +8586,9 @@ function modalItemGasto(x, titulo, sub, ref, dica){
 function modalLancamentoGasto(g,novo=false){
   if(novo)g._ffNovo=true;
   abrirModal(esc(g.oque||'Novo gasto'),'Este lançamento entra nos totais depois de salvar.',(c,fechar)=>{
-    financeiroFormulario(c,[{k:'oque',t:'Descrição',full:true,req:true,ph:'O que foi comprado ou pago'},
+    financeiroFormulario(c,[{k:'oque',t:'Descrição',full:true,req:true,ph:'Ex.: Copasa, Cemig, escola, compras pessoais'},
       {k:'valor',t:'Valor (R$)',tipo:'moeda',req:true,naoZero:true,ajuda:'Use valor negativo somente para estorno.'},
-      {k:'mes',t:'Mês do gasto',tipo:'month',req:true},{k:'classe',t:'Categoria',opcoes:['Sem categoria',...CFG('catGasto')],inicial:g.classe||g.categoria||'Sem categoria',req:true},
+      {k:'mes',t:'Mês do gasto',tipo:'month',req:true},{k:'classe',t:'Categoria',opcoes:['Sem categoria',...categoriasGasto()],inicial:g.classe||g.categoria||'Sem categoria',req:true},
       {k:'pago',t:'Forma de pagamento',opcoes:['',...CFG('formasPagto')]},{k:'obs',t:'Observações',tipo:'textarea',full:true}],
       g,(v,patch)=>financeiroSalvarRegistro(E.gastos,g,v,patch),fechar);
     c.appendChild(el('<p class="ff-note">Confira se esta despesa já está em Recorrentes; o resumo soma os dois cadastros.</p>'));
@@ -8655,7 +8656,7 @@ function vGastos(m){
   /* ================= PARA ONDE VAI O DINHEIRO (classificação) ================= */
   // as classes dos cadastros fixos entram sempre, mesmo que a config salva seja antiga —
   // senão o valor conta no total e some do detalhamento
-  const classes=[...new Set([...CFG('catGasto'),...FIXOS().map(f=>f.classe),
+  const classes=[...new Set([...categoriasGasto(),...FIXOS().map(f=>f.classe),
     ...doMes.map(g=>g.classe||g.categoria||'Sem categoria')])].filter(Boolean);
   const grupos=classes.map(cl=>{
     const itens=[];
@@ -8798,14 +8799,28 @@ function vGastos(m){
 
   const excluirGasto=async g=>{if(!confirm('Excluir este lançamento e seus comprovantes?'))return;if(!await apagarAnexosDe('gasto:'+g.id))return;E.gastos=E.gastos.filter(x=>x.id!==g.id);salvar();r()};
   m.querySelectorAll('[data-bid="gt-lista"] [data-del]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();excluirGasto(doMes[+b.dataset.del])});
-  const cartoesLanc=el('<div class="finance-mobile-list"></div>');
+  const cartoesLanc=el('<div class="gastos-categorias"></div>');
+  const gruposLanc=new Map();
+  classes.forEach(cl=>{
+    const itens=doMes.filter(g=>(g.classe||g.categoria||'Sem categoria')===cl);
+    if(!itens.length&&!['Casa','Filhos','Esposa'].includes(cl))return;
+    const icone=({Casa:'🏠',Filhos:'🧒',Esposa:'💜'})[cl]||'💸';
+    const grupo=el(`<details class="gasto-categoria" open><summary><span>${icone} ${esc(cl)}</span><b>${brl(itens.reduce((s,g)=>s+(+g.valor||0),0))}</b></summary><div class="gasto-categoria-itens"></div></details>`);
+    const bt=el(`<button type="button" class="btn ghost mini">+ Adicionar em ${esc(cl)}</button>`);
+    bt.onclick=()=>modalLancamentoGasto({id:uid(),...novoLanc(),classe:cl},true);
+    grupo.appendChild(bt);gruposLanc.set(cl,grupo.querySelector('.gasto-categoria-itens'));cartoesLanc.appendChild(grupo);
+    if(!itens.length)gruposLanc.get(cl).appendChild(el(`<p class="ff-note">${cl==='Casa'?'Adicione Copasa, Cemig, internet e outras contas.':'Adicione as despesas desta categoria.'}</p>`));
+  });
   doMes.slice().sort((a,b)=>(+b.valor||0)-(+a.valor||0)).forEach(g=>{
     const linha=el(`<div class="finance-expense-row" data-ff-gasto="${esc(g.id)}"><button class="finance-expense-open"><span>${esc(g.oque||'Sem descrição')}<small>${esc(g.classe||g.categoria||'Sem categoria')} · ${esc(g.mes||'Sem mês')}</small></span><b>${brl(+g.valor||0)} ›</b></button><button class="btn ghost mini" aria-label="${esc('Excluir '+(g.oque||'gasto'))}">Excluir</button></div>`);
     linha.querySelector('.finance-expense-open').onclick=()=>modalLancamentoGasto(g);
     linha.querySelector('.btn').onclick=()=>excluirGasto(g);
-    cartoesLanc.appendChild(linha);
+    gruposLanc.get(g.classe||g.categoria||'Sem categoria')?.appendChild(linha);
   });
-  m.querySelector('[data-bid="gt-lista"] .conteudo')?.prepend(cartoesLanc);
+  const conteudoLanc=m.querySelector('[data-bid="gt-lista"] .conteudo');
+  const modo=el('<button type="button" class="btn ghost mini" aria-pressed="false">Ver tabela</button>');
+  modo.onclick=()=>{const tabela=modo.getAttribute('aria-pressed')!=='true';modo.setAttribute('aria-pressed',String(tabela));modo.textContent=tabela?'Ver por categoria':'Ver tabela';conteudoLanc.classList.toggle('gastos-ver-tabela',tabela);cartoesLanc.hidden=tabela;};
+  conteudoLanc?.classList.add('gastos-lista-organizada');conteudoLanc?.prepend(modo,cartoesLanc);
   financeiroFiltroTabela(m.querySelector('[data-bid="gt-lista"]'),doMes,['mes','classe','categoria','oque','pago','obs'],'valor');
 
   /* ================= CADASTROS FIXOS ================= */
@@ -8814,7 +8829,7 @@ function vGastos(m){
 
   /* ---------- CASA ---------- */
   m.appendChild(tabelaBloco('gt-casa','🏠 Gastos da casa','condomínio, luz, água, internet, IPTU, quem trabalha na casa',E.casa,[
-    {k:'item',t:'Conta',tipo:'select',opcoes:CFG('catCasa'),w:170},
+    {k:'item',t:'Conta / fornecedor',ph:'Copasa, Cemig, internet…',w:170},
     {k:'onde',t:'Imóvel',ph:'casa, apto, sítio'},
     {k:'valor',t:'Valor',tipo:'moeda',w:140},
     {k:'ciclo',t:'Cobrança',tipo:'select',opcoes:['Mensal','Anual']},

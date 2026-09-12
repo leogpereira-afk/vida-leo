@@ -25,3 +25,16 @@ test('Excluir gasto para quando os comprovantes não podem ser removidos',async(
 test('Bem: prévia do saldo acompanha edição sem alterar o valor salvo',()=>{const {run,document}=app();run("E.patrimonio=[{id:'a',nome:'Apartamento',tipo:'Imóvel',valor:100,falta:20,situacao:'Financiado'}];modalBem(E.patrimonio[0])");const f=form(document);fill(f,'valor','200');f.querySelector('[name=valor]').oninput();assert.match(document.querySelector('.ff-equity-preview').textContent,/180,00/);assert.equal(run('E.patrimonio[0].valor'),100)});
 test('Todos os anos mantém o período na origem selecionada e informa contagem completa',()=>{const {run,document}=app();run("E.rendimentos=[{id:'a',data:'2024-03-12',empresa:'Aplicação',valor:20},{id:'b',data:'2026-09-12',empresa:'Aplicação',valor:80}];filtro.rendAno='todos';filtro.rendVisao='Mensal'");mount(run,'vRendimentos');assert.ok([...document.querySelectorAll('option')].some(o=>o.textContent==='Aplicação (2)'));assert.equal(document.querySelector('[data-bid=rd-mes]'),null);assert.ok(document.querySelector('[data-bid=rd-dash]'));const k=document.querySelector('[data-kpi=fonte]');assert.ok(k);k.onclick();assert.equal(run('filtro.rendAno'),'todos')});
 test('Editar gasto antigo preserva a categoria do formato legado',()=>{const {run,document}=app();run("E.gastos=[{id:'legado',mes:'2026-09',categoria:'Lazer',oque:'Cinema',valor:100}];modalLancamentoGasto(E.gastos[0])");fill(form(document),'obs','Conferido');submit(form(document));assert.equal(run("E.gastos[0].classe||E.gastos[0].categoria"),'Lazer')});
+
+test('Gastos organiza categorias sem alterar dados e permite adicionar dentro do grupo',()=>{
+ const {run,document}=app();
+ run("E.config.catGasto=['Casa','Lazer'];E.gastos=[{id:'a',mes:'2026-09',classe:'Casa',oque:'Copasa',valor:70},{id:'b',mes:'2026-09',classe:'Casa',oque:'Cemig',valor:130},{id:'c',mes:'2026-09',categoria:'Lazer',oque:'Cinema',valor:40}];filtro.gastosMes='2026-09';var antes=JSON.stringify(E.gastos)");
+ mount(run,'vGastos');
+ const casa=[...document.querySelectorAll('.gasto-categoria')].find(x=>x.querySelector('summary').textContent.includes('Casa'));
+ assert.match(casa.textContent,/Copasa/);assert.match(casa.textContent,/Cemig/);assert.match(casa.querySelector('summary').textContent,/200,00/);
+ assert.equal(document.querySelectorAll('.gastos-categorias [data-ff-gasto]').length,3);
+ const filhos=[...document.querySelectorAll('.gasto-categoria')].find(x=>x.querySelector('summary').textContent.includes('Filhos'));
+ filhos.querySelector('button').onclick();
+ assert.ok([...form(document).querySelector('[name=classe]').options].some(x=>x.value==='Filhos'));
+ assert.equal(run('JSON.stringify(E.gastos)'),run('antes'));
+});

@@ -354,3 +354,17 @@ input[type=range]{min-height:44px;cursor:pointer}
 
 /* Resultados em uma leitura contínua, com todos os assuntos visíveis. */
 .dev-results-stream .dev-stream-section{display:block;margin:0 0 38px;scroll-margin-top:120px}.dev-stream-heading{display:flex;align-items:center;gap:16px;margin:0 0 20px;padding-top:10px}.dev-stream-icon{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;font-size:22px;background:var(--verde-cl);border-radius:12px}.dev-stream-heading h3{font-size:24px;letter-spacing:-.03em;margin:0 0 5px}.dev-stream-heading p{font-size:12px;color:var(--suave);line-height:1.7;margin:0}.dev-results-stream .dev-complete-profile{padding:0!important;background:none;border:0}.dev-results-stream .dev-complete-profile>h3{font-size:16px}.dev-results-stream .dev-legacy-visible{padding:24px;border:1px solid var(--linha);border-radius:14px;background:var(--card);margin:20px 0}.dev-legacy-visible>header{display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--linha);padding-bottom:20px;margin-bottom:24px}.dev-legacy-visible>header h4{font-size:18px;margin:0;letter-spacing:-.02em}.dev-legacy-visible .dev-legacy-fields{padding:0;gap:24px}.dev-results-stream .dev-analysis-result>h4:before{content:'📝';display:inline-block;margin-right:10px;font-size:18px}.dev-results-stream .dev-practical-result>h4:before{content:'🌱';display:inline-block;margin-right:10px;font-size:18px}.dev-results-stream .dev-measured-result{padding:26px}.dev-results-stream .dev-result-source{padding-bottom:16px;margin-bottom:24px}.dev-results-stream .dev-result-source h4{font-size:18px}.dev-results-stream .dev-score{margin-bottom:20px}.dev-results-stream .dev-result-limits{background:var(--card);border:1px solid var(--linha);padding:12px 18px;border-radius:10px}.dev-results-stream .dev-result-limits summary{font-weight:600}.dev-results-stream .dev-document-reading{padding:18px 0}@media(max-width:600px){.dev-stream-heading h3{font-size:22px}.dev-stream-heading{gap:12px}.dev-stream-icon{width:38px;height:38px;flex-basis:38px;font-size:20px}.dev-results-stream .dev-legacy-visible,.dev-results-stream .dev-measured-result{padding:18px}.dev-legacy-visible>header h4{font-size:16px}.dev-results-stream .dev-stream-section{margin-bottom:28px}}
+
+/* Despesas agrupadas: os registros continuam no mesmo cadastro. */
+.gastos-categorias{display:grid;gap:12px;padding:12px 16px}
+.gasto-categoria{border:1px solid var(--linha);border-radius:14px;padding:12px 16px}
+.gasto-categoria summary{display:flex;justify-content:space-between;gap:16px;cursor:pointer;font-weight:650;padding:8px 0}
+.gasto-categoria .finance-expense-row{display:flex;align-items:center;gap:12px;border-top:1px solid var(--linha)}
+.gasto-categoria .finance-expense-open{flex:1;display:flex;justify-content:space-between;gap:16px;text-align:left;border:0;background:transparent;color:var(--tinta);padding:12px 0;min-height:44px}
+.gasto-categoria .finance-expense-open small{display:block;color:var(--suave);margin-top:4px}
+.gasto-categoria .finance-expense-open b{white-space:nowrap}
+.gastos-lista-organizada:not(.gastos-ver-tabela)>.rolagem{display:none}
+.financeiro .gastos-lista-organizada.gastos-ver-tabela>.rolagem:has(table){display:block}
+@media(max-width:600px){.gastos-categorias{padding:10px}.gasto-categoria{padding:10px}.gasto-categoria .finance-expense-open{flex-wrap:wrap}.gasto-categoria summary{font-size:15px}}
+
+.gastos-categorias[hidden],.gasto-categoria .finance-expense-row[hidden]{display:none}
