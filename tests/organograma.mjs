@@ -36,3 +36,16 @@ test('Visão geral mostra todos os nós e permite edição por teclado; detalhar
 test('Leitura exportada preserva textos longos sem acrescentar espaços',()=>{const {api,e}=app(),o=exemplo(),texto='https://exemplo.test/'+('a'.repeat(90));o.nos[1].observacoes=texto;assert.ok(api.htmlExportacao(o,e).includes(texto))});
 test('Estrutura compacta com 12 itens usa colunas verticais sem sobrepor caixas',()=>{const {api,e}=app(),o={id:'g',titulo:'Grupo de exemplo',nos:[{id:'r',nome:'Grupo',tipo:'Holding'}]};for(let i=0;i<5;i++)o.nos.push({id:'p'+i,nome:'Empresa principal '+i,parentId:'r',logo:'data:image/png;base64,YWJj'});for(let i=0;i<4;i++)o.nos.push({id:'s'+i,nome:'Empresa secundária '+i,parentId:'p0',logo:'data:image/png;base64,YWJj'});o.nos.push({id:'neto',nome:'Projeto',parentId:'s1'},{id:'area',nome:'Área',parentId:'p4'});const d=api.diagramaSVG(o,e,{resumo:true});assert.ok(d.largura<=1700);assert.ok(d.altura<=1000);const {document}=parseHTML(d.svg),caixas=[...document.querySelectorAll('[data-no-id]')].map(g=>{const r=g.querySelector('rect');return{x:+r.getAttribute('x'),y:+r.getAttribute('y'),w:+r.getAttribute('width'),h:+r.getAttribute('height')}});assert.equal(caixas.length,12);for(let i=0;i<caixas.length;i++)for(let j=i+1;j<caixas.length;j++){const a=caixas[i],b=caixas[j];assert.ok(a.x+a.w<=b.x||b.x+b.w<=a.x||a.y+a.h<=b.y||b.y+b.h<=a.y,'Caixas precisam permanecer separadas')}});
 test('Notas de exportação aparecem uma vez antes dos itens e não ficam órfãs',()=>{const {api,e}=app(),o=exemplo();o.tema='escuro';o.observacoes='Nota única de conferência';const html=api.htmlExportacao(o,e);assert.equal(html.split('Nota única de conferência').length,2);assert.ok(html.indexOf('Nota única de conferência')<html.indexOf('<div class="grade">'));assert.ok(html.includes('page-break-inside:avoid'));assert.ok(html.includes('.detalhes>p,.vinculo){color:#bbc4d2}'))});
+test('PDF distribui irmãos horizontalmente também nos níveis internos e no recorte',()=>{
+  const {api,e}=app(),o=exemplo();
+  o.nos.push({id:'d',nome:'Outra equipe',parentId:'b'});
+  const antes=JSON.stringify(o);
+  for(const opts of [{},{formato:'completo'},{raizId:'b'}]){
+    const {document}=parseHTML(api.htmlExportacao(o,e,opts));
+    const rect=id=>document.querySelector(`[data-no-id="${id}"] rect`);
+    assert.equal(rect('c').getAttribute('y'),rect('d').getAttribute('y'));
+    assert.ok(+rect('c').getAttribute('x')+272<=+rect('d').getAttribute('x'));
+    assert.ok(+rect('b').getAttribute('y')<+rect('c').getAttribute('y'));
+  }
+  assert.equal(JSON.stringify(o),antes);
+});

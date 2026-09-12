@@ -141,7 +141,7 @@
     }
     let inicio = 0; for (const n of raizes) { posicionar(n,inicio); inicio += dados.get(n.id).largura+gap; }
     let altura = Math.max(120,niveis.reduce((s,h) => s+h+gapY,0)-gapY+36);
-    if(opts.resumo){
+    if(opts.resumo && !opts.horizontal){
       // Os ramos principais ficam lado a lado; cada ramo profundo ocupa sua própria coluna.
       const recuo=24,intervalo=24;
       const profundidade=n=>Math.max(0,...filhos(o,n.id).map(f=>1+profundidade(f)));
@@ -182,7 +182,7 @@
   }
   function htmlExportacao(original, estado, opts = {}, ctx = {}) {
     const o = recorte(original,opts.raizId), raiz = original.nos.find(n => n.id === opts.raizId), parte = raiz ? identificar(raiz,estado,ctx).nome : '';
-    const compacto=opts.formato!=='completo', grafico = diagramaSVG(o,estado,{...opts,resumo:compacto},ctx), grande = compacto || grafico.largura > 1900 || grafico.altura > 1100;
+    const compacto=opts.formato!=='completo', grafico = diagramaSVG(o,estado,{...opts,resumo:compacto,horizontal:true},ctx), grande = compacto || grafico.largura > 1900 || grafico.altura > 1100;
     const escuro = (opts.tema || o.tema) === 'escuro';
     const titulo = original.titulo + (parte ? ' · ' + parte : '');
     const notas = opts.notas !== false && o.observacoes ? `<section class="notas"><h2>Observações gerais</h2><p>${esc(o.observacoes)}</p></section>` : '';
