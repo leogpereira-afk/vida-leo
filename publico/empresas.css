@@ -9,6 +9,12 @@
 .empresa-opcao>span:last-child{min-width:0;overflow-wrap:anywhere}.empresa-opcao b{display:block;font-size:14px}.empresa-opcao small{display:block;color:var(--suave);font-size:11px;margin-top:4px}
 .empresa-opcao.selecionada{background:var(--verde-claro,#e6f2ee);border-color:var(--verde);color:var(--verde)}
 .empresa-inicial{display:grid;place-items:center;width:32px;height:32px;flex:none;background:var(--bg);border-radius:9px;font-weight:700}
+.empresa-inicial{overflow:hidden}.empresa-inicial img{display:block;width:100%;height:100%;object-fit:contain;background:#fff}
+.empresa-identidade{display:flex;align-items:center;gap:16px}.empresa-identidade>div{min-width:0}.empresa-logo-cabecalho{width:76px;height:76px;font-size:25px;border:1px solid var(--linha);border-radius:16px}
+.empresa-acoes{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.empresa-acoes-ficha{margin-top:16px}.empresa-acoes-final{justify-content:flex-end;margin-top:24px;padding-top:18px;border-top:1px solid var(--linha)}
+.empresa-btn-excluir{background:var(--vermelho);border-color:var(--vermelho);color:#fff}.empresa-btn-excluir.ghost{color:var(--vermelho);background:transparent;border-color:var(--linha)}
+.empresa-logo-editor,.empresa-exclusao{padding:22px}.empresa-logo-editor>p,.empresa-exclusao>p{font-size:14px;line-height:1.6}.empresa-logo-previa{display:flex;justify-content:center;margin-bottom:20px}.empresa-logo-grande{width:160px;height:160px;border:1px solid var(--linha);border-radius:20px;font-size:42px}.empresa-erro{color:var(--vermelho)}.empresa-erro:empty{display:none}
+@media(max-width:600px){.empresa-identidade{gap:12px}.empresa-logo-cabecalho{width:56px;height:56px;font-size:20px}.empresa-logo-editor,.empresa-exclusao{padding:16px}.empresa-acoes .btn{min-height:40px}}
 .empresa-ficha{min-width:0}.empresa-cabecalho{padding:4px 0 20px;border-bottom:1px solid var(--linha);margin-bottom:12px}.empresa-cabecalho h2{font-size:30px;margin:8px 0;overflow-wrap:anywhere}.empresa-cabecalho p{font-size:13px;color:var(--suave);margin:0;overflow-wrap:anywhere}
 .empresa-resumo{display:flex;gap:12px 20px;flex-wrap:wrap;font-size:12px;color:var(--suave);margin-top:16px}.empresa-resumo b{color:var(--tinta);font-size:17px;margin-right:3px}
 .empresa-indice{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px}.empresa-indice .btn{padding:8px 10px;min-height:36px;font-size:12px}

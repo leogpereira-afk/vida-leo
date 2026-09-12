@@ -43,8 +43,15 @@ test('entrada: sinais vitais sem nenhuma medida não são gravados',()=>{
 test('entrada: pesagem exige medida positiva',()=>{
  const {run,document}=setup();run("novoCuidadoRotina('peso')");const form=document.querySelector('.rotina-form');form.querySelector('[name="peso"]').value='0';form.onsubmit({preventDefault(){}});assert.equal(run('E.peso.length'),0);assert.match(form.textContent,/Confira peso/);
 });
-test('Viagens: ordem prioriza em andamento e próximas e preserva origem',()=>{
- const {run}=setup();run("var viagensTeste=[{id:'antiga',ida:'2020-01-01',volta:'2020-01-02'},{id:'futura',ida:'2099-01-01',volta:'2099-01-03'},{id:'atual',ida:hoje(),volta:hoje()},{id:'sem-data'}]");assert.equal(run("ordenarViagensRotina(viagensTeste).map(x=>x.id).join(',')"),'atual,futura,sem-data,antiga');assert.equal(run('viagensTeste[0].id'),'antiga');
+test('Viagens: ordem cronológica de ida mantém canceladas no final e preserva origem',()=>{
+ const {run,document}=setup();run("var viagensTeste=[{id:'ferias',evento:'Férias',ida:'2026-12-26',volta:'2027-01-03',status:'Confirmado'},{id:'agosto',evento:'Agosto',ida:'2026-08-12',volta:'2026-08-16',status:'Realizado'},{id:'setembro',evento:'Setembro',ida:'2026-09-15',volta:'2026-09-19',status:'Confirmado'},{id:'janeiro',evento:'Janeiro',ida:'2027-01-10',volta:'2027-01-12',status:'Em Planejamento'},{id:'cancelada',evento:'Cancelada',ida:'2026-02-01',volta:'2026-02-02',status:'Cancelado'},{id:'sem-data',evento:'Sem data'},{id:'invalida',evento:'Data inválida',ida:'2026-02-30'}];var viagensAntes=JSON.stringify(viagensTeste)");
+ assert.equal(run("ordenarViagensRotina(viagensTeste).map(x=>x.id).join(',')"),'agosto,setembro,ferias,janeiro,sem-data,invalida,cancelada');
+ assert.equal(run('JSON.stringify(viagensTeste)===viagensAntes'),true);
+ run("filtro.viagensAno='todos';filtro.viagens='Todas';E.viagens=viagensTeste;vViagens(document.getElementById('main'))");
+ const tabela=document.querySelector('[data-bid="vg-lista"]');
+ const linhas=[...tabela.querySelectorAll('tbody tr')].map(l=>l.textContent);
+ for(const [i,nome] of ['Agosto','Setembro','Férias','Janeiro','Sem data','Data inválida','Cancelada'].entries())assert.ok(linhas[i].includes(nome));
+ assert.match(tabela.textContent,/Por data de ida, da mais antiga para a mais recente/);
 });
 test('Viagens: falta de nome não derruba gráfico de gastos',()=>{
  const {run}=setup();assert.doesNotThrow(()=>run("filtro.viagensAno='todos';E.viagens=[{id:'x',ida:'2026-01-01',volta:'2026-01-02',status:'Confirmado',gastos:100}];vViagens(document.getElementById('main'))"));

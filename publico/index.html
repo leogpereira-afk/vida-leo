@@ -244,7 +244,8 @@ tr:hover .lixo{opacity:1}
 }
 </style>
 <link rel="stylesheet" href="./refinamento.css?v=ecea1edff489">
-<link rel="stylesheet" href="empresas.css?v=1">
+<link rel="stylesheet" href="empresas.css?v=2">
+<link rel="stylesheet" href="organograma.css?v=1">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
 <link rel="stylesheet" href="./planos-fluidos.css?v=1f6fdc37af07">
@@ -284,6 +285,7 @@ tr:hover .lixo{opacity:1}
 <script src="./vendor/ical-2.2.1.min.js"></script>
 <script src="./google-datas.js?v=2"></script>
 <script src="./documentos-revisao.js?v=20260912"></script>
+<script src="./organograma.js?v=1"></script>
 <script>
 /* ============================================================
    Central do Léo — painel pessoal, um arquivo só.
@@ -639,7 +641,7 @@ const SEED={
   norte:{proposito:'',valores:'',legado:''},
   roda:{},desenvolvimento:{fontes:[],leituras:[],revisoes:[],reflexoes:[],validacoes:[]},rituais:[],instrucoes:[],protecao:[],planoAno:[],pdi:[],livros:[],bancos:[],empresasPJ:[],patrimonio:[],
   oportunidades:[],
-  estrategia:{},planejamentoEmpresas:[],
+  estrategia:{},planejamentoEmpresas:[],organogramas:[],
   comportamento:{temperamentos:{},disc:{},discAdaptado:{},big5:{},valores:{},lideranca:{},
     tipoJung:'',tracoPrincipal:'',motivadorPrincipal:'',motivadorSecundario:'',medos:'',
     positividade:'',estima:'',flexibilidade:'',fonteLaudo:'',eneagramaTipo:'',comoDecido:'',oQueMeMove:'',comoMeRecarrego:'',meusPontosCegos:'',comoMeAjudar:'',numerologia:'',perfilDisc:'',eneagrama:'',bigfive:''},
@@ -830,16 +832,20 @@ const iniciaisDe=nm=>{const p=String(nm||'?').trim().split(/\s+/);
 function avatar(nome,tam=22){
   const m=marcaDe(nome);
   const st=`width:${tam}px;height:${tam}px;border-radius:50%;flex:none;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin-right:7px`;
-  if(m.logo) return `<span style="${st};background:#fff;border:1.5px solid ${m.cor};overflow:hidden"><img src="${m.logo}" alt="" style="width:100%;height:100%;object-fit:cover"></span>`;
+  if(m.logo) return `<span style="${st};background:#fff;border:1.5px solid ${m.cor};overflow:hidden"><img src="${esc(m.logo)}" alt="" style="width:100%;height:100%;object-fit:contain"></span>`;
   return `<span style="${st};background:${m.cor};color:#fff;font-weight:700;font-size:${Math.max(9,Math.round(tam*0.42))}px;letter-spacing:.02em">${esc(iniciaisDe(nome))}</span>`;
 }
-// logo enviado vira um quadradinho de 64px (recorte central) — pesa pouco e sincroniza
-function lerLogo(file,cb){const fr=new FileReader();fr.onload=()=>{const img=new Image();
-  img.onload=()=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');
-    const lado=Math.min(img.width,img.height);
-    g.drawImage(img,(img.width-lado)/2,(img.height-lado)/2,lado,lado,0,0,64,64);cb(c.toDataURL('image/png'))};
-  img.onerror=()=>alert('Não consegui ler essa imagem.');
-  img.src=fr.result};fr.readAsDataURL(file)}
+// Logo proporcional, com margem: preserva a marca inteira e sincroniza na mesma base.
+function lerLogo(file,cb,falha=msg=>alert(msg)){
+  if(!file||!['image/png','image/jpeg','image/webp'].includes(file.type)){falha('Escolha uma imagem PNG, JPG ou WebP.');return;}
+  if(file.size>10*1024*1024){falha('A imagem deve ter até 10 MB.');return;}
+  const fr=new FileReader();fr.onerror=()=>falha('Não consegui abrir o arquivo. Tente outra imagem.');
+  fr.onload=()=>{const img=new Image();img.onerror=()=>falha('Não consegui ler essa imagem. Escolha outra.');
+    img.onload=()=>{try{if(!img.width||!img.height)throw Error();const c=document.createElement('canvas');c.width=c.height=256;const g=c.getContext('2d');
+      g.fillStyle='#fff';g.fillRect(0,0,256,256);const escala=232/Math.max(img.width,img.height),w=img.width*escala,h=img.height*escala;
+      g.drawImage(img,(256-w)/2,(256-h)/2,w,h);cb(c.toDataURL('image/png'));
+    }catch{falha('Não consegui preparar a imagem. Tente outro arquivo.')}};img.src=fr.result;};fr.readAsDataURL(file);
+}
 // mês seguinte com o dia preso ao fim do mês (31/01 → 28/02)
 function mesSeguinte(iso){const a=+iso.slice(0,4),m=+iso.slice(5,7),d=+iso.slice(8,10);
   const a2=m===12?a+1:a,m2=m===12?1:m+1,ult=new Date(a2,m2,0).getDate();
@@ -1652,7 +1658,12 @@ function faseViagem(v,data=hoje()){
   if(v.status==='Realizado'||v.volta<data)return 'historico';
   return v.ida<=data?'andamento':'proximas';
 }
-function ordenarViagensRotina(lista){const ordem={andamento:0,proximas:1,conferir:2,historico:3,canceladas:4};return [...lista].sort((a,b)=>ordem[faseViagem(a)]-ordem[faseViagem(b)]||(faseViagem(a)==='historico'?(b.ida||'').localeCompare(a.ida||''):(a.ida||'').localeCompare(b.ida||'')))}
+function ordenarViagensRotina(lista){
+  return [...lista].sort((a,b)=>{
+    const idaA=dataISOValida(a.ida)?a.ida:'9999-99-99',idaB=dataISOValida(b.ida)?b.ida:'9999-99-99';
+    return (a.status==='Cancelado')-(b.status==='Cancelado')||idaA.localeCompare(idaB);
+  });
+}
 function buscaRotina(lista,termo,campos){const q=normaliza(termo||'');return q?lista.filter(x=>campos.some(k=>normaliza(String(x[k]||'')).includes(q))):lista}
 function buscaRotinaCampo(valor,rotulo,mudar){const cx=el('<label class="rotina-busca"><span>'+esc(rotulo)+'</span><input type="search" placeholder="'+esc(rotulo)+'"></label>');const inp=cx.querySelector('input');inp.value=valor||'';inp.onchange=()=>mudar(inp.value);return cx}
 function metricasRotina(itens){const cx=el('<div class="rotina-metricas"></div>');itens.forEach(([nome,valor,sub])=>cx.appendChild(el('<div><span>'+esc(nome)+'</span><strong>'+esc(valor)+'</strong><small>'+esc(sub||'')+'</small></div>')));return cx}
@@ -1741,7 +1752,7 @@ function vViagens(m) {
     tv.appendChild(tfv); rol.appendChild(tv);
   }
   cx.appendChild(rol);
-  m.appendChild(bloco('vg-lista', 'Todas as viagens', 'Em andamento e próximas primeiro; histórico por data mais recente. Totais acompanham os filtros.', cx));
+  m.appendChild(bloco('vg-lista', 'Todas as viagens', 'Por data de ida, da mais antiga para a mais recente. Canceladas no final. Totais acompanham os filtros.', cx));
 
   m.appendChild(el(`<div class="grade">
     ${kpi('Previsto / lançado', brl(tot), ativos.length + ' viagens no filtro', '')}
@@ -8151,6 +8162,80 @@ function normalizarEmpresas(d){
   }
 }
 function empresaPorId(id){return (E.empresasPJ||[]).find(e=>e.id===id)}
+function empresaLogoUrl(valor){
+  if(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(valor||''))return valor;
+  try{return valor?empresaValidarUrl(valor):''}catch{return ''}
+}
+function empresaImagem(emp,classe='',logo=marcaDe(emp.nome).logo){
+  const cx=el('<span class="empresa-inicial '+classe+'" aria-hidden="true"></span>'),url=empresaLogoUrl(logo);
+  if(url){const img=document.createElement('img');img.src=url;img.alt='';img.onerror=()=>{cx.textContent=iniciaisDe(emp.nome)};cx.appendChild(img)}else cx.textContent=iniciaisDe(emp.nome);
+  return cx;
+}
+function empresaSalvarLogo(emp,logo){
+  if(empresaPorId(emp.id)!==emp)throw Error('A ficha mudou. Abra novamente antes de salvar a logo.');
+  if(!empresaNomeUnico(emp))throw Error('Há empresas com o mesmo nome. Confira os cadastros antes de alterar a marca.');
+  if(logo&&!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(logo))throw Error('Escolha novamente o arquivo da logo.');
+  E.marcas=E.marcas||{};const marca={...(E.marcas[emp.nome]||{})};if(logo)marca.logo=logo;else delete marca.logo;
+  if(Object.keys(marca).length)E.marcas[emp.nome]=marca;else delete E.marcas[emp.nome];salvar();
+}
+function empresaModalLogo(emp){
+  abrirModal('Logomarca da empresa',esc(emp.nome),(c,fechar)=>{
+    c.classList.add('empresa-modal');let logo=marcaDe(emp.nome).logo,versao=0;
+    const box=el('<div class="empresa-logo-editor"><div class="empresa-logo-previa"></div><p>A marca aparece nesta ficha, na lista de empresas e nos rendimentos. A imagem será ajustada sem cortes.</p><p class="empresa-nota">PNG, JPG ou WebP · até 10 MB</p><p role="alert" class="empresa-erro"></p><div class="empresa-acoes"></div></div>');
+    const previa=box.querySelector('.empresa-logo-previa'),erro=box.querySelector('[role=alert]'),acoes=box.querySelector('.empresa-acoes');
+    const pintar=()=>{previa.replaceChildren(empresaImagem(emp,'empresa-logo-grande',logo));remover.disabled=!logo;};
+    const salvarLogo=acao('Salvar logo',()=>{try{empresaSalvarLogo(emp,logo);fechar()}catch(e){erro.textContent=e.message}});
+    const escolher=acao('Escolher imagem',()=>pedirArquivo(file=>{const atual=++versao;erro.textContent='';salvarLogo.disabled=true;
+      lerLogo(file,uri=>{if(atual!==versao||!box.isConnected)return;logo=uri;salvarLogo.disabled=false;pintar()},msg=>{if(atual!==versao)return;erro.textContent=msg;salvarLogo.disabled=false});
+    },'image/png,image/jpeg,image/webp'),'ghost');
+    const remover=acao('Remover logo',()=>{versao++;logo='';erro.textContent='';salvarLogo.disabled=false;pintar()},'ghost');
+    acoes.append(escolher,remover);const rodape=el('<div class="empresa-acoes empresa-acoes-final"></div>');rodape.append(acao('Cancelar',fechar,'ghost'),salvarLogo);box.appendChild(rodape);c.appendChild(box);pintar();
+  });
+}
+function empresaDependencias(emp){
+  const refs=[],igual=n=>!!String(n||'').trim()&&normaliza(n)===normaliza(emp.nome);
+  const nomes={bancos:'Contas bancárias',patrimonio:'Bens do patrimônio',rendimentos:'Rendimentos',planejamentoEmpresas:'Planejamentos anuais',contas:'Contas de Caixa/VGV',empreend:'Empreendimentos',casas:'Casas',reservas:'Reservas',empresasPJ:'Empresas com o mesmo nome'};
+  for(const [col,itens] of Object.entries(E))if(Array.isArray(itens)){
+    const n=itens.filter(x=>x&&typeof x==='object'&&x!==emp&&(x.empresaId?x.empresaId===emp.id:[x.empresa,x.empresaNome,x.titular,x.origemLegado,col==='empresasPJ'?x.nome:''].some(igual))).length;
+    if(n)refs.push({titulo:nomes[col]||'Registros relacionados ('+col+')',n});
+  }
+  for(const [itens,titulo] of [[empresaDocumentos(emp),'Documentos societários'],[empresaObrigacoes(emp),'Obrigações e IPTU']])if(itens.length)refs.push({titulo,n:itens.length});
+  for(const [mapa,titulo] of [[E.estrategia,'Planejamento anterior'],[E.rendHist?.empresas,'Histórico de rendimentos']]){
+    const n=Object.keys(mapa||{}).filter(igual).length;if(n)refs.push({titulo,n});
+  }
+  const organogramas=(E.organogramas||[]).filter(o=>(o.nos||[]).some(n=>n.empresaId===emp.id));if(organogramas.length)refs.push({titulo:'Organogramas vinculados',n:organogramas.length});
+  const n=Object.values(E.rendHist?.detalhe||{}).filter(ano=>Object.keys(ano||{}).some(igual)).length;
+  if(n)refs.push({titulo:'Anos com rendimentos detalhados',n});return refs;
+}
+async function empresaAnexos(emp){
+  const prefixo=empresaRefArquivo(emp),pertence=ref=>ref===prefixo||String(ref||'').startsWith(prefixo+':'),arquivos=new Map();
+  arqEsquecerIndice();const idx=await arqIndice();if(naNuvem()&&!idx)throw Error('Não foi possível conferir os arquivos na nuvem. Tente novamente antes de excluir.');
+  if(idx)for(const [ref,lista] of idx)if(pertence(ref))for(const a of lista)arquivos.set(a.id,a);
+  const d=await db();await new Promise((ok,err)=>{const t=d.transaction('arq'),req=t.objectStore('arq').openCursor();
+    req.onsuccess=()=>{const cur=req.result;if(!cur){ok();return}if(pertence(cur.value.ref))arquivos.set(cur.value.id,{id:cur.value.id,ref:cur.value.ref,nome:cur.value.nome});cur.continue()};
+    req.onerror=t.onabort=()=>err(Error('Não foi possível conferir os arquivos deste aparelho. Tente novamente.'));
+  });return [...arquivos.values()];
+}
+function empresaAssinatura(emp){return JSON.stringify([emp,E.marcas?.[emp.nome]])}
+async function empresaExcluir(emp,assinatura,continuar=()=>true){
+  const conferir=()=>{if(!continuar())throw Error('Exclusão cancelada.');if(empresaPorId(emp.id)!==emp||empresaAssinatura(emp)!==assinatura)throw Error('A ficha mudou durante a conferência. Abra novamente antes de excluir.');if(empresaDependencias(emp).length)throw Error('A empresa possui dados relacionados. Confira os vínculos antes de excluir.');};
+  conferir();const anexos=await empresaAnexos(emp);conferir();if(anexos.length)throw Error('A empresa possui arquivos anexados. Confira os documentos antes de excluir.');
+  E.empresasPJ=E.empresasPJ.filter(e=>e.id!==emp.id);E.config=E.config||{};E.config.empresas=CFG('empresas').filter(n=>normaliza(n)!==normaliza(emp.nome));
+  if(E.marcas)delete E.marcas[emp.nome];if(filtro.empresaId===emp.id)filtro.empresaId='';salvar();
+}
+function empresaModalExcluir(emp){
+  abrirModal('Excluir empresa',esc(emp.nome),(c,fechar)=>{
+    c.classList.add('empresa-modal');const assinatura=empresaAssinatura(emp),box=el('<div class="empresa-exclusao"><p>Excluir remove esta ficha e sua logomarca da lista de empresas.</p><div class="empresa-excluir-vinculos"></div><p role="status">Conferindo vínculos e arquivos…</p><p role="alert" class="empresa-erro"></p><div class="empresa-acoes empresa-acoes-final"></div></div>');c.appendChild(box);
+    const lista=box.querySelector('.empresa-excluir-vinculos'),estado=box.querySelector('[role=status]'),erro=box.querySelector('[role=alert]'),acoes=box.querySelector('.empresa-acoes');
+    const confirmar=acao('Excluir empresa',async()=>{confirmar.disabled=true;erro.textContent='';try{await empresaExcluir(emp,assinatura,()=>box.isConnected);fechar()}catch(e){if(box.isConnected){erro.textContent=e.message;confirmar.disabled=false}}},'empresa-btn-excluir');confirmar.disabled=true;
+    acoes.append(acao('Cancelar',fechar,'ghost'),confirmar);
+    const mostrar=(refs,arquivos)=>{lista.replaceChildren();for(const r of refs)lista.appendChild(empresaLinha(r.titulo,r.n+' registro(s)'));if(arquivos.length)lista.appendChild(empresaLinha('Arquivos anexados',arquivos.length+' arquivo(s)'));
+      const usado=refs.length||arquivos.length;estado.textContent=usado?'A exclusão está bloqueada porque existem informações relacionadas. Confira os dados na ficha antes de removê-la.':'Nenhum vínculo ou arquivo encontrado. Confirme abaixo para excluir esta ficha.';confirmar.disabled=!!usado;
+      if(usado)acoes.prepend(acao('Conferir na ficha',()=>{fechar();empresaAbrir(emp.id)},'ghost'));
+    };
+    empresaAnexos(emp).then(arquivos=>{if(box.isConnected)mostrar(empresaDependencias(emp),arquivos)}).catch(e=>{if(box.isConnected){mostrar(empresaDependencias(emp),[]);estado.textContent='Não foi possível concluir a conferência.';erro.textContent=e.message;confirmar.disabled=true}});
+  });
+}
 function empresaLista(q=''){
   const termos=normaliza(q).split(' ').filter(Boolean);
   return (E.empresasPJ||[]).filter(e=>termos.every(t=>normaliza([e.nome,e.razaoSocial,e.cnpj,empresaCnpjChave(e.cnpj),e.cidade,e.contador,e.status].join(' ')).includes(t)))
@@ -8310,7 +8395,7 @@ function empresaModalObrigacao(emp,o){
   });
 }
 function empresaAbrir(id,secao=''){
-  filtro.empresaId=id;filtro.empresaBusca='';irTela('empresas');
+  filtro.empresaId=id;filtro.empresaBusca='';filtro.empresaAba='cadastros';irTela('empresas');
   if(secao)document.getElementById('empresa-'+secao)?.scrollIntoView({block:'start'});
 }
 function empresaAbrirAnexos(emp,doc){abrirModal(doc?esc(doc.nome):'Arquivos da empresa',esc(emp.nome),(c)=>{c.appendChild(areaArquivos(empresaRefArquivo(emp,doc),'Contrato, comprovante ou documento em PDF'))})}
@@ -8329,18 +8414,26 @@ function empresaBloco(titulo,id,sub,acaoTexto,fn){
 function empresaLinha(titulo,sub,botao,fn){const b=el('<div class="empresa-linha"><div><b>'+esc(titulo)+'</b><small>'+esc(sub||'')+'</small></div></div>');if(fn)b.appendChild(acao(botao,fn,'ghost mini'));return b}
 function empresaAbrirPlano(emp,p){filtro.estrEmpresaId=emp.id;filtro.estrPlano=p?.id||'';filtro.estrAba='resumo';irTela('estrategia')}
 function vEmpresas(m){
-  m.classList.add('workspace-layout','empresas-layout');const topo=cab('Empresas','Dados, documentos e compromissos conectados à sua empresa.');topo.appendChild(acao('+ Nova empresa',()=>empresaModalFicha()));m.appendChild(topo);
+  m.classList.add('workspace-layout','empresas-layout');const topo=cab('Empresas','Dados, documentos e compromissos conectados à sua empresa.');if(filtro.empresaAba!=='organograma')topo.appendChild(acao('+ Nova empresa',()=>empresaModalFicha()));m.appendChild(topo);
+  const abas=abasWorkspace(m,'empresas',[['cadastros','Cadastros'],['organograma','Organograma']],filtro.empresaAba||'cadastros',id=>{filtro.empresaAba=id;rr('empresas')()});
+  if(filtro.empresaAba==='organograma'){
+    if(typeof LeoOrganograma==='undefined'){abas.paineis.organograma.appendChild(el('<p class="empresa-nota">Não foi possível carregar o organograma. Atualize a página para tentar novamente.</p>'));return;}
+    LeoOrganograma.render(abas.paineis.organograma,{getState:()=>E,save:salvar,openModal:(titulo,sub,montar)=>abrirModal(esc(titulo),esc(sub),montar),openCompany:empresaAbrir,logo:nome=>marcaDe(nome).logo,selectedId:filtro.empresaOrganogramaId||'',onSelect:id=>{filtro.empresaOrganogramaId=id}});return;
+  }
+  m=abas.paineis.cadastros;
   const lista=empresaLista(filtro.empresaBusca||''),emp=lista.find(e=>e.id===filtro.empresaId)||lista[0];
   const estrutura=el('<div class="empresas-estrutura"><aside class="empresas-lista" aria-label="Lista de empresas"><label>Encontrar empresa<input type="search" placeholder="Nome, CNPJ ou cidade" aria-label="Buscar empresa"></label><div class="empresas-opcoes"></div></aside><div class="empresa-ficha"></div></div>');m.appendChild(estrutura);
   const busca=estrutura.querySelector('input');busca.value=filtro.empresaBusca||'';busca.oninput=()=>{const pos=busca.selectionStart;filtro.empresaBusca=busca.value;rr('empresas')();const novo=m.parentElement?.querySelector('input[type=search]')||document.querySelector('.empresas-lista input');novo?.focus();novo?.setSelectionRange?.(pos,pos)};
   const opcoes=estrutura.querySelector('.empresas-opcoes');
-  for(const e of lista){const b=el('<button class="empresa-opcao'+(e===emp?' selecionada':'')+'" aria-pressed="'+(e===emp)+'"><span class="empresa-inicial">'+esc((e.nome||'?').slice(0,1).toUpperCase())+'</span><span><b>'+esc(e.nome||'Empresa sem nome')+'</b><small>'+esc(e.cnpj||e.status||'Completar cadastro')+'</small></span></button>');b.onclick=()=>{filtro.empresaId=e.id;rr('empresas')()};opcoes.appendChild(b)}
+  for(const e of lista){const b=el('<button class="empresa-opcao'+(e===emp?' selecionada':'')+'" aria-pressed="'+(e===emp)+'"><span><b>'+esc(e.nome||'Empresa sem nome')+'</b><small>'+esc(e.cnpj||e.status||'Completar cadastro')+'</small></span></button>');b.prepend(empresaImagem(e));b.onclick=()=>{filtro.empresaId=e.id;rr('empresas')()};opcoes.appendChild(b)}
   if(!lista.length)opcoes.appendChild(el('<p class="empresa-nota">Nenhuma empresa encontrada.</p>'));
   const ficha=estrutura.querySelector('.empresa-ficha');
   if(!emp){const empty=el('<section class="workspace-empty"><h2>'+((E.empresasPJ||[]).length?'Nenhuma empresa neste filtro':'Sua base empresarial começa aqui')+'</h2><p>Reúna contatos, contas e documentos. Os planejamentos anuais continuarão ligados à mesma empresa.</p></section>');empty.appendChild(acao((E.empresasPJ||[]).length?'Limpar busca':'Cadastrar empresa',(E.empresasPJ||[]).length?()=>{filtro.empresaBusca='';rr('empresas')()}:()=>empresaModalFicha()));ficha.appendChild(empty);return;}
   filtro.empresaId=emp.id;
   const docs=empresaDocumentos(emp),obs=empresaObrigacoes(emp),pend=obs.filter(o=>!['Pago','Cancelado'].includes(o.status)),contas=empresaContas(emp),bens=empresaRegistros(emp,'patrimonio'),planos=(E.planejamentoEmpresas||[]).filter(p=>p.empresaId===emp.id).sort((a,b)=>b.ano-a.ano);
   const hero=el('<section class="empresa-cabecalho"><div><span class="workspace-eyebrow">FICHA EMPRESARIAL · '+esc(emp.status||'Situação não informada')+'</span><h2>'+esc(emp.nome||'Empresa sem nome')+'</h2><p>'+esc([emp.razaoSocial,emp.cnpj].filter(Boolean).join(' · ')||'Complete o CNPJ e os dados gerais.')+'</p></div><div class="empresa-resumo"><span><b>'+contas.length+'</b> contas</span><span><b>'+docs.length+'</b> documentos</span><span><b>'+pend.length+'</b> obrigações em aberto</span></div></section>');ficha.appendChild(hero);
+  const identidade=el('<div class="empresa-identidade"></div>');identidade.append(empresaImagem(emp,'empresa-logo-cabecalho'),hero.firstElementChild);hero.prepend(identidade);
+  const acoesFicha=el('<div class="empresa-acoes empresa-acoes-ficha"></div>');acoesFicha.append(acao(marcaDe(emp.nome).logo?'Trocar logo':'Adicionar logo',()=>empresaModalLogo(emp),'ghost mini'),acao('Excluir empresa',()=>empresaModalExcluir(emp),'ghost mini empresa-btn-excluir'));hero.appendChild(acoesFicha);
   const nav=el('<nav class="empresa-indice" aria-label="Seções da empresa"></nav>');for(const [id,t] of [['gerais','Dados e contatos'],['bancos','Bancos'],['documentos','Documentos'],['imoveis','Imóveis e obrigações'],['conexoes','Conexões']])nav.appendChild(acao(t,()=>document.getElementById('empresa-'+id)?.scrollIntoView({block:'start'}),'ghost mini'));ficha.appendChild(nav);
   const geral=empresaBloco('🏢 Dados e contatos','gerais','Informações cadastrais e quem procurar.','Editar dados',()=>empresaModalFicha(emp));
   const dl=el('<dl class="empresa-dados"></dl>');for(const [t,v] of [['CNPJ',emp.cnpj],['Abertura',emp.abertura?fmtDataAno(emp.abertura):''],['Atividade / CNAE',emp.atividade],['Inscrição estadual',emp.inscricaoEstadual],['Inscrição municipal',emp.inscricaoMunicipal],['Regime',emp.regime],['Sócios',emp.socios],['Endereço',[emp.endereco,emp.cidade,emp.uf,emp.cep].filter(Boolean).join(' · ')],['Contato',[emp.contato,emp.telefone,emp.email].filter(Boolean).join(' · ')],['Contabilidade',[emp.contador,emp.contadorContato].filter(Boolean).join(' · ')],['Referência bancária anterior',emp.banco],['Observações',emp.obs]])if(v)dl.appendChild(el('<div><dt>'+t+'</dt><dd>'+esc(v)+'</dd></div>'));
@@ -9907,7 +10000,7 @@ async function vConfig(m){
   });
   mcx.appendChild(el(`<p style="font-size:12.5px;color:var(--suave);margin-top:10px">
     A bolinha aparece em Rendimentos, nos gráficos e nos relatórios em PDF.
-    O logo é reduzido para 64px e sincroniza com a nuvem — aparece em todos os aparelhos.</p>`));
+    A imagem é ajustada sem cortes para 256px e sincroniza com a nuvem — aparece em todos os aparelhos.</p>`));
   m.appendChild(bloco('cf-marcas','🎨 Logos e cores das empresas','a bolinha de cada empresa — cor fixa e logo',mcx));
 
   /* ---- 🔒 senha de entrada ----
@@ -10091,7 +10184,9 @@ function baixar(blob,nome){const a=document.createElement('a');a.href=URL.create
   setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 function exportar(){baixar(new Blob([JSON.stringify(E,null,1)],{type:'application/json'}),'central-leo-'+hoje()+'.json')}
 function pedirArquivo(cb,accept){const i=document.createElement('input');i.type='file';if(accept)i.accept=accept;
-  i.onchange=()=>{if(i.files[0])cb(i.files[0])};i.click()}
+  i.hidden=true;document.body.appendChild(i);
+  i.onchange=()=>{try{if(i.files[0])cb(i.files[0])}finally{i.remove()}};
+  i.addEventListener('cancel',()=>i.remove(),{once:true});i.click()}
 /* RESTAURAR TEM DE CHEGAR NA NUVEM.
    Isto gravava só no localStorage e dizia "Backup restaurado". O arquivo trazia
    o _mt antigo, então uma de duas coisas acontecia, e nenhuma era o esperado:
@@ -10124,6 +10219,7 @@ function validarBackup(j){
     if(x[k]!==undefined&&(!Array.isArray(x[k])||x[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))throw new Error('Lista inválida: '+col+'.'+k);
   }
   validarBackupEmpresas(j);
+  if(j.organogramas?.length){if(typeof LeoOrganograma==='undefined')throw Error('Atualize a página para validar os organogramas antes de restaurar.');LeoOrganograma.validar(j.organogramas);}
   if(j.desenvolvimento)for(const k of ['fontes','leituras','revisoes','reflexoes','validacoes','resultados'])if(j.desenvolvimento[k]!==undefined&&(!Array.isArray(j.desenvolvimento[k])||j.desenvolvimento[k].some(x=>!x||typeof x!=='object'||Array.isArray(x))))throw new Error('Lista inválida: desenvolvimento.'+k);
   const chavesPlano=new Set();
   for(const p of j.planejamentoEmpresas||[]){
