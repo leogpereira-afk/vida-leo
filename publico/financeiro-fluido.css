@@ -1,0 +1,38 @@
+/* Central do Léo — leitura e edição financeira, sem alterar a identidade. */
+.ff-rendimentos .topo,.ff-patrimonio .topo{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
+.ff-rendimentos .topo .btn{flex-shrink:0}
+.ff-list-filter{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 17px;border-bottom:1px solid var(--linha)}
+.ff-list-filter input[type=search]{flex:1;min-width:180px;max-width:520px;min-height:42px;padding:10px 12px;border:1px solid var(--linha);border-radius:10px;background:var(--card);color:var(--tinta);font:inherit}
+.ff-list-filter select{max-width:100%;min-height:42px;padding:8px 12px;border:1px solid var(--linha);border-radius:10px;background:var(--card);color:var(--tinta);font:inherit}
+.ff-list-filter [role=status]{font-size:12px;color:var(--suave);font-variant-numeric:tabular-nums}
+.ff-list-filter .mais{width:auto;margin:0;min-height:42px;padding:8px 12px}
+.ff-note{color:var(--suave);font-size:12.5px;line-height:1.6;margin:12px 0 16px}
+.ff-form{display:grid;gap:18px}
+.ff-fields{display:grid;grid-template-columns:1fr 1fr;gap:17px 20px}
+.ff-field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ff-field label{font-size:13px;font-weight:600;color:var(--tinta)}
+.ff-field input,.ff-field select,.ff-field textarea{width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border:1px solid var(--linha);border-radius:9px;background:var(--card);color:var(--tinta);font:inherit}
+.ff-field small{font-size:11.5px;color:var(--suave);line-height:1.45}
+.ff-full{grid-column:1/-1}
+.ff-actions,.ff-secondary{display:flex;justify-content:flex-end;align-items:center;gap:10px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--linha)}
+.ff-actions{position:sticky;bottom:0;padding-bottom:8px;background:var(--card);z-index:1}
+.ff-secondary{margin-top:16px;justify-content:space-between}
+.ff-error{padding:10px 12px;border-left:3px solid var(--vermelho);border-radius:6px;color:var(--vermelho);background:var(--bg);font-size:13px}
+.ff-error[hidden],.ff-rendimentos [hidden],.ff-gastos [hidden],.ff-caixa [hidden]{display:none!important}
+.ff-attachments{border:1px solid var(--linha);border-radius:10px;padding:12px 14px;margin:12px 0 20px}
+.ff-attachments summary{cursor:pointer;font-weight:600;font-size:13px}
+.ff-attachments[open] summary{margin-bottom:14px}
+.ff-repeat-list{display:grid;gap:8px;max-height:50vh;overflow:auto}
+.ff-repeat-row{display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg);border:1px solid var(--linha);border-radius:9px;cursor:pointer}
+.ff-repeat-row>span{flex:1;min-width:0}.ff-repeat-row small{display:block;font-size:12px;color:var(--suave);margin-top:4px}
+.ff-repeat-row input{width:20px;height:20px;accent-color:var(--verde)}.ff-repeat-row b{font-variant-numeric:tabular-nums;white-space:nowrap;font-size:13px}
+.ff-position{display:flex;align-items:center;gap:20px;background:var(--card);border:1px solid var(--linha);border-radius:14px;padding:16px 18px;margin:16px 0}
+.ff-position>div:not(.ff-position-track){display:grid;gap:5px;font-size:12px;color:var(--suave)}.ff-position b{font-variant-numeric:tabular-nums;color:var(--tinta);font-size:15px}
+.ff-position-track{flex:1;min-width:70px;height:10px;border-radius:8px;background:var(--areia);overflow:hidden}.ff-position-track i{display:block;height:100%;background:var(--verde);border-radius:8px}
+.ff-caixa .caixa-fonte{gap:12px;padding:18px 20px;flex-wrap:wrap}.ff-caixa .caixa-fonte h2{font-size:17px;line-height:1.4}.ff-caixa .caixa-fonte p{font-size:12.5px}
+.ff-source-quality{display:flex;align-items:center;gap:10px 18px;flex-wrap:wrap;flex-basis:100%;width:100%;border-top:1px solid var(--linha);padding-top:12px;font-size:12px;color:var(--suave)}
+.ff-source-quality .btn{margin-left:auto}
+.ff-patrimonio .ff-list-filter{padding:0 0 14px;border:0}
+@media(max-width:620px){.ff-fields{grid-template-columns:1fr;gap:14px}.ff-full{grid-column:auto}.ff-list-filter{gap:8px;padding:12px}.ff-list-filter input[type=search]{max-width:none;width:100%;flex-basis:100%;min-width:0}.ff-list-filter select{flex:1;min-width:0}.ff-list-filter [role=status]{flex-basis:100%}.ff-position{gap:12px;flex-wrap:wrap;padding:14px}.ff-position-track{order:3;flex-basis:100%}.ff-position>div:last-child{margin-left:auto;text-align:right}.ff-caixa .caixa-fonte{padding:14px}.ff-source-quality{gap:8px}.ff-source-quality .btn{margin-left:0}.ff-repeat-row{gap:8px}.ff-repeat-row b{font-size:12px}.ff-actions .btn{flex:1}.ff-secondary{justify-content:flex-start}}
+@media print{.ff-list-filter,.ff-actions,.ff-secondary,.ff-source-quality button{display:none!important}.ff-caixa [hidden]{display:block!important}.ff-form{break-inside:avoid}}
+.ff-equity-preview{display:block;border:1px solid var(--linha);background:var(--bg);border-radius:9px;padding:12px;font-size:13px;font-variant-numeric:tabular-nums;line-height:1.5}
