@@ -1,0 +1,30 @@
+/* Fichas empresariais: compactas, sem esconder o histórico em abas. */
+.empresas-layout .topo{align-items:center;margin-bottom:20px}
+.empresas-estrutura{display:grid;grid-template-columns:minmax(220px,270px) minmax(0,1fr);gap:24px;align-items:start}
+.empresas-lista{position:sticky;top:24px;border:1px solid var(--linha);border-radius:18px;background:var(--card);padding:14px;max-height:calc(100vh - 64px);overflow:auto}
+.empresas-lista label{display:grid;gap:8px;font-size:12px;font-weight:700;color:var(--suave)}
+.empresas-lista input{min-width:0;width:100%;box-sizing:border-box;border:1px solid var(--linha);border-radius:10px;padding:11px 12px;font:inherit;font-size:14px;background:var(--bg);color:var(--tinta)}
+.empresas-opcoes{display:grid;gap:5px;margin-top:12px}
+.empresa-opcao{display:flex;align-items:center;gap:10px;padding:12px 9px;border:1px solid transparent;border-radius:10px;background:transparent;text-align:left;font:inherit;cursor:pointer;color:var(--tinta);min-width:0;width:100%}
+.empresa-opcao>span:last-child{min-width:0;overflow-wrap:anywhere}.empresa-opcao b{display:block;font-size:14px}.empresa-opcao small{display:block;color:var(--suave);font-size:11px;margin-top:4px}
+.empresa-opcao.selecionada{background:var(--verde-claro,#e6f2ee);border-color:var(--verde);color:var(--verde)}
+.empresa-inicial{display:grid;place-items:center;width:32px;height:32px;flex:none;background:var(--bg);border-radius:9px;font-weight:700}
+.empresa-ficha{min-width:0}.empresa-cabecalho{padding:4px 0 20px;border-bottom:1px solid var(--linha);margin-bottom:12px}.empresa-cabecalho h2{font-size:30px;margin:8px 0;overflow-wrap:anywhere}.empresa-cabecalho p{font-size:13px;color:var(--suave);margin:0;overflow-wrap:anywhere}
+.empresa-resumo{display:flex;gap:12px 20px;flex-wrap:wrap;font-size:12px;color:var(--suave);margin-top:16px}.empresa-resumo b{color:var(--tinta);font-size:17px;margin-right:3px}
+.empresa-indice{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px}.empresa-indice .btn{padding:8px 10px;min-height:36px;font-size:12px}
+.empresa-secao{border:1px solid var(--linha);background:var(--card);border-radius:16px;margin-bottom:18px;overflow:hidden;scroll-margin-top:25px}
+.empresa-secao>header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:17px 20px;border-bottom:1px solid var(--linha)}
+.empresa-secao>header h2{font-weight:700;line-height:1.4;margin:0;font-family:inherit;font-size:17px}.empresa-secao>header p{font-size:12px;color:var(--suave);margin:4px 0 0}.empresa-secao-corpo{padding:4px 20px 16px}.empresa-secao-corpo>.btn{margin-top:12px}
+.empresa-dados{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 22px;margin:16px 0 0}.empresa-dados div{min-width:0}.empresa-dados dt{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--suave);margin-bottom:5px}.empresa-dados dd{font-size:14px;margin:0;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.empresa-linha{display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--linha)}.empresa-linha:last-child{border-bottom:0}.empresa-linha>div{flex:1;min-width:0}.empresa-linha b{font-size:14px;display:block;overflow-wrap:anywhere}.empresa-linha small{display:block;font-size:12px;line-height:1.6;color:var(--suave);margin-top:4px;overflow-wrap:anywhere}.empresa-linha>.btn{flex:none}
+.empresa-obrigacoes{border-top:1px solid var(--linha);margin-top:18px;padding-top:12px}.empresa-obrigacoes h3{font-size:14px;margin:0 0 10px}.empresa-obrigacoes>select{font:inherit;font-size:12px;padding:7px;border:1px solid var(--linha);border-radius:8px;background:var(--bg);color:var(--tinta);max-width:100%}.empresa-atencao{border-left:3px solid var(--areia,#9c691c);padding-left:12px}
+.empresa-nota{font-size:13px;line-height:1.6;color:var(--suave);margin:14px 0}.empresa-historico{padding:0 22px 20px}.empresa-historico h4{font-size:14px}.empresa-historico p{padding:10px 0;border-bottom:1px solid var(--linha);font-size:13px}.empresa-agenda-contexto{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;font-size:13px}
+.empresas-layout button:focus-visible,.empresas-layout input:focus-visible,.empresas-layout a:focus-visible{outline:3px solid var(--verde);outline-offset:3px}
+@media(max-width:1100px){.empresas-estrutura{grid-template-columns:220px minmax(0,1fr);gap:16px}.empresa-linha{flex-wrap:wrap}.empresa-linha>div{flex-basis:100%}}
+@media(max-width:760px){.empresas-estrutura{grid-template-columns:minmax(0,1fr)}.empresas-lista{position:static;max-height:none;padding:12px}.empresas-opcoes{max-height:210px;overflow:auto}.empresa-opcao{padding:9px}.empresa-cabecalho h2{font-size:26px}.empresa-secao>header{padding:14px;flex-wrap:wrap}.empresa-secao-corpo{padding:2px 14px 14px}.empresa-dados{grid-template-columns:minmax(0,1fr);gap:13px}.empresa-indice{gap:5px}.empresa-indice .btn{font-size:11px}.empresa-secao{scroll-margin-top:110px}.empresa-resumo{gap:10px}.empresas-layout .topo .btn{padding:10px 13px}}
+@media print{.empresas-lista,.empresa-indice,.empresa-ficha .btn,.empresas-layout>.topo>.btn{display:none!important}.empresas-estrutura{display:block}.empresa-secao{break-inside:avoid}.empresa-cabecalho{border:0}}
+
+.empresa-versao{border-bottom:1px solid var(--linha);padding:14px 0}.empresa-versao>p{margin:5px 0;padding:0;border:0;overflow-wrap:anywhere}
+.empresas-layout .btn,.empresa-modal .btn{font-family:inherit}
+
+.empresa-form-grupo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-column:1/-1;gap:14px 18px;border:0;border-top:1px solid var(--linha);padding:18px 0 6px;margin:8px 0 0;min-width:0}.empresa-form-grupo legend{font-size:14px;font-weight:700;color:var(--verde);padding-right:12px}.empresa-form-grupo>.ff-field{min-width:0}@media(max-width:600px){.empresa-form-grupo{grid-template-columns:minmax(0,1fr)}}

@@ -244,10 +244,12 @@ tr:hover .lixo{opacity:1}
 }
 </style>
 <link rel="stylesheet" href="./refinamento.css?v=ecea1edff489">
+<link rel="stylesheet" href="empresas.css?v=1">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
 <link rel="stylesheet" href="./planos-fluidos.css?v=1f6fdc37af07">
 <link rel="stylesheet" href="./central-fluida.css?v=df0c674c8278">
+<link rel="stylesheet" href="./documentos-revisao.css?v=20260912">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -281,6 +283,7 @@ tr:hover .lixo{opacity:1}
 
 <script src="./vendor/ical-2.2.1.min.js"></script>
 <script src="./google-datas.js?v=2"></script>
+<script src="./documentos-revisao.js?v=20260912"></script>
 <script>
 /* ============================================================
    Central do Léo — painel pessoal, um arquivo só.
@@ -630,7 +633,7 @@ const SEED={
   obraM2Fora:[],
   assinaturas:[],seguros:[],planos:[],casa:[],documentos:[],metas:[],pessoas:[],paraEles:[],colapso:{},
   // saúde ampliada
-  vitais:[],vacinas:[],histFamiliar:[],rastreios:[],
+  vitais:[],vacinas:[],histFamiliar:[],rastreios:[],acervoDocumental:[],
   sos:{sangue:'',alergias:'',doencas:'',cirurgias:'',plano:'',carteirinha:'',contato1:'',contato2:'',medico:'',obs:''},
   // guia de vida ampliado
   norte:{proposito:'',valores:'',legado:''},
@@ -752,6 +755,7 @@ function carregar(){
     d.config.tiposContaBanco=[...new Set([...d.config.tiposContaBanco,...d.config.tiposConta])];
     d.config.tiposConta=[...capital];
   }
+  normalizarEmpresas(d);
   prepararDesenvolvimento(d);
   return d;
 }
@@ -1231,7 +1235,8 @@ const MODS=[
   {id:'agenda',ic:'📅',nome:'Agenda',grupo:'',render:vAgenda},
   {id:'demandas',ic:'✅',nome:'Demandas',grupo:'',render:vDemandas},
   {id:'saude',ic:'🩺',nome:'Saúde',grupo:'',render:vSaude},
-  {id:'estrategia',ic:'♟️',nome:'Planejamento estratégico',grupo:'Empresa',render:vEstrategia},
+  {id:'empresas',ic:'🏢',nome:'Empresas',grupo:'Empresa',render:vEmpresas},
+  {id:'estrategia',ic:'♟️',nome:'Planejamento estratégico',grupo:'',render:vEstrategia},
   {id:'fortemais',ic:'🏗️',nome:'Fortemais',grupo:'Projeto especial',render:vFortemais},
   {id:'bosques',ic:'🌳',nome:'Portal dos Bosques',url:'https://leogpereira-afk.github.io/bosques/'},
   {id:'oportunidades',ic:'💡',nome:'Oportunidades',grupo:'Extra',render:vOportunidades},
@@ -1376,14 +1381,14 @@ function tela(){
   const m=document.getElementById('main'),pagina=el('<div class="pagina"></div>');m.replaceChildren(pagina);
   const alvo=_alvoBloco;_alvoBloco=null;
   const mod=MODS.find(x=>x.id===atual&&!x.url);document.title=mod.nome+' · Central do Léo';
-  const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else if(atual==='caixavgv')organizarCaixaVGV(pagina,alvo);else if(atual==='config')organizarConfig(pagina,alvo);else if(atual==='demandas')organizarDemandasTopo(pagina);else indiceDaTela(pagina);prepararTabelas(pagina);if(alvo)rolaAlvo(pagina,alvo)};
+  const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else if(atual==='caixavgv')organizarCaixaVGV(pagina,alvo);else if(atual==='config')organizarConfig(pagina,alvo);else if(atual==='demandas')organizarDemandasTopo(pagina);else indiceDaTela(pagina);prepararTabelas(pagina);if(typeof docIntegrarTela==='function')docIntegrarTela(pagina,atual);if(alvo)rolaAlvo(pagina,alvo)};
   const falhou=()=>{if(pagina.isConnected)pagina.appendChild(el('<p class="aviso" role="alert">Não foi possível concluir o carregamento. Abra esta seção novamente.</p>'))};
   try{const resultado=mod.render(pagina);if(resultado?.then)resultado.then(finalizar).catch(falhou);else finalizar()}catch(erro){falhou()}
   return !!alvo;
 }
 const rr=id=>()=>{if(atual===id)tela()};
 // trocar de tela: sobe ao topo, a não ser que alguém tenha pedido um bloco
-function irTela(id){if(!MODS.some(m=>m.id===id&&!m.url))return;atual=id;if(location.hash!=='#'+id)history.pushState(null,'','#'+id);alternarMenu(false);menu();if(!tela())window.scrollTo(0,0);document.getElementById('main').focus({preventScroll:true})}
+function irTela(id){if(id==='guia'&&_alvoBloco==='gu-empresas'){id='empresas';_alvoBloco=null}if(!MODS.some(m=>m.id===id&&!m.url))return;atual=id;if(location.hash!=='#'+id)history.pushState(null,'','#'+id);alternarMenu(false);menu();if(!tela())window.scrollTo(0,0);document.getElementById('main').focus({preventScroll:true})}
 window.addEventListener('popstate',()=>{const id=location.hash.slice(1)||'inicio';if(MODS.some(m=>m.id===id&&!m.url)){atual=id;menu();tela()}});
 const cab=(t,s)=>el(`<div class="topo"><div><h1>${t}</h1><p>${s||''}</p></div><span class="cresce"></span></div>`);
 const kpi=(rot,val,sub,cl,ir)=>`<div class="kpi ${cl||''}${ir?' clic':''}"${ir?` data-kpi="${ir}" role="button" tabindex="0" title="Abrir detalhes"`:''}><div class="rot">${rot}</div><div class="val">${val}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
@@ -1452,6 +1457,9 @@ function ordenarDemandas(lista){
   return [...lista].sort((a,b)=>(a.status==='Concluída')-(b.status==='Concluída')||(a.prazo||'9999').localeCompare(b.prazo||'9999')||(prioridade[a.prioridade]??1)-(prioridade[b.prioridade]??1)||(a.titulo||'').localeCompare(b.titulo||'','pt-BR'));
 }
 function abrirRegistro(secao,col,registro){
+  if(col==='empresasPJ'&&registro){empresaAbrir(registro.id);return;}
+  if(['empresaDocumento','empresaObrigacao'].includes(col)&&registro){const emp=empresaPorId(registro.empresaId);if(!emp)return;empresaAbrir(emp.id,col==='empresaDocumento'?'documentos':'imoveis');const item=(col==='empresaDocumento'?empresaDocumentos(emp):empresaObrigacoes(emp)).find(x=>x.id===registro.id);if(item)(col==='empresaDocumento'?empresaModalDocumento:empresaModalObrigacao)(emp,item);return;}
+
   const detalhes={agenda:modalCompromisso,viagens:modalViagem,demandas:modalDemanda,documentos:modalDoc,patrimonio:modalBem,pessoas:modalPessoa,exames:modalExame,oportunidades:modalOport,rendimentos:modalRendimento};
   const blocos={vacinas:'sa-vac',tratamentos:'sa-trat',bancos:'gu-bancos',empresasPJ:'gu-empresas',metas:'gu-metas',rituais:'gu-rituais',livros:'gu-livros',contas:'cx-contas',empreend:'cx-emp',reservas:'cx-res',seguros:'gt-seg',assinaturas:'gt-assin',casa:'gt-casa',planos:'gt-plano'};
   if(!detalhes[col]&&blocos[col])abreBloco(blocos[col]);
@@ -2338,6 +2346,7 @@ const FONTES_AGENDA=[
   {k:'acoes',       rot:'Ações do plano',ic:'🎯',cor:'#2b8a3e'},
   {k:'oportunidades',rot:'Oportunidades',ic:'💡',cor:'#b8860b'},
   {k:'demandas',    rot:'Demandas',ic:'✅',cor:'#0ca678'},
+  {k:'empresas',    rot:'Empresas',ic:'🏢',cor:'#5145a5'},
   {k:'seguros',     rot:'Seguros renovando',ic:'🛡️',cor:'#c92a2a'},
 ];
 const corFonte=k=>(FONTES_AGENDA.find(f=>f.k===k)||{}).cor||'var(--suave)';
@@ -2501,7 +2510,7 @@ function eventoNoMes(e,mes){
   return e.data<=dataLocal(fim)&&(e.ate&&e.ate>=e.data?e.ate:e.data)>=inicio;
 }
 function eventoPendenteVencido(e,data=hoje()){
-  return ['documentos','acoes','oportunidades','demandas','seguros'].includes(e.fonte)&&!!e.data&&e.data<data;
+  return ['documentos','acoes','oportunidades','demandas','seguros','empresas'].includes(e.fonte)&&!!e.data&&e.data<data;
 }
 function proximosCompromissos(lista,data=hoje()){
   return lista.filter(a=>a.data&&(a.ate&&a.ate>=a.data?a.ate:a.data)>=data)
@@ -2595,6 +2604,7 @@ function eventosDoEcossistema(){
       fonte:'seguros',ic:'🛡️',ir:'gastos',col:'seguros',ref:g});
   });
 
+  ev.push(...empresaEventos());
   return ev.sort((a,b)=>(a.data+(a.hora||'')).localeCompare(b.data+(b.hora||'')));
 }
 
@@ -2615,14 +2625,16 @@ function vAgenda(m){
      Antes cada chip desligava a sua categoria, e para ver só os aniversários
      era preciso desligar as outras sete. Agora clicar isola; clicar de novo na
      mesma volta para tudo. É o gesto que a pessoa faz esperando ver, não sumir. */
-  const todosEv=eventosDoEcossistema();
+  const empresaAgenda=filtro.agSo==='empresas'?empresaPorId(filtro.agEmpresaId):null;
+  const todosEv=eventosDoEcossistema().filter(e=>!empresaAgenda||e.fonte==='empresas'&&e.ref?.empresaId===empresaAgenda.id);
+  if(empresaAgenda){const aviso=el('<div class="empresa-agenda-contexto">Empresa: <b>'+esc(empresaAgenda.nome)+'</b></div>');aviso.appendChild(acao('Todas as empresas',()=>{filtro.agEmpresaId='';r()},'ghost mini'));m.appendChild(aviso)}
   const mesChip=filtro.agMes||hoje().slice(0,7);
   const noMes=todosEv.filter(e=>eventoNoMes(e,mesChip));
   const so=filtro.agSo||null;
 
   const chips=el('<div class="agenda-categorias" style="display:flex;gap:7px;flex-wrap:wrap;margin:0 0 14px;align-items:center"></div>');
   const bTudo=el(`<button class="btn mini ${so?'ghost':''}">${so?'↺ Ver tudo':'Tudo ('+noMes.length+')'}</button>`);
-  bTudo.onclick=()=>{filtro.agSo=null;r()};
+  bTudo.onclick=()=>{filtro.agSo=null;filtro.agEmpresaId='';r()};
   chips.appendChild(bTudo);
   FONTES_AGENDA.forEach(f=>{
     const qtd=noMes.filter(e=>e.fonte===f.k).length;
@@ -2630,7 +2642,7 @@ function vAgenda(m){
     const vazio=!qtd;
     const b=el(`<button class="btn mini ${aceso?'':'ghost'}" title="${so===f.k?'clique para ver tudo de novo':'clique para ver só isto'}"
       style="${aceso&&!vazio?'background:'+f.cor+';border-color:'+f.cor+';color:#fff':'opacity:'+(vazio?'.4':'.55')}">${f.ic} ${f.rot} (${qtd})</button>`);
-    b.onclick=()=>{filtro.agSo=(so===f.k?null:f.k);r()};
+    b.onclick=()=>{filtro.agSo=(so===f.k?null:f.k);filtro.agEmpresaId='';r()};
     chips.appendChild(b);
   });
   m.appendChild(chips);
@@ -2996,6 +3008,8 @@ function numeroResultadoSaude(valor){
 }
 // semáforo de um exame: 'ok' | 'atencao' | 'ruim' | ''
 function semaforo(x) {
+  // Resultados documentais conservam a leitura do laudo; não recebem alvos genéricos.
+  if(x.origemDocumental)return x.resultado==='Alterado'?'ruim':x.resultado==='Normal'?'ok':x.resultado==='Atenção'?'atencao':'';
   const m = MARCADORES.find(y => y[0] === x.exame);
   const v = numeroResultadoSaude(x.valor);
   if(x.resultado==='Aguardando')return '';
@@ -3007,7 +3021,7 @@ function semaforo(x) {
 // As faixas do painel são referências cadastradas; o laudo e a avaliação clínica são independentes.
 const CHIP_SEM = { ok: ['var(--verde-cl)', 'var(--verde)', 'No alvo'], atencao: ['var(--areia-cl)', 'var(--areia)', 'Fora do alvo'], ruim: ['var(--vermelho-cl)', 'var(--vermelho)', 'Alterado'] };
 
-function unidadeSaude(x){return x.unidade||MARCADORES.find(m=>m[0]===x.exame)?.[1]||''}
+function unidadeSaude(x){if(x.origemDocumental)return x.unidade||'';return x.unidade||MARCADORES.find(m=>m[0]===x.exame)?.[1]||''}
 function resultadoSaudeRegistrado(x){return dataISOValida(x.data)&&x.data<=hoje()&&x.resultado!=='Aguardando'&&(String(x.valor??'').trim()!==''||['Normal','Atenção','Alterado'].includes(x.resultado))}
 function registrosResultadoSaude(lista){return lista.filter(resultadoSaudeRegistrado).slice().sort((a,b)=>a.data.localeCompare(b.data))}
 function novoExameRotina(nome=''){novoRegistroRotina('Novo exame',E.exames,{data:hoje(),exame:nome,valor:'',medico:'',resultado:'',proximo:'',obs:''},[
@@ -3105,7 +3119,7 @@ function vSaude(m) {
 
   if (grupos.length) {
     const t = document.createElement('table');
-    t.innerHTML = '<thead><tr><th>Marcador</th><th style="text-align:right">Último</th><th>Alvo cadastrado</th>' +
+    t.innerHTML = '<thead><tr><th>Marcador</th><th style="text-align:right">Último</th><th>Referência / alvo</th>' +
       '<th>Situação</th><th>Evolução</th><th style="text-align:right">Medições</th><th>Última coleta</th></tr></thead>';
     const tb = document.createElement('tbody');
     grupos.forEach(g => {
@@ -3115,11 +3129,11 @@ function vSaude(m) {
       else if (g.sem === 'atencao') tr.style.boxShadow = 'inset 3px 0 0 var(--areia)';
       else if (g.sem === 'ok') tr.style.boxShadow = 'inset 3px 0 0 var(--verde)';
       const td = g.tend;
-      const corT = !td ? 'var(--suave)' : td.rumo > 0 ? 'var(--verde)' : td.rumo < 0 ? 'var(--vermelho)' : 'var(--suave)';
+      const corT = !td || g.ult.origemDocumental || g.itens.some(x=>x.origemDocumental) ? 'var(--suave)' : td.rumo > 0 ? 'var(--verde)' : td.rumo < 0 ? 'var(--vermelho)' : 'var(--suave)';
       tr.innerHTML = `<td style="padding:10px"><b style="font-size:14px">${esc(g.nome)}</b>${g.pendentes?'<small class="rotina-nota">'+g.pendentes+' registro(s) a completar</small>':''}</td>
         <td style="padding:10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:14px">${
           g.ult.valor !== '' && g.ult.valor != null ? esc(g.ult.valor) + (unidadeSaude(g.ult) ? ' <span style="font-weight:400;font-size:11.5px;color:var(--suave)">' + esc(unidadeSaude(g.ult)) + '</span>' : '') : '—'}</td>
-        <td style="padding:10px;color:var(--suave);font-size:12.5px">${g.mk&&normaliza(unidadeSaude(g.ult))===normaliza(g.mk[1]) ? esc(g.mk[3]) : 'Consultar laudo'}</td>
+        <td style="padding:10px;color:var(--suave);font-size:12.5px">${g.ult.origemDocumental ? esc(g.ult.referenciaLaudo||'Consultar laudo original') : g.mk&&normaliza(unidadeSaude(g.ult))===normaliza(g.mk[1]) ? esc(g.mk[3]) : 'Consultar laudo'}</td>
         <td style="padding:10px">${c ? `<span class="chip" style="background:${c[0]};color:${c[1]}">${c[2]}</span>` : '—'}</td>
         <td style="padding:10px;color:${corT};font-size:12.5px;font-variant-numeric:tabular-nums">${
           td ? td.seta + ' ' + (td.pct > 0 ? '+' : '') + td.pct.toFixed(0) + '%' : '<span style="color:var(--suave)">'+(g.resultados>1?'Sem comparação numérica':g.resultados?'1ª medição':'Aguardando resultado')+'</span>'}</td>
@@ -3271,7 +3285,7 @@ function modalMarcador(nome) {
   const itens = E.exames.filter(x => (x.exame || '').trim() === nome)
     .sort((a, b) => (a.data || '').localeCompare(b.data || ''));
   const ult = registrosResultadoSaude(itens).at(-1);
-  abrirModal(esc(nome), mk && (!ult||normaliza(unidadeSaude(ult))===normaliza(mk[1])) ? 'Alvo cadastrado: ' + esc(mk[3]) + ' · referência: ' + esc(mk[2]) : itens.length + ' medição(ões)', (c, fechar) => {
+  abrirModal(esc(nome), ult?.origemDocumental ? 'Referência do laudo: ' + esc(ult.referenciaLaudo||'Consultar documento original') : mk && (!ult||normaliza(unidadeSaude(ult))===normaliza(mk[1])) ? 'Alvo cadastrado: ' + esc(mk[3]) + ' · referência: ' + esc(mk[2]) : itens.length + ' medição(ões)', (c, fechar) => {
     const pts = registrosResultadoSaude(itens).filter(x => !isNaN(numeroResultadoSaude(x.valor))&&normaliza(unidadeSaude(x))===normaliza(unidadeSaude(ult||{})))
       .map(x => ({ r: fmtDataAno(x.data).slice(0, 5) + '/' + (x.data || '').slice(2, 4), v: numeroResultadoSaude(x.valor) }));
     if (pts.length > 1) {
@@ -3284,7 +3298,7 @@ function modalMarcador(nome) {
       c.appendChild(el(`<div class="aviso" style="margin:0 0 12px;background:${sem === 'ruim' ? 'var(--vermelho-cl)' : sem === 'atencao' ? 'var(--areia-cl)' : sem==='ok'?'var(--verde-cl)':'var(--bg)'};
         border-color:${sem === 'ruim' ? 'var(--vermelho)' : sem === 'atencao' ? 'var(--areia)' : sem==='ok'?'var(--verde)':'var(--linha)'}">
         <b>${ch ? ch[2] : '—'}</b> — último: ${esc(ult.valor)}${unidadeSaude(ult) ? ' ' + esc(unidadeSaude(ult)) : ''} em ${fmtDataAno(ult.data)}.
-        ${mk&&normaliza(unidadeSaude(ult))===normaliza(mk[1]) ? 'Alvo cadastrado: <b>' + esc(mk[3]) + '</b>. Referência cadastrada: ' + esc(mk[2]) + '.' : ''}</div>`));
+        ${ult.origemDocumental ? 'Referência do laudo: <b>'+esc(ult.referenciaLaudo||'Consultar documento original')+'</b>. '+(devURL(ult.origemDocumental.url)?'<a href="'+esc(devURL(ult.origemDocumental.url))+'" target="_blank" rel="noopener noreferrer">Abrir fonte'+(ult.origemDocumental.pagina?' · p. '+esc(ult.origemDocumental.pagina):'')+'</a>':'') : mk&&normaliza(unidadeSaude(ult))===normaliza(mk[1]) ? 'Alvo cadastrado: <b>' + esc(mk[3]) + '</b>. Referência cadastrada: ' + esc(mk[2]) + '.' : ''}</div>`));
     }
     const s2 = el('<div class="secao"><h4>Todas as medições</h4></div>');
     const rl = el('<div class="rolagem"></div>');
@@ -5421,8 +5435,8 @@ const FONTES_BUSCA=[
    campos:['banco','titular','tipo','pix','gerente','agencia','conta'],
    tit:x=>[x.banco,x.titular].filter(Boolean).join(' · ')||'conta',
    sub:x=>[x.tipo,x.agencia&&'ag. '+x.agencia,x.conta&&'cc. '+x.conta].filter(Boolean).join(' · ')},
-  {col:'empresasPJ',tela:'guia',ic:'🏢',rot:'Empresa',
-   campos:['nome','cnpj','regime','socios','contador','banco'],
+  {col:'empresasPJ',tela:'empresas',ic:'🏢',rot:'Empresa',
+   campos:['nome','razaoSocial','cnpj','atividade','inscricaoEstadual','inscricaoMunicipal','endereco','cidade','uf','contato','telefone','email','regime','socios','contador','contadorContato','banco','obs'],
    tit:x=>x.nome||'empresa',sub:x=>[x.cnpj,x.regime,x.status].filter(Boolean).join(' · ')},
   {col:'seguros',tela:'gastos',ic:'🛡️',rot:'Seguro',
    campos:['tipo','item','seguradora','apolice','beneficiarios','telefone'],
@@ -5495,6 +5509,10 @@ function buscarEmTudo(q){
     });
   });
   const incluir=(f,x,tit,sub,textos,abrir)=>{if(partes.every(p=>normaliza([f.rot,tit,sub,...textos].join(' ')).includes(p)))achados.push({f,x,tit,sub,abrir})};
+  for(const emp of E.empresasPJ||[]){
+    for(const d of empresaDocumentos(emp))incluir({rot:'Documento empresarial',ic:'📁',tela:'empresas'},d,d.nome||d.tipo,emp.nome,[d.tipo,d.data,d.validade,d.status,d.obs,...(d.revisoes||[]).map(v=>[v.nome,v.obs].join(' '))],()=>{empresaAbrir(emp.id,'documentos');empresaModalDocumento(emp,d)});
+    for(const o of empresaObrigacoes(emp))incluir({rot:'Obrigação empresarial',ic:'🏠',tela:'empresas'},o,o.nome||o.tipo,emp.nome,[o.tipo,o.ano,o.inscricao,o.vencimento,o.status,o.obs,(E.patrimonio||[]).find(x=>x.id===o.patrimonioId)?.nome],()=>{empresaAbrir(emp.id,'imoveis');empresaModalObrigacao(emp,o)});
+  }
   for(const p of E.planejamentoEmpresas||[])for(const o of p.objetivos||[]){
     incluir({rot:'Objetivo estratégico',ic:'🎯',tela:'estrategia'},o,o.titulo||'Objetivo',p.empresaNome+' · '+p.ano,[o.indicador,o.meta,o.resultado,...historicoResultadoObjetivo(o).map(r=>r.resultado),...(o.acoes||[]).map(a=>[a.oque,a.quem,a.status].join(' '))],()=>{filtro.estrEmpresaId=p.empresaId;filtro.estrPlano=p.id;filtro.estrAba='plano';filtro.estrObjetivo=o.id;filtro.estrBusca='';filtro.estrFiltro='todas';irTela('estrategia')});
   }
@@ -6181,7 +6199,7 @@ function prepararEstrategia(m){
   const topo=cab('Planejamento estratégico','Direção clara. Prioridades definidas. Execução acompanhada.');m.appendChild(topo);
   if(!empresas.length){
     const vazio=el('<div class="workspace-empty"><h2>Comece pela sua empresa</h2><p>Cadastre uma empresa para organizar o planejamento anual, de 2027 em diante.</p></div>');
-    vazio.appendChild(acao('Cadastrar empresa',()=>{abreBloco('gu-empresas');irTela('guia')}));m.appendChild(vazio);return null;
+    vazio.appendChild(acao('Cadastrar empresa',()=>{irTela('empresas');empresaModalFicha()}));m.appendChild(vazio);return null;
   }
   const emp=empresas.find(e=>e.id===filtro.estrEmpresaId)||empresas[0];filtro.estrEmpresaId=emp.id;
   const planos=(E.planejamentoEmpresas||[]).filter(p=>p.empresaId===emp.id).sort((a,b)=>b.ano-a.ano);
@@ -6371,7 +6389,7 @@ function vEstrategia(m){
   ];
   narrativas.forEach(([t,sub,campos,editar])=>{const c=card(identidade,t);c.classList.add('strategy-direction');c.appendChild(el('<p class="strategy-muted">'+sub+'</p>'));const grid=el('<div class="strategy-narratives"></div>');campos.forEach(([k,nome])=>grid.appendChild(el('<div><h4>'+nome+'</h4><p'+(!est[k]?' class="strategy-muted"':'')+'>'+esc(est[k]||'Ainda não definido.')+'</p></div>')));if(t==='Identidade')grid.appendChild(el('<div class="full"><h4>Valores</h4>'+(est.valores.length?est.valores.map(v=>'<p><b>'+esc(v.titulo)+'</b>'+ (v.oque?' · '+esc(v.oque):'')+'</p>').join(''):'<p class="strategy-muted">Ainda não definidos.</p>')+'</div>'));c.appendChild(grid);if(!est.encerrado){c.appendChild(acao('Editar '+t.toLowerCase(),editar,'ghost'));if(t==='Identidade'){const gerenciar=el('<details class="strategy-values-edit"><summary>Gerenciar valores</summary></details>');est.valores.forEach(v=>gerenciar.appendChild(acao('Editar: '+v.titulo,()=>modalValorEstrategia(est,v,r),'ghost')));gerenciar.appendChild(acao('+ Adicionar valor',()=>modalValorEstrategia(est,null,r),'ghost'));c.appendChild(gerenciar)}}});
   const dados=el('<details class="strategy-company" data-bid="es-dados"><summary>Dados cadastrais da empresa</summary><div class="strategy-goal-data"></div></details>');
-  [['CNPJ',emp.cnpj],['Regime',emp.regime],['Sócios',emp.socios],['Contabilidade',emp.contador],['Banco principal',emp.banco],['Situação',emp.status]].forEach(([t,v])=>dados.querySelector('div').appendChild(el('<div><span>'+t+'</span><b>'+esc(v||'Não informado')+'</b></div>')));
+  [['CNPJ',emp.cnpj],['Abertura',emp.abertura?fmtDataAno(emp.abertura):''],['Atividade / CNAE',emp.atividade],['Inscrição estadual',emp.inscricaoEstadual],['Inscrição municipal',emp.inscricaoMunicipal],['Regime',emp.regime],['Sócios',emp.socios],['Contabilidade',emp.contador],['Banco principal',emp.banco],['Situação',emp.status]].forEach(([t,v])=>dados.querySelector('div').appendChild(el('<div><span>'+t+'</span><b>'+esc(v||'Não informado')+'</b></div>')));
   const contas=contasDaEmpresa(emp);
   if(!contas.length)dados.appendChild(el('<p class="strategy-muted">Nenhuma conta vinculada por empresa ou titular exato. Os demais cadastros continuam em Guia de vida → Cadastros.</p>'));contas.forEach(b=>dados.appendChild(el('<p>'+esc(b.banco)+' · '+esc(b.titular||'Titular não informado')+' · Tipo '+esc(b.tipo||'—')+' · Agência '+esc(b.agencia||'—')+' · Conta '+esc(b.conta||'—')+' · PIX '+esc(b.pix||'—')+' · Gerente '+esc(b.gerente||'—')+'</p>')));identidade.appendChild(dados);
 
@@ -8121,6 +8139,239 @@ function financeiroSalvarRegistro(lista,obj,valores,patch){
   if(existe)Object.assign(existe,patch);else{const novo={...obj,...valores};delete novo._ffNovo;lista.push(novo)}salvar();
 }
 function financeiroBusca(lista,termo,campos){const q=normaliza(termo||'');return !q?lista:lista.filter(x=>normaliza(campos.map(k=>x[k]??'').join(' ')).includes(q))}
+/* ===================== EMPRESAS =====================
+   E.empresasPJ é a ficha canônica. Bancos e bens continuam em suas listas;
+   somente documentos e obrigações exclusivos da empresa ficam aninhados. */
+function normalizarEmpresas(d){
+  for(const e of d.empresasPJ||[]){
+    for(const k of ['documentosEmpresa','obrigacoesEmpresa']){
+      if(e[k]===undefined)e[k]=[];
+      if(Array.isArray(e[k]))for(const x of e[k])if(!x.id)x.id=uid();
+    }
+  }
+}
+function empresaPorId(id){return (E.empresasPJ||[]).find(e=>e.id===id)}
+function empresaLista(q=''){
+  const termos=normaliza(q).split(' ').filter(Boolean);
+  return (E.empresasPJ||[]).filter(e=>termos.every(t=>normaliza([e.nome,e.razaoSocial,e.cnpj,empresaCnpjChave(e.cnpj),e.cidade,e.contador,e.status].join(' ')).includes(t)))
+    .slice().sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR',{sensitivity:'base'}));
+}
+function empresaNomeUnico(emp){return (E.empresasPJ||[]).filter(e=>normaliza(e.nome||'')===normaliza(emp.nome||'')).length===1}
+function empresaRegistros(emp,col){
+  const unico=empresaNomeUnico(emp);
+  return (E[col]||[]).filter(x=>x.empresaId?x.empresaId===emp.id:unico&&[x.empresa,x.empresaNome].some(n=>String(n||'').trim()&&normaliza(n)===normaliza(emp.nome)));
+}
+function empresaContas(emp){return contasDaEmpresa(emp).filter(b=>b.empresaId||empresaNomeUnico(emp))}
+function empresaDocumentos(emp){return Array.isArray(emp.documentosEmpresa)?emp.documentosEmpresa:[]}
+function empresaObrigacoes(emp){return Array.isArray(emp.obrigacoesEmpresa)?emp.obrigacoesEmpresa:[]}
+function empresaRefArquivo(emp,doc){return doc?'empresa:'+emp.id+':documento:'+doc.id:'empresa:'+emp.id}
+function empresaRefObrigacao(emp,o){return 'empresa:'+emp.id+':obrigacao:'+o.id}
+function empresaCnpjChave(valor){return String(valor||'').toUpperCase().replace(/[.\/\-\s]/g,'')}
+function empresaCnpjValido(valor){
+  if(!String(valor||'').trim())return true;const n=empresaCnpjChave(valor);
+  if(!/^[A-Z0-9]{12}[0-9]{2}$/.test(n)||/^(\d)\1+$/.test(n))return false;
+  // Receita Federal: caracteres ASCII menos 48; mesmo módulo 11 do formato numérico.
+  const dig=s=>{let peso=s.length-7,soma=0;for(const c of s){soma+=(c.charCodeAt(0)-48)*peso;if(--peso<2)peso=9}const resto=soma%11;return resto<2?0:11-resto};
+  return dig(n.slice(0,12))===+n[12]&&dig(n.slice(0,13))===+n[13];
+}
+function empresaValidarUrl(valor){
+  if(!valor)return '';let u;try{u=new URL(valor)}catch{throw Error('Informe um endereço completo começando com https://.')}
+  if(u.protocol!=='https:'||u.username||u.password)throw Error('Use um link HTTPS sem credenciais no endereço.');return u.href;
+}
+function empresaValidarNome(nome,ignorar){
+  if(!String(nome||'').trim())throw Error('Informe o nome da empresa.');
+  if(['__proto__','prototype','constructor'].includes(nome))throw Error('Use outro nome para a empresa.');
+  if((E.empresasPJ||[]).some(e=>e.id!==ignorar&&normaliza(e.nome||'')===normaliza(nome)))throw Error('Já existe uma empresa com esse nome. Abra o cadastro existente.');
+}
+function empresaSalvarFicha(emp,novo,v,patch=v){
+  const nome=String(v.nome||'').trim();empresaValidarNome(nome,emp.id);
+  if(v.cnpj&&v.cnpj!==emp.cnpj&&!empresaCnpjValido(v.cnpj))throw Error('Confira o CNPJ: os dígitos informados não são válidos.');
+  const cnpj=empresaCnpjChave(v.cnpj);
+  if(cnpj&&(E.empresasPJ||[]).some(e=>e.id!==emp.id&&empresaCnpjChave(e.cnpj)===cnpj))throw Error('Este CNPJ já está em outra ficha. Confira antes de cadastrar novamente.');
+  if(v.site)empresaValidarUrl(v.site);
+  if(novo){if(empresaPorId(emp.id))throw Error('Esta empresa já foi salva. Abra a ficha.');const registro={...emp,...v,nome};E.empresasPJ.push(registro);normalizarEmpresas(E);filtro.empresaId=registro.id;salvar();return registro;}
+  if(empresaPorId(emp.id)!==emp)throw Error('A ficha mudou. Abra novamente antes de salvar.');
+  if(nome!==emp.nome&&!renomeiaEmpresa(emp.nome,nome,emp))throw Error('Não foi possível renomear. Confira os vínculos dessa empresa.');
+  Object.assign(emp,patch,{nome});salvar();return emp;
+}
+function empresaFormulario(titulo,sub,defs,obj,gravar){
+  abrirModal(titulo,sub,(c,fechar)=>{c.classList.add('empresa-modal');const editor=financeiroFormulario(c,defs,obj,gravar,fechar);if(defs.some(d=>d.grupo)){const campos=editor.form.querySelector('.ff-fields');let grupo;for(const d of defs){const campo=editor.controles[d.k].closest('.ff-field');if(d.grupo){grupo=el('<fieldset class="empresa-form-grupo"><legend></legend></fieldset>');grupo.querySelector('legend').textContent=d.grupo;campos.appendChild(grupo)}grupo.appendChild(campo)}}});
+}
+function empresaModalFicha(emp){
+  const novo=!emp;emp=emp||{id:uid(),nome:'',status:'Ativa'};
+  empresaFormulario(novo?'Nova empresa':'Editar dados da empresa','Salve a ficha para anexar documentos e organizar as contas.',[
+    {k:'nome',grupo:'Identificação da empresa',t:'Nome da empresa',req:true},{k:'razaoSocial',t:'Razão social'},{k:'cnpj',t:'CNPJ',ph:'00.000.000/0001-00',ajuda:'Aceita CNPJ numérico ou com letras. A validação confere os dígitos; não consulta a Receita.'},{k:'abertura',t:'Data de abertura',tipo:'date'},
+    {k:'atividade',grupo:'Cadastros e regime tributário',t:'Atividade / CNAE'},{k:'inscricaoEstadual',t:'Inscrição estadual'},{k:'inscricaoMunicipal',t:'Inscrição municipal'},
+    {k:'status',t:'Situação',opcoes:['Ativa','Em abertura','Em alteração','Baixada']},{k:'regime',t:'Regime tributário',opcoes:['',...CFG('regimes')]},
+    {k:'socios',grupo:'Sociedade e endereço',t:'Sócios e participação',full:true},{k:'endereco',t:'Endereço',full:true},{k:'cidade',t:'Cidade'},{k:'uf',t:'UF',opcoes:['','AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']},
+    {k:'cep',t:'CEP'},{k:'contato',grupo:'Contatos e referências',t:'Contato principal'},{k:'telefone',t:'Telefone'},{k:'email',t:'E-mail',tipo:'email'},
+    {k:'site',t:'Site',tipo:'url',ph:'https://'},{k:'contador',t:'Contabilidade'},{k:'contadorContato',t:'Contato da contabilidade'},
+    {k:'banco',t:'Referência bancária anterior',ajuda:'Texto do cadastro anterior; as contas detalhadas ficam na seção Bancos.'},
+    {k:'obs',t:'Observações',tipo:'textarea',full:true}
+  ],emp,(v,p)=>empresaSalvarFicha(emp,novo,v,p));
+}
+function empresaSalvarBanco(emp,b,novo,v,p=v){
+  if(empresaPorId(emp.id)!==emp)throw Error('A empresa mudou. Abra a ficha novamente.');
+  if(!String(v.banco||'').trim())throw Error('Informe o banco.');
+  if(!novo&&(!E.bancos.includes(b)||!empresaContas(emp).includes(b)))throw Error('Esta conta não pertence a esta ficha. Confira o vínculo.');
+  if(novo&&v.conta&&empresaContas(emp).some(x=>normaliza(x.banco)===normaliza(v.banco)&&String(x.agencia||'').trim()===String(v.agencia||'').trim()&&String(x.conta||'').trim()===String(v.conta).trim()))throw Error('Esta conta já está cadastrada na empresa. Abra a conta existente.');
+  if(novo)E.bancos.push({...b,...v,empresaId:emp.id,titular:emp.nome});else Object.assign(b,p,{empresaId:emp.id,titular:emp.nome});salvar();
+}
+function empresaModalBanco(emp,b){
+  const novo=!b;b=b||{id:uid(),tipo:''};
+  empresaFormulario(novo?'Nova conta da empresa':'Editar conta da empresa','Agência, conta, PIX e contato. Não registre senhas ou códigos de acesso.',[
+    {k:'banco',t:'Banco',req:true},{k:'tipo',t:'Tipo da conta',opcoes:['',...CFG('tiposContaBanco')]},{k:'agencia',t:'Agência'},{k:'conta',t:'Conta'},
+    {k:'pix',t:'Chave PIX'},{k:'gerente',t:'Gerente / contato'},{k:'obs',t:'Observações',tipo:'textarea',full:true}
+  ],b,(v,p)=>empresaSalvarBanco(emp,b,novo,v,p));
+}
+function empresaVincularRegistro(emp,col,id){
+  if(!['bancos','patrimonio'].includes(col))throw Error('Este tipo de vínculo não pode ser alterado aqui.');
+  const x=(E[col]||[]).find(x=>x.id===id);if(!x||empresaPorId(emp.id)!==emp)throw Error('O cadastro mudou. Confira a seleção.');
+  if(x.empresaId&&x.empresaId!==emp.id)throw Error('Este registro já está vinculado a outra empresa.');
+  const nome=col==='bancos'?x.titular:x.empresa||x.empresaNome;
+  if(nome&&normaliza(nome)!==normaliza(emp.nome))throw Error('O titular informado é diferente. Confira o cadastro original antes de vincular.');
+  if(col==='bancos'&&!x.empresaId&&nome&&!empresaNomeUnico(emp))throw Error('Há empresas com nomes iguais. Confira os titulares primeiro.');
+  x.empresaId=emp.id;if(col==='bancos')x.titular=emp.nome;salvar();
+}
+function empresaModalVinculo(emp,col){
+  const candidatos=(E[col]||[]).filter(x=>!x.empresaId&&!(col==='bancos'?empresaContas(emp):empresaRegistros(emp,col)).includes(x));
+  abrirModal(col==='bancos'?'Vincular conta existente':'Vincular imóvel do patrimônio',esc(emp.nome),(c,fechar)=>{
+    const sec=el('<div class="secao"><p class="empresa-nota">Escolha o registro que pertence a esta empresa. O cadastro original será mantido.</p></div>');
+    const opts=candidatos.filter(x=>{const n=col==='bancos'?x.titular:x.empresa||x.empresaNome;return !n||normaliza(n)===normaliza(emp.nome)});
+    if(!opts.length)sec.appendChild(el('<p class="vazio">Não há registros livres para vincular. Cadastre o bem no Patrimônio ou confira o titular na lista de bancos.</p>'));
+    else {const select=seletor('',[['','Selecione'],...opts.map(x=>[x.id,col==='bancos'?[x.banco,x.agencia,x.conta].filter(Boolean).join(' · '):[x.nome,x.onde].filter(Boolean).join(' · ')])],()=>{},'Registro para vincular');sec.appendChild(select);
+      const erro=el('<p role="alert"></p>');sec.appendChild(erro);sec.appendChild(acao('Salvar vínculo',()=>{try{empresaVincularRegistro(emp,col,select.value);fechar()}catch(e){erro.textContent=e.message}}));}
+    if(col==='patrimonio')sec.appendChild(acao('Abrir Patrimônio',()=>{fechar();irTela('patrimonio')},'ghost'));
+    sec.appendChild(acao('Cancelar',fechar,'ghost'));c.appendChild(sec);
+  });
+}
+function empresaSalvarInterno(emp,col,obj,novo,v,p=v){
+  if(empresaPorId(emp.id)!==emp)throw Error('A empresa mudou. Abra novamente.');
+  const lista=col==='documentosEmpresa'?empresaDocumentos(emp):empresaObrigacoes(emp);
+  if(!novo&&!lista.includes(obj))throw Error('Este registro mudou. Abra novamente.');
+  if(!String(v.nome||'').trim())throw Error('Informe o título.');
+  if(col==='documentosEmpresa'){
+    for(const k of ['data','validade'])if(v[k]&&!dataISOValida(v[k]))throw Error('Confira a data do documento.');
+    if(v.data&&v.validade&&v.validade<v.data)throw Error('A validade não pode ser anterior à data do documento.');
+    if(v.url)empresaValidarUrl(v.url);
+    if(v.anteriorId){let anterior=lista.find(x=>x.id===v.anteriorId),vistos=new Set([obj.id]);if(!anterior)throw Error('O documento anterior não pertence a esta empresa.');while(anterior){if(vistos.has(anterior.id))throw Error('O vínculo entre documentos formaria um ciclo.');vistos.add(anterior.id);anterior=lista.find(x=>x.id===anterior.anteriorId)}}
+  }else{
+    if(!dataISOValida(v.vencimento))throw Error('Informe um vencimento válido.');
+    if(!/^\d{4}$/.test(String(v.ano))||+v.ano<1900||+v.ano>2200)throw Error('Informe um ano entre 1900 e 2200.');
+    if(v.patrimonioId&&!empresaRegistros(emp,'patrimonio').some(x=>x.id===v.patrimonioId)&&(novo||v.patrimonioId!==obj.patrimonioId))throw Error('O imóvel não está vinculado a esta empresa.');
+    if(v.tipo==='IPTU'&&!v.patrimonioId)throw Error('Vincule o imóvel do IPTU antes de salvar.');
+    if(v.valor!==''){const valor=financeiroNumero(v.valor);if(valor<0)throw Error('O valor não pode ser negativo.');v={...v,valor};if('valor' in p)p={...p,valor}}
+    if(v.pagoEm&&!dataISOValida(v.pagoEm))throw Error('Confira a data de pagamento.');
+    if(v.status==='Pago'&&v.pagoEm&&v.pagoEm>hoje())throw Error('O pagamento informado não pode estar no futuro.');
+    if(v.status!=='Pago'&&v.pagoEm)throw Error('A data de pagamento exige a situação Pago.');
+  }
+  if(novo){if(lista.some(x=>x.id===obj.id))throw Error('Este registro já foi salvo.');if(!Array.isArray(emp[col]))emp[col]=[];emp[col].push({...obj,...v});}
+  else if(Object.keys(p).length){const versao={...structuredClone(obj)};delete versao.revisoes;const revisoes=[...(obj.revisoes||[]),{...versao,revisadoEm:new Date().toISOString()}];Object.assign(obj,p,{revisoes});}
+  salvar();
+}
+function empresaHistorico(c,obj,campos){
+  const historico=el('<section class="empresa-historico"><h4>Histórico de revisões</h4></section>');
+  for(const v of [...(obj.revisoes||[])].reverse()){
+    const linha=el('<div class="empresa-versao"><small>Revisão guardada em '+esc(v.revisadoEm?new Date(v.revisadoEm).toLocaleString('pt-BR'):'data não informada')+'</small></div>');
+    for(const [k,t] of campos)if(v[k]!==undefined&&v[k]!=='')linha.appendChild(el('<p><b>'+t+':</b> '+esc(v[k])+'</p>'));
+    historico.appendChild(linha);
+  }
+  if(!obj.revisoes?.length)historico.appendChild(el('<p>Nenhuma revisão anterior. As próximas alterações serão guardadas aqui.</p>'));c.appendChild(historico);
+}
+function empresaModalDocumento(emp,doc){
+  const novo=!doc;doc=doc||{id:uid(),tipo:'Contrato social',status:'Em revisão'};
+  abrirModal(novo?'Adicionar documento empresarial':esc(doc.nome),'Contrato social, alterações, licenças e certidões com histórico.',(c,fechar)=>{
+    c.classList.add('empresa-modal');const editor=financeiroFormulario(c,[
+      {k:'nome',t:'Título do documento',req:true,full:true},{k:'tipo',t:'Tipo',opcoes:['Contrato social','Alteração contratual','Licença','Certidão','Outro']},
+      {k:'data',t:'Data do documento',tipo:'date'},{k:'validade',t:'Validade (se houver)',tipo:'date'},
+      {k:'status',t:'Situação informada',opcoes:['Em revisão','Vigente','Histórico']},{k:'url',t:'Link no Drive ou site',tipo:'url',full:true,ph:'https://'},
+      {k:'anteriorId',t:'Documento anterior (opcional)',opcoes:['',...empresaDocumentos(emp).filter(x=>x.id!==doc.id).map(x=>x.id)]},
+      {k:'obs',t:'Observações / o que mudou',tipo:'textarea',full:true}
+    ],doc,(v,p)=>empresaSalvarInterno(emp,'documentosEmpresa',doc,novo,v,p),fechar);
+    const select=editor.controles.anteriorId;for(const o of select.options)if(o.value)o.textContent=empresaDocumentos(emp).find(x=>x.id===o.value)?.nome||'Referência anterior indisponível';
+    if(!novo)empresaHistorico(c,doc,[['nome','Título'],['tipo','Tipo'],['data','Data'],['validade','Validade'],['status','Situação'],['url','Link'],['obs','Observações']]);
+  });
+}
+function empresaModalObrigacao(emp,o){
+  const novo=!o;o=o||{id:uid(),nome:'',tipo:'IPTU',ano:hoje().slice(0,4),status:'Pendente',valor:''};
+  abrirModal(novo?'Nova obrigação':'Editar obrigação',esc(emp.nome)+' · O pagamento é sempre informado por você.',(c,fechar)=>{
+    c.classList.add('empresa-modal');const editor=financeiroFormulario(c,[
+      {k:'nome',t:'Título / parcela',req:true,full:true,ph:'IPTU · parcela 1 ou taxa anual'},
+      {k:'tipo',t:'Tipo',opcoes:['IPTU','Taxa','Renovação','Outra']},{k:'ano',t:'Ano de referência',tipo:'number',req:true},
+      {k:'patrimonioId',t:'Imóvel vinculado',opcoes:['',...empresaRegistros(emp,'patrimonio').map(x=>x.id)]},
+      {k:'inscricao',t:'Inscrição municipal / referência'},
+      {k:'vencimento',t:'Vencimento',tipo:'date',req:true},{k:'valor',t:'Valor (R$)',ph:'Deixe vazio se ainda não souber'},
+      {k:'status',t:'Situação informada',opcoes:['Pendente','A conferir','Pago','Cancelado']},{k:'pagoEm',t:'Data do pagamento (opcional)',tipo:'date'},
+      {k:'obs',t:'Observações',tipo:'textarea',full:true}
+    ],o,(v,p)=>empresaSalvarInterno(emp,'obrigacoesEmpresa',o,novo,v,p),fechar);
+    for(const opt of editor.controles.patrimonioId.options)if(opt.value)opt.textContent=(E.patrimonio||[]).find(x=>x.id===opt.value)?.nome||'Imóvel não encontrado · confira o vínculo';
+    editor.controles.valor.setAttribute('inputmode','decimal');
+    if(!novo)empresaHistorico(c,o,[['nome','Título'],['ano','Ano'],['vencimento','Vencimento'],['valor','Valor'],['status','Situação'],['pagoEm','Data de pagamento'],['obs','Observações']]);
+  });
+}
+function empresaAbrir(id,secao=''){
+  filtro.empresaId=id;filtro.empresaBusca='';irTela('empresas');
+  if(secao)document.getElementById('empresa-'+secao)?.scrollIntoView({block:'start'});
+}
+function empresaAbrirAnexos(emp,doc){abrirModal(doc?esc(doc.nome):'Arquivos da empresa',esc(emp.nome),(c)=>{c.appendChild(areaArquivos(empresaRefArquivo(emp,doc),'Contrato, comprovante ou documento em PDF'))})}
+function empresaEventos(){
+  const eventos=[];
+  for(const emp of E.empresasPJ||[]){
+    for(const d of empresaDocumentos(emp))if(dataISOValida(d.validade)&&d.status!=='Histórico')eventos.push({id:'empresa-doc:'+emp.id+':'+d.id,data:d.validade,titulo:(d.nome||'Documento')+' vence',sub:emp.nome,fonte:'empresas',ic:'🏢',ir:'empresas',col:'empresaDocumento',ref:{empresaId:emp.id,id:d.id}});
+    for(const o of empresaObrigacoes(emp))if(dataISOValida(o.vencimento)&&!['Pago','Cancelado'].includes(o.status))eventos.push({id:'empresa-obrigacao:'+emp.id+':'+o.id,data:o.vencimento,titulo:o.nome||o.tipo||'Obrigação',sub:[emp.nome,o.ano,o.valor!==''&&o.valor!=null?brl(Number(o.valor)):null].filter(Boolean).join(' · '),fonte:'empresas',ic:'🏢',ir:'empresas',col:'empresaObrigacao',ref:{empresaId:emp.id,id:o.id}});
+  }
+  return eventos;
+}
+function empresaBloco(titulo,id,sub,acaoTexto,fn){
+  const b=el('<section class="empresa-secao" id="empresa-'+id+'"><header><div><h2>'+esc(titulo)+'</h2><p>'+esc(sub||'')+'</p></div></header><div class="empresa-secao-corpo"></div></section>');
+  if(fn)b.querySelector('header').appendChild(acao(acaoTexto,fn,'ghost mini'));return b;
+}
+function empresaLinha(titulo,sub,botao,fn){const b=el('<div class="empresa-linha"><div><b>'+esc(titulo)+'</b><small>'+esc(sub||'')+'</small></div></div>');if(fn)b.appendChild(acao(botao,fn,'ghost mini'));return b}
+function empresaAbrirPlano(emp,p){filtro.estrEmpresaId=emp.id;filtro.estrPlano=p?.id||'';filtro.estrAba='resumo';irTela('estrategia')}
+function vEmpresas(m){
+  m.classList.add('workspace-layout','empresas-layout');const topo=cab('Empresas','Dados, documentos e compromissos conectados à sua empresa.');topo.appendChild(acao('+ Nova empresa',()=>empresaModalFicha()));m.appendChild(topo);
+  const lista=empresaLista(filtro.empresaBusca||''),emp=lista.find(e=>e.id===filtro.empresaId)||lista[0];
+  const estrutura=el('<div class="empresas-estrutura"><aside class="empresas-lista" aria-label="Lista de empresas"><label>Encontrar empresa<input type="search" placeholder="Nome, CNPJ ou cidade" aria-label="Buscar empresa"></label><div class="empresas-opcoes"></div></aside><div class="empresa-ficha"></div></div>');m.appendChild(estrutura);
+  const busca=estrutura.querySelector('input');busca.value=filtro.empresaBusca||'';busca.oninput=()=>{const pos=busca.selectionStart;filtro.empresaBusca=busca.value;rr('empresas')();const novo=m.parentElement?.querySelector('input[type=search]')||document.querySelector('.empresas-lista input');novo?.focus();novo?.setSelectionRange?.(pos,pos)};
+  const opcoes=estrutura.querySelector('.empresas-opcoes');
+  for(const e of lista){const b=el('<button class="empresa-opcao'+(e===emp?' selecionada':'')+'" aria-pressed="'+(e===emp)+'"><span class="empresa-inicial">'+esc((e.nome||'?').slice(0,1).toUpperCase())+'</span><span><b>'+esc(e.nome||'Empresa sem nome')+'</b><small>'+esc(e.cnpj||e.status||'Completar cadastro')+'</small></span></button>');b.onclick=()=>{filtro.empresaId=e.id;rr('empresas')()};opcoes.appendChild(b)}
+  if(!lista.length)opcoes.appendChild(el('<p class="empresa-nota">Nenhuma empresa encontrada.</p>'));
+  const ficha=estrutura.querySelector('.empresa-ficha');
+  if(!emp){const empty=el('<section class="workspace-empty"><h2>'+((E.empresasPJ||[]).length?'Nenhuma empresa neste filtro':'Sua base empresarial começa aqui')+'</h2><p>Reúna contatos, contas e documentos. Os planejamentos anuais continuarão ligados à mesma empresa.</p></section>');empty.appendChild(acao((E.empresasPJ||[]).length?'Limpar busca':'Cadastrar empresa',(E.empresasPJ||[]).length?()=>{filtro.empresaBusca='';rr('empresas')()}:()=>empresaModalFicha()));ficha.appendChild(empty);return;}
+  filtro.empresaId=emp.id;
+  const docs=empresaDocumentos(emp),obs=empresaObrigacoes(emp),pend=obs.filter(o=>!['Pago','Cancelado'].includes(o.status)),contas=empresaContas(emp),bens=empresaRegistros(emp,'patrimonio'),planos=(E.planejamentoEmpresas||[]).filter(p=>p.empresaId===emp.id).sort((a,b)=>b.ano-a.ano);
+  const hero=el('<section class="empresa-cabecalho"><div><span class="workspace-eyebrow">FICHA EMPRESARIAL · '+esc(emp.status||'Situação não informada')+'</span><h2>'+esc(emp.nome||'Empresa sem nome')+'</h2><p>'+esc([emp.razaoSocial,emp.cnpj].filter(Boolean).join(' · ')||'Complete o CNPJ e os dados gerais.')+'</p></div><div class="empresa-resumo"><span><b>'+contas.length+'</b> contas</span><span><b>'+docs.length+'</b> documentos</span><span><b>'+pend.length+'</b> obrigações em aberto</span></div></section>');ficha.appendChild(hero);
+  const nav=el('<nav class="empresa-indice" aria-label="Seções da empresa"></nav>');for(const [id,t] of [['gerais','Dados e contatos'],['bancos','Bancos'],['documentos','Documentos'],['imoveis','Imóveis e obrigações'],['conexoes','Conexões']])nav.appendChild(acao(t,()=>document.getElementById('empresa-'+id)?.scrollIntoView({block:'start'}),'ghost mini'));ficha.appendChild(nav);
+  const geral=empresaBloco('🏢 Dados e contatos','gerais','Informações cadastrais e quem procurar.','Editar dados',()=>empresaModalFicha(emp));
+  const dl=el('<dl class="empresa-dados"></dl>');for(const [t,v] of [['CNPJ',emp.cnpj],['Abertura',emp.abertura?fmtDataAno(emp.abertura):''],['Atividade / CNAE',emp.atividade],['Inscrição estadual',emp.inscricaoEstadual],['Inscrição municipal',emp.inscricaoMunicipal],['Regime',emp.regime],['Sócios',emp.socios],['Endereço',[emp.endereco,emp.cidade,emp.uf,emp.cep].filter(Boolean).join(' · ')],['Contato',[emp.contato,emp.telefone,emp.email].filter(Boolean).join(' · ')],['Contabilidade',[emp.contador,emp.contadorContato].filter(Boolean).join(' · ')],['Referência bancária anterior',emp.banco],['Observações',emp.obs]])if(v)dl.appendChild(el('<div><dt>'+t+'</dt><dd>'+esc(v)+'</dd></div>'));
+  if(!dl.children.length)dl.appendChild(el('<p class="empresa-nota">Preencha endereço, contatos e dados da empresa para facilitar a consulta.</p>'));geral.lastElementChild.appendChild(dl);if(emp.site){try{const url=empresaValidarUrl(emp.site);geral.lastElementChild.appendChild(el('<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Abrir site ↗</a>'))}catch{geral.lastElementChild.appendChild(el('<p class="empresa-nota">Confira o endereço do site no cadastro.</p>'))}}ficha.appendChild(geral);
+  const bancos=empresaBloco('🏦 Bancos da empresa','bancos','Agência, conta, PIX e contato do gerente.','+ Nova conta',()=>empresaModalBanco(emp));
+  for(const b of contas)bancos.lastElementChild.appendChild(empresaLinha(b.banco||'Banco',[b.tipo,b.agencia&&'Ag. '+b.agencia,b.conta&&'Conta '+b.conta,b.pix&&'PIX '+b.pix,b.gerente].filter(Boolean).join(' · '),'Editar',()=>empresaModalBanco(emp,b)));
+  if(!contas.length)bancos.lastElementChild.appendChild(el('<p class="empresa-nota">Nenhuma conta vinculada a esta empresa.</p>'));bancos.lastElementChild.appendChild(acao('Vincular conta já cadastrada',()=>empresaModalVinculo(emp,'bancos'),'ghost mini'));ficha.appendChild(bancos);
+  const documentos=empresaBloco('📁 Documentos societários','documentos','Contratos, alterações e certidões em ordem de data.','+ Documento',()=>empresaModalDocumento(emp));
+  for(const d of [...docs].sort((a,b)=>(b.data||'').localeCompare(a.data||''))){const anterior=docs.find(x=>x.id===d.anteriorId);const row=empresaLinha(d.nome||d.tipo,[d.tipo,d.data?fmtDataAno(d.data):'Data não informada',d.status,d.validade?'Validade '+fmtDataAno(d.validade):'',anterior?'Relacionado a '+anterior.nome:d.anteriorId?'Documento anterior não encontrado':''].filter(Boolean).join(' · '),'Editar',()=>empresaModalDocumento(emp,d));row.appendChild(acao('Arquivos',()=>empresaAbrirAnexos(emp,d),'ghost mini'));if(d.url){try{row.appendChild(el('<a class="btn ghost mini" href="'+esc(empresaValidarUrl(d.url))+'" target="_blank" rel="noopener noreferrer">Abrir link ↗</a>'))}catch{row.appendChild(el('<small>Link a conferir</small>'))}}documentos.lastElementChild.appendChild(row)}
+  if(!docs.length)documentos.lastElementChild.appendChild(el('<p class="empresa-nota">Cadastre o contrato social e mantenha cada alteração como um documento relacionado.</p>'));documentos.lastElementChild.appendChild(acao('Arquivos gerais da empresa',()=>empresaAbrirAnexos(emp),'ghost mini'));ficha.appendChild(documentos);
+  const imoveis=empresaBloco('🏠 Imóveis e obrigações','imoveis','Bens do Patrimônio, IPTU, taxas e renovações.','+ Obrigação',()=>empresaModalObrigacao(emp));
+  for(const b of bens)imoveis.lastElementChild.appendChild(empresaLinha(b.nome||'Bem',[b.onde,b.documento].filter(Boolean).join(' · '),'Abrir bem',()=>modalBem(b)));
+  imoveis.lastElementChild.appendChild(acao('Vincular imóvel do Patrimônio',()=>empresaModalVinculo(emp,'patrimonio'),'ghost mini'));
+  const resumoObrig=el('<div class="empresa-obrigacoes"><h3>Vencimentos e histórico</h3></div>');
+  const anos=[...new Set(obs.map(o=>String(o.ano)).filter(Boolean))].sort().reverse();const filtroAno=filtro.empresaAnoObrigacao||'Todos';
+  if(anos.length)resumoObrig.appendChild(seletor(anos.includes(filtroAno)?filtroAno:'Todos',[['Todos','Todos os anos'],...anos.map(a=>[a,a])],v=>{filtro.empresaAnoObrigacao=v;rr('empresas')()},'Ano das obrigações'));
+  const obrVis=obs.filter(o=>!anos.includes(filtroAno)||String(o.ano)===filtroAno).slice().sort((a,b)=>(['Pago','Cancelado'].includes(a.status)-['Pago','Cancelado'].includes(b.status))||(a.vencimento||'').localeCompare(b.vencimento||''));
+  for(const o of obrVis){const bem=(E.patrimonio||[]).find(b=>b.id===o.patrimonioId),sit=o.status==='Pago'?'Pago · informado':o.status||'A conferir';const texto=[o.ano,o.vencimento?fmtDataAno(o.vencimento):'Sem vencimento',o.valor!==''&&o.valor!=null?brl(Number(o.valor)):'Valor não informado',sit,o.patrimonioId?bem?.nome||'Imóvel não encontrado':''].filter(Boolean).join(' · ');const row=empresaLinha(o.nome||o.tipo,texto,'Editar',()=>empresaModalObrigacao(emp,o));row.appendChild(acao('Comprovantes',()=>abrirModal(esc(o.nome||'Obrigação'),esc(emp.nome),(c)=>c.appendChild(areaArquivos(empresaRefObrigacao(emp,o),'Guia, boleto e comprovante de pagamento'))),'ghost mini'));if(o.vencimento<hoje()&&!['Pago','Cancelado'].includes(o.status))row.classList.add('empresa-atencao');resumoObrig.appendChild(row)}
+  if(!obs.length)resumoObrig.appendChild(el('<p class="empresa-nota">Registre vencimento, imóvel e valor. Marque como pago apenas depois de conferir o pagamento.</p>'));imoveis.lastElementChild.appendChild(resumoObrig);ficha.appendChild(imoveis);
+  const conexoes=empresaBloco('🔗 Conexões da empresa','conexoes','Abra a origem da informação; cada dado continua no seu cadastro.');
+  for(const p of planos)conexoes.lastElementChild.appendChild(empresaLinha('Planejamento '+p.ano,(p.encerrado?'Encerrado':'Em andamento')+' · histórico e apresentação em PDF','Abrir plano',()=>empresaAbrirPlano(emp,p)));
+  conexoes.lastElementChild.appendChild(acao(planos.length?'Novo planejamento anual':'Planejar a empresa',()=>{empresaAbrirPlano(emp);if(planos.length)modalAnoEmpresa(emp)},'ghost mini'));
+  const rend=empresaRegistros(emp,'rendimentos');const porAno={};rend.forEach(x=>{const ano=String(x.data||'').slice(0,4);if(/^\d{4}$/.test(ano))porAno[ano]=(porAno[ano]||0)+(+x.valor||0)});
+  for(const ano of Object.keys(porAno).sort().reverse())conexoes.lastElementChild.appendChild(empresaLinha('Rendimentos · '+ano,brl(porAno[ano])+' · lançamentos registrados','Ver rendimentos',()=>{filtro.rendAno=Number(ano);filtro.rendEmp=emp.nome;irTela('rendimentos')}));
+  if(!rend.length)conexoes.lastElementChild.appendChild(empresaLinha('Rendimentos','Consulte lançamentos e histórico desta empresa.','Abrir',()=>{filtro.rendEmp=emp.nome;irTela('rendimentos')}));
+  for(const [col,t,bid] of [['contas','Contas de Caixa/VGV','cx-contas'],['empreend','Empreendimentos','cx-emp'],['casas','Casas','cx-casas'],['reservas','Reservas','cx-res']]){const itens=empresaRegistros(emp,col);if(itens.length)conexoes.lastElementChild.appendChild(empresaLinha(t,itens.map(x=>x.nome).filter(Boolean).join(' · '),'Consultar',()=>{abreBloco(bid);irTela('caixavgv')}))}
+  conexoes.lastElementChild.appendChild(empresaLinha('Caixa e VGV','Fonte: planilha patrimonial. Uma nova importação substitui os registros dessa área.','Abrir',()=>irTela('caixavgv')));
+  const proximos=empresaEventos().filter(e=>e.ref.empresaId===emp.id).sort((a,b)=>a.data.localeCompare(b.data));
+  conexoes.lastElementChild.appendChild(empresaLinha('Agenda da empresa',proximos.length+' vencimento(s) em aberto · documentos e obrigações','Ver Agenda',()=>{filtro.agEmpresaId=emp.id;filtro.agSo='empresas';filtro.agMes=(proximos[0]?.data||hoje()).slice(0,7);irTela('agenda')}));ficha.appendChild(conexoes);
+}
+
 /* ===================== PATRIMÔNIO ===================== */
 function vPatrimonio(m){
   const r=rr('patrimonio');
@@ -8667,7 +8918,8 @@ function devModalRevisao(){
   });
 }
 function devModalReflexao(){abrirModal('Registrar aprendizado','Uma situação concreta ajuda a entender seu jeito de agir.',(c,fechar)=>{const b=el('<div class="secao"></div>');devFormulario(b,[{k:'titulo',t:'O que aconteceu?',req:true,full:true},{k:'data',t:'Data',tipo:'date',req:true,max:hoje()},{k:'tipo',t:'Tipo de registro',opcoes:['Reflexão','Feedback recebido','Conquista']},{k:'contexto',t:'Situação e minha reação',tipo:'textarea',full:true},{k:'aprendizado',t:'O que aprendi sobre mim',tipo:'textarea',full:true},{k:'proximoPasso',t:'O que vou experimentar diferente',tipo:'textarea',full:true}],{data:hoje(),tipo:'Reflexão'},'Guardar no histórico',v=>{if(v.data>hoje())throw new Error('Use uma data até hoje.');devDados().reflexoes.push({id:uid(),...v});salvar();fechar()});c.appendChild(b)})}
-function devModalLeitura(l){abrirModal(esc(l.titulo),l.tipo||'Leitura dos registros',(c,fechar)=>{const b=el('<div class="secao dev-reading"></div>');b.appendChild(el('<p>'+esc(l.texto)+'</p>'));
+function devContextoLeitura(l){const b=el('<div class="dev-reading-context workspace-note"></div>');if(l.origemDocumental){const p=el('<p></p>');p.textContent='Leitura documental'+(l.data?' · '+fmtDataAno(l.data):' · data não identificada')+(l.pagina?' · p. '+l.pagina:'');b.appendChild(p)}if(l.limites){const p=el('<p></p>');p.textContent=l.limites;b.appendChild(p)}return b}
+function devModalLeitura(l){abrirModal(esc(l.titulo),l.tipo||'Leitura dos registros',(c,fechar)=>{const b=el('<div class="secao dev-reading"></div>');b.appendChild(el('<p>'+esc(l.texto)+'</p>'));b.appendChild(devContextoLeitura(l));
   if(l.pergunta)b.appendChild(el('<p class="dev-question">'+esc(l.pergunta)+'</p>'));
   b.appendChild(devFontesLinks(l.fontes));devFormulario(b,[{k:'status',t:'Isso me representa hoje?',opcoes:['A conferir','Reconheço','Quero trabalhar','Não me representa']},{k:'nota',t:'Meu exemplo ou correção',tipo:'textarea',full:true}],l,'Guardar minha percepção',v=>{devValidar(l,v.status,v.nota);fechar()});c.appendChild(b);
 })}
@@ -8760,7 +9012,7 @@ function devPainelResultados(host){
   function pintarAnalises(){cards.innerHTML='';
     const leituras=d.leituras;
     if(!leituras.length)cards.appendChild(el('<p class="workspace-note">Ainda não há análises dos documentos registradas.</p>'));
-    leituras.forEach(l=>{const c=el('<article class="workspace-card dev-analysis-result"><span class="dev-tag">'+esc(l.area||'Pessoal')+' · '+esc(l.tipo||'Leitura dos registros')+'</span><h4>'+esc(l.titulo)+'</h4><p>'+esc(l.texto)+'</p></article>');c.appendChild(devFontesLinks(l.fontes));
+    leituras.forEach(l=>{const c=el('<article class="workspace-card dev-analysis-result"><span class="dev-tag">'+esc(l.area||'Pessoal')+' · '+esc(l.tipo||'Leitura dos registros')+'</span><h4>'+esc(l.titulo)+'</h4><p>'+esc(l.texto)+'</p></article>');c.appendChild(devContextoLeitura(l));c.appendChild(devFontesLinks(l.fontes));
       const quadro=el('<div class="dev-analysis-application"><div><b>Como aplicar</b><p>'+esc(l.passo||'Ainda sem aplicação definida.')+'</p></div><div><b>Como observar o resultado</b><p>'+esc(l.medida||'Defina um exemplo observável para acompanhar.')+'</p></div></div>');c.appendChild(quadro);
       if(l.nota)c.appendChild(el('<p class="dev-my-reading"><b>Minha percepção:</b> '+esc(l.nota)+'</p>'));
       const resultados=d.resultados.filter(x=>x.leituraId===l.id).sort((a,b)=>b.data.localeCompare(a.data));
@@ -8804,7 +9056,7 @@ function organizarDesenvolvimento(host){
   const andamento=devResumoAndamento(),fluxo=el('<section class="planos-development-path" aria-label="Acompanhamento do desenvolvimento"><header><h3>Da percepção à prática</h3><p>Confira a leitura, experimente uma ação e registre o que mudou.</p></header><div></div></section>');
   [['01','Leituras para conferir',andamento.conferir,'Sua percepção sobre as análises','resultados'],['02','Práticas em andamento',andamento.praticas,andamento.revisar?andamento.revisar+' com revisão até hoje':'Habilidades e próximos passos','acao'],['03','Resultados registrados',andamento.resultados,andamento.semEvidencia?andamento.semEvidencia+' sem exemplo ou evidência descrita':'Mudanças observadas por você','resultados']].forEach(([n,t,v,sub,aba])=>{const b=acao('',()=>seleciona(aba),'ghost');b.innerHTML='<span class="planos-step">'+n+'</span><span><b>'+t+'</b><small>'+sub+'</small></span><strong>'+v+'</strong>';fluxo.querySelector('div').appendChild(b)});retrato.appendChild(fluxo);
   const grid=el('<div class="dev-insights"></div>');retrato.appendChild(grid);
-  d.leituras.filter(l=>l.status!=='Não me representa').forEach(l=>{const card=el('<article class="workspace-card dev-insight"><span class="dev-tag">'+esc(l.tipo||'Síntese')+' · '+esc(l.area||'Pessoal')+'</span><h3>'+esc(l.titulo)+'</h3><p>'+esc(l.texto)+'</p></article>');card.appendChild(devFontesLinks(l.fontes));const a=el('<div class="dev-card-actions"></div>');a.appendChild(acao(l.status&&l.status!=='A conferir'?l.status:'Conferir comigo',()=>devModalLeitura(l),'ghost'));if(l.passo)a.appendChild(acao('Levar ao plano',()=>{devModalAcao(devCriarAcao(l,false))},'ghost'));card.appendChild(a);grid.appendChild(card)});
+  d.leituras.filter(l=>l.status!=='Não me representa').forEach(l=>{const card=el('<article class="workspace-card dev-insight"><span class="dev-tag">'+esc(l.tipo||'Síntese')+' · '+esc(l.area||'Pessoal')+'</span><h3>'+esc(l.titulo)+'</h3><p>'+esc(l.texto)+'</p></article>');card.appendChild(devContextoLeitura(l));card.appendChild(devFontesLinks(l.fontes));const a=el('<div class="dev-card-actions"></div>');a.appendChild(acao(l.status&&l.status!=='A conferir'?l.status:'Conferir comigo',()=>devModalLeitura(l),'ghost'));if(l.passo)a.appendChild(acao('Levar ao plano',()=>{devModalAcao(devCriarAcao(l,false))},'ghost'));card.appendChild(a);grid.appendChild(card)});
   if(!d.leituras.length){const v=el('<div class="workspace-empty"><h3>Traga contexto para seu desenvolvimento.</h3><p>Uma nota isolada não explica sua história. Registre uma situação ou adicione um relatório para organizar a leitura.</p></div>');v.appendChild(acao('Adicionar fonte',devModalFonte));grid.appendChild(v)}
   const proximos=el('<div class="workspace-card dev-next"><h3>O que acompanhar agora</h3></div>');
   const ps=E.pdi.filter(x=>x.habilidade&&x.status!=='Dominado').sort((a,b)=>(a.ate||'9999').localeCompare(b.ate||'9999')).slice(0,3);
@@ -8867,7 +9119,7 @@ function organizarGuia(m,atrasoRitual){
   const partes=[...m.querySelectorAll(':scope > [data-bid]')];
   const gu=abasWorkspace(m,'guia',[['resumo','Visão geral'],['planos','Meus planos'],['familia','Família'],['cadastros','Cadastros'],['desenvolvimento','Desenvolvimento']],filtro.guiaAba||'resumo',v=>{filtro.guiaAba=v;botoes[0].hidden=v==='desenvolvimento'});botoes[0].hidden=filtro.guiaAba==='desenvolvimento';
   m.querySelectorAll(':scope > .guia-aviso-bancos').forEach(a=>m.querySelector('[data-bid="gu-bancos"] .conteudo').prepend(a));
-  const textos={planos:['Meus planos','Propósito, metas e planejamento pessoal de cada ano.'],familia:['Pessoas que importam','Relações, momentos e informações para cuidar da família.'],cadastros:['Empresas e contas','Uma base única, também usada no planejamento das empresas.'],desenvolvimento:['Meu desenvolvimento','Equilíbrio, habilidades e aprendizados para acompanhar.']};
+  const textos={planos:['Meus planos','Propósito, metas e planejamento pessoal de cada ano.'],familia:['Pessoas que importam','Relações, momentos e informações para cuidar da família.'],cadastros:['Contas e cadastros','Suas contas pessoais e o acesso às fichas empresariais.'],desenvolvimento:['Meu desenvolvimento','Equilíbrio, habilidades e aprendizados para acompanhar.']};
   Object.entries(textos).forEach(([k,[t,s]])=>gu.paineis[k].appendChild(tituloWorkspace(t,s)));
   const acoes=el('<div class="workspace-actions"></div>');botoes.slice(1,5).forEach(b=>acoes.appendChild(b));gu.paineis.familia.appendChild(acoes);
   partes.forEach(b=>gu.paineis[grupoGuia(b.dataset.bid)].appendChild(b));
@@ -9047,19 +9299,10 @@ function vGuia(m) {
     { k: 'status', t: 'Status', tipo: 'select', opcoes: ['Ideia', 'Planejado', 'Feito'] },
   ], () => ({ pessoa: '', tipo: CFG('tiposParaEles')[0], oque: '', quando: '', status: 'Ideia' }), r));
 
-  /* ---- 7a. MINHAS EMPRESAS ---- */
-  const ativasPJ = E.empresasPJ.filter(x => x.status !== 'Baixada').length;
-  m.appendChild(tabelaBloco('gu-empresas', '🏢 Minhas empresas',
-    'CNPJ, sócios, regime e quem cuida da contabilidade — é o que a família precisa para não ficar perdida', E.empresasPJ, [
-      { k: 'nome', t: 'Empresa', ph: 'nome fantasia', aoGravar:(valor,empresa)=>{if(!E.empresasPJ.includes(empresa))return;if(renomeiaEmpresa(empresa.nome,valor,empresa))r();return false;} },
-      { k: 'cnpj', t: 'CNPJ', ph: '00.000.000/0001-00', w: 175 },
-      { k: 'regime', t: 'Regime', tipo: 'select', opcoes: CFG('regimes'), w: 130 },
-      { k: 'socios', t: 'Sócios e participação', ph: 'ex.: Léo 70%, Chico 30%' },
-      { k: 'contador', t: 'Contabilidade', ph: 'escritório' },
-      { k: 'banco', t: 'Banco', ph: 'onde movimenta' },
-      { k: 'status', t: 'Situação', tipo: 'select', opcoes: ['Ativa', 'Em abertura', 'Em alteração', 'Baixada'], w: 150 },
-    ], () => ({ nome: '', cnpj: '', regime: CFG('regimes')[1], socios: '', contador: '', banco: '', status: 'Ativa' }), r,
-    '', E.empresasPJ));
+  /* O cadastro único agora tem sua própria ficha no menu Empresas. */
+  const ponteEmpresas=el('<div class="corpo"><p>Dados gerais, contas, documentos societários e obrigações estão reunidos em Empresas.</p></div>');
+  ponteEmpresas.appendChild(acao('Abrir Empresas',()=>irTela('empresas'),'ghost'));
+  m.appendChild(bloco('gu-empresas','🏢 Minhas empresas','Os mesmos cadastros, organizados em fichas.',ponteEmpresas));
 
   /* ---- 7b. BANCOS E PIX ---- */
   const bc = el('<div class="guia-aviso-bancos"></div>');
@@ -9070,7 +9313,7 @@ function vGuia(m) {
   m.appendChild(tabelaBloco('gu-bancos', '🏦 Bancos e PIX',
     'onde está o dinheiro, de quem é a conta e como transferir', E.bancos, [
       { k: 'banco', t: 'Banco', ph: 'nome do banco' },
-      { k: 'titular', t: 'Titular', ph: 'você ou a empresa' },
+      { k: 'titular', t: 'Titular', ph: 'você ou a empresa', aoGravar:(valor,b)=>{const emp=empresaPorId(b.empresaId);if(emp&&valor!==emp.nome){alert('Esta conta está vinculada à empresa '+emp.nome+'. Atualize o nome na ficha Empresas.');return false}} },
       { k: 'tipo', t: 'Tipo', tipo: 'select', opcoes: CFG('tiposContaBanco'), w: 175 },
       { k: 'agencia', t: 'Agência', ph: '0000', w: 110 },
       { k: 'conta', t: 'Conta', ph: '00000-0', w: 130 },
@@ -9856,6 +10099,18 @@ function pedirArquivo(cb,accept){const i=document.createElement('input');i.type=
    silêncio, ou a primeira edição empurrava os dados velhos por cima da nuvem.
    Agora grava pelo caminho normal (salvar + envio com a trava de concorrência),
    e o estado de antes fica em "Versão descartada". */
+function validarBackupEmpresas(j){
+  const empresasIds=new Set(),internos=new Set();
+  for(const e of j.empresasPJ||[]){
+    if(e.id){if(empresasIds.has(e.id))throw Error('ID de empresa duplicado no backup.');empresasIds.add(e.id)}
+    for(const col of ['documentosEmpresa','obrigacoesEmpresa'])for(const x of e[col]||[]){
+      if(x.id){const chave=e.id+':'+col+':'+x.id;if(internos.has(chave))throw Error('Documento ou obrigação duplicado no backup.');internos.add(chave)}
+      if(x.revisoes!==undefined&&(!Array.isArray(x.revisoes)||x.revisoes.some(r=>!r||typeof r!=='object'||Array.isArray(r))))throw Error('Histórico empresarial inválido.');
+      if(x.patrimonioId!==undefined&&typeof x.patrimonioId!=='string')throw Error('Vínculo de imóvel inválido.');
+      if(x.anteriorId!==undefined&&typeof x.anteriorId!=='string')throw Error('Vínculo documental inválido.');
+    }
+  }
+}
 function validarBackup(j){
   if(!j||typeof j!=='object'||Array.isArray(j)||!Array.isArray(j.viagens))throw new Error('não parece um backup daqui');
   for(const [k,v] of Object.entries(SEED)){
@@ -9864,10 +10119,11 @@ function validarBackup(j){
       if(!Array.isArray(j[k])||j[k].some(x=>k==='obraM2Fora'?typeof x!=='string':(!x||typeof x!=='object'||Array.isArray(x))))throw new Error('Lista inválida: '+k);
     }else if(v&&typeof v==='object'&&(!j[k]||typeof j[k]!=='object'||Array.isArray(j[k])))throw new Error('Seção inválida: '+k);
   }
-  const listasInternas={viagens:['custos','passagens','hoteis','tickets','roteiro','lugares'],metas:['passos'],oportunidades:['links'],planejamentoEmpresas:['objetivos','valores','zonas','pecas']};
+  const listasInternas={acervoDocumental:['registros'],empresasPJ:['documentosEmpresa','obrigacoesEmpresa'],viagens:['custos','passagens','hoteis','tickets','roteiro','lugares'],metas:['passos'],oportunidades:['links'],planejamentoEmpresas:['objetivos','valores','zonas','pecas']};
   for(const [col,camposLista] of Object.entries(listasInternas))for(const x of j[col]||[])for(const k of camposLista){
     if(x[k]!==undefined&&(!Array.isArray(x[k])||x[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))throw new Error('Lista inválida: '+col+'.'+k);
   }
+  validarBackupEmpresas(j);
   if(j.desenvolvimento)for(const k of ['fontes','leituras','revisoes','reflexoes','validacoes','resultados'])if(j.desenvolvimento[k]!==undefined&&(!Array.isArray(j.desenvolvimento[k])||j.desenvolvimento[k].some(x=>!x||typeof x!=='object'||Array.isArray(x))))throw new Error('Lista inválida: desenvolvimento.'+k);
   const chavesPlano=new Set();
   for(const p of j.planejamentoEmpresas||[]){
