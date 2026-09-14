@@ -6,6 +6,8 @@
 //   POST {acao:'trocar', senhaAtual, senhaNova} +Bearer -> { ok: true }
 //   GET  (Bearer)                                    -> { mt, dados } | { mt: 0, dados: null }
 //   PUT  (Bearer) { dados }                          -> { mt }
+//   POST {acao:"strava…"} +Bearer                       -> strava.ts (ler, sincronizar, autorizarUrl)
+//   GET  ?acao=stravaCallback&code&state (sem Bearer)   -> strava.ts (volta do OAuth; state = crachá CURTO)
 //
 // De-para: store "central" chave "estado" -> tabela leo_estado (uma linha so).
 //
@@ -21,6 +23,8 @@
 // ============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+// O Strava mora em strava.ts: aqui só se confere o crachá e se despacha (14/09/2026).
+import { stravaAcao } from "./strava.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -103,10 +107,26 @@ const novoTokenAdmin = async () => {
    mesma. O HMAC antigo continua valendo enquanto a virada assenta. */
 const JWT_EQUIPE = Deno.env.get("EQUIPE_JWT_SECRET") ?? "";
 
-async function crachaOk(token: string): Promise<boolean> {
-  if (!JWT_EQUIPE || !token) return false;
+/* CADA CRACHÁ PARA A SUA PORTA (14/09/2026).
+   Este conferidor devolve o PAYLOAD em vez de um sim/não, porque quem chama
+   precisa olhar o campo `uso`. São dois crachás com o mesmo formato e o mesmo
+   segredo, mas com finalidades diferentes:
+     - o da SESSÃO (180 dias, sem `uso`): abre o estado da Central, as obras e
+       as ações do Strava;
+     - o do `state` do OAuth (10 min, `uso:"strava-state"`): viaja na URL até o
+       Strava e volta, ficando no histórico do navegador e no log de terceiros.
+   Misturar os dois é o buraco: o que passeia pela URL abriria tudo, e o de meio
+   ano poderia ser colado num link de autorização montado à mão. */
+interface Cracha {
+  uso: string;
+  exp: number;
+  iat: number | null;
+}
+
+async function crachaPayload(token: string): Promise<Cracha | null> {
+  if (!JWT_EQUIPE || !token) return null;
   const partes = token.split(".");
-  if (partes.length !== 3) return false;
+  if (partes.length !== 3) return null;
   try {
     const chave = await crypto.subtle.importKey(
       "raw", new TextEncoder().encode(JWT_EQUIPE),
@@ -122,14 +142,23 @@ async function crachaOk(token: string): Promise<boolean> {
     const ok = await crypto.subtle.verify(
       "HMAC", chave, b64url(partes[2]),
       new TextEncoder().encode(`${partes[0]}.${partes[1]}`));
-    if (!ok) return false;
+    if (!ok) return null;
     const p = JSON.parse(new TextDecoder().decode(b64url(partes[1])));
-    if (typeof p.exp !== "number" || !Number.isFinite(p.exp) || p.exp <= Math.floor(Date.now() / 1000)) return false;
-    return p.sis === "central";
+    if (typeof p.exp !== "number" || !Number.isFinite(p.exp) || p.exp <= Math.floor(Date.now() / 1000)) return null;
+    if (p.sis !== "central") return null;
+    return {
+      uso: typeof p.uso === "string" ? p.uso : "",
+      exp: p.exp,
+      iat: typeof p.iat === "number" && Number.isFinite(p.iat) ? p.iat : null,
+    };
   } catch {
-    return false;
+    return null;
   }
 }
+
+// O carimbo do crachá que só serve de `state`, e o quanto ele pode durar.
+const USO_STATE = "strava-state";
+const STATE_MAX_SEG = 15 * 60;   // crachaCurto(10 min) + folga de relógio
 
 /* SÓ O CRACHÁ (11/08/2026).
    A sessão desta Central era um HMAC próprio, de formato diferente do dos
@@ -140,7 +169,37 @@ async function crachaOk(token: string): Promise<boolean> {
    a senha de sempre. */
 async function tokenOk(t: string | null): Promise<boolean> {
   if (!t) return false;
-  return await crachaOk(t);
+  const p = await crachaPayload(t);
+  /* O crachá do `state` NÃO abre porta nenhuma aqui: ele passeia pela URL do
+     Strava e fica registrado em histórico e em log de terceiro. */
+  return !!p && p.uso !== USO_STATE;
+}
+
+/* O `state` que volta do Strava: só vale o crachá curto feito para esta ida e
+   volta. O de 180 dias é recusado mesmo válido, e um crachá curto forjado com
+   validade longa também (iat/exp precisam caber em STATE_MAX_SEG). */
+async function stateOk(t: string | null): Promise<boolean> {
+  if (!t) return false;
+  const p = await crachaPayload(t);
+  if (!p || p.uso !== USO_STATE) return false;
+  if (p.iat == null || p.exp - p.iat > STATE_MAX_SEG) return false;
+  return true;
+}
+
+/* Crachá CURTO (minutos) só para o `state` do OAuth do Strava: ele viaja na URL
+   até o Strava e volta -- fica em histórico de navegador e em log de terceiro,
+   e o crachá de 180 dias não pode ir junto. Mesmo formato (JWT HS256, sis
+   "central") e mesmo segredo, mas com `uso: "strava-state"` — é esse carimbo
+   que o `stateOk` exige na volta e que o `tokenOk` recusa nas outras portas. */
+async function crachaCurto(minutos: number): Promise<string> {
+  const b64 = (s: string) => btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const cab = b64(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const agora = Math.floor(Date.now() / 1000);
+  const carga = b64(JSON.stringify({ sis: "central", uso: "strava-state", iat: agora, exp: agora + minutos * 60 }));
+  const chave = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(JWT_EQUIPE), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", chave, new TextEncoder().encode(cab + "." + carga)));
+  return cab + "." + carga + "." + b64(String.fromCharCode(...mac));
 }
 
 // ---------------------------------------------------------------- senha
@@ -187,6 +246,19 @@ Deno.serve(async (req: Request) => {
        teria mudado. A senha da casa se troca no Painel, num lugar só, e vale
        para os oito sistemas. */
 
+
+    /* ---- STRAVA (14/09/2026) ------------------------------------------
+       Toda ação que começa com "strava" vive em strava.ts (ler o que está no
+       banco, sincronizar com a API do Strava, montar a URL de autorização).
+       O crachá é conferido AQUI, do mesmo jeito que nas outras ações; o
+       módulo recebe o pedido já autorizado. */
+    if (typeof acao === "string" && acao.startsWith("strava")) {
+      const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+      if (!(await tokenOk(t))) return json({ erro: "Não autorizado" }, 401);
+      // o state da autorização é um crachá de 10 minutos, nunca o da sessão
+      if (acao === "stravaAutorizarUrl") corpo.state = await crachaCurto(10);
+      return await stravaAcao(acao, corpo, sb, req, new URL(req.url));
+    }
 
     /* ---- OBRAS: o histórico de custo (23/08/2026) -----------------------
        Por que estes lançamentos NÃO moram no estado geral: uma obra do
@@ -427,6 +499,24 @@ Deno.serve(async (req: Request) => {
     }
 
     return json({ erro: "ação inválida" }, 400);
+  }
+
+  /* VOLTA DO STRAVA (OAuth, 14/09/2026). O navegador chega aqui redirecionado
+     pelo Strava, SEM cabeçalho Authorization: o crachá viaja no `state`, que
+     o Strava devolve intacto. Conferido pelo `stateOk`: só passa o crachá curto
+     carimbado para isto (uso "strava-state", 10 min) — o de 180 dias não serve
+     de state, e o state não serve de sessão. Sem ele, nenhum code vira token. Aceita a
+     forma ?acao=stravaCallback e o sub-caminho /leo-sync/stravaCallback (o
+     redirect_uri usa o sub-caminho: URL limpa para o Strava acrescentar
+     ?state=&code=&scope=). */
+  if (req.method === "GET") {
+    const url = new URL(req.url);
+    if (url.searchParams.get("acao") === "stravaCallback" || /\/stravaCallback\/?$/.test(url.pathname)) {
+      if (!(await stateOk(url.searchParams.get("state")))) {
+        return json({ erro: "Crachá inválido ou vencido no retorno do Strava. Abra a Central, entre de novo e clique em Conectar ao Strava outra vez." }, 401);
+      }
+      return await stravaAcao("stravaCallback", {}, sb, req, url);
+    }
   }
 
   const t = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");

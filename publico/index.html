@@ -182,6 +182,215 @@ tr:hover .lixo{opacity:1}
 .dv-nota{font-size:12px;color:var(--suave);margin:8px 0 2px}
 .modal.largo{max-width:min(1180px,97vw)}
 @media(max-width:640px){.dv-tab th.num,.dv-tab td.num{display:none}.dv-acoes{flex-direction:column;align-items:flex-end}.dv-tab .cam{max-width:110px}.dv-tab td.nm{min-width:110px}}
+/* Strava */
+/* ===================== Strava — botão flutuante, gaveta, abas e cards =====================
+   Prefixo .stv-. Só variáveis do app: o modo escuro vem de graça. O laranja Strava
+   (#FC4C02) mora apenas no ícone do botão e nos selos de PR. */
+
+/* botão flutuante (z 58 — abaixo do botão de recuperação do app, que usa 90) */
+.stv-btn{position:fixed;right:18px;bottom:18px;z-index:58;width:52px;height:52px;border-radius:50%;
+  border:1px solid var(--linha);background:var(--card);box-shadow:var(--sombra);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;padding:0;transition:transform .12s,box-shadow .12s}
+.stv-btn[hidden]{display:none}
+.stv-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px -8px rgba(0,0,0,.3)}
+.stv-btn:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+.stv-btn svg{width:26px;height:26px;display:block}
+.stv-ponto{position:absolute;top:3px;right:3px;width:13px;height:13px;border-radius:50%;background:var(--verde);
+  border:2px solid var(--card);animation:stv-pulso 1.6s ease-out infinite}
+.stv-ponto[hidden]{display:none}
+@keyframes stv-pulso{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--verde) 55%,transparent)}100%{box-shadow:0 0 0 11px transparent}}
+@media(prefers-reduced-motion:reduce){.stv-ponto{animation:none}.stv-gaveta{transition:none}}
+
+/* gaveta lateral direita (z 59 — o modal do app, z 60, cobre os dois) */
+.stv-gaveta{position:fixed;top:0;right:0;bottom:0;width:420px;max-width:100vw;z-index:59;background:var(--bg);
+  border-left:1px solid var(--linha);box-shadow:-10px 0 34px -14px rgba(0,0,0,.28);display:flex;flex-direction:column;
+  transform:translateX(105%);transition:transform .22s ease,visibility 0s .22s;visibility:hidden}
+.stv-gaveta.aberta{transform:none;visibility:visible;transition:transform .22s ease}
+@media(max-width:640px){.stv-gaveta{width:100%}}
+/* a rolagem da gaveta não empurra a página atrás dela */
+.stv-gaveta,.stv-corpo{overscroll-behavior:contain}
+/* enquanto o botão "Recuperar textos preservados" (z 90) ocupa o canto, o do Strava sobe */
+body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
+.stv-cab{display:flex;align-items:center;gap:9px;padding:13px 14px;border-bottom:1px solid var(--linha);background:var(--card);flex:none}
+.stv-cab>svg{width:22px;height:22px;flex:none}
+.stv-cab h3{font-size:17px;line-height:1.2}
+.stv-cab .stv-sinc{font-size:11.5px;color:var(--suave);margin-top:1px}
+.stv-cab .cresce{flex:1}
+.stv-cab .btn.mini{padding:5px 9px}
+.stv-cab .stv-fechar{font-size:14px;line-height:1}
+.stv-abas-cx{display:flex;flex-direction:column;flex:1;min-height:0}
+.stv-tela{display:block}
+
+/* abas — servem à gaveta e à tela cheia */
+.stv-abas{display:flex;gap:4px;flex-wrap:wrap;padding:10px 14px 0;flex:none}
+.stv-tela .stv-abas{padding:0 0 4px}
+.stv-abas button{border:1px solid var(--linha);background:var(--card);font:600 12.5px Inter;padding:6px 12px;border-radius:20px;cursor:pointer;color:var(--suave)}
+.stv-abas button:hover{color:var(--tinta)}
+.stv-abas button.on{background:var(--verde);border-color:var(--verde);color:#fff}
+.stv-abas button:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+.stv-sinc-linha{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--suave);padding:6px 14px 0;flex:none}
+.stv-tela .stv-sinc-linha{padding:0 0 10px}
+.stv-corpo{flex:1;min-height:0;overflow-y:auto;padding:12px 14px 28px;-webkit-overflow-scrolling:touch}
+.stv-corpo.stv-largo{overflow:visible;padding:0}
+.stv-corpo .bloco{margin-bottom:12px}
+.stv-corpo .bloco>header{padding:11px 14px}
+.stv-corpo .bloco>header h2{font-size:14.5px}
+.stv-corpo .bloco .conteudo{padding:12px 14px}
+.stv-largo .bloco .conteudo{padding:14px 17px}
+.stv-corpo .grade{gap:9px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:0}
+.stv-corpo .kpi{padding:11px 12px}
+.stv-corpo .kpi .val{font-size:20px}
+.stv-corpo .kpi .sub{line-height:1.5}
+.stv-corpo .kpi .sub .chip{margin-top:3px}
+.stv-largo .grade{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:13px}
+.stv-largo .kpi{padding:15px 16px}
+.stv-largo .kpi .val{font-size:23px}
+.stv-acoes{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.stv-sub{font:600 12px Inter;color:var(--suave);margin:12px 0 4px}
+.stv-suave{color:var(--suave);font-size:12px}
+
+/* card do último treino / meta */
+.stv-ultimo{display:flex;flex-direction:column;gap:6px}
+/* ícones de linha (SVG) acompanham o texto; nos títulos ficam um tanto maiores */
+.stv-ic{vertical-align:-.15em;flex:none}
+.stv-titulo .stv-ic{width:1.25em;height:1.25em}
+.stv-destaque .stv-ic{width:18px;height:18px;color:var(--verde)}
+.stv-rec-cab .stv-ic{width:14px;height:14px}
+.stv-ultimo .stv-titulo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:Fraunces,serif;font-size:16.5px;font-weight:600}
+.stv-ultimo .stv-quando{font-size:12.5px;color:var(--suave)}
+.stv-metricas{display:grid;gap:8px 12px;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));margin-top:4px}
+.stv-metricas div{font-size:13.5px;font-variant-numeric:tabular-nums}
+.stv-metricas small{display:block;font-size:10.5px;color:var(--suave);text-transform:uppercase;letter-spacing:.05em}
+.stv-selo{display:inline-block;padding:2px 8px;border-radius:20px;font:700 11px Inter;background:#FC4C02;color:#fff;letter-spacing:.04em;flex:none}
+.stv-novo{display:inline-block;padding:1px 7px;border-radius:20px;font:600 10.5px Inter;background:#FC4C02;color:#fff;margin-left:4px;vertical-align:middle;text-transform:none;letter-spacing:0}
+.stv-chip-v{background:var(--verde-cl);color:var(--verde)}
+.stv-chip-r{background:var(--vermelho-cl);color:var(--vermelho)}
+.stv-chip-a{background:var(--areia-cl);color:var(--areia)}
+.stv-chip-n{background:color-mix(in srgb,var(--linha) 55%,transparent);color:var(--suave)}
+.stv-chip-az{background:var(--azul-cl);color:var(--azul)}
+
+.stv-meta{display:flex;flex-direction:column;gap:5px}
+.stv-meta .stv-titulo{display:flex;align-items:center;gap:8px;font-family:Fraunces,serif;font-size:17px;font-weight:600}
+.stv-meta .stv-titulo .cresce{flex:1}
+.stv-meta-tab{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13.5px;font-variant-numeric:tabular-nums}
+.stv-meta-tab span:nth-child(odd){color:var(--suave);font-size:12.5px}
+.stv-prog{height:12px;background:color-mix(in srgb,var(--linha) 55%,transparent);border-radius:6px;overflow:hidden;margin:6px 0 2px}
+.stv-prog .b{height:100%;background:var(--verde);border-radius:6px;transition:width .3s}
+.stv-prog-rot{font-size:12px;color:var(--suave);font-variant-numeric:tabular-nums}
+.stv-metas{display:flex;flex-direction:column;gap:8px}
+.stv-meta-linha{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 11px;border:1px solid var(--linha);border-radius:10px;background:var(--bg)}
+.stv-meta-linha.on{border-color:var(--verde)}
+.stv-meta-linha .sub{font-size:12px;color:var(--suave);margin-top:2px}
+.stv-meta-acoes{display:flex;gap:6px;margin-left:auto;align-items:center}
+
+/* últimas atividades: linhas clicáveis, rolagem interna */
+.stv-rol{max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.stv-largo .stv-rol{max-height:420px}
+.stv-linha{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid transparent;background:none;color:inherit;
+  font:inherit;padding:7px 9px;border-radius:9px;cursor:pointer;min-width:0}
+.stv-linha:hover{background:var(--bg);border-color:var(--linha)}
+.stv-linha:focus-visible{outline:2px solid var(--verde);outline-offset:1px}
+.stv-linha:disabled{cursor:default;opacity:.7}
+.stv-linha .ic{flex:none;font-size:15px}
+.stv-linha .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-size:13px}
+.stv-linha .nm small{display:block;font-weight:400;color:var(--suave);font-size:11.5px;overflow:hidden;text-overflow:ellipsis}
+.stv-linha .vl{flex:none;text-align:right;font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stv-linha .vl small{display:block;color:var(--suave);font-size:11px}
+.stv-destaques{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.stv-destaque{padding:9px 11px;border:1px solid var(--linha);border-radius:10px;background:var(--bg);font-size:13px}
+.stv-destaque b{display:block;font-family:Fraunces,serif;font-size:17px;font-variant-numeric:tabular-nums}
+.stv-destaque small{color:var(--suave);font-size:11.5px}
+
+/* dicas */
+.stv-dicas{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
+.stv-dica{position:relative;padding:10px 34px 10px 12px;border:1px solid var(--linha);border-left:4px solid var(--suave);border-radius:10px;background:var(--bg)}
+.stv-dica.stv-p-alta{border-left-color:var(--vermelho)}
+.stv-dica.stv-p-media{border-left-color:var(--areia)}
+.stv-dica.stv-p-baixa{border-left-color:var(--azul)}
+.stv-dica b{display:block;font-size:13.5px}
+.stv-dica p{font-size:13px;color:var(--tinta);margin-top:2px}
+.stv-dica .chip{margin-top:5px}
+.stv-dica .stv-x{position:absolute;top:6px;right:6px;border:0;background:none;color:var(--suave);cursor:pointer;font-size:14px;padding:3px 6px;border-radius:6px;line-height:1}
+.stv-dica .stv-x:hover{color:var(--tinta);background:var(--card)}
+.stv-dica .stv-x:focus-visible{outline:2px solid var(--verde)}
+.stv-rodape{font-size:11.5px;color:var(--suave);margin-top:10px;line-height:1.4}
+
+/* recordes */
+.stv-filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.stv-filtros select{border:1px solid var(--linha);background:var(--card);color:inherit;border-radius:8px;padding:5px 8px;font:500 12.5px Inter}
+.stv-recs{display:grid;gap:9px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.stv-largo .stv-recs{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+.stv-rec{background:var(--bg);border:1px solid var(--linha);border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.stv-rec .stv-rec-cab{font-size:12px;color:var(--suave);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.stv-rec .stv-rec-val{font-family:Fraunces,serif;font-size:21px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15}
+.stv-rec .stv-rec-sub{font-size:12px;color:var(--suave);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stv-rec .btn{align-self:flex-start;margin-top:5px}
+/* cinza sim, ilegível não: só o número grande desbota (contraste do texto preservado) */
+.stv-apagado{filter:grayscale(1)}
+.stv-apagado .stv-rec-val{opacity:.45}
+.stv-tenis.stv-apagado .stv-vida,.stv-tenis.stv-apagado .stv-tenis-grid{opacity:.6}
+
+/* tabelas pequenas (curva de Riegel, eficiência, pares de tênis) */
+.stv-tab{width:100%;border-collapse:collapse;font-size:13px}
+.stv-tab th{text-align:left;font:600 10.5px Inter;letter-spacing:.06em;text-transform:uppercase;color:var(--suave);padding:6px 8px;border-bottom:1px solid var(--linha);background:none}
+.stv-tab td{padding:6px 8px;border-bottom:1px solid var(--linha);font-variant-numeric:tabular-nums;white-space:nowrap}
+.stv-tab tr:last-child td{border-bottom:0}
+.stv-tab td.n,.stv-tab th.n{text-align:right}
+.stv-tab .pos{color:var(--vermelho)} .stv-tab .neg{color:var(--verde)}
+.stv-tab tr.on td{background:var(--verde-cl)}
+.stv-insight{margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--azul-cl);color:var(--azul);font-size:13px;line-height:1.45}
+.stv-nota{font-size:12px;color:var(--suave);margin-top:8px;line-height:1.45}
+.stv-legenda{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.stv-legenda .chip{border:1px solid transparent}
+.stv-legenda button.chip{cursor:pointer;font:600 11.5px Inter;background:var(--verde);color:#fff}
+.stv-legenda button.chip.off{opacity:.55;border-color:var(--linha);background:var(--card);color:var(--suave)}
+.stv-legenda button.chip:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
+
+/* gráficos SVG: sempre responsivos; heatmap rola na horizontal */
+.stv-graf{display:block;width:100%;height:auto;max-width:100%;font-family:Inter,system-ui,sans-serif}
+.stv-rol-x{overflow-x:auto;padding-bottom:4px;max-width:100%}
+.stv-heat{display:block;font-family:Inter,system-ui,sans-serif}
+.stv-heat-legenda{display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:11px;color:var(--suave);margin-top:6px}
+.stv-heat-legenda i{display:inline-block;width:11px;height:11px;border-radius:2px}
+.stv-pcts{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.stv-pcts .chip{font-weight:500}
+.stv-multi{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+.stv-multi h5{font:600 12px Inter;color:var(--suave);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stv-donut-cx{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.stv-donut{width:150px;max-width:150px;flex:none}
+.stv-donut-leg{display:flex;flex-direction:column;gap:6px;flex:1;min-width:160px}
+.stv-donut-item{display:flex;align-items:center;gap:8px;font-size:13px;min-width:0}
+.stv-donut-item i{display:inline-block;width:11px;height:11px;border-radius:3px;flex:none}
+.stv-donut-item span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stv-donut-item b{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+
+/* tênis */
+.stv-alertas{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.stv-alerta{padding:9px 12px;border-radius:10px;font-size:13px;border:1px solid var(--linha);background:var(--card);line-height:1.45}
+.stv-alerta.r{background:var(--vermelho-cl);border-color:color-mix(in srgb,var(--vermelho) 30%,transparent)}
+.stv-alerta.a{background:var(--areia-cl);border-color:color-mix(in srgb,var(--areia) 30%,transparent)}
+.stv-mt{margin-top:8px}
+.stv-alerta.az{background:var(--azul-cl);border-color:color-mix(in srgb,var(--azul) 30%,transparent)}
+.stv-tenis-lista{display:grid;gap:10px;grid-template-columns:1fr}
+.stv-largo .stv-tenis-lista{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+.stv-tenis{background:var(--bg);border:1px solid var(--linha);border-radius:12px;padding:12px 13px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.stv-tenis .stv-titulo{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-family:Fraunces,serif;font-size:15.5px;font-weight:600}
+.stv-tenis .sub{font-size:12.5px;color:var(--suave);font-variant-numeric:tabular-nums}
+.stv-vida{height:10px;background:color-mix(in srgb,var(--linha) 55%,transparent);border-radius:5px;overflow:hidden}
+.stv-vida .b{height:100%;border-radius:5px;transition:width .3s;background:var(--verde)}
+.stv-vida .b.amarelo{background:var(--areia)}
+.stv-vida .b.vermelho{background:var(--vermelho)}
+.stv-tenis-grid{display:grid;gap:5px 10px;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));font-size:13px;font-variant-numeric:tabular-nums}
+.stv-tenis-grid small{display:block;font-size:10.5px;color:var(--suave);text-transform:uppercase;letter-spacing:.05em}
+.stv-tenis .stv-acoes{margin-top:4px}
+.stv-check{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-top:12px;cursor:pointer}
+.stv-check input{accent-color:var(--verde);width:16px;height:16px}
+.stv-erro{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
+.stv-erro .aviso{margin-bottom:0}
+.stv-erro .btn{align-self:flex-start}
+
+@media print{.stv-btn,.stv-gaveta{display:none}}
+/* fim Strava */
 /* modal */
 .fundo{position:fixed;inset:0;background:rgba(20,22,20,.45);backdrop-filter:blur(3px);
   display:flex;align-items:flex-start;justify-content:center;padding:34px 16px;z-index:60;overflow-y:auto}
@@ -658,6 +867,7 @@ async function importarArquivos(f) {
 const SEED={
   // Sem dados pessoais aqui: o HTML é público. Tudo vem da nuvem após o login.
   viagens:[],
+  strava:{tenis:{},metas:[],dicasDispensadas:{}},
   rendHist:{anos:[],empresas:{},totalAno:[],totalGeral:0,mediaAnual:0,parciais:[],aIdentificar:[],aplicPorInst:{},detalhe:{}},
   rendimentos:[],gastos:[],agenda:[],demandas:[],peso:[],exames:[],tratamentos:[],
   /* Fortemais: as FICHAS das obras e os APORTES moram aqui (são dezenas de linhas,
@@ -1280,6 +1490,7 @@ function areaArquivos(ref,dica,somenteLeitura=false){
 /* ---------------- navegação ---------------- */
 // logos de verdade na lateral (o emoji não faz jus)
 const LOGO_DRIVE='<svg viewBox="0 0 87.3 78" aria-hidden="true"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>';
+const LOGO_STRAVA='<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#FC4C02" d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>';
 const MODS=[
   {id:'inicio',ic:'🏠',nome:'Início',grupo:'',render:vInicio},
   {id:'rendimentos',ic:'📈',nome:'Rendimentos',grupo:'Dinheiro',render:vRendimentos},
@@ -1290,6 +1501,7 @@ const MODS=[
   {id:'agenda',ic:'📅',nome:'Agenda',grupo:'',render:vAgenda},
   {id:'demandas',ic:'✅',nome:'Demandas',grupo:'',render:vDemandas},
   {id:'saude',ic:'🩺',nome:'Saúde',grupo:'',render:vSaude},
+  {id:'strava',ic:LOGO_STRAVA,nome:'Strava',grupo:'',render:vStrava},
   {id:'empresas',ic:'🏢',nome:'Empresas',grupo:'Empresa',render:vEmpresas},
   {id:'estrategia',ic:'♟️',nome:'Planejamento estratégico',grupo:'',render:vEstrategia},
   {id:'fortemais',ic:'🏗️',nome:'Fortemais',grupo:'Projeto especial',render:vFortemais},
@@ -1440,6 +1652,7 @@ function tela(){
   const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else if(atual==='caixavgv')organizarCaixaVGV(pagina,alvo);else if(atual==='config')organizarConfig(pagina,alvo);else if(atual==='demandas')organizarDemandasTopo(pagina);else indiceDaTela(pagina);prepararTabelas(pagina);if(typeof docIntegrarTela==='function')docIntegrarTela(pagina,atual);if(alvo)rolaAlvo(pagina,alvo)};
   const falhou=()=>{if(pagina.isConnected)pagina.appendChild(el('<p class="aviso" role="alert">Não foi possível concluir o carregamento. Abra esta seção novamente.</p>'))};
   try{const resultado=mod.render(pagina);if(resultado?.then)resultado.then(finalizar).catch(falhou);else finalizar()}catch(erro){falhou()}
+  if(typeof stravaMontarBotao==='function')stravaMontarBotao();
   return !!alvo;
 }
 const rr=id=>()=>{if(atual===id)tela()};
@@ -9442,6 +9655,1291 @@ async function baixarDrive(f0){
   const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000);
 }
 
+
+/* ================== STRAVA ==================
+/* Ícones do Strava na Central: a marca oficial (laranja #FC4C02) e glifos de
+   linha no mesmo espírito do app do Strava — nada de emoji. Todos herdam a
+   cor do texto (stroke=currentColor), então funcionam no claro e no escuro. */
+const STV_ICONES={
+  // modalidades
+  corrida:'<circle cx="15" cy="4.2" r="1.7"/><path d="M13.5 7.5 9.5 10 7 13.5"/><path d="M13.5 7.5 16.8 10.4 19.5 9.2"/><path d="M13.5 7.5 11.2 12.6 14.2 15.4 12.2 21"/><path d="M14.2 15.4 17 17.2 18.2 21"/>',
+  musculacao:'<path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/>',
+  escada:'<path d="M4 20h4v-4h4v-4h4V8h4"/><path d="M4 20V16h4"/>',
+  bike:'<circle cx="6" cy="17" r="3.5"/><circle cx="18" cy="17" r="3.5"/><path d="M6 17l4-8h6l2 8M10 9l-1.5-3H6M13 17h-3"/>',
+  caminhada:'<path d="M13.5 5.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/><path d="M9 21l2-6 2 2v4M11 15l-1-5 2-2 2 2v3l2 1M10 10l-2 3"/>',
+  outros:'<path d="M3 12h4l2-6 4 12 2-6h6"/>',
+  // medidas
+  distancia:'<path d="M4 18c3-8 5-8 8 0s5 8 8 0"/><circle cx="4" cy="18" r="1.5"/><circle cx="20" cy="18" r="1.5"/>',
+  tempo:'<circle cx="12" cy="13" r="8"/><path d="M12 8v5l3 2M9 2h6"/>',
+  pace:'<path d="M4 17a8 8 0 0 1 16 0"/><path d="M12 17l4-5M4 17h16"/>',
+  calorias:'<path d="M12 3c1 3 4 4 4 8a4 4 0 0 1-8 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 0-7z"/>',
+  elevacao:'<path d="M3 19l6-9 4 5 3-4 5 8z"/>',
+  fc:'<path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/><path d="M5.5 12h3l1.5-2 2 4 1.5-2h4"/>',
+  cadencia:'<ellipse cx="8" cy="15" rx="2.7" ry="4"/><ellipse cx="16" cy="8.5" rx="2.7" ry="4"/><path d="M6 21h4M14 14.5h4"/>',
+  esforco:'<path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/>',
+  // conquistas e estado
+  pr:'<path d="M7 3.5h10v4.5a5 5 0 0 1-10 0z"/><path d="M7 5.5H4.5A2.5 2.5 0 0 0 7 8M17 5.5h2.5A2.5 2.5 0 0 1 17 8"/><path d="M12 13v3M8.5 20.5h7M12 16c0 2.2-1.4 3.4-3.5 4.5M12 16c0 2.2 1.4 3.4 3.5 4.5"/>',
+  medalha:'<circle cx="12" cy="15" r="5"/><path d="M8 3l3 7M16 3l-3 7M12 12.5l1 2h2l-1.5 1.5.5 2-2-1-2 1 .5-2L9 14.5h2z"/>',
+  novo:'<path d="M12 3l2.5 5.5 6 .7-4.5 4 1.3 6L12 16.2 6.7 19.2 8 13.2 3.5 9.2l6-.7z"/>',
+  fogo:'<path d="M12 3c1 3 4 4 4 8a4 4 0 0 1-8 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 0-7z"/>',
+  calendario:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  meta:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>',
+  tenis:'<path d="M3 16c0-1 1-2 3-2l3-4 3 1 2-1c2 2 5 3 7 3v4H3z"/><path d="M3 16v2h18M9 10l2 2M11 9l2 2"/>',
+  dica:'<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/>',
+  alerta:'<path d="M12 3L2 21h20z"/><path d="M12 10v5M12 18h.01"/>',
+  ok:'<path d="M4 12l5 5L20 7"/>',
+  fechar:'<path d="M6 6l12 12M18 6L6 18"/>',
+  externo:'<path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
+  atualizar:'<path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/>',
+  config:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+};
+/* stvIcone('corrida') → SVG de 24×24 que acompanha o tamanho da fonte (1em).
+   `cor` opcional (ex.: '#FC4C02' para o selo PR). */
+function stvIcone(nome,{tam='1em',cor='currentColor',classe=''}={}){
+  const d=STV_ICONES[nome]||STV_ICONES.outros;
+  return `<svg class="stv-ic ${classe}" viewBox="0 0 24 24" width="${tam}" height="${tam}" fill="none" stroke="${cor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+}
+// modalidade → ícone (sport_type do Strava)
+function stvIconeModalidade(tipo){
+  if(['Run','TrailRun','VirtualRun'].includes(tipo))return stvIcone('corrida');
+  if(tipo==='WeightTraining')return stvIcone('musculacao');
+  if(tipo==='StairStepper')return stvIcone('escada');
+  if(/Ride|Bike|Velomobile|Handcycle/.test(tipo||''))return stvIcone('bike');
+  if(tipo==='Walk'||tipo==='Hike')return stvIcone('caminhada');
+  return stvIcone('outros');
+}
+
+/* ===================== STRAVA — CÁLCULOS PUROS =====================
+   Tudo aqui recebe as atividades na forma que `stravaLer` devolve
+   ({id,tipo,nome,inicioLocal,gearId,distanciaM,movingTime,elapsedTime,
+     elevacao,calorias,cadencia,esforco,prCount,fcMedia,fcMax,watts,velMax,local,
+     bestEfforts:[{tipo,rotulo,seg}]}) e devolve números e objetos prontos
+   para a tela. Nada de DOM, nada de fetch, nada de Date com fuso: dia é
+   sempre a string 'AAAA-MM-DD' tirada de `inicioLocal`, e "hoje" chega por
+   parâmetro (`hojeStr`) para o cálculo ser testável.
+   Qualquer campo pode faltar — nenhuma função lança por dado ausente.
+   GPS ruim: corrida com velMax > 7 m/s (25 km/h) ou com um best effort que
+   implica pace abaixo de 2:30/km tem os bestEfforts IGNORADOS nos recordes
+   (nativos, evolução, curva, meta, dados das dicas); continua valendo para
+   volume, calorias, streak etc. — ver stvGpsRuim/stvEsforcos. */
+
+const STV_DISTANCIAS=[
+  {tipo:'Fastest400',rotulo:'400m',distM:400},
+  {tipo:'FastestHalfMile',rotulo:'1/2 milha',distM:804.67},
+  {tipo:'Fastest1k',rotulo:'1K',distM:1000},
+  {tipo:'FastestMile',rotulo:'1 milha',distM:1609.34},
+  {tipo:'Fastest2Mile',rotulo:'2 milhas',distM:3218.69},
+  {tipo:'Fastest5k',rotulo:'5K',distM:5000},
+  {tipo:'Fastest10k',rotulo:'10K',distM:10000},
+  {tipo:'Fastest15k',rotulo:'15K',distM:15000},
+  {tipo:'Fastest10Mile',rotulo:'10 milhas',distM:16093.4},
+  {tipo:'Fastest20k',rotulo:'20K',distM:20000},
+  {tipo:'FastestHalfMarathon',rotulo:'Meia Maratona',distM:21097.5}
+];
+const STV_TIPOS_CORRIDA=['Run','TrailRun','VirtualRun'];
+const STV_MODALIDADES=['corrida','musculacao','escada','outros'];
+
+/* ---------- miúdos ---------- */
+// lista segura: só objetos; qualquer outra coisa vira []
+const stvLista=a=>Array.isArray(a)?a.filter(x=>x&&typeof x==='object'):[];
+// número seguro: NaN/null/'' viram 0
+const stvNum=v=>{const n=+v;return Number.isFinite(n)?n:0};
+const stvDiaValido=d=>/^\d{4}-\d{2}-\d{2}$/.test(String(d||''));
+const stvMesValido=m=>/^\d{4}-\d{2}$/.test(String(m||''));
+// aritmética de dias em UTC puro (sem fuso): 'AAAA-MM-DD' + n dias
+function stvDiaMais(dia,n){if(!stvDiaValido(dia))return '';const t=Date.UTC(+dia.slice(0,4),+dia.slice(5,7)-1,+dia.slice(8,10))+stvNum(n)*864e5;return new Date(t).toISOString().slice(0,10)}
+// dias de a até b (positivo quando b é depois); null se alguma data for inválida
+function stvDiasEntre(a,b){if(!stvDiaValido(a)||!stvDiaValido(b))return null;const u=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10));return Math.round((u(b)-u(a))/864e5)}
+// 'AAAA-MM' + n meses
+function stvMesMais(mes,n){if(!stvMesValido(mes))return '';const m=+mes.slice(5,7)-1+stvNum(n);const y=+mes.slice(0,4)+Math.floor(m/12),mm=((m%12)+12)%12;return y+'-'+String(mm+1).padStart(2,'0')}
+// dias que o mês tem
+function stvDiasNoMes(mes){if(!stvMesValido(mes))return 0;return new Date(Date.UTC(+mes.slice(0,4),+mes.slice(5,7),0)).getUTCDate()}
+// 0=segunda … 6=domingo
+function stvDiaSemana(dia){if(!stvDiaValido(dia))return null;return (new Date(Date.UTC(+dia.slice(0,4),+dia.slice(5,7)-1,+dia.slice(8,10))).getUTCDay()+6)%7}
+// segunda-feira da semana daquele dia (semana começa segunda)
+function stvSegunda(dia){const ds=stvDiaSemana(dia);return ds==null?'':stvDiaMais(dia,-ds)}
+// semana ISO 'AAAA-Wnn' (segunda a domingo; semana 1 é a que tem 4 de janeiro)
+function stvSemanaISO(dia){if(!stvDiaValido(dia))return '';const d=new Date(Date.UTC(+dia.slice(0,4),+dia.slice(5,7)-1,+dia.slice(8,10)));d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7)+3);const ano=d.getUTCFullYear();const q=new Date(Date.UTC(ano,0,4));const sem=1+Math.round(((d-q)/864e5-3+((q.getUTCDay()+6)%7))/7);return ano+'-W'+String(sem).padStart(2,'0')}
+// média simples; null se a lista estiver vazia
+const stvMedia=xs=>xs.length?xs.reduce((t,x)=>t+x,0)/xs.length:null;
+const stvOrdenaDia=(x,y)=>x.dia<y.dia?-1:x.dia>y.dia?1:0;
+const stvId=v=>v==null||v===''?null:String(v);
+// duração curta para frase: '47s' | '1min 47s' | '1h 02min'
+function stvFmtDur(seg){const s=Math.round(Math.abs(stvNum(seg)));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;if(h)return h+'h '+String(m).padStart(2,'0')+'min';if(m)return m+'min '+String(x).padStart(2,'0')+'s';return x+'s'}
+// número solto para frase, em português: 52.5 → '52,5'; 554 → '554'
+function stvFmtN(v){if(v==null||v==='')return '—';const x=+v;return Number.isFinite(x)?String(x).replace('.',','):'—'}
+
+/* ---------- classificação e formatos ---------- */
+function stvEhCorrida(a){return !!a&&STV_TIPOS_CORRIDA.includes(a.tipo)}
+function stvModalidade(a){if(!a)return 'outros';if(stvEhCorrida(a))return 'corrida';if(a.tipo==='WeightTraining')return 'musculacao';if(a.tipo==='StairStepper')return 'escada';return 'outros'}
+// pace em min/km; null se não dá para calcular
+function stvPace(movingSeg,distM){if(movingSeg==null||distM==null)return null;const s=+movingSeg,d=+distM;if(!(d>0)||!Number.isFinite(s)||s<0)return null;return (s/60)/(d/1000)}
+function stvFmtPace(p){const v=+p;if(p==null||!Number.isFinite(v)||v<0)return '—';let min=Math.floor(v),sec=Math.round((v-min)*60);if(sec===60){min++;sec=0}return min+':'+String(sec).padStart(2,'0')+'/km'}
+function stvFmtTempo(seg){const s=Math.round(+seg);if(seg==null||!Number.isFinite(s)||s<0)return '—';const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return h>0?h+':'+String(m).padStart(2,'0')+':'+String(x).padStart(2,'0'):m+':'+String(x).padStart(2,'0')}
+function stvFmtKm(m){const n=+m;if(m==null||!Number.isFinite(n))return '—';return (n/1000).toFixed(2).replace('.',',')+' km'}
+function stvDia(a){const s=String((a&&a.inicioLocal)||'');return /^\d{4}-\d{2}-\d{2}/.test(s)?s.slice(0,10):''}
+// GPS ruim: pico de velocidade acima de 7 m/s (25 km/h) ou algum best effort
+// que implica pace abaixo de 2:30/km (400 m em 45 s, 5K em 23 min numa corrida
+// de 10 h). velMax ausente não filtra. A atividade em si continua valendo.
+function stvGpsRuim(a){
+  if(!a||typeof a!=='object')return false;
+  const v=a.velMax==null?null:+a.velMax;if(v!=null&&Number.isFinite(v)&&v>7)return true;
+  for(const b of (Array.isArray(a.bestEfforts)?a.bestEfforts:[])){if(!b)continue;const d=STV_DISTANCIAS.find(x=>x.tipo===b.tipo);if(!d)continue;const p=stvPace(b.seg,d.distM);if(p!=null&&p<2.5)return true}
+  return false}
+// best efforts que valem para recorde: [] se não é corrida, não tem ou o GPS é ruim
+function stvEsforcos(a){if(!stvEhCorrida(a)||!Array.isArray(a.bestEfforts)||stvGpsRuim(a))return [];return a.bestEfforts.filter(b=>b&&b.tipo&&+b.seg>0)}
+// Corrida "de verdade" para os recordes de FC/cadência e para a eficiência:
+// GPS bom E pace plausível de corrida (até 9:00/km ≈ 6,7 km/h). Caminhada ou
+// registro deixado ligado (98 bpm a 11:07/km, com 47 h de elapsed) não concorre
+// a "menor FC média em corrida": venceria sempre e travaria o recorde para sempre.
+const STV_PACE_MAX_CORRIDA=9;
+function stvCorridaPlausivel(a){if(!stvEhCorrida(a)||stvGpsRuim(a))return false;const p=stvPace(a&&a.movingTime,a&&a.distanciaM);return p!=null&&p<=STV_PACE_MAX_CORRIDA}
+
+/* ---------- apoio ---------- */
+// Dias seguidos com treino, contados de hoje para trás. Se hoje ainda não
+// teve treino a sequência não morreu (o dia não acabou): conta a partir de ontem.
+function stvStreak(atividades,hojeStr){
+  const dias=new Set(stvLista(atividades).map(stvDia).filter(Boolean));
+  if(!stvDiaValido(hojeStr)||!dias.size)return 0;
+  let d=dias.has(hojeStr)?hojeStr:stvDiaMais(hojeStr,-1),n=0;
+  while(dias.has(d)){n++;d=stvDiaMais(d,-1)}
+  return n}
+function stvVariacao(atual,anterior){if(atual==null||anterior==null)return null;const a=+atual,b=+anterior;if(!Number.isFinite(a)||!Number.isFinite(b)||b===0)return null;return (a-b)/b*100}
+// Riegel: T2 = T1 × (D2/D1)^1.06
+function stvRiegel(tempoBase,distBase,distAlvo){const t=+tempoBase,d1=+distBase,d2=+distAlvo;if(!(t>0)||!(d1>0)||!(d2>0))return null;return t*Math.pow(d2/d1,1.06)}
+// 0..100: quanto do caminho entre a referência inicial e o alvo já foi andado
+function stvProgressoMeta(prAtual,tempoAlvo,tempoRefInicial){const pr=+prAtual,alvo=+tempoAlvo,ref=+tempoRefInicial;if(!(pr>0)||!(alvo>0)||!(ref>0))return 0;if(ref<=alvo)return pr<=alvo?100:0;return Math.max(0,Math.min(100,(ref-pr)/(ref-alvo)*100))}
+
+/* ---------- resumo por período ---------- */
+function stvResumo(atividades,iniStr,fimStr){
+  const r={treinos:0,calorias:0,kmCorrida:0,horas:0,prs:0,corridas:0,dias:0,porModalidade:{corrida:{n:0,km:0,kcal:0,seg:0},musculacao:{n:0,kcal:0,seg:0},escada:{n:0,kcal:0,seg:0},outros:{n:0,kcal:0,seg:0}}};
+  const diasSet=new Set();
+  for(const a of stvLista(atividades)){
+    const d=stvDia(a);if(!d)continue;if(iniStr&&d<iniStr)continue;if(fimStr&&d>fimStr)continue;
+    const kcal=stvNum(a.calorias),seg=stvNum(a.movingTime),mod=stvModalidade(a),pm=r.porModalidade[mod];
+    r.treinos++;r.calorias+=kcal;r.horas+=seg/3600;r.prs+=stvNum(a.prCount);pm.n++;pm.kcal+=kcal;pm.seg+=seg;diasSet.add(d);
+    if(mod==='corrida'){const km=stvNum(a.distanciaM)/1000;r.corridas++;r.kmCorrida+=km;pm.km+=km}}
+  r.dias=diasSet.size;return r}
+
+/* ---------- recordes ---------- */
+// Menor tempo por tipo de best effort (só de corridas com GPS bom — stvEsforcos).
+// Empate: fica o mais recente (igualar o tempo é PR novo no Strava — a semente
+// da milha confirma: 393 s em 06/06 e em 30/08, o Strava marca 30/08).
+function stvRecordesNativos(atividades,{desde}={}){
+  const melhor={};
+  for(const a of stvLista(atividades)){
+    const efs=stvEsforcos(a),dia=stvDia(a);if(!efs.length||!dia)continue;if(desde&&dia<desde)continue;
+    for(const b of efs){const seg=+b.seg;const at=melhor[b.tipo];
+      if(!at||seg<at.seg||(seg===at.seg&&dia>at.dia))melhor[b.tipo]={seg,atividadeId:stvId(a.id),gearId:stvId(a.gearId),dia}}}
+  const out={};
+  for(const d of STV_DISTANCIAS){const m=melhor[d.tipo];if(!m)continue;out[d.tipo]={tipo:d.tipo,rotulo:d.rotulo,distM:d.distM,seg:m.seg,pace:stvPace(m.seg,d.distM),atividadeId:m.atividadeId,gearId:m.gearId,dia:m.dia}}
+  return out}
+
+// Recordes que não vêm prontos do Strava. Elevação/cadência/FC olham só corrida;
+// calorias e Relative Effort valem para qualquer modalidade (é "maior sessão").
+function stvRecordesCalculados(atividades){
+  const lista=stvLista(atividades).filter(a=>stvDia(a));
+  const corr=lista.filter(stvEhCorrida);
+  const carimbo=(a,valor,unidade)=>({valor,unidade,atividadeId:stvId(a.id),dia:stvDia(a),gearId:stvId(a.gearId)});
+  const maior=(xs,campo,unidade,f=v=>v)=>{let m=null;for(const a of xs){const v=+a[campo];if(!(v>0))continue;if(!m||v>m.bruto)m={bruto:v,a}}return m?carimbo(m.a,f(m.bruto),unidade):null};
+  const menor=(xs,campo,unidade)=>{let m=null;for(const a of xs){const v=+a[campo];if(!(v>0))continue;if(!m||v<m.bruto)m={bruto:v,a}}return m?carimbo(m.a,m.bruto,unidade):null};
+  // cadência e FC média só saem de corrida plausível (GPS bom + pace de corrida)
+  const c5=corr.filter(a=>stvNum(a.distanciaM)>=5000&&stvCorridaPlausivel(a));
+  // volume por semana ISO e por mês (só corrida)
+  const porSem={},porMes={};
+  for(const a of corr){const d=stvDia(a),km=stvNum(a.distanciaM)/1000;const s=stvSemanaISO(d),m=d.slice(0,7);
+    porSem[s]=porSem[s]||{km:0,dia:stvSegunda(d)};porSem[s].km+=km;porMes[m]=(porMes[m]||0)+km}
+  let maiorSemana=null;for(const s in porSem)if(!maiorSemana||porSem[s].km>maiorSemana.valor)maiorSemana={valor:+porSem[s].km.toFixed(2),unidade:'km',semana:s,dia:porSem[s].dia};
+  let maiorMes=null;for(const m in porMes)if(!maiorMes||porMes[m]>maiorMes.valor)maiorMes={valor:+porMes[m].toFixed(2),unidade:'km',mes:m};
+  // maior sequência de dias seguidos (qualquer modalidade)
+  const dias=[...new Set(lista.map(stvDia))].sort();
+  let maiorStreak=null,atual=0,ant='';
+  for(const d of dias){atual=(ant&&stvDiasEntre(ant,d)===1)?atual+1:1;ant=d;if(!maiorStreak||atual>maiorStreak.valor)maiorStreak={valor:atual,unidade:'dias',fim:d}}
+  return {
+    maiorDistancia:maior(corr,'distanciaM','km',v=>+(v/1000).toFixed(2)),
+    maiorElevacao:maior(corr,'elevacao','m',v=>Math.round(v)),
+    maiorCalorias:maior(lista,'calorias','kcal',v=>Math.round(v)),
+    maiorEsforco:maior(lista,'esforco','',v=>Math.round(v)),
+    maiorSemana,maiorMes,maiorStreak,
+    /* FC e cadência só valem de corrida DE VERDADE: sem pico de GPS e com pace
+       plausível (até 9:00/km). Sem isso, "menor FC média" saía de uma caminhada
+       com o relógio esquecido ligado — 98 bpm a 11:07/km. */
+    melhorCadencia5k:maior(c5.filter(stvCorridaPlausivel),'cadencia','spm',v=>Math.round(v*10)/10),
+    melhorFC5k:menor(c5.filter(stvCorridaPlausivel),'fcMedia','bpm')}}
+
+/* ---------- curva de Riegel ---------- */
+// base = o PR que, projetado para 10 km, dá o menor tempo. Tiros curtos (400m,
+// 1 milha) projetam tempos irreais para 10 km, então a base sai só de distâncias
+// ≥ minBaseM (5 km); se não houver nenhuma, vale qualquer uma.
+function stvCurva(recordesNativos,{minBaseM=5000}={}){
+  const rec=recordesNativos&&typeof recordesNativos==='object'?recordesNativos:{};
+  const tem=STV_DISTANCIAS.map(d=>rec[d.tipo]).filter(r=>r&&+r.seg>0&&+r.distM>0);
+  if(!tem.length)return {base:null,linhas:STV_DISTANCIAS.map(d=>({tipo:d.tipo,rotulo:d.rotulo,distM:d.distM,pr:null,projecao:null,gapSeg:null})),insight:null};
+  let cand=tem.filter(r=>r.distM>=minBaseM);if(!cand.length)cand=tem;
+  let base=null,melhor=Infinity;
+  for(const r of cand){const p=stvRiegel(r.seg,r.distM,10000);if(p<melhor){melhor=p;base=r}}
+  const linhas=STV_DISTANCIAS.map(d=>{const r=rec[d.tipo];const proj=stvRiegel(base.seg,base.distM,d.distM);const pr=r&&+r.seg>0?+r.seg:null;
+    return {tipo:d.tipo,rotulo:d.rotulo,distM:d.distM,pr,projecao:Math.round(proj),gapSeg:pr!=null?Math.round(pr-proj):null,base:d.tipo===base.tipo}});
+  // insight: o PR mais "atrasado" em relação à curva (gap positivo = pior que o projetado)
+  let insight=null;for(const l of linhas)if(l.gapSeg>0&&(!insight||l.gapSeg>insight.gapSeg))insight={tipo:l.tipo,rotulo:l.rotulo,gapSeg:l.gapSeg};
+  return {base:{tipo:base.tipo,rotulo:base.rotulo,distM:base.distM,seg:base.seg},linhas,insight}}
+
+/* ---------- tendências ---------- */
+// Melhor tempo acumulado até cada corrida que tem esse best effort; a janela
+// de `meses` conta a partir de hojeStr (ou da última corrida, se não vier).
+function stvEvolucaoPR(atividades,tipo,meses=12,hojeStr){
+  const def=STV_DISTANCIAS.find(x=>x.tipo===tipo);
+  const corr=stvLista(atividades).filter(stvDia)
+    .map(a=>{const b=stvEsforcos(a).find(x=>x.tipo===tipo);return b?{dia:stvDia(a),seg:+b.seg,atividadeId:stvId(a.id)}:null}).filter(Boolean).sort(stvOrdenaDia);
+  if(!corr.length)return [];
+  const ref=stvDiaValido(hojeStr)?hojeStr:corr[corr.length-1].dia;
+  const desde=meses>0?stvMesMais(ref.slice(0,7),-(meses-1))+'-01':'';
+  let melhor=Infinity;const out=[];
+  // empate conta como PR novo — o mesmo critério de stvRecordesNativos (e do Strava)
+  for(const c of corr){const novo=c.seg<=melhor;if(novo)melhor=c.seg;if(c.dia<desde||c.dia>ref)continue;
+    out.push({dia:c.dia,seg:melhor,segCorrida:c.seg,pace:def?stvPace(melhor,def.distM):null,paceCorrida:def?stvPace(c.seg,def.distM):null,novoPR:novo,atividadeId:c.atividadeId})}
+  return out}
+
+// km de corrida por mês nos últimos `meses` (inclui o mês atual), média móvel
+// de 3 meses e alerta quando subiu mais de 10% sobre o mês anterior.
+function stvVolumeMensal(atividades,meses=12,hojeStr){
+  const porMes={},nMes={};let ultimo='';
+  for(const a of stvLista(atividades)){if(!stvEhCorrida(a))continue;const d=stvDia(a);if(!d)continue;const m=d.slice(0,7);porMes[m]=(porMes[m]||0)+stvNum(a.distanciaM)/1000;nMes[m]=(nMes[m]||0)+1;if(d>ultimo)ultimo=d}
+  const ref=stvDiaValido(hojeStr)?hojeStr.slice(0,7):ultimo.slice(0,7);if(!ref)return [];
+  const n=Math.max(1,stvNum(meses)|0),out=[];
+  for(let i=n-1;i>=0;i--){const mes=stvMesMais(ref,-i);const km=porMes[mes]||0,ant=porMes[stvMesMais(mes,-1)]||0,m2=porMes[stvMesMais(mes,-2)]||0;
+    out.push({mes,km:+km.toFixed(2),corridas:nMes[mes]||0,mediaMovel3:+((km+ant+m2)/3).toFixed(2),alerta:ant>0&&km>ant*1.10})}
+  return out}
+
+// Dias do ano com treino (para o heatmap), % de dias treinados por mês e
+// minutos por modalidade por mês. Com hojeStr no mesmo ano, meses futuros
+// ficam de fora e o mês corrente conta só os dias já vividos.
+function stvConsistencia(atividades,ano,hojeStr){
+  ano=String(ano||'').slice(0,4);const dias={},mods={};
+  for(const a of stvLista(atividades)){const d=stvDia(a);if(!d||d.slice(0,4)!==ano)continue;
+    const x=dias[d]||(dias[d]={seg:0,kcal:0,n:0,modalidades:[]});const mod=stvModalidade(a),seg=stvNum(a.movingTime);
+    x.seg+=seg;x.kcal+=stvNum(a.calorias);x.n++;if(!x.modalidades.includes(mod))x.modalidades.push(mod);
+    const mes=d.slice(0,7);const pm=mods[mes]||(mods[mes]={corrida:0,musculacao:0,escada:0,outros:0});pm[mod]+=seg/60}
+  const pctPorMes={},porMesModalidade=[];
+  const limite=stvDiaValido(hojeStr)&&hojeStr.slice(0,4)===ano?hojeStr:null;
+  for(let m=1;m<=12;m++){const mes=ano+'-'+String(m).padStart(2,'0');if(limite&&mes>limite.slice(0,7))break;
+    const diasNoMes=limite&&mes===limite.slice(0,7)?+limite.slice(8,10):stvDiasNoMes(mes);
+    const treinados=Object.keys(dias).filter(d=>d.startsWith(mes)).length;
+    pctPorMes[mes]=diasNoMes?Math.round(treinados/diasNoMes*100):0;
+    const pm=mods[mes]||{corrida:0,musculacao:0,escada:0,outros:0};
+    porMesModalidade.push({mes,corrida:Math.round(pm.corrida),musculacao:Math.round(pm.musculacao),escada:Math.round(pm.escada),outros:Math.round(pm.outros)})}
+  return {dias,pctPorMes,porMesModalidade}}
+
+// Corridas ≥ 5 km com FC média: índice = FC / velocidade (km/h); menor é melhor.
+function stvEficiencia(atividades){
+  return stvLista(atividades).filter(a=>stvCorridaPlausivel(a)&&stvDia(a)&&stvNum(a.distanciaM)>=5000&&stvNum(a.fcMedia)>0&&stvNum(a.movingTime)>0)
+    .map(a=>{const kmh=(stvNum(a.distanciaM)/1000)/(stvNum(a.movingTime)/3600);return {dia:stvDia(a),pace:stvPace(a.movingTime,a.distanciaM),fc:+(+a.fcMedia).toFixed(1),indice:+(stvNum(a.fcMedia)/kmh).toFixed(2),atividadeId:stvId(a.id)}})
+    .sort(stvOrdenaDia)}
+
+/* ---------- tênis ---------- */
+// nome de exibição: apelido configurado > "Marca Modelo (nome no Strava)" > id
+function stvNomeTenis(g,cfg){
+  if(cfg&&cfg.apelido)return String(cfg.apelido);
+  const base=[g&&g.marca,g&&g.modelo].filter(Boolean).join(' ').trim(),ap=g&&g.nome?String(g.nome):'';
+  return base?(ap?base+' ('+ap+')':base):(ap||'Tênis '+((g&&g.gearId)||''))}
+// mapa gearId → gear, incluindo tênis que só aparecem nas atividades
+function stvMapaGear(atividades,gear){
+  const gs={};for(const g of stvLista(gear)){if(g.gearId!=null&&g.gearId!=='')gs[String(g.gearId)]=g}
+  for(const a of stvLista(atividades)){const id=stvId(a.gearId);if(id&&!gs[id])gs[id]={gearId:id}}
+  return gs}
+function stvUltimoDia(atividades){let u='';for(const a of stvLista(atividades)){const d=stvDia(a);if(d>u)u=d}return u}
+
+function stvTenis(atividades,gear,config,hojeStr){
+  const lista=stvLista(atividades),cfgT=(config&&config.tenis)||{},gs=stvMapaGear(lista,gear);
+  const ref=stvDiaValido(hojeStr)?hojeStr:stvUltimoDia(lista);
+  const rec=stvRecordesNativos(lista);
+  const out=Object.keys(gs).map(id=>{
+    const g=gs[id],c=cfgT[id]||{},corr=lista.filter(a=>stvEhCorrida(a)&&stvId(a.gearId)===id);
+    let segs=0,dist=0,ult='';for(const a of corr){segs+=stvNum(a.movingTime);dist+=stvNum(a.distanciaM);const d=stvDia(a);if(d>ult)ult=d}
+    // km acumulado: o total do Strava (inclui corridas fora da janela carregada); sem ele, soma das atividades
+    const km=+((stvNum(g.distanciaM)>0?stvNum(g.distanciaM):dist)/1000).toFixed(1);
+    const limiteKm=+c.limiteKm>0?+c.limiteKm:600,pctVida=+(km/limiteKm).toFixed(3);
+    const prs=STV_DISTANCIAS.filter(d=>rec[d.tipo]&&rec[d.tipo].gearId===id).map(d=>d.rotulo);
+    const compra=stvDiaValido(c.compra)?c.compra:'';let kmPorMes=null;
+    if(compra&&ref){const dias=stvDiasEntre(compra,ref);if(dias>0)kmPorMes=+(km/(dias/30.44)).toFixed(1)}
+    return {gearId:id,nome:stvNomeTenis(g,c),apelido:c.apelido?String(c.apelido):'',nomeStrava:g.nome?String(g.nome):'',marca:g.marca?String(g.marca):'',modelo:g.modelo?String(g.modelo):'',
+      km,kmAtividades:+(dist/1000).toFixed(1),corridas:corr.length,limiteKm,pctVida,faixa:pctVida>0.9?'vermelho':pctVida>=0.7?'amarelo':'verde',
+      paceMedio:stvPace(segs,dist),ultima:ult,diasSemUso:ult&&ref?stvDiasEntre(ult,ref):null,prs,
+      tipo:['rodagem','prova','trail','outro'].includes(c.tipo)?c.tipo:'rodagem',
+      aposentado:c.aposentado!=null?!!c.aposentado:!!g.aposentadoStrava,compra,kmPorMes}});
+  out.sort((x,y)=>(x.aposentado-y.aposentado)||(y.km-x.km)||x.nome.localeCompare(y.nome));
+  return out}
+
+// Compara pace médio entre tênis em corridas de distância equivalente.
+// Faixas geométricas de ±15% (razão 1,3 entre bordas): duas corridas na mesma
+// faixa contam como "distância similar".
+// minPar = corridas comparáveis em CADA tênis (o peso é a soma dos min(nA,nB)
+// por faixa, então peso>=minPar garante minPar corridas de cada lado).
+function stvImpactoTenis(atividades,gear,config,minPar=3){
+  const lista=stvLista(atividades),gs=stvMapaGear(lista,gear),cfgT=(config&&config.tenis)||{};
+  const faixas={}; // faixa → gearId → {seg,dist,n}
+  for(const a of lista){const id=stvId(a.gearId);const dist=stvNum(a.distanciaM),seg=stvNum(a.movingTime);if(!stvEhCorrida(a)||!id||dist<1000||seg<=0)continue;
+    const f=Math.round(Math.log(dist/1000)/Math.log(1.3));const fx=faixas[f]||(faixas[f]={});const t=fx[id]||(fx[id]={seg:0,dist:0,n:0});t.seg+=seg;t.dist+=dist;t.n++}
+  const ids=Object.keys(gs),pares=[];
+  for(let i=0;i<ids.length;i++)for(let j=i+1;j<ids.length;j++){
+    let soma=0,peso=0;
+    for(const f in faixas){const A=faixas[f][ids[i]],B=faixas[f][ids[j]];if(!A||!B)continue;const w=Math.min(A.n,B.n);
+      soma+=(stvPace(A.seg,A.dist)-stvPace(B.seg,B.dist))*60*w;peso+=w}
+    if(!peso)continue;
+    const dif=soma/peso; // positivo = i mais lento que j (s/km)
+    const [a,b]=dif<=0?[ids[i],ids[j]]:[ids[j],ids[i]];
+    pares.push({a,b,nomeA:stvNomeTenis(gs[a],cfgT[a]),nomeB:stvNomeTenis(gs[b],cfgT[b]),difSegKm:Math.round(Math.abs(dif)),n:peso})}
+  if(!pares.length)return null;
+  pares.sort((x,y)=>(y.n-x.n)||(y.difSegKm-x.difSegKm));
+  const p=pares.find(x=>x.n>=minPar);if(!p)return null; // amostra pequena não vira afirmação
+  const frase=p.difSegKm<2?'Corridas com '+p.nomeA+' e com '+p.nomeB+' têm pace médio praticamente igual em distâncias similares.'
+    :'Corridas com '+p.nomeA+' têm pace médio '+p.difSegKm+'s/km mais rápido que com '+p.nomeB+' em distâncias similares.';
+  return {frase,pares}}
+
+// [{mes, [gearId]:km}] nos últimos `meses` (inclui o mês de referência)
+function stvKmPorTenisMensal(atividades,gear,config,meses=12,hojeStr){
+  const lista=stvLista(atividades),gs=stvMapaGear(lista,gear);
+  const ref=(stvDiaValido(hojeStr)?hojeStr:stvUltimoDia(lista)).slice(0,7);if(!ref)return [];
+  const n=Math.max(1,stvNum(meses)|0),out=[],idx={};
+  for(let i=n-1;i>=0;i--){const mes=stvMesMais(ref,-i);const linha={mes};for(const id in gs)linha[id]=0;idx[mes]=linha;out.push(linha)}
+  for(const a of lista){const id=stvId(a.gearId),d=stvDia(a);if(!stvEhCorrida(a)||!id||!d)continue;const l=idx[d.slice(0,7)];if(l)l[id]=+(l[id]+stvNum(a.distanciaM)/1000).toFixed(2)}
+  return out}
+
+// {[gearId]:[{dia,km}]} — km acumulado (só das atividades carregadas) ao longo do tempo
+function stvKmAcumuladoTenis(atividades,gear){
+  const lista=stvLista(atividades),gs=stvMapaGear(lista,gear),out={};
+  for(const id in gs)out[id]=[];
+  const corr=lista.filter(a=>stvEhCorrida(a)&&stvId(a.gearId)&&stvDia(a)).map(a=>({id:stvId(a.gearId),dia:stvDia(a),km:stvNum(a.distanciaM)/1000})).sort(stvOrdenaDia);
+  const acum={};
+  for(const c of corr){acum[c.id]=(acum[c.id]||0)+c.km;const s=out[c.id];const u=s[s.length-1];
+    if(u&&u.dia===c.dia)u.km=+acum[c.id].toFixed(2);else s.push({dia:c.dia,km:+acum[c.id].toFixed(2)})}
+  return out}
+
+// [{gearId,km,pct}] no mês; corrida sem tênis registrado entra como gearId null
+function stvUsoTenisMes(atividades,mesStr){
+  if(!stvMesValido(mesStr))return [];
+  const por={};let total=0;
+  for(const a of stvLista(atividades)){if(!stvEhCorrida(a)||stvDia(a).slice(0,7)!==mesStr)continue;const id=stvId(a.gearId),km=stvNum(a.distanciaM)/1000;if(!(km>0))continue;const k=id||'';por[k]=(por[k]||0)+km;total+=km}
+  return Object.keys(por).map(k=>({gearId:k||null,km:+por[k].toFixed(2),pct:total?Math.round(por[k]/total*100):0})).sort((x,y)=>y.km-x.km)}
+
+/* ---------- o "d" das regras ---------- */
+function stvDados(atividades,gear,config,hojeStr){
+  const lista=stvLista(atividades);
+  const hoje=stvDiaValido(hojeStr)?hojeStr:(stvUltimoDia(lista)||'');
+  const mesAtual=hoje.slice(0,7),mesAnterior=stvMesMais(mesAtual,-1);
+  // Mês parcial contra mês inteiro engana (dia 14 sempre "cai" 50%): o mês anterior
+  // é cortado no MESMO dia (1–14/09 contra 1–14/08). Um dia que não existe lá
+  // ('2026-02-31') é inofensivo: stvResumo compara as datas como texto.
+  const diaDoMes=hoje.slice(8,10);
+  const rMes=stvResumo(lista,mesAtual+'-01',hoje),rAnt=stvResumo(lista,mesAnterior+'-01',mesAnterior+'-'+diaDoMes);
+  const kmMesAtual=+rMes.kmCorrida.toFixed(1),kmMesAnterior=+rAnt.kmCorrida.toFixed(1);
+  const trechoMes=+diaDoMes>0?'dias 1 a '+(+diaDoMes):'';
+  const var_=stvVariacao(kmMesAtual,kmMesAnterior);
+  // tênis
+  const tenis=stvTenis(lista,gear,config,hoje),ativos=tenis.filter(t=>!t.aposentado);
+  const principal=ativos[0]||null;
+  const provas=ativos.filter(t=>t.tipo==='prova').sort((x,y)=>x.km-y.km),prova=provas[0]||null;
+  let parado=null;for(const t of ativos)if(t.diasSemUso!=null&&(!parado||t.diasSemUso>parado.diasSemUso))parado=t;
+  // recordes e proximidade de PR (últimos 30 dias, distâncias ≥ 1 km, só tentativas
+  // feitas DEPOIS do recorde vigente — comparar o PR com um esforço anterior dele
+  // mesmo inverteria a dica: "ficou a 11s do recorde" seria o dia em que o bateu)
+  const rec=stvRecordesNativos(lista),curva=stvCurva(rec),calc=stvRecordesCalculados(lista);
+  const d30=stvDiaMais(hoje,-30);let perto=null;
+  for(const a of lista){const efs=stvEsforcos(a),dia=stvDia(a);if(!efs.length||!dia||dia<d30||dia>hoje)continue;
+    for(const b of efs){const r=rec[b.tipo];if(!r||r.distM<1000||stvId(a.id)===r.atividadeId||dia<=r.dia)continue;
+      const razao=+b.seg/r.seg;if(!perto||razao<perto.razao)perto={razao,seg:+b.seg,pr:r.seg,dist:r.rotulo,dia}}}
+  // variação de ritmo nos últimos 30 dias (desvio-padrão do pace em min/km; precisa de 4 corridas)
+  const paces=lista.filter(a=>stvEhCorrida(a)&&stvDia(a)>=d30&&stvDia(a)<=hoje&&stvNum(a.distanciaM)>=1000).map(a=>stvPace(a.movingTime,a.distanciaM)).filter(p=>p!=null);
+  let desvioPaceMes=null;if(paces.length>=4){const m=stvMedia(paces);desvioPaceMes=+Math.sqrt(stvMedia(paces.map(p=>(p-m)*(p-m)))).toFixed(3)}
+  // semana atual (segunda até hoje)
+  const segunda=stvSegunda(hoje),rSem=stvResumo(lista,segunda,hoje);
+  // último longão (≥ 15 km)
+  let ultLongao='';for(const a of lista){if(stvEhCorrida(a)&&stvNum(a.distanciaM)>=15000){const d=stvDia(a);if(d&&d<=hoje&&d>ultLongao)ultLongao=d}}
+  // cadência: média dos últimos 30 dias (número cru do Strava) × melhor histórica em corrida ≥ 5 km
+  const cads=lista.filter(a=>stvEhCorrida(a)&&stvDia(a)>=d30&&stvDia(a)<=hoje&&stvNum(a.cadencia)>0).map(a=>+a.cadencia);
+  const cadenciaMedia=cads.length?Math.round(stvMedia(cads)):null;
+  // eficiência: últimos 30 dias × janela de 30 dias centrada 90 dias atrás
+  const efi=stvEficiencia(lista),d75=stvDiaMais(hoje,-75),d105=stvDiaMais(hoje,-105);
+  const iAgora=stvMedia(efi.filter(e=>e.dia>d30&&e.dia<=hoje).map(e=>e.indice)),iAntes=stvMedia(efi.filter(e=>e.dia>=d105&&e.dia<=d75).map(e=>e.indice));
+  const streak=stvStreak(lista,hoje);
+  return {
+    hoje,mesAtual,mesAnterior,
+    kmMesAtual,kmMesAnterior,pct:var_==null?null:Math.round(var_),trechoMes,
+    tenisPrincipal:principal?{nome:principal.nome,km:principal.km,pctVida:principal.pctVida,gearId:principal.gearId}:{nome:'',km:0,pctVida:0,gearId:null},
+    temTenisProva:!!prova,tenisProva:prova?prova.nome:'',kmProva:prova?prova.km:null,
+    melhorRecente:perto?perto.seg:Infinity,pr:perto?perto.pr:0,gap:perto?Math.round(perto.seg-perto.pr):null,dist:perto?perto.dist:'',diaMelhorRecente:perto?perto.dia:'',
+    maiorGapCurva:curva.insight?curva.insight.gapSeg:0,distGap:curva.insight?curva.insight.rotulo:'',gapFmt:curva.insight?stvFmtDur(curva.insight.gapSeg):'',
+    desvioPaceMes,corridasSemana:rSem.corridas,treinosSemana:rSem.treinos,diasTreinadosSemana:rSem.dias,
+    diasDesdeUltimoLongao:ultLongao?stvDiasEntre(ultLongao,hoje):null,ultimoLongao:ultLongao,
+    cadenciaMedia,cadenciaPR:calc.melhorCadencia5k?Math.round(calc.melhorCadencia5k.valor):null,
+    diasConsecutivos:streak,streak,
+    tenisParado:parado&&parado.diasSemUso>60?parado.nome:null,diasSemUso:parado?parado.diasSemUso:null,
+    indiceEficiencia:iAgora==null?null:+iAgora.toFixed(2),indiceEficiencia3MesesAtras:iAntes==null?null:+iAntes.toFixed(2),
+    recordes:rec,curva,calculados:calc,tenis}}
+
+/* ---------- motor de dicas ----------
+   Regra nova = mais um item aqui. `condicao` recebe o "d" de stvDados e pode
+   contar com os campos acima; guardas contra null ficam na própria condição
+   (null <= 0 é true em JS — por isso pr=0 e melhorRecente=Infinity quando não há). */
+const STV_REGRAS=[
+  {id:'volume_spike',condicao:d=>d.kmMesAnterior>0&&d.kmMesAtual>d.kmMesAnterior*1.15,titulo:'Aumento acelerado de volume',
+    texto:d=>'Volume subiu '+d.pct+'% em relação ao mesmo trecho do mês anterior'+(d.trechoMes?' ('+d.trechoMes+')':'')+'. A referência usual de segurança é até 10% ao mês.',prioridade:'alta'},
+  {id:'tenis_fim_vida',condicao:d=>!!d.tenisPrincipal&&d.tenisPrincipal.pctVida>0.90,titulo:'Tênis na faixa de troca',
+    texto:d=>d.tenisPrincipal.nome+' está com '+stvFmtN(d.tenisPrincipal.km)+' km, '+Math.round(d.tenisPrincipal.pctVida*100)+'% do limite configurado.',prioridade:'alta'},
+  {id:'tenis_prova_disponivel',condicao:d=>d.temTenisProva&&d.pr>0&&d.melhorRecente<=d.pr*1.05,titulo:'Momento para tentar PR',
+    texto:d=>'Você está a '+stvFmtDur(d.gap)+' do PR de '+d.dist+' e tem '+d.tenisProva+' com apenas '+stvFmtN(d.kmProva)+' km de uso.',prioridade:'alta'},
+  {id:'curva_desalinhada',condicao:d=>d.maiorGapCurva>120,titulo:d=>'Potencial nos '+d.distGap,
+    texto:d=>'Seu PR de '+d.distGap+' está '+d.gapFmt+' acima do que sua velocidade em outras distâncias projeta.',prioridade:'alta'},
+  {id:'so_ritmo_unico',condicao:d=>d.desvioPaceMes!=null&&d.desvioPaceMes<0.25,titulo:'Pouca variação de ritmo',
+    texto:'Quase todos os treinos no mesmo pace. Alternar entre rodagem leve e sessões mais intensas costuma destravar tempo em prova.',prioridade:'alta'},
+  /* Fala do MESMO PR de 'tenis_prova_disponivel' (≤3% cabe dentro dos ≤5% dela).
+     Com tênis de prova, o card de lá já diz o gap e ainda indica o tênis — então
+     esta cede a vez e não ocupa duas das quatro vagas com a mesma informação. */
+  {id:'pr_proximo',condicao:d=>!d.temTenisProva&&d.pr>0&&d.melhorRecente<=d.pr*1.03,titulo:'PR ao alcance',
+    texto:d=>'Você ficou a '+stvFmtDur(d.gap)+' do seu recorde de '+d.dist+'.',prioridade:'alta'},
+  {id:'sem_corrida_semana',condicao:d=>d.corridasSemana===0&&d.treinosSemana>2,titulo:'Semana sem corrida',
+    texto:'Nenhuma sessão de corrida nesta semana. A meta de 10K depende de frequência específica.',prioridade:'alta'},
+  {id:'sem_longao',condicao:d=>d.diasDesdeUltimoLongao>21,titulo:'Sem corrida longa há 3 semanas',
+    texto:'Corridas acima de 15 km sustentam a base aeróbica para 10K e meia.',prioridade:'media'},
+  {id:'cadencia_baixa',condicao:d=>d.cadenciaMedia!=null&&d.cadenciaMedia<84,titulo:'Cadência abaixo da sua média histórica',
+    texto:d=>'Cadência média caiu para '+d.cadenciaMedia+' spm. Sua melhor marca foi '+(d.cadenciaPR!=null?d.cadenciaPR:'—')+' spm.',prioridade:'media'},
+  {id:'sequencia_sem_descanso',condicao:d=>d.diasConsecutivos>12,titulo:'Sequência longa sem descanso',
+    texto:d=>d.diasConsecutivos+' dias seguidos de treino. Dias de recuperação fazem parte da adaptação.',prioridade:'media'},
+  {id:'tenis_parado',condicao:d=>!!d.tenisParado&&d.diasSemUso>60,titulo:'Tênis sem uso',
+    texto:d=>d.tenisParado+' não é usado há '+d.diasSemUso+' dias.',prioridade:'baixa'},
+  {id:'eficiencia_melhorando',condicao:d=>d.indiceEficiencia>0&&d.indiceEficiencia3MesesAtras>0&&d.indiceEficiencia<d.indiceEficiencia3MesesAtras*0.97,titulo:'Eficiência cardíaca em alta',
+    texto:'Você está sustentando o mesmo pace com FC média menor que há 3 meses.',prioridade:'baixa'}
+];
+const STV_PRIORIDADE={alta:0,media:1,baixa:2};
+// Dicas ativas: regra que dispara, não dispensada nos últimos 7 dias; ordem alta > média > baixa
+function stvDicas(d,dispensadas,hojeStr){
+  const dados=d&&typeof d==='object'?d:{},disp=dispensadas&&typeof dispensadas==='object'?dispensadas:{};
+  const out=[];
+  for(const r of STV_REGRAS){
+    let ok=false;try{ok=!!r.condicao(dados)}catch(e){ok=false}
+    if(!ok)continue;
+    const quando=disp[r.id];if(stvDiaValido(quando)&&stvDiaValido(hojeStr)){const dd=stvDiasEntre(quando,hojeStr);if(dd!=null&&dd>=0&&dd<7)continue}
+    let titulo='',texto='';
+    try{titulo=String(typeof r.titulo==='function'?r.titulo(dados):r.titulo);texto=String(typeof r.texto==='function'?r.texto(dados):r.texto)}catch(e){continue}
+    out.push({id:r.id,titulo,texto,prioridade:r.prioridade||'baixa'})}
+  return out.sort((x,y)=>(STV_PRIORIDADE[x.prioridade]??9)-(STV_PRIORIDADE[y.prioridade]??9))}
+
+/* ---------- meta ativa ---------- */
+function stvMetaAtiva(config,recordes,curva){
+  const metas=config&&Array.isArray(config.metas)?config.metas:[];
+  const meta=metas.find(m=>m&&m.ativa)||null;if(!meta)return null;
+  const distM=+meta.distanciaM,alvo=+meta.tempoAlvoSeg;if(!(distM>0)||!(alvo>0))return null;
+  const km=distM/1000;
+  // casa a distância da meta com um best effort do Strava (tolerância de 1%)
+  const def=STV_DISTANCIAS.find(d=>Math.abs(d.distM-distM)/d.distM<0.01)||null;
+  const rec=def&&recordes&&typeof recordes==='object'?recordes[def.tipo]:null;
+  const prAtual=rec&&+rec.seg>0?+rec.seg:null;
+  const ref=+meta.tempoRefInicialSeg>0?+meta.tempoRefInicialSeg:prAtual;
+  const linha=def&&curva&&Array.isArray(curva.linhas)?curva.linhas.find(l=>l&&l.tipo===def.tipo):null;
+  return {meta,tipo:def?def.tipo:null,rotulo:def?def.rotulo:stvFmtKm(distM),
+    prAtual,paceAlvo:alvo/60/km,paceAtual:prAtual!=null?prAtual/60/km:null,
+    gapSegKm:prAtual!=null?Math.round((prAtual-alvo)/km):null,gapTotalSeg:prAtual!=null?Math.round(prAtual-alvo):null,
+    pct:prAtual!=null&&ref?Math.round(stvProgressoMeta(prAtual,alvo,ref)):0,
+    projecaoCurva:linha&&linha.projecao!=null?linha.projecao:null,
+    precisa5k:Math.round(stvRiegel(alvo,distM,5000)),
+    atingida:prAtual!=null&&prAtual<=alvo,diaPR:rec?rec.dia:'',atividadeIdPR:rec?rec.atividadeId:null}}
+
+/* ===================== STRAVA — tela, gaveta, botão e gráficos =====================
+   Tudo aqui é tela: usa só o contrato de strava_calc.js (stv*) e os helpers do app
+   (el, esc, bloco, cab, acao, seletor, kpi, ranking, abrirModal, campos, tela,
+   irTela, filtro, E, salvar, uid, hoje, dataLocal, fmtDataAno, apiSync, temSessao).
+   Estado de UI mora em filtro.strava*; configuração pessoal (tênis, metas, dicas
+   dispensadas) mora em E.strava via stravaConfig() + salvar(). Nenhum dado pessoal
+   fica no código: tudo chega pelo servidor (stravaLer) ou pelo estado do usuário.
+   Links externos: só https://www.strava.com/activities/<id numérico>. */
+
+
+/* ---------- carga e cache (1 h em memória) ---------- */
+let stravaCache=null,stravaPedido=null,stravaFalhaEm=0;
+const STRAVA_CACHE_MS=36e5;
+const stravaCacheValido=()=>!!(stravaCache&&Date.now()-stravaCache.em<STRAVA_CACHE_MS);
+/* Chegar até o pedido significa uma de duas coisas: não há cache válido (primeira
+   abertura ou a hora venceu) ou o Léo clicou em "Atualizar"/"Tentar de novo". Nos
+   dois casos o servidor busca no Strava o que há de novo ANTES de devolver
+   (`sincronizar:true`, prazo curto no servidor). Com cache válido nem sai pedido. */
+function stravaCarregar(forcar){
+  if(!forcar&&stravaCacheValido())return Promise.resolve(stravaCache);
+  // prévia local (sem crachá) não bate na função de produção
+  if(typeof naNuvem==='function'&&!naNuvem())return Promise.reject(new Error('Rodando no computador, fora do site: os dados do Strava só aparecem na Central publicada.'));
+  if(stravaPedido)return stravaPedido;
+  stravaPedido=apiSync('POST',{acao:'stravaLer',sincronizar:true}).then(r=>{
+    if(!r||!Array.isArray(r.atividades))throw new Error('o servidor não devolveu a lista de atividades');
+    const atividades=r.atividades.filter(a=>a&&typeof a==='object')
+      .sort((x,y)=>String(y.inicioLocal||'').localeCompare(String(x.inicioLocal||'')));
+    stravaCache={atividades,gear:Array.isArray(r.gear)?r.gear.filter(g=>g&&typeof g==='object'):[],atualizadoEm:r.atualizadoEm||'',sync:r.sync&&typeof r.sync==='object'?r.sync:null,em:Date.now()};
+    stravaFalhaEm=0;return stravaCache;
+  }).catch(e=>{stravaFalhaEm=Date.now();throw new Error('Não foi possível carregar os dados do Strava'+(e&&e.message?': '+e.message:'.'))})
+    .finally(()=>{stravaPedido=null});
+  return stravaPedido;
+}
+// E.strava com defaults; não salva sozinho (quem muda algo chama salvar()).
+function stravaConfig(){
+  if(!E.strava||typeof E.strava!=='object'||Array.isArray(E.strava))E.strava={};
+  const s=E.strava;
+  if(!s.tenis||typeof s.tenis!=='object'||Array.isArray(s.tenis))s.tenis={};
+  if(!Array.isArray(s.metas))s.metas=[];
+  if(!s.dicasDispensadas||typeof s.dicasDispensadas!=='object'||Array.isArray(s.dicasDispensadas))s.dicasDispensadas={};
+  /* A meta que o Léo pediu nasce pronta, UMA vez: 10 km abaixo de 49 min. A
+     referência inicial NÃO vai no código (este HTML é público e não leva tempo
+     real): nasce vazia e é congelada com o PR que vem do servidor, na primeira
+     vez que a tela tiver recordes. Apagou? Não volta sozinha (metasSemeadas). */
+  if(!s.metas.length&&!s.metasSemeadas){s.metas.push({id:uid(),nome:'10K sub-49min',distanciaM:10000,tempoAlvoSeg:2940,tempoRefInicialSeg:null,ativa:true,criadaEm:hoje()});s.metasSemeadas=true}
+  return s;
+}
+/* Congela a referência inicial das metas com o PR real assim que ele existe.
+   Devolve true quando mudou alguma coisa (quem chama decide salvar). */
+function stravaCongelarRef(cfg,recordes){
+  let mudou=false;
+  ((cfg&&cfg.metas)||[]).forEach(m=>{
+    if(!m||+m.tempoRefInicialSeg>0)return;
+    const distM=+m.distanciaM,def=distM>0?STV_DISTANCIAS.find(x=>Math.abs(x.distM-distM)/x.distM<0.01):null;
+    const pr=def&&recordes&&typeof recordes==='object'?recordes[def.tipo]:null;
+    if(pr&&+pr.seg>0){m.tempoRefInicialSeg=+pr.seg;mudou=true}
+  });
+  return mudou;
+}
+
+/* ---------- volta do OAuth e conexão com o Strava ---------- */
+/* O servidor, quando a autorização falha, devolve o navegador para
+   …/vida-leo/?strava_erro=<motivo>#strava. Lemos o motivo UMA vez, tiramos o
+   parâmetro da URL e guardamos o aviso até o Léo fechar. */
+let stravaAvisoVolta=(()=>{try{const q=new URLSearchParams(location.search).get('strava_erro');if(!q)return '';history.replaceState(null,'',location.pathname+location.hash);return String(q).slice(0,40)}catch(_){return ''}})();
+function stravaTextoVolta(m){
+  m=String(m||'');
+  if(m==='negado')return 'Você não autorizou o acesso no Strava, então nada foi conectado. Para ligar, clique em “Conectar ao Strava” e aceite na tela do Strava.';
+  if(m==='escopo')return 'A autorização saiu sem “Ver atividades privadas”: os treinos privados não vão aparecer. Para incluir, conecte de novo e deixe essa opção marcada.';
+  if(m.indexOf('troca')===0)return 'O Strava recusou a autorização'+(m.length>6?' (código '+m.slice(6)+')':'')+'. Confira as chaves do aplicativo no servidor e tente de novo.';
+  if(m==='config')return 'Faltam as chaves do Strava no servidor, então a conexão nem começa. É uma configuração de uma vez só.';
+  if(m==='rede')return 'Não foi possível falar com o Strava agora. Tente de novo em alguns minutos.';
+  if(m==='banco')return 'A autorização voltou do Strava, mas não deu para guardar aqui. Tente conectar de novo.';
+  return 'A conexão com o Strava não foi concluída (motivo: '+m+').';
+}
+/* Botão que começa a conexão: o servidor monta a URL do Strava (com um crachá
+   curto no `state`) e esta mesma aba navega para lá; o retorno traz o Léo de volta. */
+function stravaBtnConectar(txt){
+  const b=acao(txt||'Conectar ao Strava',()=>{});
+  b.onclick=()=>{
+    b.disabled=true;
+    Promise.resolve().then(()=>apiSync('POST',{acao:'stravaAutorizarUrl'})).then(r=>{
+      const u=String((r&&r.url)||'');
+      if(!/^https:\/\/(www\.)?strava\.com\//.test(u))throw new Error('o servidor não devolveu o endereço do Strava');
+      location.assign(u);
+    }).catch(e=>{b.disabled=false;alert('Não foi possível abrir a conexão com o Strava'+(e&&e.message?': '+e.message:'.'))});
+  };
+  return b;
+}
+function stravaCartaoConectar(){
+  const c=el('<div class="stv-conectar"><b>Conectar ao Strava</b><p>Esta Central ainda não tem autorização para ler os seus treinos. É uma vez só: depois os dados passam a chegar sozinhos.</p><div class="stv-acoes"></div></div>');
+  c.querySelector('.stv-acoes').appendChild(stravaBtnConectar());
+  return c;
+}
+function stravaCartaoVolta(refazer){
+  const c=el(`<div class="stv-alerta a" role="alert">${esc(stravaTextoVolta(stravaAvisoVolta))}<div class="stv-acoes"></div></div>`);
+  const ac=c.querySelector('.stv-acoes');
+  ac.appendChild(stravaBtnConectar('Tentar conectar de novo'));
+  ac.appendChild(acao('Entendi',()=>{stravaAvisoVolta='';refazer()},'ghost'));
+  return c;
+}
+/* O que o servidor fez na última sincronização, em português direto. */
+function stravaTextoSync(sy,res,precisa){
+  if(precisa)return 'O Strava ainda não está conectado a esta Central.';
+  if(!sy)return '';
+  if(res){
+    if(res.erro)return 'Não deu para atualizar agora: '+res.erro;
+    if(res.emAndamento)return 'Outra atualização já estava rodando; tente de novo em instantes.';
+    const p=[],n=+res.novas||0,at=+res.atualizadas||0;
+    if(n)p.push(stravaPlural(n,'treino novo','treinos novos'));
+    if(at)p.push(stravaPlural(at,'treino atualizado','treinos atualizados'));
+    if(!p.length)p.push('nada novo desde a última vez');
+    if(res.orcamentoEsgotado)p.push('o Strava pediu uma pausa; tente de novo em alguns minutos');
+    else if(res.parcial)p.push('faltou um pedaço: continua na próxima atualização');
+    return p.join(' · ');
+  }
+  if(sy.emAndamento)return 'Atualização em andamento no servidor.';
+  if(sy.ultimoErro)return 'Na última tentativa: '+sy.ultimoErro;
+  return '';
+}
+
+/* ---------- miúdos de tela (prefixo strava*, para não colidir com o calc) ---------- */
+const STRAVA_MESES=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const STRAVA_MOD_NOME={corrida:'Corrida',musculacao:'Musculação',escada:'Stair Stepper',outros:'Outros'};
+const stravaDiaOk=d=>/^\d{4}-\d{2}-\d{2}$/.test(String(d||''));
+const stravaDiaNum=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5;
+const stravaNumDia=n=>new Date(Math.round(n)*864e5).toISOString().slice(0,10);
+const stravaDiaMais=(d,n)=>stravaDiaOk(d)?stravaNumDia(stravaDiaNum(d)+n):'';
+const stravaDiasEntre=(a,b)=>stravaDiaOk(a)&&stravaDiaOk(b)?Math.round(stravaDiaNum(b)-stravaDiaNum(a)):null;
+const stravaMesMais=(m,n)=>{const k=+m.slice(0,4)*12+(+m.slice(5,7)-1)+n;return Math.floor(k/12)+'-'+String(k%12+1).padStart(2,'0')};
+const stravaSegunda=d=>stravaDiaOk(d)?stravaDiaMais(d,-((new Date(Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))).getUTCDay()+6)%7)):'';
+const stravaMesRot=m=>/^\d{4}-\d{2}/.test(String(m||''))?STRAVA_MESES[+m.slice(5,7)-1]+'/'+m.slice(0,4):'—';
+const stravaMesCurto=m=>/^\d{4}-\d{2}/.test(String(m||''))?STRAVA_MESES[+m.slice(5,7)-1]:'';
+const stravaN=(n,c=0)=>Number.isFinite(+n)&&n!==null&&n!==''?(+n).toLocaleString('pt-BR',{minimumFractionDigits:c,maximumFractionDigits:c}):'—';
+const stravaKcal=n=>stravaN(Math.round(+n||0))+' kcal';
+const stravaKmN=km=>stravaN(km,km>=100?0:1)+' km';
+function stravaDur(seg){const s=Math.round(+seg||0),h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?h+'h '+String(m).padStart(2,'0')+'min':m+' min'}
+const stravaMin=min=>min>=120?stravaN(min/60,1)+' h':stravaN(min,0)+' min';
+const stravaQuando=a=>{const s=String((a&&a.inicioLocal)||''),d=stvDia(a);return d?fmtDataAno(d)+(s.length>=16?' · '+s.slice(11,16):''):'—'};
+const stravaPlural=(n,um,varios)=>stravaN(n)+' '+(n===1?um:varios);
+function stravaModalidade(a){if(stvEhCorrida(a))return 'corrida';const t=a&&a.tipo;if(t==='WeightTraining')return 'musculacao';if(t==='StairStepper')return 'escada';return 'outros'}
+function stravaIcone(a){return stvIconeModalidade(a&&a.tipo)}
+const stravaIdOk=id=>/^\d+$/.test(String(id==null?'':id));
+// A única porta para fora: atividade do Strava por id numérico, em aba nova.
+function stravaAbrirAtividade(id){if(!stravaIdOk(id))return;window.open('https://www.strava.com/activities/'+String(id),'_blank','noopener')}
+function stravaBtnVer(id,txt){const b=acao(txt||'Ver atividade →',()=>stravaAbrirAtividade(id),'ghost');if(!stravaIdOk(id)){b.disabled=true;b.title='Esta atividade não tem link'}return b}
+const stravaChip=(txt,cl)=>`<span class="chip stv-chip-${cl||'n'}">${esc(txt)}</span>`;
+// chip de variação: '+12% em km vs ago'; sem base de comparação mostra `semBase`
+function stravaChipVar(pct,rot,semBase){if(pct==null||!Number.isFinite(+pct))return stravaChip(semBase||'sem comparação','n');const p=Math.round(+pct);return stravaChip((p>0?'+':'')+stravaN(p)+'% '+rot,p>0?'v':p<0?'r':'n')}
+const stravaMapaTenis=tenis=>{const m={};(tenis||[]).forEach(t=>{if(t&&t.gearId!=null)m[String(t.gearId)]=t.nome||''});return m};
+// Só aceita m:ss ou h:mm:ss. Número solto ("49") seria ambíguo — 49 s ou 49 min? —
+// e virava meta de 0:49 sem ninguém avisar; agora o formulário pede o formato.
+function stravaParseTempo(s){s=String(s||'').trim();if(!s)return null;const p=s.split(':').map(x=>x.trim());if(p.length<2||p.length>3||!/^\d{1,3}$/.test(p[0])||p.slice(1).some(x=>!/^\d{1,2}$/.test(x)||+x>59))return null;const n=p.map(Number);const seg=p.length===3?n[0]*3600+n[1]*60+n[2]:n[0]*60+n[1];return seg>0?seg:null}
+function stravaSincTexto(iso){const d=iso?new Date(iso):null;if(!d||isNaN(d))return 'Sem data de sincronização';return 'Dados do Strava de '+fmtDataAno(dataLocal(d))+' às '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+const stravaVazio=txt=>el(`<div class="vazio">${esc(txt)}</div>`);
+const stravaNota=txt=>el(`<div class="stv-nota">${esc(txt)}</div>`);
+// re-renderiza o contêiner de abas em que `cx` está (gaveta ou tela)
+const stravaR=cx=>()=>{const raiz=cx.closest('.stv-abas-cx');if(raiz&&raiz._stravaRender)raiz._stravaRender();else tela()};
+function stravaAtualizarGaveta(){const g=document.getElementById('stravaGaveta');if(g&&g.classList.contains('aberta'))stravaAbas(g.querySelector('.stv-abas-cx'),{largo:false})}
+
+/* ---------- tela cheia (entrada do menu) ---------- */
+function vStrava(m){
+  m.appendChild(cab('Strava','Corridas, recordes, tendências e tênis, direto do Strava.'));
+  const cx=el('<div class="stv-tela"></div>');m.appendChild(cx);
+  stravaAbas(cx,{largo:true});
+}
+
+/* ---------- abas (servem à gaveta e à tela) ---------- */
+const STRAVA_ABAS=[['resumo','Resumo'],['recordes','Recordes'],['tendencias','Tendências'],['tenis','Tênis']];
+function stravaAbas(cx,{largo=false}={}){
+  const ativa=STRAVA_ABAS.some(a=>a[0]===filtro.stravaAba)?filtro.stravaAba:'resumo';filtro.stravaAba=ativa;
+  const antigo=cx.querySelector('.stv-corpo'),rolagem=antigo&&cx._stravaAba===ativa?antigo.scrollTop:0;cx._stravaAba=ativa;
+  cx.classList.add('stv-abas-cx');cx._stravaRender=()=>stravaAbas(cx,{largo});
+  const nav=el('<nav class="stv-abas" aria-label="Seções do Strava"></nav>');
+  STRAVA_ABAS.forEach(([id,nome])=>{const b=el(`<button type="button"${id===ativa?' class="on" aria-current="page"':''}>${esc(nome)}</button>`);b.onclick=()=>{filtro.stravaAba=id;stravaAbas(cx,{largo})};nav.appendChild(b)});
+  const sinc=el('<div class="stv-sinc-linha"></div>'),corpo=el(`<div class="stv-corpo${largo?' stv-largo':''}"></div>`);
+  cx.replaceChildren(nav,sinc,corpo);
+  const carregando=txt=>corpo.replaceChildren(stravaVazio(txt||'Carregando dados do Strava…'));
+  const mostrar=dados=>{
+    if(!corpo.isConnected)return;
+    const sy=dados&&dados.sync&&typeof dados.sync==='object'?dados.sync:null;
+    const res=sy&&sy.resultado&&typeof sy.resultado==='object'?sy.resultado:null;
+    const precisa=!!(sy&&(sy.autorizado===false||(res&&res.precisaAutorizar)));
+    const nota=stravaTextoSync(sy,res,precisa),ruim=precisa||!!(res&&res.erro);
+    sinc.replaceChildren(el(`<span>${esc(stravaSincTexto(dados.atualizadoEm))}</span>`));
+    if(nota)sinc.appendChild(el(`<span class="stv-sinc-nota${ruim?' ruim':''}">${esc(nota)}</span>`));
+    sinc.appendChild(acao('Atualizar',()=>{carregando('Atualizando…');stravaCarregar(true).then(mostrar).catch(falhar)},'ghost'));
+    corpo.replaceChildren();
+    if(stravaAvisoVolta)corpo.appendChild(stravaCartaoVolta(()=>mostrar(dados)));
+    if(precisa)corpo.appendChild(stravaCartaoConectar());
+    const f={resumo:stravaAbaResumo,recordes:stravaAbaRecordes,tendencias:stravaAbaTendencias,tenis:stravaAbaTenis}[ativa];
+    try{f(corpo,dados,largo)}
+    catch(e){
+      const nomeAba=(STRAVA_ABAS.find(a=>a[0]===ativa)||[])[1]||ativa;
+      if(typeof console!=='undefined'&&console.error)console.error('strava/'+ativa,e);
+      corpo.appendChild(el(`<p class="aviso" role="alert">Não foi possível montar a aba ${esc(nomeAba)} com os dados recebidos: ${esc((e&&e.message)||String(e))}</p>`));
+    }
+    if(!largo)corpo.scrollTop=rolagem;
+    stravaMontarBotao();
+  };
+  const falhar=e=>{
+    if(!corpo.isConnected)return;
+    const cxErro=el(`<div class="stv-erro"><p class="aviso" role="alert">${esc((e&&e.message)||'Não foi possível carregar os dados do Strava.')}</p></div>`);
+    cxErro.appendChild(acao('Tentar de novo',()=>{carregando();stravaCarregar(true).then(mostrar).catch(falhar)}));
+    corpo.replaceChildren(cxErro);
+  };
+  if(!stravaCacheValido())carregando();
+  stravaCarregar().then(mostrar).catch(falhar);
+}
+
+/* ================= ABA 1 — RESUMO ================= */
+function stravaAbaResumo(cx,dados,largo){
+  const h=hoje(),cfg=stravaConfig(),A=dados.atividades||[],G=dados.gear||[],r=stravaR(cx);
+  if(!A.length){cx.appendChild(stravaVazio('Ainda não há treinos carregados do Strava. Sincronize e volte aqui.'));return}
+  const tenis=stvTenis(A,G,cfg,h),nomeT=stravaMapaTenis(tenis);
+  const rec=stvRecordesNativos(A),curva=stvCurva(rec),d=stvDados(A,G,cfg,h);
+  // referência inicial da meta nunca nasce no código: congela aqui, com o PR de verdade
+  if(stravaCongelarRef(cfg,rec))salvar();
+  const mes=h.slice(0,7),ano=h.slice(0,4),mesAnt=stravaMesMais(mes,-1),fimMesAnt=stravaDiaMais(mes+'-01',-1);
+  const rHoje=stvResumo(A,h,h),rMes=stvResumo(A,mes+'-01',h),rAnt=stvResumo(A,mesAnt+'-01',fimMesAnt);
+  const rAno=stvResumo(A,ano+'-01-01',h),rAnoAnt=stvResumo(A,(+ano-1)+'-01-01',(+ano-1)+h.slice(4));
+
+  /* 1.1 último treino */
+  const u=A[0],mod=stravaModalidade(u),mets=[];
+  if(mod==='corrida')mets.push(['Distância',stvFmtKm(u.distanciaM)],['Pace médio',stvFmtPace(stvPace(u.movingTime,u.distanciaM))],['Tempo',stvFmtTempo(u.movingTime)],['Calorias',stravaKcal(u.calorias)],['Tênis',nomeT[String(u.gearId)]||'sem registro']);
+  else if(mod==='escada')mets.push(['Duração',stravaDur(u.movingTime)],['Calorias',stravaKcal(u.calorias)],['Cadência',u.cadencia!=null&&+u.cadencia>0?stravaN(u.cadencia,0)+' spm':'—']);
+  else{mets.push(['Duração',stravaDur(u.movingTime)],['Calorias',stravaKcal(u.calorias)]);if(+u.distanciaM>0)mets.push(['Distância',stvFmtKm(u.distanciaM)])}
+  if(+u.fcMedia>0)mets.push(['FC média',stravaN(u.fcMedia,0)+' bpm']);
+  const ult=el(`<div class="stv-ultimo"><div class="stv-titulo"><span>${stravaIcone(u)}</span><span>${esc(u.nome||STRAVA_MOD_NOME[mod])}</span>${+u.prCount>0?`<span class="stv-selo">PR ×${esc(stravaN(u.prCount))}</span>`:''}</div>
+    <div class="stv-quando">${esc(STRAVA_MOD_NOME[mod])} · ${esc(stravaQuando(u))}${u.local?' · '+esc(u.local):''}</div>
+    <div class="stv-metricas">${mets.map(([k,v])=>`<div><small>${esc(k)}</small>${esc(v)}</div>`).join('')}</div><div class="stv-acoes"></div></div>`);
+  ult.querySelector('.stv-acoes').appendChild(stravaBtnVer(u.id));
+  cx.appendChild(bloco('stv-ultimo','Último treino','',ult));
+
+  /* 1.2 KPIs hoje / mês / ano */
+  const treinou=rHoje.treinos>0;
+  const subHoje=[stravaKcal(rHoje.calorias)].concat(rHoje.corridas?[stravaKmN(rHoje.kmCorrida)]:[]).concat([treinou?'treinou hoje':'ainda não treinou']).join(' · ');
+  const subMes=esc([stravaPlural(rMes.treinos,'treino','treinos'),stravaKcal(rMes.calorias),stravaDur(rMes.horas*3600),stravaPlural(rMes.prs,'PR','PRs')].join(' · '))+'<br>'+stravaChipVar(stvVariacao(rMes.kmCorrida,rAnt.kmCorrida),'em km vs '+stravaMesCurto(mesAnt),'sem corrida em '+stravaMesCurto(mesAnt)+' para comparar');
+  const subAno=esc([stravaPlural(rAno.treinos,'treino','treinos'),stravaKcal(rAno.calorias),stravaPlural(rAno.prs,'PR','PRs')].join(' · '))+'<br>'+stravaChipVar(stvVariacao(rAno.kmCorrida,rAnoAnt.kmCorrida),'em km vs mesmo período de '+(+ano-1),'sem corrida até esta data em '+(+ano-1)+' para comparar');
+  const kp=el('<div class="grade"></div>');
+  kp.innerHTML=kpi('Hoje',esc(stravaPlural(rHoje.treinos,'treino','treinos')),esc(subHoje),treinou?'v':'a')
+    +kpi('Mês · '+esc(stravaMesRot(mes)),esc(stravaKmN(rMes.kmCorrida)),subMes,'')
+    +kpi('Ano · '+esc(ano),esc(stravaKmN(rAno.kmCorrida)),subAno,'');
+  cx.appendChild(bloco('stv-kpis','Hoje, mês e ano','km de corrida; calorias de todas as modalidades',kp));
+
+  /* 1.3 meta ativa */
+  const meta=stvMetaAtiva(cfg,rec,curva),cxMeta=el('<div class="stv-meta"></div>');
+  if(!meta)cxMeta.appendChild(el('<div class="vazio">Nenhuma meta ativa. Crie uma em “Metas”.</div>'));
+  else{
+    const m=meta.meta,alvo=+m.tempoAlvoSeg,ref=+m.tempoRefInicialSeg>0?+m.tempoRefInicialSeg:null;
+    const gap=meta.gapSegKm==null?'ainda sem tempo nessa distância':meta.gapTotalSeg>0?stravaN(meta.gapSegKm)+' s/km · '+stvFmtTempo(meta.gapTotalSeg)+' no total':'abaixo do alvo em '+stvFmtTempo(-meta.gapTotalSeg);
+    cxMeta.innerHTML=`<div class="stv-titulo"><span>${stvIcone('meta')}</span><span>${esc(m.nome||meta.rotulo)}</span><span class="cresce"></span>${meta.atingida?stravaChip('meta batida','v'):''}</div>
+      <div class="stv-meta-tab"><span>Distância</span><span>${esc(meta.rotulo)} · alvo ${esc(stvFmtTempo(alvo))}</span>
+      <span>Pace alvo</span><span>${esc(stvFmtPace(meta.paceAlvo))}</span>
+      <span>PR atual</span><span>${meta.prAtual!=null?esc(stvFmtTempo(meta.prAtual)+' ('+stvFmtPace(meta.paceAtual)+')'+(meta.diaPR?' · '+fmtDataAno(meta.diaPR):'')):'ainda sem tempo nessa distância'}</span>
+      <span>Gap</span><span>${esc(gap)}</span></div>
+      <div class="stv-prog" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${meta.pct}"><div class="b" style="width:${meta.pct}%"></div></div>
+      <div class="stv-prog-rot">${meta.pct}% do caminho${ref?' · referência inicial '+esc(stvFmtTempo(ref)):' · sem referência inicial, o progresso começa em 0%'}</div>
+      ${meta.projecaoCurva!=null?`<div class="stv-nota">Projeção pela curva das outras distâncias: ~${esc(stvFmtTempo(meta.projecaoCurva))}</div>`:''}
+      ${meta.tipo!=='Fastest5k'&&meta.precisa5k?`<div class="stv-nota">Para ${esc(stvFmtTempo(alvo))} nos ${esc(meta.rotulo)}, o 5K precisa chegar a ~${esc(stvFmtTempo(meta.precisa5k))}.</div>`:''}
+      <div class="stv-acoes"></div>`;
+    if(meta.atividadeIdPR)cxMeta.querySelector('.stv-acoes').appendChild(stravaBtnVer(meta.atividadeIdPR,'Ver corrida do PR →'));
+  }
+  const acMeta=cxMeta.querySelector('.stv-acoes')||cxMeta.appendChild(el('<div class="stv-acoes"></div>'));
+  acMeta.appendChild(acao('Metas',()=>stravaModalMetas(rec),'ghost'));
+  cx.appendChild(bloco('stv-meta','Meta ativa','',cxMeta));
+
+  /* 1.4 volume por modalidade (mês atual) */
+  const pm=rMes.porModalidade,itensVol=[];
+  if(pm.corrida.n)itensVol.push({ic:stvIcone('corrida')+' ',r:'Corrida · '+stravaKmN(pm.corrida.km)+' · '+stravaPlural(pm.corrida.n,'corrida','corridas'),v:pm.corrida.kcal});
+  if(pm.musculacao.n)itensVol.push({ic:stvIcone('musculacao')+' ',r:'Musculação · '+stravaPlural(pm.musculacao.n,'sessão','sessões'),v:pm.musculacao.kcal});
+  if(pm.escada.n)itensVol.push({ic:stvIcone('escada')+' ',r:'Stair Stepper · '+stravaPlural(pm.escada.n,'sessão','sessões'),v:pm.escada.kcal});
+  if(pm.outros.n)itensVol.push({ic:stvIcone('outros')+' ',r:'Outros · '+stravaPlural(pm.outros.n,'sessão','sessões'),v:pm.outros.kcal});
+  const vol=el('<div></div>');
+  vol.innerHTML=itensVol.length?ranking(itensVol,{fmt:stravaKcal,max:4,mostraPct:true}):'<div class="vazio">Nenhum treino neste mês ainda.</div>';
+  cx.appendChild(bloco('stv-volume','Volume por modalidade','mês atual · barra = calorias e % do total',vol));
+
+  /* 1.5 últimas 7 atividades */
+  const rol=el('<ul class="stv-rol"></ul>');
+  A.slice(0,7).forEach(a=>{
+    const mo=stravaModalidade(a),dia=stvDia(a),tn=nomeT[String(a.gearId)];
+    const principal=mo==='corrida'?stvFmtKm(a.distanciaM):stravaDur(a.movingTime);
+    const sec=[stravaKcal(a.calorias)].concat(mo==='corrida'?[stvFmtPace(stvPace(a.movingTime,a.distanciaM))]:[]).join(' · ');
+    const b=el(`<button type="button" class="stv-linha" title="Abrir no Strava"><span class="ic">${stravaIcone(a)}</span><span class="nm">${esc(a.nome||STRAVA_MOD_NOME[mo])}<small>${esc(dia?fmtDataAno(dia):'—')}${tn?' · '+stvIcone('tenis')+' '+esc(tn):''}</small></span><span class="vl">${esc(principal)}<small>${esc(sec)}</small></span>${+a.prCount>0?'<span class="stv-selo">PR</span>':''}</button>`);
+    if(stravaIdOk(a.id))b.onclick=()=>stravaAbrirAtividade(a.id);else{b.disabled=true;b.title='Esta atividade não tem link'}
+    const li=el('<li></li>');li.appendChild(b);rol.appendChild(li);
+  });
+  cx.appendChild(bloco('stv-recentes','Atividades recentes','clique abre no Strava',rol));
+
+  /* 1.6 streak e destaques */
+  const streak=stvStreak(A,h),segunda=stravaSegunda(h);
+  const diasSemana=new Set(A.map(stvDia).filter(x=>x&&x>=segunda&&x<=h)).size;
+  let maiorMes=null;A.forEach(a=>{if(stvEhCorrida(a)&&stvDia(a).slice(0,7)===mes&&(!maiorMes||+a.distanciaM>+maiorMes.distanciaM))maiorMes=a});
+  const dest=el(`<div class="stv-destaques">
+    <div class="stv-destaque">${stvIcone('fogo')} <b>${esc(stravaPlural(streak,'dia','dias'))}</b><small>${streak===1?'seguido com treino':'seguidos com treino'}</small></div>
+    <div class="stv-destaque">${stvIcone('pr')} <b>${maiorMes?esc(stvFmtKm(maiorMes.distanciaM)):'—'}</b><small>${maiorMes?'maior corrida do mês · '+esc(fmtDataAno(stvDia(maiorMes))):'nenhuma corrida no mês'}</small></div>
+    <div class="stv-destaque">${stvIcone('medalha')} <b>${esc(stravaPlural(rMes.prs,'PR','PRs'))}</b><small>no mês</small></div>
+    <div class="stv-destaque">${stvIcone('calendario')} <b>${esc(stravaN(diasSemana))} de 7</b><small>dias com treino nesta semana</small></div></div>`);
+  cx.appendChild(bloco('stv-destaques','Sequência e destaques','',dest));
+
+  /* dicas */
+  stravaMontarDicas(cx,d,cfg,h,r);
+}
+
+/* motor de exibição das dicas: máx. 4 por prioridade, "ver todas", ✕ dispensa por 7 dias */
+function stravaMontarDicas(cx,d,cfg,h,r){
+  const todas=stvDicas(d,cfg.dicasDispensadas,h),verTodas=!!filtro.stravaDicasTodas,lista=verTodas?todas:todas.slice(0,4);
+  const cxD=el('<div></div>'),ul=el('<div class="stv-dicas"></div>');
+  const ROT={alta:'prioridade alta',media:'prioridade média',baixa:'prioridade baixa'},CL={alta:'r',media:'a',baixa:'az'};
+  lista.forEach(t=>{
+    const p=ROT[t.prioridade]?t.prioridade:'baixa';
+    const c=el(`<div class="stv-dica stv-p-${p}"><b>${esc(t.titulo)}</b><p>${esc(t.texto)}</p>${stravaChip(ROT[p],CL[p])}<button type="button" class="stv-x" title="Dispensar por 7 dias" aria-label="Dispensar “${esc(t.titulo)}” por 7 dias">✕</button></div>`);
+    // relê o estado no clique: depois de adotar a nuvem, o `cfg` do render é um E velho
+    c.querySelector('.stv-x').onclick=()=>{stravaConfig().dicasDispensadas[t.id]=hoje();salvar();r()};
+    ul.appendChild(c);
+  });
+  const dispensadas=Object.keys(cfg.dicasDispensadas).filter(k=>{const n=stravaDiasEntre(cfg.dicasDispensadas[k],h);return n!=null&&n>=0&&n<7}).length;
+  if(!todas.length)ul.appendChild(stravaVazio('Nenhuma observação por agora.'+(dispensadas?' '+stravaPlural(dispensadas,'dica dispensada','dicas dispensadas')+' nos últimos 7 dias.':'')));
+  cxD.appendChild(ul);
+  if(todas.length>4)cxD.appendChild(acao(verTodas?'Ver menos':'Ver todas ('+todas.length+')',()=>{filtro.stravaDicasTodas=!verTodas;r()},'ghost'));
+  cxD.appendChild(el('<p class="stv-rodape">Observações geradas a partir dos dados registrados no Strava. Não constituem prescrição de treino nem orientação médica.</p>'));
+  cx.appendChild(bloco('stv-dicas','Observações',todas.length?stravaPlural(todas.length,'observação','observações'):'',cxD));
+}
+
+/* ================= ABA 2 — RECORDES ================= */
+function stravaAbaRecordes(cx,dados,largo){
+  const h=hoje(),cfg=stravaConfig(),A=dados.atividades||[],G=dados.gear||[],r=stravaR(cx);
+  if(!A.some(a=>stvEhCorrida(a)&&Array.isArray(a.bestEfforts)&&a.bestEfforts.length)){cx.appendChild(stravaVazio('Ainda não há corridas suficientes com recordes registrados no Strava.'));return}
+  const f=['todos','12m','ano'].includes(filtro.stravaRecFiltro)?filtro.stravaRecFiltro:'todos';
+  const desde=f==='12m'?stravaDiaMais(h,-365):f==='ano'?h.slice(0,4)+'-01-01':'';
+  const filtros=el('<div class="stv-filtros" role="group" aria-label="Período dos recordes"></div>');
+  [['todos','Todos'],['12m','Últimos 12 meses'],['ano','Este ano']].forEach(([id,n])=>{const b=acao(n,()=>{filtro.stravaRecFiltro=id;r()},id===f?'':'ghost');b.setAttribute('aria-pressed',String(id===f));filtros.appendChild(b)});
+  cx.appendChild(filtros);
+  const nomeT=stravaMapaTenis(stvTenis(A,G,cfg,h));
+  const recTodos=stvRecordesNativos(A),rec=desde?stvRecordesNativos(A,{desde}):recTodos,d30=stravaDiaMais(h,-30);
+  const tenisDe=gid=>gid!=null&&nomeT[String(gid)]?nomeT[String(gid)]:'sem tênis registrado';
+
+  /* 2.1 distâncias nativas, ordem crescente */
+  const grade=el('<div class="stv-recs"></div>');
+  STV_DISTANCIAS.forEach(dd=>{
+    const x=rec[dd.tipo];
+    if(!x){grade.appendChild(el(`<div class="stv-rec stv-apagado"><div class="stv-rec-cab">${stvIcone('medalha')} ${esc(dd.rotulo)}</div><div class="stv-rec-val">—</div><div class="stv-rec-sub">${recTodos[dd.tipo]?'sem registro no período':'distância nunca corrida'}</div></div>`));return}
+    const c=el(`<div class="stv-rec"><div class="stv-rec-cab">${stvIcone('medalha')} ${esc(dd.rotulo)}${x.dia>=d30?`<span class="stv-novo">${stvIcone('novo')} novo</span>`:''}</div><div class="stv-rec-val">${esc(stvFmtTempo(x.seg))}</div><div class="stv-rec-sub">${esc(stvFmtPace(x.pace))} · ${esc(fmtDataAno(x.dia))}</div><div class="stv-rec-sub" title="${esc(tenisDe(x.gearId))}">${stvIcone('tenis')} ${esc(tenisDe(x.gearId))}</div></div>`);
+    c.appendChild(stravaBtnVer(x.atividadeId));grade.appendChild(c);
+  });
+  cx.appendChild(bloco('stv-rec-nativos','Recordes por distância',stvIcone('novo')+' = batido nos últimos 30 dias',grade));
+
+  /* 2.2 calculados */
+  const calc=stvRecordesCalculados(desde?A.filter(a=>stvDia(a)>=desde):A);
+  const itens=[
+    [stvIcone('distancia'),'Maior distância em uma corrida',calc.maiorDistancia,v=>stravaN(v.valor,2)+' km'],
+    [stvIcone('elevacao'),'Maior elevação acumulada',calc.maiorElevacao,v=>stravaN(v.valor,0)+' m'],
+    [stvIcone('calorias'),'Maior gasto calórico em uma sessão',calc.maiorCalorias,v=>stravaN(v.valor,0)+' kcal'],
+    [stvIcone('esforco'),'Maior esforço relativo',calc.maiorEsforco,v=>stravaN(v.valor,0)+' pontos'],
+    [stvIcone('calendario'),'Maior semana em volume',calc.maiorSemana,v=>stravaN(v.valor,1)+' km',v=>v.dia?'semana de '+fmtDataAno(v.dia):v.semana||''],
+    [stvIcone('calendario'),'Maior mês em volume',calc.maiorMes,v=>stravaN(v.valor,1)+' km',v=>stravaMesRot(v.mes)],
+    [stvIcone('fogo'),'Maior sequência de dias',calc.maiorStreak,v=>stravaPlural(v.valor,'dia','dias'),v=>v.fim?'até '+fmtDataAno(v.fim):''],
+    [stvIcone('cadencia'),'Melhor cadência média (corrida ≥ 5 km)',calc.melhorCadencia5k,v=>stravaN(v.valor,1)+' spm'],
+    [stvIcone('fc'),'Menor FC média (corrida ≥ 5 km)',calc.melhorFC5k,v=>stravaN(v.valor,0)+' bpm']];
+  const gr2=el('<div class="stv-recs"></div>');
+  itens.forEach(([ic,tit,v,fmt,sub])=>{
+    if(!v||v.valor==null){gr2.appendChild(el(`<div class="stv-rec stv-apagado"><div class="stv-rec-cab">${ic} ${esc(tit)}</div><div class="stv-rec-val">—</div><div class="stv-rec-sub">sem registro</div></div>`));return}
+    const linha2=sub?sub(v):(v.dia?fmtDataAno(v.dia):'');
+    const c=el(`<div class="stv-rec"><div class="stv-rec-cab">${ic} ${esc(tit)}${v.dia&&v.dia>=d30?`<span class="stv-novo">${stvIcone('novo')} novo</span>`:''}</div><div class="stv-rec-val">${esc(fmt(v))}</div><div class="stv-rec-sub">${esc(linha2||'—')}</div>${v.gearId!=null&&v.atividadeId?`<div class="stv-rec-sub">${stvIcone('tenis')} ${esc(tenisDe(v.gearId))}</div>`:''}</div>`);
+    if(v.atividadeId)c.appendChild(stravaBtnVer(v.atividadeId));
+    gr2.appendChild(c);
+  });
+  cx.appendChild(bloco('stv-rec-calc','Recordes calculados','a partir das atividades carregadas · esforço relativo = a pontuação de carga que o Strava dá a cada treino',gr2));
+}
+
+/* ================= ABA 3 — TENDÊNCIAS ================= */
+function stravaAbaTendencias(cx,dados,largo){
+  const h=hoje(),cfg=stravaConfig(),A=dados.atividades||[],G=dados.gear||[],r=stravaR(cx),alt=largo?220:180;
+  if(!A.some(stvEhCorrida)){cx.appendChild(stravaVazio('Ainda não há corridas suficientes para mostrar tendências.'));return}
+  const nomeT=stravaMapaTenis(stvTenis(A,G,cfg,h));
+
+  /* T1 evolução dos PRs */
+  const sel=filtro.stravaPRSel&&typeof filtro.stravaPRSel==='object'?filtro.stravaPRSel:(filtro.stravaPRSel={Fastest5k:true,Fastest10k:true,FastestHalfMarathon:true});
+  const opc=[['Fastest5k','5K','var(--verde)'],['Fastest10k','10K','var(--azul)'],['FastestHalfMarathon','21K','var(--roxo)']];
+  const t1=el('<div></div>'),leg=el('<div class="stv-legenda" role="group" aria-label="Distâncias no gráfico"></div>');
+  opc.forEach(([t,n,cor])=>{const b=el(`<button type="button" class="chip${sel[t]?'':' off'}" aria-pressed="${!!sel[t]}"${sel[t]?` style="background:${cor};color:#fff"`:''}>${esc(n)}</button>`);b.onclick=()=>{sel[t]=!sel[t];r()};leg.appendChild(b)});
+  t1.appendChild(leg);
+  const series=opc.filter(([t])=>sel[t]).map(([t,n,cor])=>({nome:n,cor,pontos:stvEvolucaoPR(A,t,12,h).map(p=>({x:p.dia,y:p.pace,marca:!!p.novoPR}))})).filter(s=>s.pontos.length);
+  if(!series.length)t1.appendChild(stravaVazio(opc.some(([t])=>sel[t])?'Ainda não há corridas com essas distâncias nos últimos 12 meses.':'Escolha pelo menos uma distância.'));
+  else t1.appendChild(el(`<div>${stvGrafLinha({series,yInvertido:true,fmtY:stvFmtPace,altura:alt,largura:largo?600:380})}</div>`));
+  t1.appendChild(stravaNota('Cada ponto é uma corrida com essa distância; a linha é o melhor tempo acumulado (pace, mais rápido para cima). O ponto maior marca o dia em que o recorde foi batido.'));
+  cx.appendChild(bloco('stv-t1','Evolução dos recordes','últimos 12 meses',t1));
+
+  /* T2 curva de Riegel */
+  const rec=stvRecordesNativos(A),curva=stvCurva(rec),t2=el('<div></div>');
+  if(!curva.base)t2.appendChild(stravaVazio('Ainda não há recordes para traçar a curva.'));
+  else{
+    const linhas=curva.linhas.map(l=>{const g=l.gapSeg;const cls=g==null?'':g>0?'pos':g<0?'neg':'';const gap=g==null?'—':g>0?'+'+stvFmtTempo(g):g<0?'−'+stvFmtTempo(-g):'0:00';
+      return `<tr${l.tipo===curva.base.tipo?' class="on"':''}><td>${esc(l.rotulo)}${l.tipo===curva.base.tipo?' ★':''}</td><td class="n">${l.pr!=null?esc(stvFmtTempo(l.pr)):'—'}</td><td class="n">${l.projecao!=null?'~'+esc(stvFmtTempo(l.projecao)):'—'}</td><td class="n ${cls}">${esc(gap)}</td></tr>`}).join('');
+    t2.appendChild(el(`<div class="stv-rol-x"><table class="stv-tab"><thead><tr><th>Distância</th><th class="n">PR atual</th><th class="n">Projeção</th><th class="n">Gap</th></tr></thead><tbody>${linhas}</tbody></table></div>`));
+    t2.appendChild(stravaNota('Projeção pela fórmula de Riegel (T2 = T1 × (D2/D1)^1,06) a partir do PR de '+curva.base.rotulo+' ('+stvFmtTempo(curva.base.seg)+', marcado com ★). Gap positivo = PR mais lento do que a curva projeta.'));
+    if(curva.insight)t2.appendChild(el(`<div class="stv-insight">${stvIcone('dica')} ${esc(curva.insight.rotulo)} é a distância mais desalinhada da curva (${esc(stvFmtTempo(curva.insight.gapSeg))} acima da projeção): é onde o ganho está mais acessível.</div>`));
+    else t2.appendChild(el('<div class="stv-insight">'+stvIcone('dica')+' Nenhum PR está atrás da curva: as distâncias estão alinhadas entre si.</div>'));
+  }
+  cx.appendChild(bloco('stv-t2','Curva de Riegel','o que cada PR projeta para as outras distâncias',t2));
+
+  /* T3 volume mensal */
+  const vol=stvVolumeMensal(A,12,h),t3=el('<div></div>');
+  if(!vol.length||!vol.some(v=>v.km>0))t3.appendChild(stravaVazio('Ainda não há corridas nos últimos 12 meses.'));
+  else{
+    t3.appendChild(el(`<div>${stvGrafBarras({barras:vol.map(v=>({x:v.mes,v:v.km,alerta:!!v.alerta})),linha:vol.map(v=>({x:v.mes,v:v.mediaMovel3})),fmtV:v=>stravaN(v,0)+' km',altura:alt,largura:largo?600:380})}</div>`));
+    const alertas=vol.map((v,i)=>v.alerta?{mes:v.mes,pct:i>0?stvVariacao(v.km,vol[i-1].km):null}:null).filter(Boolean);
+    if(alertas.length)t3.appendChild(el(`<div class="stv-alerta a stv-mt">${stvIcone('alerta')} Subida acima de 10% sobre o mês anterior em ${alertas.map(a=>esc(stravaMesRot(a.mes))+(a.pct!=null?' (+'+esc(stravaN(a.pct,0))+'%)':'')).join(', ')}.</div>`));
+    t3.appendChild(stravaNota('Barras: km de corrida no mês. Linha: média móvel de 3 meses. Barra em destaque: subiu mais de 10% sobre o mês anterior.'));
+  }
+  cx.appendChild(bloco('stv-t3','Volume mensal','km de corrida · 12 meses',t3));
+
+  /* T4 consistência */
+  const anos=[...new Set(A.map(stvDia).filter(Boolean).map(x=>x.slice(0,4)))].sort().reverse(),t4=el('<div></div>');
+  if(!anos.length)t4.appendChild(stravaVazio('Ainda não há treinos com data.'));
+  else{
+    const ano=anos.includes(filtro.stravaHeatAno)?filtro.stravaHeatAno:(anos.includes(h.slice(0,4))?h.slice(0,4):anos[0]);
+    const cons=stvConsistencia(A,ano,h);
+    const topo=el('<div class="stv-filtros"></div>');topo.appendChild(seletor(ano,anos.map(a=>[a,a]),v=>{filtro.stravaHeatAno=v;r()},'Ano do mapa de consistência'));
+    const nDias=Object.keys(cons.dias||{}).length;topo.appendChild(el(`<span class="stv-nota" style="margin:0">${esc(stravaPlural(nDias,'dia com treino','dias com treino'))} em ${esc(ano)}</span>`));
+    t4.appendChild(topo);
+    t4.appendChild(el(`<div>${stvGrafHeatmap(cons.dias,ano)}</div>`));
+    const pcts=Object.entries(cons.pctPorMes||{});
+    if(pcts.length)t4.appendChild(el(`<div class="stv-pcts">${pcts.map(([m,p])=>stravaChip(stravaMesCurto(m)+' '+stravaN(p)+'%',p>=50?'v':p>=25?'a':'n')).join('')}</div>`));
+    t4.appendChild(stravaNota('Cada etiqueta mostra a parte dos dias daquele mês com pelo menos um treino.'));
+    const meses=cons.porMesModalidade||[];
+    if(meses.some(m=>m.corrida||m.musculacao||m.escada||m.outros)){
+      t4.appendChild(el('<h5 class="stv-sub">Minutos por modalidade ao longo do ano</h5>'));
+      t4.appendChild(el(`<div>${stvGrafAreaEmpilhada({meses,largura:largo?600:380})}</div>`));
+      t4.appendChild(el(`<div class="stv-legenda">${[['Corrida','var(--verde)'],['Musculação','var(--azul)'],['Stair Stepper','var(--areia)'],['Outros','var(--roxo)']].map(([n,c])=>`<span class="chip" style="background:${c};color:#fff">${esc(n)}</span>`).join('')}</div>`));
+    }
+  }
+  cx.appendChild(bloco('stv-t4','Consistência','um quadrado por dia; cor pela duração',t4));
+
+  /* T5 eficiência cardíaca */
+  const efi=stvEficiencia(A),t5=el('<div></div>');
+  if(efi.length<3)t5.appendChild(stravaVazio('Ainda não há corridas de 5 km ou mais com frequência cardíaca registrada (precisa de pelo menos 3).'));
+  else{
+    const d365=stravaDiaMais(h,-365);let pts=efi.filter(e=>e.dia>=d365);if(pts.length<3)pts=efi;
+    t5.appendChild(el(`<div>${stvGrafDispersao({pontos:pts.map(e=>({x:e.dia,y:e.indice,rot:fmtDataAno(e.dia)+' · '+stvFmtPace(e.pace)+' · '+stravaN(e.fc,0)+' bpm · índice '+stravaN(e.indice,1)})),fmtY:v=>stravaN(v,0),altura:alt,largura:largo?600:380})}</div>`));
+    const d=stvDados(A,G,cfg,h);
+    if(d.indiceEficiencia!=null&&d.indiceEficiencia3MesesAtras!=null){const dif=stvVariacao(d.indiceEficiencia,d.indiceEficiencia3MesesAtras);
+      t5.appendChild(el(`<div class="stv-insight">Índice nos últimos 30 dias: ${esc(stravaN(d.indiceEficiencia,1))} · há 3 meses: ${esc(stravaN(d.indiceEficiencia3MesesAtras,1))} ${dif!=null?'('+(dif<0?'−':'+')+esc(stravaN(Math.abs(dif),0))+'%)':''}${dif!=null&&dif<-3?' · melhorando: mesmo pace com menos batimentos.':dif!=null&&dif>3?' · piorando: mais batimentos para o mesmo pace.':' · estável.'}</div>`))}
+    const ult=pts.slice(-6).reverse();
+    t5.appendChild(el(`<div class="stv-rol-x"><table class="stv-tab"><thead><tr><th>Data</th><th class="n">Pace</th><th class="n">FC média</th><th class="n">Índice</th></tr></thead><tbody>${ult.map(e=>`<tr><td>${esc(fmtDataAno(e.dia))}</td><td class="n">${esc(stvFmtPace(e.pace))}</td><td class="n">${esc(stravaN(e.fc,0))} bpm</td><td class="n">${esc(stravaN(e.indice,1))}</td></tr>`).join('')}</tbody></table></div>`));
+    t5.appendChild(stravaNota('Índice = FC média ÷ velocidade (km/h), em corridas de 5 km ou mais. Quanto menor, melhor: o mesmo pace custando menos batimentos. A linha tracejada é a tendência.'));
+  }
+  cx.appendChild(bloco('stv-t5','Eficiência cardíaca','pace × FC média · menor é melhor',t5));
+
+  /* T6 impacto do tênis */
+  const imp=stvImpactoTenis(A,G,cfg),t6=el('<div></div>');
+  if(!imp||!imp.pares||!imp.pares.length)t6.appendChild(stravaVazio('Ainda não há corridas de distância parecida com tênis diferentes para comparar.'));
+  else{
+    t6.appendChild(el(`<div class="stv-insight">${stvIcone('tenis')} ${esc(imp.frase)}</div>`));
+    const nm=(p,k)=>p['nome'+k.toUpperCase()]||nomeT[String(p[k])]||'Tênis '+p[k];
+    t6.appendChild(el(`<div class="stv-rol-x"><table class="stv-tab"><thead><tr><th>Mais rápido</th><th>Mais lento</th><th class="n">Diferença</th><th class="n">Corridas comparadas</th></tr></thead><tbody>${imp.pares.map(p=>`<tr><td>${esc(nm(p,'a'))}</td><td>${esc(nm(p,'b'))}</td><td class="n">${esc(stravaN(p.difSegKm))} s/km</td><td class="n">${esc(stravaN(p.n))}</td></tr>`).join('')}</tbody></table></div>`));
+    t6.appendChild(stravaNota('Compara o pace médio de cada tênis só em corridas de distância parecida (faixas de ±15%), para não misturar tiro curto com longão.'));
+  }
+  cx.appendChild(bloco('stv-t6','Impacto do tênis','pace médio em distâncias equivalentes',t6));
+}
+
+/* ================= ABA 4 — TÊNIS ================= */
+function stravaAbaTenis(cx,dados,largo){
+  const h=hoje(),cfg=stravaConfig(),A=dados.atividades||[],G=dados.gear||[],r=stravaR(cx),mes=h.slice(0,7);
+  const tenis=stvTenis(A,G,cfg,h);
+  if(!tenis.length){cx.appendChild(stravaVazio('Nenhum tênis registrado no Strava ainda. Marque o tênis nas corridas do Strava e sincronize.'));return}
+  const nomeT=stravaMapaTenis(tenis),ativos=tenis.filter(t=>!t.aposentado),d=stvDados(A,G,cfg,h);
+  const TIPO={rodagem:'rodagem',prova:'prova',trail:'trail',outro:'outro'};
+
+  /* 4.4 alertas */
+  const al=[];
+  ativos.filter(t=>t.pctVida>0.9).forEach(t=>al.push(['r',''+t.nome+' passou de 90% da vida útil ('+stravaN(t.km,0)+' de '+stravaN(t.limiteKm,0)+' km).']));
+  ativos.filter(t=>t.diasSemUso!=null&&t.diasSemUso>60).forEach(t=>al.push(['a',''+t.nome+' está sem uso há '+stravaPlural(t.diasSemUso,'dia','dias')+'.']));
+  if(d.temTenisProva&&d.pr>0&&d.melhorRecente<=d.pr*1.05)al.push(['az','Tênis de prova disponível: você está a '+stravaN(d.gap)+' s do PR de '+d.dist+' e tem '+d.tenisProva+' com '+stravaN(d.kmProva,0)+' km de uso.']);
+  if(al.length){const cxA=el('<div class="stv-alertas"></div>');al.forEach(([cl,tx])=>cxA.appendChild(el(`<div class="stv-alerta ${cl}">${esc(tx)}</div>`)));cx.appendChild(cxA)}
+
+  /* 4.1 cards */
+  const lista=el('<div class="stv-tenis-lista"></div>');
+  tenis.forEach(t=>{
+    const pct=Math.round(t.pctVida*100),estado=t.faixa==='vermelho'?' · faixa de troca':t.faixa==='amarelo'?' · atenção, chegando no limite':'';
+    const c=el(`<div class="stv-tenis${t.aposentado?' stv-apagado':''}"><div class="stv-titulo"><span>${stvIcone('tenis')}</span><span>${esc(t.nome)}</span>${t.aposentado?stravaChip('aposentado','n'):''}${stravaChip(TIPO[t.tipo]||'rodagem','az')}</div>
+      <div class="sub">${esc(stravaN(t.km,1))} km · ${esc(stravaPlural(t.corridas,'corrida','corridas'))}${t.kmPorMes!=null?' · '+esc(stravaN(t.kmPorMes,0))+' km/mês':''}${t.apelido&&(t.marca||t.modelo)?' · '+esc([t.marca,t.modelo].filter(Boolean).join(' ')):''}</div>
+      <div class="stv-vida" role="progressbar" aria-label="Vida útil" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100,pct)}"><div class="b ${t.faixa}" style="width:${Math.min(100,pct)}%"></div></div>
+      <div class="sub">${esc(stravaN(pct))}% de ${esc(stravaN(t.limiteKm,0))} km${esc(estado)}</div>
+      <div class="stv-tenis-grid"><div><small>Pace médio</small>${esc(stvFmtPace(t.paceMedio))}</div>
+      <div><small>Última corrida</small>${t.ultima?esc(fmtDataAno(t.ultima))+(t.diasSemUso!=null?' <span class="stv-suave">('+(t.diasSemUso===0?'hoje':'há '+esc(stravaPlural(t.diasSemUso,'dia','dias')))+')</span>':''):'—'}</div>
+      <div><small>PRs com ele</small>${t.prs&&t.prs.length?esc(t.prs.join(', ')):'nenhum'}</div>
+      ${t.compra?`<div><small>Compra</small>${esc(fmtDataAno(t.compra))}</div>`:''}</div><div class="stv-acoes"></div></div>`);
+    const ac=c.querySelector('.stv-acoes');
+    ac.appendChild(acao('Configurar',()=>stravaModalTenis(t),'ghost'));
+    ac.appendChild(acao(t.aposentado?'Reativar':'Aposentar',()=>{const c2=stravaCfgTenis(t);c2.aposentado=!t.aposentado;salvar();r()},'ghost'));
+    lista.appendChild(c);
+  });
+  cx.appendChild(bloco('stv-tenis-cards','Meus tênis','ativos por km; aposentados no fim',lista));
+
+  /* 4.3 gráficos */
+  const kmMes=stvKmPorTenisMensal(A,G,cfg,12,h),comUso=ativos.filter(t=>kmMes.some(l=>+l[t.gearId]>0));
+  const g1=el('<div></div>');
+  if(!comUso.length)g1.appendChild(stravaVazio('Nenhum tênis ativo com corridas nos últimos 12 meses.'));
+  else{const multi=el('<div class="stv-multi"></div>');comUso.forEach(t=>{const b=el(`<div><h5>${esc(t.nome)}</h5>${stvGrafBarras({barras:kmMes.map(l=>({x:l.mes,v:+l[t.gearId]||0})),fmtV:v=>stravaN(v,0)+' km',altura:120,largura:largo?300:330})}</div>`);multi.appendChild(b)});g1.appendChild(multi)}
+  cx.appendChild(bloco('stv-tenis-km','Km por tênis','últimos 12 meses',g1));
+
+  const ac=stvKmAcumuladoTenis(A,G),CORES=['var(--verde)','var(--azul)','var(--roxo)','var(--areia)','var(--vermelho)'];
+  const series=tenis.filter(t=>Array.isArray(ac[t.gearId])&&ac[t.gearId].length>=2).map((t,i)=>({nome:t.nome,cor:CORES[i%CORES.length],pontos:ac[t.gearId].map(p=>({x:p.dia,y:p.km}))}));
+  const g2=el('<div></div>');
+  if(!series.length)g2.appendChild(stravaVazio('Ainda não há corridas suficientes por tênis para traçar o acumulado.'));
+  else{g2.appendChild(el(`<div class="stv-legenda">${series.map(s=>`<span class="chip" style="background:${s.cor};color:#fff">${esc(s.nome)}</span>`).join('')}</div>`));
+    g2.appendChild(el(`<div>${stvGrafLinha({series,fmtY:v=>stravaN(v,0)+' km',altura:largo?220:180,largura:largo?600:380})}</div>`));
+    g2.appendChild(stravaNota('Soma das corridas carregadas; o total do card vem do Strava e pode incluir corridas mais antigas.'))}
+  cx.appendChild(bloco('stv-tenis-acum','Km acumulado no tempo','por tênis',g2));
+
+  const uso=stvUsoTenisMes(A,mes),g3=el('<div></div>');
+  if(!uso.length)g3.appendChild(stravaVazio('Nenhuma corrida neste mês ainda.'));
+  else{const total=uso.reduce((t,u)=>t+(+u.km||0),0);
+    // mesma redução que o donut faz (3 maiores + "Outros"), para legenda e fatias baterem
+    let fatias=uso.map(u=>({rot:u.gearId?(nomeT[String(u.gearId)]||'Tênis '+u.gearId):'sem tênis registrado',v:+u.km||0})).filter(f=>f.v>0).sort((a,b)=>b.v-a.v);
+    if(fatias.length>4){const resto=fatias.slice(3);fatias=fatias.slice(0,3).concat([{rot:'Outros ('+resto.length+')',v:resto.reduce((t,f)=>t+f.v,0)}])}
+    const cxD=el(`<div class="stv-donut-cx">${stvGrafDonut({fatias,centro:stravaN(total,0)+' km',fmt:v=>stravaN(v,1)+' km'})}<div class="stv-donut-leg"></div></div>`);
+    const legd=cxD.querySelector('.stv-donut-leg');const cores=['var(--verde)','var(--azul)','var(--areia)','var(--roxo)'];
+    fatias.forEach((f,i)=>legd.appendChild(el(`<div class="stv-donut-item"><i style="background:${cores[i]}"></i><span>${esc(f.rot)}</span><b>${esc(stravaN(f.v,1))} km · ${esc(stravaN(total?f.v/total*100:0))}%</b></div>`)));
+    g3.appendChild(cxD)}
+  cx.appendChild(bloco('stv-tenis-uso','Uso no mês','% dos km de corrida em '+stravaMesRot(mes),g3));
+}
+
+// garante a entrada de configuração do tênis em E.strava (sem salvar sozinho)
+function stravaCfgTenis(t){
+  const cfg=stravaConfig(),id=String(t.gearId);
+  const c=cfg.tenis[id]||(cfg.tenis[id]={});
+  if(!['rodagem','prova','trail','outro'].includes(c.tipo))c.tipo=t.tipo||'rodagem';
+  if(!(+c.limiteKm>0))c.limiteKm=t.limiteKm||600;
+  if(c.apelido==null)c.apelido='';
+  if(c.compra==null)c.compra='';
+  // aposentado fica null até o Léo decidir: null = quem manda é o Strava
+  return c;
+}
+/* 4.5 configuração de um tênis: campos() grava direto em E.strava.tenis[gearId] + salvar() */
+function stravaModalTenis(t){
+  const c=stravaCfgTenis(t),ident=[t.marca,t.modelo].filter(Boolean).join(' ')+(t.nomeStrava?' · "'+t.nomeStrava+'" no Strava':'');
+  abrirModal('Configurar tênis',esc(ident||t.nome||''),(cx,fechar)=>{
+    const s=el('<div class="secao"></div>');
+    s.appendChild(campos(c,[
+      {k:'apelido',t:'Apelido',tipo:'text',ph:'como você chama esse tênis'},
+      {k:'tipo',t:'Tipo',tipo:'select',opcoes:['rodagem','prova','trail','outro']},
+      {k:'limiteKm',t:'Vida útil (km)',tipo:'number',ph:'600'},
+      {k:'compra',t:'Data de compra',tipo:'date'}]));
+    const ck=el(`<label class="stv-check"><input type="checkbox"${c.aposentado?' checked':''}> Aposentado (sai dos alertas e vai para o fim da lista)</label>`);
+    ck.querySelector('input').onchange=ev=>{c.aposentado=ev.target.checked;salvar()};
+    s.appendChild(ck);
+    s.appendChild(el('<p class="stv-nota">O km acumulado vem do Strava. O limite define a barra de vida útil (padrão 600 km). A data de compra habilita o km por mês.</p>'));
+    cx.appendChild(s);
+    const acoes=el('<div class="secao"></div>');acoes.appendChild(acao('Concluir',fechar));cx.appendChild(acoes);
+  },stravaAtualizarGaveta);
+}
+
+/* 1.3 metas: lista com ativar/apagar e formulário de nova meta (uma ativa por vez) */
+function stravaModalMetas(recordes){
+  const cfg=stravaConfig(),rasc={rotulo:'10K',alvo:'',ref:'',nome:''};
+  abrirModal('Metas','Uma meta ativa por vez. O progresso compara o PR atual com a referência inicial.',(cx,fechar)=>{
+    const montar=()=>{
+      cx.replaceChildren();
+      const lista=el('<div class="secao stv-metas"></div>');
+      if(!cfg.metas.length)lista.appendChild(stravaVazio('Nenhuma meta ainda. Crie a primeira abaixo.'));
+      cfg.metas.forEach(m=>{
+        const li=el(`<div class="stv-meta-linha${m.ativa?' on':''}"><div><b>${esc(m.nome||'')}</b><div class="sub">${esc(stvFmtKm(m.distanciaM))} em ${esc(stvFmtTempo(m.tempoAlvoSeg))}${+m.tempoRefInicialSeg>0?' · partiu de '+esc(stvFmtTempo(m.tempoRefInicialSeg)):''}${m.criadaEm?' · criada em '+esc(fmtDataAno(m.criadaEm)):''}</div></div><div class="stv-meta-acoes"></div></div>`);
+        const ac=li.querySelector('.stv-meta-acoes');
+        if(m.ativa)ac.appendChild(el(stravaChip('ativa','v')));
+        else ac.appendChild(acao('Ativar',()=>{cfg.metas.forEach(x=>{x.ativa=x===m});salvar();montar()},'ghost'));
+        ac.appendChild(acao('Apagar',()=>{if(!confirm('Apagar a meta "'+(m.nome||'')+'"?'))return;cfg.metas=cfg.metas.filter(x=>x!==m);salvar();montar()},'ghost'));
+        lista.appendChild(li);
+      });
+      cx.appendChild(lista);
+      const nova=el('<div class="secao"><h4>Nova meta</h4></div>');
+      nova.appendChild(campos(rasc,[
+        {k:'rotulo',t:'Distância',tipo:'select',opcoes:STV_DISTANCIAS.map(x=>x.rotulo),rascunho:true},
+        {k:'alvo',t:'Tempo alvo (m:ss ou h:mm:ss)',tipo:'text',ph:'49:00',rascunho:true},
+        {k:'ref',t:'Referência inicial (opcional)',tipo:'text',ph:'vazio = PR de hoje',rascunho:true},
+        {k:'nome',t:'Nome',tipo:'text',ph:'ex.: 10K sub-49',rascunho:true}]));
+      const aviso=el('<p class="form-erro" role="alert" hidden></p>');nova.appendChild(aviso);
+      const acoes=el('<div class="stv-acoes"></div>');
+      acoes.appendChild(acao('Salvar meta',()=>{
+        const def=STV_DISTANCIAS.find(x=>x.rotulo===rasc.rotulo)||STV_DISTANCIAS.find(x=>x.tipo==='Fastest10k');
+        const alvo=stravaParseTempo(rasc.alvo);
+        if(!alvo){aviso.textContent='Informe o tempo alvo como m:ss (ex.: 49:00) ou h:mm:ss.';aviso.hidden=false;return}
+        let ref=stravaParseTempo(rasc.ref);
+        if(rasc.ref&&!ref){aviso.textContent='A referência inicial precisa estar como m:ss ou h:mm:ss.';aviso.hidden=false;return}
+        if(!ref){const pr=recordes&&recordes[def.tipo];ref=pr&&+pr.seg>0?+pr.seg:null}
+        cfg.metas.push({id:uid(),nome:String(rasc.nome||'').trim()||def.rotulo+' em '+stvFmtTempo(alvo),distanciaM:def.distM,tempoAlvoSeg:alvo,tempoRefInicialSeg:ref,ativa:!cfg.metas.some(m=>m.ativa),criadaEm:hoje()});
+        salvar();rasc.alvo='';rasc.ref='';rasc.nome='';montar();
+      }));
+      acoes.appendChild(acao('Fechar',fechar,'ghost'));
+      nova.appendChild(acoes);cx.appendChild(nova);
+    };
+    montar();
+  },stravaAtualizarGaveta);
+}
+
+/* ================= BOTÃO FLUTUANTE + GAVETA ================= */
+let stravaEventosLigados=false;
+function stravaLigarEventos(){
+  if(stravaEventosLigados)return;stravaEventosLigados=true;
+  // ESC fecha a gaveta — mas só quando não há modal do app aberto (o modal cuida do próprio ESC)
+  document.addEventListener('keydown',ev=>{
+    if(ev.key!=='Escape')return;const g=document.getElementById('stravaGaveta');
+    if(!g||!g.classList.contains('aberta')||document.querySelector('.fundo'))return;
+    ev.preventDefault();stravaFecharGaveta();
+  });
+  // clique fora fecha; clique no botão, dentro da gaveta ou num modal não conta
+  document.addEventListener('click',ev=>{
+    const g=document.getElementById('stravaGaveta');if(!g||!g.classList.contains('aberta'))return;
+    /* pelo CAMINHO do evento, não pelo alvo: trocar de aba re-renderiza a gaveta
+       (replaceChildren) e o alvo já saiu do DOM quando o clique chega aqui —
+       decidindo por ev.target a gaveta se fechava sozinha a cada clique. */
+    const caminho=ev.composedPath?ev.composedPath():[ev.target];
+    if(caminho.some(x=>x===g||(x instanceof Element&&(x.id==='stravaBtn'||x.id==='modais'||x.classList.contains('fundo')))))return;
+    stravaFecharGaveta();
+  });
+}
+const stravaTreinouHoje=()=>{const h=hoje();return !!(stravaCache&&stravaCache.atividades.some(a=>stvDia(a)===h))};
+function stravaPontoVerde(btn){
+  const p=btn.querySelector('.stv-ponto');
+  const marcar=()=>{const ok=stravaTreinouHoje();p.hidden=!ok;btn.title=ok?'Strava · treino de hoje registrado':'Strava';btn.setAttribute('aria-label',(ok?'Treinou hoje. ':'')+'Abrir painel do Strava')};
+  if(stravaCache)marcar();else p.hidden=true;
+  // carrega em silêncio quando não há cache válido; depois de uma falha espera 5 min antes de insistir
+  if(!stravaCacheValido()&&Date.now()-stravaFalhaEm>3e5)stravaCarregar().then(marcar).catch(()=>{});
+}
+function stravaMontarBotao(){
+  if(typeof temSessao==='function'&&!temSessao()){document.getElementById('stravaBtn')?.remove();document.getElementById('stravaGaveta')?.remove();return}
+  stravaLigarEventos();
+  let btn=document.getElementById('stravaBtn');
+  if(!btn){
+    btn=el(`<button type="button" id="stravaBtn" class="stv-btn" aria-label="Abrir painel do Strava" aria-controls="stravaGaveta" aria-expanded="false" title="Strava">${LOGO_STRAVA}<span class="stv-ponto" hidden aria-hidden="true"></span></button>`);
+    btn.onclick=()=>stravaAlternarGaveta();document.body.appendChild(btn);
+  }
+  let g=document.getElementById('stravaGaveta');
+  if(!g){
+    g=el(`<aside id="stravaGaveta" class="stv-gaveta" role="complementary" aria-label="Painel do Strava"><div class="stv-cab">${LOGO_STRAVA}<div><h3>Strava</h3><div class="stv-sinc">Corridas, recordes, tendências e tênis</div></div><span class="cresce"></span></div><div class="stv-abas-cx"></div></aside>`);
+    const cabG=g.querySelector('.stv-cab');
+    cabG.appendChild(acao('Tela cheia',()=>{stravaFecharGaveta();irTela('strava')},'ghost'));
+    const x=el('<button type="button" class="btn ghost mini stv-fechar" aria-label="Fechar painel do Strava">✕</button>');x.onclick=()=>stravaFecharGaveta();cabG.appendChild(x);
+    document.body.appendChild(g);
+  }
+  const naTela=typeof atual!=='undefined'&&atual==='strava';
+  btn.hidden=naTela;if(naTela&&g.classList.contains('aberta'))stravaFecharGaveta();
+  stravaPontoVerde(btn);
+}
+function stravaAbrirGaveta(){
+  const g=document.getElementById('stravaGaveta'),btn=document.getElementById('stravaBtn');if(!g)return;
+  filtro.stravaGavetaAberta=true;g.classList.add('aberta');btn&&btn.setAttribute('aria-expanded','true');
+  stravaAbas(g.querySelector('.stv-abas-cx'),{largo:false});
+  const x=g.querySelector('.stv-fechar');x&&x.focus({preventScroll:true});
+}
+function stravaFecharGaveta(){
+  const g=document.getElementById('stravaGaveta'),btn=document.getElementById('stravaBtn');if(!g)return;
+  filtro.stravaGavetaAberta=false;g.classList.remove('aberta');btn&&btn.setAttribute('aria-expanded','false');
+  if(g.contains(document.activeElement)&&btn&&!btn.hidden)btn.focus({preventScroll:true});
+}
+function stravaAlternarGaveta(){const g=document.getElementById('stravaGaveta');if(g&&g.classList.contains('aberta'))stravaFecharGaveta();else stravaAbrirGaveta()}
+
+/* ================= GRÁFICOS SVG (strings; responsivos por viewBox) ================= */
+// x pode ser número, 'AAAA-MM-DD' ou 'AAAA-MM' (vira número de dias)
+const stravaSvgX=x=>{if(typeof x==='number')return x;const s=String(x||'');if(/^\d{4}-\d{2}-\d{2}/.test(s))return stravaDiaNum(s.slice(0,10));if(/^\d{4}-\d{2}$/.test(s))return stravaDiaNum(s+'-01');const n=+s;return Number.isFinite(n)?n:0};
+const stravaEscala=(min,max,a,b)=>{const d=(max-min)||1;return v=>a+(v-min)/d*(b-a)};
+function stravaTicks(min,max,n){const span=max-min;if(!(span>0))return [min];const bruto=span/Math.max(1,n),mag=Math.pow(10,Math.floor(Math.log10(bruto))),f=bruto/mag,passo=(f<1.5?1:f<3?2:f<7?5:10)*mag;const out=[];for(let v=Math.ceil(min/passo-1e-9)*passo;v<=max+1e-9&&out.length<50;v+=passo)out.push(+v.toFixed(8));return out}
+const stravaSvgTexto=(x,y,txt,extra='')=>`<text x="${(+x).toFixed(1)}" y="${(+y).toFixed(1)}" font-size="10" fill="var(--suave)" ${extra}>${esc(txt)}</text>`;
+const stravaRotEixoX=(datas,longo,fmtX)=>v=>{if(datas){const d=stravaNumDia(v);return fmtX?fmtX(d):(longo?d.slice(5,7)+'/'+d.slice(2,4):d.slice(8,10)+'/'+d.slice(5,7))}return fmtX?fmtX(v):String(v)};
+const stravaSemGraf='<div class="vazio">Sem dados para o gráfico.</div>';
+
+function stvGrafLinha({series=[],yInvertido=false,fmtY=v=>String(v),fmtX=null,altura=180,largura=600}={}){
+  const W=Math.max(240,+largura||600),H=Math.max(120,+altura||180),PL=54,PR=14,PT=12,PB=26;
+  const CORES=['var(--verde)','var(--azul)','var(--roxo)','var(--areia)','var(--vermelho)'];
+  const ss=(series||[]).filter(s=>s).map((s,i)=>({nome:String(s.nome||''),cor:s.cor||CORES[i%CORES.length],
+    pontos:(s.pontos||[]).filter(p=>p&&p.y!=null&&Number.isFinite(+p.y)).map(p=>({x:stravaSvgX(p.x),xo:p.x,y:+p.y,marca:!!p.marca})).sort((a,b)=>a.x-b.x)})).filter(s=>s.pontos.length);
+  const todos=ss.flatMap(s=>s.pontos);if(!todos.length)return stravaSemGraf;
+  let xmin=Math.min(...todos.map(p=>p.x)),xmax=Math.max(...todos.map(p=>p.x)),ymin=Math.min(...todos.map(p=>p.y)),ymax=Math.max(...todos.map(p=>p.y));
+  if(xmax===xmin){xmin-=1;xmax+=1}
+  const folga=((ymax-ymin)||Math.abs(ymax)*0.1||1)*0.1;ymin-=folga;ymax+=folga;
+  const sx=stravaEscala(xmin,xmax,PL,W-PR),sy=yInvertido?stravaEscala(ymin,ymax,PT,H-PB):stravaEscala(ymin,ymax,H-PB,PT);
+  const datas=todos.some(p=>typeof p.xo==='string'),rotX=stravaRotEixoX(datas,xmax-xmin>120,fmtX);
+  let s='';
+  stravaTicks(ymin,ymax,4).forEach(t=>{const y=sy(t);s+=`<line x1="${PL}" x2="${W-PR}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--linha)"/>`+stravaSvgTexto(PL-6,y+3.5,fmtY(t),'text-anchor="end"')});
+  stravaTicks(xmin,xmax,5).forEach(t=>{s+=stravaSvgTexto(sx(t),H-8,rotX(t),'text-anchor="middle"')});
+  ss.forEach(sr=>{
+    const d=sr.pontos.map((p,i)=>(i?'L':'M')+sx(p.x).toFixed(1)+' '+sy(p.y).toFixed(1)).join(' ');
+    s+=`<path d="${d}" fill="none" stroke="${sr.cor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    sr.pontos.forEach(p=>{const t=(sr.nome?sr.nome+': ':'')+fmtY(p.y)+' · '+rotX(p.x)+(p.marca?' · novo recorde':'');
+      s+=`<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="${p.marca?4.5:2.5}" fill="${sr.cor}"${p.marca?' stroke="var(--card)" stroke-width="1.5"':''}><title>${esc(t)}</title></circle>`});
+  });
+  return `<svg class="stv-graf" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de linha${ss.length?': '+esc(ss.map(x=>x.nome).filter(Boolean).join(', ')):''}">${s}</svg>`;
+}
+
+function stvGrafBarras({barras=[],linha=null,fmtV=v=>String(v),altura=170,largura=600}={}){
+  const bs=(barras||[]).filter(b=>b&&b.x!=null).map(b=>({x:String(b.x),v:Math.max(0,+b.v||0),alerta:!!b.alerta}));
+  if(!bs.length)return stravaSemGraf;
+  const W=Math.max(240,+largura||600),H=Math.max(100,+altura||170),PL=48,PR=10,PT=16,PB=24,n=bs.length,slot=(W-PL-PR)/n,larg=Math.max(4,slot*0.62);
+  const ln=(linha||[]).filter(l=>l&&l.x!=null&&Number.isFinite(+l.v)).map(l=>({x:String(l.x),v:+l.v}));
+  const vmax=Math.max(1,...bs.map(b=>b.v),...ln.map(l=>l.v))*1.12,sy=stravaEscala(0,vmax,H-PB,PT),cx=i=>PL+slot*i+slot/2;
+  const rot=(x,i)=>/^\d{4}-\d{2}$/.test(x)?stravaMesCurto(x)+(x.slice(5,7)==='01'||i===0?'/'+x.slice(2,4):''):x;
+  let s='';
+  stravaTicks(0,vmax,4).forEach(t=>{const y=sy(t);s+=`<line x1="${PL}" x2="${W-PR}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--linha)"/>`+stravaSvgTexto(PL-6,y+3.5,fmtV(t),'text-anchor="end"')});
+  bs.forEach((b,i)=>{const y=sy(b.v),alt=(H-PB)-y;
+    s+=`<rect x="${(cx(i)-larg/2).toFixed(1)}" y="${y.toFixed(1)}" width="${larg.toFixed(1)}" height="${Math.max(0,alt).toFixed(1)}" rx="3" fill="${b.alerta?'var(--areia)':'var(--verde)'}"><title>${esc(rot(b.x,i)+': '+fmtV(b.v)+(b.alerta?' · subiu mais de 10% sobre o mês anterior':''))}</title></rect>`;
+    if(n<=12&&b.v>0)s+=stravaSvgTexto(cx(i),y-4,fmtV(b.v),'text-anchor="middle" font-size="9"');
+    if(n<=12||i%2===0)s+=stravaSvgTexto(cx(i),H-7,rot(b.x,i),'text-anchor="middle"')});
+  if(ln.length){const idx={};bs.forEach((b,i)=>{idx[b.x]=i});const pts=ln.filter(l=>idx[l.x]!=null).map(l=>({x:cx(idx[l.x]),y:sy(l.v),v:l.v,r:rot(l.x,idx[l.x])}));
+    if(pts.length){s+=`<path d="${pts.map((p,i)=>(i?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' ')}" fill="none" stroke="var(--azul)" stroke-width="2" stroke-linejoin="round"/>`;
+      pts.forEach(p=>{s+=`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.5" fill="var(--azul)"><title>${esc('média de 3 meses em '+p.r+': '+fmtV(p.v))}</title></circle>`})}}
+  return `<svg class="stv-graf" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de barras">${s}</svg>`;
+}
+
+// 1 quadrado por dia do ano, 4 intensidades pela duração (até 30, 60, 90 min e acima)
+function stvGrafHeatmap(dias,ano){
+  ano=String(ano||'').slice(0,4);if(!/^\d{4}$/.test(ano))return stravaSemGraf;
+  const D=dias&&typeof dias==='object'?dias:{};
+  const base=stravaDiaNum(ano+'-01-01'),nDias=stravaDiaNum(ano+'-12-31')-base+1;
+  const off=(new Date(Date.UTC(+ano,0,1)).getUTCDay()+6)%7,semanas=Math.ceil((off+nDias)/7),cel=11,passo=13,PL=26,PT=16;
+  const W=PL+semanas*passo,H=PT+7*passo,NIVEL=[0,30,55,80,100];
+  const cor=n=>n?`color-mix(in srgb,var(--verde) ${NIVEL[n]}%,transparent)`:'color-mix(in srgb,var(--linha) 60%,transparent)';
+  let s='';const meses=[];
+  for(let i=0;i<nDias;i++){
+    const dia=stravaNumDia(base+i),col=Math.floor((off+i)/7),lin=(off+i)%7,x=PL+col*passo,y=PT+lin*passo;
+    if(dia.slice(8,10)==='01')meses.push([x,+dia.slice(5,7)-1]);
+    const info=D[dia],min=info?(+info.seg||0)/60:0,tem=!!info&&((+info.n||0)>0||min>0);
+    const nivel=!tem?0:min<30?1:min<60?2:min<90?3:4;
+    const t=fmtDataAno(dia)+(tem?' · '+stravaN(Math.round(min))+' min · '+stravaPlural(+info.n||0,'treino','treinos')+(Array.isArray(info.modalidades)&&info.modalidades.length?' · '+info.modalidades.map(m=>STRAVA_MOD_NOME[m]||m).join(', '):''):' · sem treino');
+    s+=`<rect x="${x}" y="${y}" width="${cel}" height="${cel}" rx="2" fill="${cor(nivel)}"><title>${esc(t)}</title></rect>`;
+  }
+  meses.forEach(([x,m])=>{s+=stravaSvgTexto(x,PT-5,STRAVA_MESES[m])});
+  [['seg',0],['qua',2],['sex',4]].forEach(([r,l])=>{s+=stravaSvgTexto(0,PT+l*passo+9,r)});
+  const legenda=`<div class="stv-heat-legenda">Menos ${[0,1,2,3,4].map(n=>`<i style="background:${cor(n)}"></i>`).join('')} Mais <span>· até 30, 60, 90 min e acima</span></div>`;
+  return `<div class="stv-rol-x"><svg class="stv-heat" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Dias com treino em ${esc(ano)}">${s}</svg></div>`+legenda;
+}
+
+function stvGrafDispersao({pontos=[],fmtX=null,fmtY=v=>String(v),altura=170,largura=600}={}){
+  const ps=(pontos||[]).filter(p=>p&&p.y!=null&&Number.isFinite(+p.y)).map(p=>({x:stravaSvgX(p.x),xo:p.x,y:+p.y,rot:p.rot!=null?String(p.rot):''})).sort((a,b)=>a.x-b.x);
+  if(!ps.length)return stravaSemGraf;
+  const W=Math.max(240,+largura||600),H=Math.max(120,+altura||170),PL=48,PR=14,PT=12,PB=26;
+  let xmin=Math.min(...ps.map(p=>p.x)),xmax=Math.max(...ps.map(p=>p.x)),ymin=Math.min(...ps.map(p=>p.y)),ymax=Math.max(...ps.map(p=>p.y));
+  if(xmax===xmin){xmin-=1;xmax+=1}
+  const folga=((ymax-ymin)||Math.abs(ymax)*0.1||1)*0.12;ymin-=folga;ymax+=folga;
+  const sx=stravaEscala(xmin,xmax,PL,W-PR),sy=stravaEscala(ymin,ymax,H-PB,PT);
+  const datas=ps.some(p=>typeof p.xo==='string'),rotX=stravaRotEixoX(datas,xmax-xmin>120,fmtX);
+  let s='';
+  stravaTicks(ymin,ymax,4).forEach(t=>{const y=sy(t);s+=`<line x1="${PL}" x2="${W-PR}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--linha)"/>`+stravaSvgTexto(PL-6,y+3.5,fmtY(t),'text-anchor="end"')});
+  stravaTicks(xmin,xmax,5).forEach(t=>{s+=stravaSvgTexto(sx(t),H-8,rotX(t),'text-anchor="middle"')});
+  if(ps.length>=3){ // tendência por mínimos quadrados
+    const n=ps.length,mx=ps.reduce((t,p)=>t+p.x,0)/n,my=ps.reduce((t,p)=>t+p.y,0)/n;
+    let num=0,den=0;ps.forEach(p=>{num+=(p.x-mx)*(p.y-my);den+=(p.x-mx)*(p.x-mx)});
+    if(den>0){const b=num/den,a=my-b*mx,y1=a+b*xmin,y2=a+b*xmax;
+      s+=`<line x1="${sx(xmin).toFixed(1)}" y1="${sy(Math.min(ymax,Math.max(ymin,y1))).toFixed(1)}" x2="${sx(xmax).toFixed(1)}" y2="${sy(Math.min(ymax,Math.max(ymin,y2))).toFixed(1)}" stroke="var(--suave)" stroke-width="1.5" stroke-dasharray="4 3"/>`}}
+  ps.forEach(p=>{s+=`<circle cx="${sx(p.x).toFixed(1)}" cy="${sy(p.y).toFixed(1)}" r="4" fill="var(--verde)" fill-opacity=".75"><title>${esc(p.rot||fmtY(p.y)+' · '+rotX(p.x))}</title></circle>`});
+  return `<svg class="stv-graf" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gráfico de dispersão">${s}</svg>`;
+}
+
+function stvGrafAreaEmpilhada({meses=[],largura=600}={}){
+  const ms=(meses||[]).filter(m=>m&&m.mes).map(m=>({mes:String(m.mes),corrida:Math.max(0,+m.corrida||0),musculacao:Math.max(0,+m.musculacao||0),escada:Math.max(0,+m.escada||0),outros:Math.max(0,+m.outros||0)}));
+  if(!ms.length)return stravaSemGraf;
+  const K=[['corrida','Corrida','var(--verde)'],['musculacao','Musculação','var(--azul)'],['escada','Stair Stepper','var(--areia)'],['outros','Outros','var(--roxo)']];
+  const W=Math.max(240,+largura||600),H=170,PL=48,PR=10,PT=12,PB=26,n=ms.length;
+  const sx=i=>n>1?PL+i*(W-PL-PR)/(n-1):(PL+W-PR)/2;
+  const totais=ms.map(m=>K.reduce((t,[k])=>t+m[k],0)),vmax=Math.max(1,...totais)*1.1,sy=stravaEscala(0,vmax,H-PB,PT);
+  let s='';
+  stravaTicks(0,vmax,4).forEach(t=>{const y=sy(t);s+=`<line x1="${PL}" x2="${W-PR}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="var(--linha)"/>`+stravaSvgTexto(PL-6,y+3.5,stravaMin(t),'text-anchor="end"')});
+  let base=ms.map(()=>0);
+  K.forEach(([k,nome,cor])=>{
+    const topo=ms.map((m,i)=>base[i]+m[k]);
+    if(n===1){const alt=sy(base[0])-sy(topo[0]);if(alt>0)s+=`<rect x="${(sx(0)-30).toFixed(1)}" y="${sy(topo[0]).toFixed(1)}" width="60" height="${alt.toFixed(1)}" fill="${cor}"/>`}
+    else{const d=topo.map((v,i)=>(i?'L':'M')+sx(i).toFixed(1)+' '+sy(v).toFixed(1)).join(' ')+' '+base.map((v,i)=>'L'+sx(i).toFixed(1)+' '+sy(v).toFixed(1)).reverse().join(' ')+' Z';
+      s+=`<path d="${d}" fill="${cor}" fill-opacity=".85" stroke="var(--card)" stroke-width=".5"/>`}
+    base=topo;
+  });
+  ms.forEach((m,i)=>{if(n<=12||i%2===0)s+=stravaSvgTexto(sx(i),H-8,stravaMesCurto(m.mes)||m.mes,'text-anchor="middle"');
+    const t=stravaMesRot(m.mes)+' · '+K.map(([k,nome])=>nome+' '+stravaMin(m[k])).join(' · ');
+    const larg=n>1?(W-PL-PR)/(n-1):W-PL-PR;
+    s+=`<rect x="${(sx(i)-larg/2).toFixed(1)}" y="${PT}" width="${larg.toFixed(1)}" height="${H-PB-PT}" fill="transparent"><title>${esc(t)}</title></rect>`});
+  return `<svg class="stv-graf" viewBox="0 0 ${W} ${H}" role="img" aria-label="Minutos por modalidade ao longo do ano">${s}</svg>`;
+}
+
+function stvGrafDonut({fatias=[],centro='',fmt=null}={}){
+  const CORES=['var(--verde)','var(--azul)','var(--areia)','var(--roxo)'];
+  let fs=(fatias||[]).filter(f=>f&&+f.v>0).map(f=>({rot:String(f.rot||''),v:+f.v,cor:f.cor||''})).sort((a,b)=>b.v-a.v);
+  if(fs.length>4){const resto=fs.slice(3);fs=fs.slice(0,3).concat([{rot:'Outros ('+resto.length+')',v:resto.reduce((t,f)=>t+f.v,0),cor:''}])}
+  fs.forEach((f,i)=>{if(!f.cor)f.cor=CORES[i%CORES.length]});
+  const total=fs.reduce((t,f)=>t+f.v,0);if(!(total>0))return stravaSemGraf;
+  const R=60,r=38,C=80,S=160,pt=(a,rad)=>[(C+rad*Math.cos(a)).toFixed(2),(C+rad*Math.sin(a)).toFixed(2)];
+  let ang=-Math.PI/2,s='';
+  fs.forEach(f=>{
+    const frac=f.v/total,a2=ang+frac*2*Math.PI,grande=frac>0.5?1:0,t=esc(f.rot+': '+stravaN(frac*100)+'%'+(fmt?' · '+fmt(f.v):''));
+    if(frac>=0.9999)s+=`<circle cx="${C}" cy="${C}" r="${(R+r)/2}" fill="none" stroke="${f.cor}" stroke-width="${R-r}"><title>${t}</title></circle>`;
+    else{const [x1,y1]=pt(ang,R),[x2,y2]=pt(a2,R),[x3,y3]=pt(a2,r),[x4,y4]=pt(ang,r);
+      s+=`<path d="M${x1} ${y1} A${R} ${R} 0 ${grande} 1 ${x2} ${y2} L${x3} ${y3} A${r} ${r} 0 ${grande} 0 ${x4} ${y4} Z" fill="${f.cor}" stroke="var(--card)" stroke-width="1.5"><title>${t}</title></path>`}
+    ang=a2;
+  });
+  if(centro)s+=`<text x="${C}" y="${C+4}" text-anchor="middle" font-size="12" font-weight="600" fill="var(--tinta)">${esc(centro)}</text>`;
+  return `<svg class="stv-graf stv-donut" viewBox="0 0 ${S} ${S}" role="img" aria-label="Distribuição${centro?' · '+esc(centro):''}">${s}</svg>`;
+}
+/* ================== FIM STRAVA ================== */
 function vDocumentos(m){
   m.classList.add('workspace-layout','documentos-workspace','planos-documents');
   const lista=E.documentos,donos=[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...lista.map(d=>d.dono||'Léo')])];
