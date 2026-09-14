@@ -137,6 +137,8 @@ tr:hover .lixo{opacity:1}
 .cartao .vl{font-family:Fraunces,serif;font-size:16px;margin-left:auto;font-variant-numeric:tabular-nums}
 
 /* Google Drive */
+.dv-planilha{height:72vh;min-height:420px;border:1px solid var(--linha);border-radius:10px;overflow:hidden;background:#fff;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px}
+.dv-planilha iframe{width:100%;height:100%;border:0;display:block}
 .dv-trilha{display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:13px;margin:-6px 0 14px}
 .dv-trilha button{border:0;background:none;font:inherit;color:var(--verde);cursor:pointer;padding:3px 6px;border-radius:7px}
 .dv-trilha button:hover{background:var(--verde-cl)}
@@ -868,6 +870,7 @@ const SEED={
   // Sem dados pessoais aqui: o HTML é público. Tudo vem da nuvem após o login.
   viagens:[],
   strava:{tenis:{},metas:[],dicasDispensadas:{}},
+  planilhas:[],
   rendHist:{anos:[],empresas:{},totalAno:[],totalGeral:0,mediaAnual:0,parciais:[],aIdentificar:[],aplicPorInst:{},detalhe:{}},
   rendimentos:[],gastos:[],agenda:[],demandas:[],peso:[],exames:[],tratamentos:[],
   /* Fortemais: as FICHAS das obras e os APORTES moram aqui (são dezenas de linhas,
@@ -9463,8 +9466,114 @@ function driveTabela(arquivos,{caminho=false,vazio='Nada por aqui.'}={}){
   return t;
 }
 /* ---------- a tela ---------- */
+/* ================== PLANILHAS ==================
+   O resto desta tela é somente leitura, de propósito (drive.readonly). Aqui é
+   outra coisa: o editor do PRÓPRIO Google, dentro de um quadro. Quem autoriza a
+   edição é a sessão do Google DESTE NAVEGADOR — não o crachá que a Central
+   guarda no servidor. São dois caminhos diferentes, e é por isso que nada aqui
+   passa pela API do Drive: a Central continua sem permissão de escrita.
+
+   O LINK NUNCA MORA NO CÓDIGO. O id de uma planilha é a chave dela: quem tem o
+   id abre o documento. Este arquivo é servido em github.io para qualquer pessoa
+   do mundo, então a lista vive em E.planilhas — estado do dono, que vai para a
+   nuvem dele e não para o HTML público. */
+const PLANILHA_LINK=/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]{20,})/;
+function driveLinkPlanilha(url){
+  const t=String(url||'').trim(),m=t.match(PLANILHA_LINK);
+  if(!m)return null;
+  const g=t.match(/[#&?]gid=(\d+)/);
+  return {sheetId:m[1],gid:g?g[1]:''};
+}
+const planilhaLista=()=>Array.isArray(E.planilhas)?E.planilhas:(E.planilhas=[]);
+const planilhaUrlEditor=p=>'https://docs.google.com/spreadsheets/d/'+encodeURIComponent(p.sheetId)+'/edit?rm=minimal'+(p.gid?'&gid='+encodeURIComponent(p.gid):'');
+const planilhaUrlGoogle=p=>'https://docs.google.com/spreadsheets/d/'+encodeURIComponent(p.sheetId)+'/edit'+(p.gid?'#gid='+encodeURIComponent(p.gid):'');
+function planilhaAbrirNoGoogle(p){const u=urlSegura(planilhaUrlGoogle(p));if(u!=='#')window.open(u,'_blank','noopener')}
+
+function modalPlanilha(p,aoFechar){
+  const novo=!p,d=novo?{nome:'',link:''}:{nome:p.nome||'',link:planilhaUrlGoogle(p)};
+  abrirModal(novo?'Nova planilha':'Editar planilha',
+    'Cole o link do Google Planilhas. Ele fica guardado na sua nuvem — nunca no código do site, que é público.',
+    (c,fechar)=>{
+      const s=el('<div class="secao"></div>');
+      s.appendChild(campos(d,[
+        {k:'nome',t:'Nome que aparece na lista',full:true},
+        {k:'link',t:'Link da planilha',full:true,ph:'https://docs.google.com/spreadsheets/d/…'}]));
+      c.appendChild(s);
+      const aviso=el('<p class="dv-nota" role="alert"></p>');c.appendChild(aviso);
+      const acoes=el('<div class="secao"></div>');
+      acoes.appendChild(acao('Salvar',()=>{
+        const nome=String(d.nome||'').trim(),dados=driveLinkPlanilha(d.link);
+        if(!nome){aviso.textContent='Dê um nome para reconhecer a planilha na lista.';return}
+        if(!dados){aviso.textContent='Esse link não é de uma planilha do Google. Abra a planilha e copie o endereço da barra do navegador.';return}
+        if(novo)planilhaLista().push({id:uid(),nome,...dados,em:hoje()});
+        else Object.assign(p,{nome,...dados});
+        salvar();fechar();
+      }));
+      if(!novo)acoes.appendChild(acao('Remover da lista',()=>{
+        if(!confirm('Tirar “'+(p.nome||'planilha')+'” da lista?\n\nA planilha continua no Google, intacta. Sai só o atalho daqui.'))return;
+        E.planilhas=planilhaLista().filter(x=>x!==p);
+        if(filtro.drive&&filtro.drive.planilha===p.id)filtro.drive.planilha='';
+        salvar();fechar();
+      },'ghost'));
+      c.appendChild(acoes);
+    },aoFechar);
+}
+
+/* O quadro com o editor do Google. Se o Google recusar ser embutido, o quadro
+   vem em branco e o navegador NÃO avisa — por isso a conferência: um quadro
+   recusado fica em about:blank, que é mesma origem e dá para ler. */
+function planilhaQuadro(p,r){
+  const cx=el('<div></div>');
+  const barra=el('<div class="painel"></div>');
+  barra.appendChild(acao('← Todas as planilhas',()=>{filtro.drive.planilha='';r()},'ghost'));
+  barra.appendChild(el('<span class="cresce"></span>'));
+  barra.appendChild(acao('Editar atalho',()=>modalPlanilha(p,r),'ghost'));
+  barra.appendChild(acao('Abrir no Google ↗',()=>planilhaAbrirNoGoogle(p),'ghost'));
+  cx.appendChild(barra);
+  const quadro=el('<div class="dv-planilha"></div>');
+  const f=document.createElement('iframe');
+  f.title='Planilha '+(p.nome||'');f.referrerPolicy='no-referrer-when-downgrade';
+  quadro.appendChild(f);cx.appendChild(quadro);
+  const nota=el('<p class="dv-nota">A edição usa a conta Google deste navegador — não o acesso que a Central guarda. Se pedir permissão, entre no Google com a conta dona da planilha.</p>');
+  cx.appendChild(nota);
+  const conferir=()=>{
+    if(!quadro.isConnected)return;
+    let recusado=false;
+    try{const doc=f.contentDocument;if(doc&&doc.location&&doc.location.href==='about:blank')recusado=true}catch(_){recusado=false}
+    if(!recusado)return;
+    quadro.replaceChildren(el('<div class="vazio">O Google não deixou esta planilha ser aberta aqui dentro.</div>'));
+    const b=acao('Abrir no Google ↗',()=>planilhaAbrirNoGoogle(p));quadro.appendChild(b);
+  };
+  f.onload=()=>setTimeout(conferir,400);
+  setTimeout(conferir,9000);
+  f.src=planilhaUrlEditor(p);
+  return bloco('dv-planilha-aberta','📊 '+esc(p.nome||'Planilha'),'editando aqui dentro, no editor do Google',cx);
+}
+
+function blocoPlanilhas(r){
+  const D=filtro.drive,lista=planilhaLista();
+  const aberta=lista.find(x=>x.id===D.planilha);
+  if(aberta)return planilhaQuadro(aberta,r);
+  const cx=el('<div class="corpo"></div>');
+  const acoes=el('<div class="painel"></div>');
+  acoes.appendChild(acao('+ Planilha',()=>modalPlanilha(null,r)));
+  cx.appendChild(acoes);
+  if(!lista.length){
+    cx.appendChild(el('<div class="vazio">Nenhuma planilha guardada. Clique em “+ Planilha” e cole o link — ela passa a abrir por aqui, já no modo de edição.</div>'));
+    return bloco('dv-planilhas','📊 Planilhas','as que você mexe, abertas e editadas dentro da Central',cx);
+  }
+  const g=el('<div class="dv-pastas"></div>');
+  lista.forEach(pl=>{
+    const b=el(`<button class="dv-pasta" title="${esc(pl.nome||'')}"><span class="ic">📊</span><span style="min-width:0"><div class="nm">${esc(pl.nome||'sem nome')}</div><div class="sub">abrir e editar aqui</div></span></button>`);
+    b.onclick=()=>{filtro.drive.planilha=pl.id;r()};
+    g.appendChild(b);
+  });
+  cx.appendChild(g);
+  return bloco('dv-planilhas','📊 Planilhas','as que você mexe, abertas e editadas dentro da Central',cx);
+}
+
 function vDrive(m){
-  if(!filtro.drive)filtro.drive={pasta:'root',trilha:[{id:'root',nome:'Meu Drive'}],trilhaPendente:'',modo:'pastas',busca:'',digitado:'',tipo:''};
+  if(!filtro.drive)filtro.drive={pasta:'root',trilha:[{id:'root',nome:'Meu Drive'}],trilhaPendente:'',modo:'pastas',busca:'',digitado:'',tipo:'',planilha:''};
   const D=filtro.drive,r=rr('drive');
   m.appendChild(cab('Google Drive','Suas pastas e arquivos, para ver e baixar sem sair daqui. Nada aqui apaga, move ou renomeia — o acesso é somente de leitura.'));
   if(driveAvisoVolta){
@@ -9504,7 +9613,7 @@ function vDrive(m){
   busca.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();buscar()}};
   barra.append(busca,tipo,acao('Buscar',buscar));
   barra.appendChild(el('<span class="div"></span>'));
-  [['pastas','📁 Meu Drive'],['compartilhados','🤝 Compartilhados comigo'],['estrela','⭐ Com estrela'],['recentes','🕒 Recentes']].forEach(([modo,rot])=>{
+  [['pastas','📁 Meu Drive'],['compartilhados','🤝 Compartilhados comigo'],['estrela','⭐ Com estrela'],['recentes','🕒 Recentes'],['planilhas','📊 Planilhas']].forEach(([modo,rot])=>{
     const b=acao(rot,()=>{D.modo=modo;D.busca='';D.digitado='';if(modo==='pastas'){D.pasta='root';D.trilha=[{id:'root',nome:'Meu Drive'}];D.trilhaPendente=''}r()},(D.modo===modo?'':'ghost'));barra.appendChild(b)});
   barra.appendChild(el('<span class="cresce"></span>'));
   const cota=el('<div class="dv-cota" title="Espaço usado na conta Google inteira (Drive, Gmail e Fotos)"><span>Conta Google: …</span></div>');barra.appendChild(cota);
@@ -9519,6 +9628,9 @@ function vDrive(m){
   driveSobre().then(s=>{const q=s.storageQuota||{},uso=+q.usage||0,lim=+q.limit||0;const pct=lim?Math.min(100,uso/lim*100):0;
     cota.innerHTML=`<span>Conta Google: ${tamanho(uso)}${lim?' de '+tamanho(lim):''}</span>${lim?`<div class="tr"><div class="b${pct>90?' cheia':''}" style="width:${pct.toFixed(0)}%"></div></div>`:''}`;
   }).catch(()=>{cota.textContent=''});
+  /* Planilhas é outra história: não lista o Drive, abre o editor do Google.
+     Sai antes da trilha, das pastas e do Raio-X, que não valem aqui. */
+  if(D.modo==='planilhas'){m.appendChild(blocoPlanilhas(r));return}
   // ---- trilha ----
   const cabecalhoLista=el('<nav class="dv-trilha" aria-label="Caminho"></nav>');
   if(D.modo==='pastas'){
