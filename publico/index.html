@@ -11082,10 +11082,10 @@ function stravaAbaRelatorios(cx,dados,largo){
 
   /* ---- corpo e saúde: não vem do Strava, vem da própria Central ----
      Estas duas seções aparecem SEMPRE, mesmo vazias. Seção que some sozinha faz
-     o dono achar que ela não existe -- e "não medi" é uma informação, não um
+     o dono achar que ela não existe — e "não medi" é uma informação, não um
      motivo para calar. */
   cx.appendChild(bloco('stv-rel-corpo','Corpo','peso, medidas e sinais vitais anotados na Central dentro do período',
-    L.corpo.length?pares(L.corpo):stravaVazio('Nenhuma pesagem ou sinal vital com valor neste período -- registro sem o número não conta. Isso é anotado na tela Saúde.')));
+    L.corpo.length?pares(L.corpo):stravaVazio('Nenhuma pesagem ou sinal vital com valor neste período — registro sem o número não conta. Isso é anotado na tela Saúde.')));
   if(L.exames.length){
     const ge=el('<div class="stv-recs"></div>');
     ge.innerHTML=L.exames.map(x=>`<div class="stv-rec"><div class="stv-rec-cab">${esc(x.rot)}</div><div class="stv-rec-val">${esc(x.valor)}</div><div class="stv-rec-sub">${esc(x.sub)}</div></div>`).join('');
