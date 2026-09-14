@@ -452,7 +452,14 @@ function colunasDoDetalhe(d: Registro, tipo: string): Registro {
   const esf = inteiro(d.suffer_score); if (esf != null) out.esforco = esf;
   const vm = numero(d.max_speed); if (vm != null) out.vel_max = vm;
   const g = gearCurto(d.gear_id); if (g) out.gear_id = g;
-  if (ehCorrida(tipo)) out.best_efforts = esforcosDe(d.best_efforts);
+  /* O ÚNICO campo que já foi escrito sem guarda. Todos os de cima só entram se
+     o Strava mandou valor; este entrava sempre — e `esforcosDe` devolve null
+     quando não vem lista, o que APAGARIA os recordes já gravados. Hoje não
+     morde (perf_lido nunca volta a false, então cada atividade é lida uma vez
+     só), mas no dia em que existir um "reler detalhes" os recordes sumiriam em
+     silêncio, que é justamente como o 1K ficou preso em 2020. Lista vazia é
+     resposta e vale; ausência não. */
+  if (ehCorrida(tipo)) { const be = esforcosDe(d.best_efforts); if (be) out.best_efforts = be; }
   return out;
 }
 
