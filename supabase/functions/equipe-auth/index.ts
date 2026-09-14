@@ -112,6 +112,15 @@ const MODULOS_PAINEL = ["gestao", "contas-atrasadas", "orcamentos",
   // `conferir-sistemas.mjs`, que le esta aqui e teria acusado na hora.
   // O script agora roda no deploy do painel -- ver .github/workflows/pages.yml.
   "campanhas",
+  // 14/09/2026 -- `documentos` ("Documentos e ativos") nasce aqui como modulo
+  // de verdade. Ate hoje a tela nao tinha modulo NENHUM: a rota do Painel
+  // abria sem `Restrito`, o item entrava no menu fora do filtro, e a porta de
+  // dados (painel-ativos) so exigia modulo para marketing/licitacao/predial.
+  // Quem entrasse com um unico modulo de consulta lia -- e APAGAVA -- as
+  // certidoes da empresa, o contrato social, as apolices com a importancia
+  // segurada e a ficha dos carros e maquinas. A tela de conceder acesso
+  // prometia o contrario, com todas as letras.
+  "documentos",
   "patrimonio", "configuracoes"];
 // Calculado na hora de usar, não na carga do módulo: normalizarUsuario é um
 // const declarado mais abaixo, e chamá-lo aqui derruba a function inteira.
