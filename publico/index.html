@@ -9851,7 +9851,19 @@ function stvGpsRuim(a){
   for(const b of (Array.isArray(a.bestEfforts)?a.bestEfforts:[])){if(!b)continue;const d=STV_DISTANCIAS.find(x=>x.tipo===b.tipo);if(!d)continue;const p=stvPace(b.seg,d.distM);if(p!=null&&p<2.5)return true}
   return false}
 // best efforts que valem para recorde: [] se não é corrida, não tem ou o GPS é ruim
-function stvEsforcos(a){if(!stvEhCorrida(a)||!Array.isArray(a.bestEfforts)||stvGpsRuim(a))return [];return a.bestEfforts.filter(b=>b&&b.tipo&&+b.seg>0)}
+/* O Strava batiza a distância ora "1k", ora "1K", e a carga inicial guardou a
+   forma antiga. Como o recorde casa pelo `tipo`, um "Fastest1K" que não bate com
+   "Fastest1k" some em silêncio: o 1K ficou parado em 6:21 de 2020 enquanto havia
+   5:08 guardado. A grafia é acertada aqui, na única porta por onde os esforços
+   entram nos recordes. */
+const STV_TIPO_CANON=(()=>{const m={};
+  for(const d of STV_DISTANCIAS)m[d.tipo.toLowerCase()]=d.tipo;
+  for(const t of ['Fastest30k','Fastest50k','FastestMarathon'])m[t.toLowerCase()]=t;
+  return m})();
+const stvTipoEsforco=t=>{const s=String(t||'');return STV_TIPO_CANON[s.toLowerCase()]||s};
+function stvEsforcos(a){if(!stvEhCorrida(a)||!Array.isArray(a.bestEfforts)||stvGpsRuim(a))return [];
+  return a.bestEfforts.filter(b=>b&&b.tipo&&+b.seg>0)
+    .map(b=>{const t=stvTipoEsforco(b.tipo);return t===b.tipo?b:{...b,tipo:t}})}
 // Corrida "de verdade" para os recordes de FC/cadência e para a eficiência:
 // GPS bom E pace plausível de corrida (até 9:00/km ≈ 6,7 km/h). Caminhada ou
 // registro deixado ligado (98 bpm a 11:07/km, com 47 h de elapsed) não concorre

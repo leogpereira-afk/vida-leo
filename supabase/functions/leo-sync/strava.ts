@@ -104,12 +104,15 @@ const inicioLocalDe = (v: unknown): string | null => {
   return m ? m[0] : null;
 };
 
-// Nome que o Strava dá ao best effort -> tipo canônico que a tela conhece.
+/* Nome que o Strava dá ao best effort -> tipo canônico que a tela conhece.
+   A busca é em minúsculas de propósito: o Strava manda "1K" numas atividades e
+   "1k" noutras, e as duas grafias viravam dois recordes diferentes — o de cima
+   ficava escondido para sempre. */
 const TIPO_ESFORCO: Record<string, string> = {
   "400m": "Fastest400", "1/2 mile": "FastestHalfMile", "1k": "Fastest1k", "1 mile": "FastestMile",
   "2 mile": "Fastest2Mile", "5k": "Fastest5k", "10k": "Fastest10k", "15k": "Fastest15k",
-  "10 mile": "Fastest10Mile", "20k": "Fastest20k", "Half-Marathon": "FastestHalfMarathon",
-  "30k": "Fastest30k", "Marathon": "FastestMarathon", "50k": "Fastest50k",
+  "10 mile": "Fastest10Mile", "20k": "Fastest20k", "half-marathon": "FastestHalfMarathon",
+  "30k": "Fastest30k", "marathon": "FastestMarathon", "50k": "Fastest50k",
 };
 // [{tipo, rotulo, seg}] — o tempo é o elapsed_time, que é o que o Strava exibe.
 function esforcosDe(lista: unknown): Registro[] | null {
@@ -121,7 +124,7 @@ function esforcosDe(lista: unknown): Registro[] | null {
     const seg = inteiro(e.elapsed_time) ?? inteiro(e.moving_time);
     if (!nome || seg == null || seg <= 0) continue;
     out.push({
-      tipo: TIPO_ESFORCO[nome] ?? ("Fastest" + nome.replace(/[^0-9a-zA-Z]/g, "")),
+      tipo: TIPO_ESFORCO[nome.toLowerCase()] ?? ("Fastest" + nome.replace(/[^0-9a-zA-Z]/g, "")),
       rotulo: nome,
       seg,
     });
