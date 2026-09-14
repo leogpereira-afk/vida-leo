@@ -10172,6 +10172,60 @@ function stvRelatorio(atividades,gear,config,hojeStr,periodo){
     tenis:stvTenis(lista,gear,config,j.fim||hojeStr)};
 }
 
+/* ---------- corpo e saúde no relatório ----------
+   NÃO é dado do Strava: peso, medidas, sinais vitais e exames já moram na
+   Central (E.peso, E.vitais, E.exames). Entram aqui porque o relatório de
+   treino sem o corpo conta metade da história — e porque é UM documento que o
+   Léo pode levar ao médico. A função é pura de propósito: recebe as listas,
+   devolve números, e é ela que a tela E o PDF leem.
+
+   Regra: só entra o que foi medido DENTRO da janela. Mostrar a última pesagem
+   de dois anos atrás num relatório "deste mês" seria afirmar o que ninguém
+   mediu. A ALTURA é a exceção declarada — não muda, então vale a última
+   conhecida até o fim da janela, senão o IMC nunca sairia. */
+function stvCorpo(pesos,vitais,exames,janela){
+  const j=janela&&typeof janela==='object'?janela:{ini:'',fim:''};
+  const dentro=d=>!!d&&(!j.ini||d>=j.ini)&&(!j.fim||d<=j.fim);
+  const ate=d=>!!d&&(!j.fim||d<=j.fim);
+  const emOrdem=xs=>stvLista(xs).filter(x=>stvDiaValido(x.data)).sort((a,b)=>a.data<b.data?-1:a.data>b.data?1:0);
+  const n1=v=>+(+v).toFixed(1);
+
+  const todos=emOrdem(pesos).filter(x=>stvNum(x.peso)>0);
+  const comAltura=todos.filter(x=>ate(x.data)&&stvNum(x.altura)>0);
+  const altura=comAltura.length?stvNum(comAltura[comAltura.length-1].altura):null;
+  const naJanela=todos.filter(x=>dentro(x.data));
+  const u=naJanela[naJanela.length-1]||null,pri=naJanela[0]||null;
+  const cint=u&&stvNum(u.cintura)>0?stvNum(u.cintura):null;
+  const peso=u?{
+    kg:n1(stvNum(u.peso)),data:u.data,medicoes:naJanela.length,
+    variacao:pri&&pri!==u?n1(stvNum(u.peso)-stvNum(pri.peso)):null,
+    desde:pri&&pri!==u?pri.data:null,
+    imc:altura>0?n1(stvNum(u.peso)/(altura*altura)):null,
+    cintura:cint,
+    cinturaAltura:altura>0&&cint?+(cint/(altura*100)).toFixed(2):null
+  }:null;
+
+  const v=emOrdem(vitais).filter(x=>dentro(x.data));
+  const uv=v[v.length-1]||null;
+  const sinais=uv?{data:uv.data,medicoes:v.length,
+    sistolica:stvNum(uv.sis)>0?stvNum(uv.sis):null,
+    diastolica:stvNum(uv.dia)>0?stvNum(uv.dia):null,
+    fc:stvNum(uv.fc)>0?stvNum(uv.fc):null}:null;
+
+  /* um por marcador: o mais recente dentro da janela (a lista vem em ordem, o
+     último a sobrescrever é o mais novo) */
+  const porMarcador={};
+  for(const x of emOrdem(exames)){
+    const k=String((x&&x.exame)||'').trim();if(!k||!dentro(x.data))continue;
+    porMarcador[k]={exame:k,data:x.data,
+      valor:String(x.valor==null?'':x.valor).trim(),
+      situacao:String((x&&x.resultado)||'').trim()};
+  }
+  const listaEx=Object.keys(porMarcador).map(k=>porMarcador[k])
+    .sort((a,b)=>a.data<b.data?1:a.data>b.data?-1:a.exame.localeCompare(b.exame));
+  return {altura,peso,sinais,exames:listaEx};
+}
+
 function stvDados(atividades,gear,config,hojeStr){
   const lista=stvLista(atividades);
   const hoje=stvDiaValido(hojeStr)?hojeStr:(stvUltimoDia(lista)||'');
@@ -10920,7 +10974,7 @@ function stravaRelJanelaTexto(j){
   return fmtDataAno(j.ini)+' a '+fmtDataAno(j.fim);
 }
 /* As linhas de cada quadro, em pares [rótulo, valor]. Servem à tela e ao papel. */
-function stravaRelLinhas(rel,nomeT){
+function stravaRelLinhas(rel,nomeT,corpo){
   const g=rel.geral,c=rel.corrida;
   const geral=[
     ['Treinos',stravaN(g.treinos)],
@@ -10955,7 +11009,25 @@ function stravaRelLinhas(rel,nomeT){
   const tenis=(rel.tenis||[]).filter(t=>+t.kmAtividades>0)
     .map(t=>({rot:(nomeT&&nomeT[String(t.gearId)])||t.nome||'sem registro',
       valor:tudo?stravaKmN(t.km):stravaKmN(t.kmAtividades)+' no período · '+stravaKmN(t.km)+' no total'}));
-  return {geral,corrida,assuntos,meses,recordes,tenis};
+  /* corpo e saúde: mesma porta, para o papel não discordar da tela */
+  const cp=corpo&&typeof corpo==='object'?corpo:{peso:null,sinais:null,exames:[]};
+  const body=[];
+  if(cp.peso){
+    body.push(['Peso',stravaN(cp.peso.kg,1)+' kg · '+fmtDataAno(cp.peso.data)]);
+    if(cp.peso.variacao!=null)body.push(['Variação no período',(cp.peso.variacao>0?'+':'')+stravaN(cp.peso.variacao,1)+' kg desde '+fmtDataAno(cp.peso.desde)]);
+    if(cp.peso.imc!=null)body.push(['IMC',stravaN(cp.peso.imc,1)+(cp.altura?' · altura '+stravaN(cp.altura,2)+' m':'')]);
+    if(cp.peso.cintura!=null)body.push(['Cintura',stravaN(cp.peso.cintura,0)+' cm'+(cp.peso.cinturaAltura!=null?' · cintura/altura '+stravaN(cp.peso.cinturaAltura,2):'')]);
+    body.push(['Pesagens no período',stravaN(cp.peso.medicoes)]);
+  }
+  if(cp.sinais){
+    const pa=cp.sinais.sistolica!=null&&cp.sinais.diastolica!=null?stravaN(cp.sinais.sistolica,0)+'/'+stravaN(cp.sinais.diastolica,0)+' mmHg':null;
+    if(pa)body.push(['Pressão',pa+' · '+fmtDataAno(cp.sinais.data)]);
+    if(cp.sinais.fc!=null)body.push(['Batimentos em repouso',stravaN(cp.sinais.fc,0)+' bpm · '+fmtDataAno(cp.sinais.data)]);
+  }
+  const exames=(cp.exames||[]).map(x=>({rot:x.exame,
+    valor:x.valor||(x.situacao||'—'),
+    sub:fmtDataAno(x.data)+(x.valor&&x.situacao?' · '+x.situacao:'')}));
+  return {geral,corrida,assuntos,meses,recordes,tenis,corpo:body,exames};
 }
 const STRAVA_REL_COL_ASSUNTO=['Assunto','Sessões','Dias','Tempo','Média','Calorias','Distância','FC média'];
 const STRAVA_REL_COL_MES=['Mês','Dias','Treinos','Corrida','Tempo','Calorias'];
@@ -10964,22 +11036,23 @@ function stravaAbaRelatorios(cx,dados,largo){
   const h=hoje(),cfg=stravaConfig(),A=dados.atividades||[],G=dados.gear||[],r=stravaR(cx);
   if(!A.length){cx.appendChild(stravaVazio('Ainda não há treinos carregados do Strava. Sincronize e volte aqui.'));return}
   const per=stravaRelPeriodo(),rel=stvRelatorio(A,G,cfg,h,per);
-  const nomeT=stravaMapaTenis(stvTenis(A,G,cfg,h)),L=stravaRelLinhas(rel,nomeT);
+  const corpo=stvCorpo(E&&E.peso,E&&E.vitais,E&&E.exames,rel.janela);
+  const nomeT=stravaMapaTenis(stvTenis(A,G,cfg,h)),L=stravaRelLinhas(rel,nomeT,corpo);
 
   const barra=el('<div class="stv-filtros" role="group" aria-label="Período do relatório"></div>');
   STV_REL_PERIODOS.forEach(([id,nome])=>{const b=acao(nome,()=>{filtro.stravaRelPeriodo=id;r()},id===per?'':'ghost');
     b.setAttribute('aria-pressed',String(id===per));barra.appendChild(b)});
   barra.appendChild(el('<span class="cresce"></span>'));
-  barra.appendChild(acao('🖨 Salvar em PDF',()=>stravaRelatorioImprimir(rel,nomeT),'ghost'));
+  barra.appendChild(acao('🖨 Salvar em PDF',()=>stravaRelatorioImprimir(rel,nomeT,corpo),'ghost'));
   cx.appendChild(barra);
-
-  if(!rel.geral.treinos){
-    cx.appendChild(stravaVazio('Nenhum treino em '+STRAVA_REL_ROTULO[per].toLowerCase()+'. Escolha outro período.'));
-    return;
-  }
 
   const pares=linhas=>{const d=el('<div class="stv-meta-tab"></div>');
     d.innerHTML=linhas.map(([k,v])=>`<span>${esc(k)}</span><span>${esc(v)}</span>`).join('');return d};
+  /* Sem treino no período o relatório NÃO acaba: peso, pressão e exames são
+     outro assunto e podem muito bem ter medição no mesmo período. */
+  const semTreino=!rel.geral.treinos;
+  if(semTreino)cx.appendChild(stravaVazio('Nenhum treino em '+STRAVA_REL_ROTULO[per].toLowerCase()+'.'));
+  if(!semTreino){
   cx.appendChild(bloco('stv-rel-geral','Visão geral',esc(stravaRelJanelaTexto(rel.janela)),pares(L.geral)));
 
   const tAss=el('<div class="stv-rol-x"></div>');
@@ -11005,14 +11078,25 @@ function stravaAbaRelatorios(cx,dados,largo){
     tt.innerHTML=L.tenis.map(x=>`<span>${stvIcone('tenis')} ${esc(x.rot)}</span><span>${esc(x.valor)}</span>`).join('');
     cx.appendChild(bloco('stv-rel-tenis','Tênis',esc(stravaRelPeriodo()==='tudo'?'quilometragem que o Strava acumula em cada par':'o que rodou no período e o total que o Strava acumula em cada par'),tt));
   }
+  }
+
+  /* ---- corpo e saúde: não vem do Strava, vem da própria Central ---- */
+  if(L.corpo.length)cx.appendChild(bloco('stv-rel-corpo','Corpo','peso, medidas e sinais vitais anotados na Central dentro do período',pares(L.corpo)));
+  if(L.exames.length){
+    const ge=el('<div class="stv-recs"></div>');
+    ge.innerHTML=L.exames.map(x=>`<div class="stv-rec"><div class="stv-rec-cab">${esc(x.rot)}</div><div class="stv-rec-val">${esc(x.valor)}</div><div class="stv-rec-sub">${esc(x.sub)}</div></div>`).join('');
+    cx.appendChild(bloco('stv-rel-exames','Exames','o resultado mais recente de cada marcador dentro do período',ge));
+  }
+  if(!L.corpo.length&&!L.exames.length)
+    cx.appendChild(bloco('stv-rel-corpo','Corpo e exames','',stravaVazio('Nenhuma pesagem, sinal vital ou exame anotado neste período. Eles são registrados na tela Saúde.')));
 }
 
 /* O PDF: a mesma conta, em papel. Segue o jeito da casa — abre uma janela,
    escreve o documento e manda imprimir; o navegador oferece "Salvar em PDF". */
-function stravaRelatorioImprimir(rel,nomeT){
+function stravaRelatorioImprimir(rel,nomeT,corpo){
   const w=window.open('','_blank');
   if(!w){alert('Libere o pop-up para gerar o PDF.');return}
-  const L=stravaRelLinhas(rel,nomeT);
+  const L=stravaRelLinhas(rel,nomeT,corpo);
   const per=STRAVA_REL_ROTULO[rel.janela.periodo]||'Período';
   const linhas=ls=>ls.map(([k,v])=>`<div class="l"><b>${esc(k)}</b>${esc(v)}</div>`).join('');
   const tabela=(cols,corpo)=>`<table><thead><tr>${cols.map((c,i)=>`<th${i?' class="n"':''}>${esc(c)}</th>`).join('')}</tr></thead><tbody>${corpo}</tbody></table>`;
@@ -11043,6 +11127,8 @@ function stravaRelatorioImprimir(rel,nomeT){
   <h2>Mês a mês</h2>
   ${tabela(STRAVA_REL_COL_MES,L.meses.map(m=>`<tr><td>${esc(m.rot)}</td>${m.celulas.map(v=>`<td class="n">${esc(v)}</td>`).join('')}</tr>`).join(''))}
   ${L.tenis.length?'<h2>Tênis</h2>'+linhas(L.tenis.map(x=>[x.rot,x.valor])):''}
+  ${L.corpo.length?'<h2>Corpo</h2>'+linhas(L.corpo):''}
+  ${L.exames.length?'<h2>Exames</h2>'+tabela(['Marcador','Resultado','Quando'],L.exames.map(x=>`<tr><td>${esc(x.rot)}</td><td>${esc(x.valor)}</td><td>${esc(x.sub)}</td></tr>`).join('')):''}
   <div class="cab" style="margin-top:24px">Central do Léo · dados do Strava · gerado em ${new Date().toLocaleDateString('pt-BR')}</div>`);
   w.document.close();
   setTimeout(()=>w.print(),400);
