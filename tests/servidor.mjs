@@ -4,7 +4,7 @@ function backend({query=()=>({data:null,error:null}),remove=async()=>({error:nul
  let handler;const calls=[];
  const mock={from(table){const q={table,op:'select',args:{}};for(const m of ['select','eq','order','range','in','limit','maybeSingle','update','insert','upsert','delete'])q[m]=(...a)=>{q.args[m]=a;if(['update','insert','upsert','delete'].includes(m))q.op=m;return q};q.then=(ok,err)=>{calls.push(q);return Promise.resolve(query(q)).then(ok,err)};return q},storage:{from:()=>({remove})}};
  const NativeDate=Date;class Clock extends NativeDate{static now(){return now}}
- vm.runInNewContext(source,{createClient:()=>mock,Deno:{env:{get:n=>n==='EQUIPE_JWT_SECRET'?'teste':'configurado'},serve:h=>handler=h},crypto:webcrypto,TextEncoder,TextDecoder,atob,Response,Date:Clock,setTimeout});
+ vm.runInNewContext(source,{createClient:()=>mock,Deno:{env:{get:n=>n==='EQUIPE_JWT_SECRET'?'teste':'configurado'},serve:h=>handler=h},crypto:webcrypto,TextEncoder,TextDecoder,atob,Response,URL,Date:Clock,setTimeout});
  const head=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base64url'),body=Buffer.from(JSON.stringify({sis:'central',exp:9999999999})).toString('base64url');const unsigned=head+'.'+body;const token=unsigned+'.'+createHmac('sha256','teste').update(unsigned).digest('base64url');
  return {calls,request:(method,payload,auth=true)=>handler(new Request('https://teste.example/leo-sync',{method,headers:auth?{authorization:'Bearer '+token,'content-type':'application/json'}:{},body:payload?JSON.stringify(payload):undefined}))};
 }
