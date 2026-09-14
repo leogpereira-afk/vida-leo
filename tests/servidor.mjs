@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFileSync} from 'node:fs';import {stripTypeScriptTypes} from 'node:module';import {webcrypto,createHmac} from 'node:crypto';
-const source=stripTypeScriptTypes(readFileSync(new URL('../supabase/functions/leo-sync/index.ts',import.meta.url),'utf8').replace(/^import .*;$/m,''));
+const source=stripTypeScriptTypes(readFileSync(new URL('../supabase/functions/leo-sync/index.ts',import.meta.url),'utf8').replace(/^import .*;$/gm,''));
 function backend({query=()=>({data:null,error:null}),remove=async()=>({error:null}),now=1000}={}){
  let handler;const calls=[];
  const mock={from(table){const q={table,op:'select',args:{}};for(const m of ['select','eq','order','range','in','limit','maybeSingle','update','insert','upsert','delete'])q[m]=(...a)=>{q.args[m]=a;if(['update','insert','upsert','delete'].includes(m))q.op=m;return q};q.then=(ok,err)=>{calls.push(q);return Promise.resolve(query(q)).then(ok,err)};return q},storage:{from:()=>({remove})}};
