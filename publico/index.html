@@ -9234,6 +9234,42 @@ const DRIVE_PASTA='application/vnd.google-apps.folder', DRIVE_ATALHO='applicatio
 const driveCache={pastas:{},listas:{},nomes:{root:'Meu Drive'},pais:{},raiz:'',sobre:null,mapa:null,mapeando:null,erroMapa:''};
 // a conexão sozinha é tentada uma vez por sessão; o que o Google disser fica aqui
 let driveAutoTentado=false,driveAutoErro='';
+/* A volta do Google com problema chega como …/vida-leo/?google_erro=<motivo>#drive.
+   Lemos uma vez, tiramos da barra de endereço e explicamos em português. */
+let driveAvisoVolta=(()=>{try{const q=new URLSearchParams(location.search).get('google_erro');if(!q)return '';history.replaceState(null,'',location.pathname+location.hash);return q}catch(e){return ''}})();
+function driveTextoVolta(m){
+  if(m==='negado')return 'Você não autorizou o acesso no Google, então nada foi conectado. Para ligar, clique em “Conectar o Google Drive” e aceite na tela do Google.';
+  if(m==='escopo')return 'A autorização saiu sem a permissão de leitura do Drive. Conecte de novo e deixe a caixa marcada.';
+  if(m==='sem-renovacao')return 'O Google não devolveu a chave de renovação. Tente conectar de novo; se repetir, remova o acesso da Central em myaccount.google.com e conecte outra vez.';
+  if(m==='config')return 'Faltam as chaves do Google no servidor. É configuração de uma vez só.';
+  if(m==='rede')return 'Não foi possível falar com o Google agora. Tente de novo em alguns minutos.';
+  if(m==='banco')return 'A autorização voltou do Google, mas não deu para guardar aqui. Tente conectar de novo.';
+  if(m.indexOf('troca')===0)return 'O Google recusou a autorização'+(m.length>6?' (código '+m.slice(6)+')':'')+'. Confira as chaves do aplicativo no servidor.';
+  return 'A conexão com o Google não foi concluída (motivo: '+m+').';
+}
+/* O caminho curto: o servidor guarda a autorização do Google (chave de
+   renovação) e devolve um crachá de leitura já pronto. Sem janela, sem clique.
+   Só quando ele diz "precisa autorizar" é que a tela pede o clique — uma vez. */
+async function driveCrachaDoServidor(){
+  const r=await apiSync('POST',{acao:'googleToken'});
+  if(!r||!r.token)return false;
+  const vence=Date.parse(r.vence);
+  googleSessao.drive={token:r.token,vence:Number.isFinite(vence)?vence:Date.now()+3000e3};
+  return true;
+}
+async function driveConectar(){
+  // 1) o crachá que o servidor já tem; 2) se não houver, o caminho antigo pelo navegador
+  try{if(await driveCrachaDoServidor())return true}catch(e){}
+  await conectarGoogle('drive');
+  return true;
+}
+// Manda o navegador para a autorização do Google. Uma vez só: depois o servidor renova sozinho.
+async function driveAutorizarNoGoogle(){
+  const r=await apiSync('POST',{acao:'googleAutorizarUrl'});
+  const u=r&&r.url?urlSegura(r.url):'';
+  if(!u||u==='#')throw new Error('o servidor não devolveu o endereço de autorização');
+  location.assign(u);
+}
 function driveLimparCache(){Object.assign(driveCache,{pastas:{},listas:{},nomes:{root:'Meu Drive'},pais:{},raiz:'',sobre:null,mapa:null,mapeando:null,erroMapa:''});driveAutoTentado=true;driveAutoErro=''}
 // texto dentro do `q` da API vai entre aspas simples — escapar o que quebraria
 const driveQ=t=>String(t||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
@@ -9431,6 +9467,11 @@ function vDrive(m){
   if(!filtro.drive)filtro.drive={pasta:'root',trilha:[{id:'root',nome:'Meu Drive'}],trilhaPendente:'',modo:'pastas',busca:'',digitado:'',tipo:''};
   const D=filtro.drive,r=rr('drive');
   m.appendChild(cab('Google Drive','Suas pastas e arquivos, para ver e baixar sem sair daqui. Nada aqui apaga, move ou renomeia — o acesso é somente de leitura.'));
+  if(driveAvisoVolta){
+    const av=el(`<div class="aviso" role="alert">${esc(driveTextoVolta(driveAvisoVolta))}</div>`);
+    av.appendChild(acao('Entendi',()=>{driveAvisoVolta='';tela()},'ghost'));
+    m.appendChild(av);
+  }
   if(!googleConectado('drive')){
     /* Conexão sozinha: com a permissão já dada uma vez, o Google devolve o
        crachá sem abrir janela nenhuma (prompt vazio). Só quando ele recusa em
@@ -9440,16 +9481,17 @@ function vDrive(m){
       driveAutoTentado=true;
       const espera=el('<div class="corpo"><p class="google-nota">Conectando ao Google Drive…</p></div>');
       m.appendChild(bloco('dv-conectar','📁 Google Drive','conexão somente leitura',espera));
-      conectarGoogle('drive').then(()=>{if(atual==='drive')tela()}).catch(e=>{driveAutoErro=e&&e.message||'';if(atual==='drive')tela()});
+      driveConectar().then(()=>{if(atual==='drive')tela()}).catch(e=>{driveAutoErro=e&&e.message||'';if(atual==='drive')tela()});
       return;
     }
     const cx=el('<div class="corpo google-conexao"></div>');
     cx.appendChild(el('<p><b>Conectar o Google Drive</b></p>'));
-    cx.appendChild(el('<p class="google-nota">A Central pede ao Google um acesso <b>somente de leitura</b>: dá para navegar, abrir e baixar; apagar, mover ou renomear continua sendo coisa que só se faz no próprio Drive. A autorização vale só nesta sessão — ao recarregar a página pode ser preciso conectar de novo.</p>'));
+    cx.appendChild(el('<p class="google-nota">A Central pede ao Google um acesso <b>somente de leitura</b>: dá para navegar, abrir e baixar; apagar, mover ou renomear continua sendo coisa que só se faz no próprio Drive. Autorizando desta vez, a Central passa a se conectar sozinha nas próximas — o Google guarda a permissão com o servidor, não com este navegador.</p>'));
     const a=el('<div class="google-acoes"></div>');const status=el('<p role="status" class="google-nota"></p>');
     if(driveAutoErro)status.textContent=driveAutoErro;
-    const b=acao('Conectar Google Drive',async()=>{b.disabled=true;status.textContent='Abrindo a janela do Google…';try{await conectarGoogle('drive');tela()}catch(e){status.textContent=e.message}finally{b.disabled=false}});
-    a.appendChild(b);cx.appendChild(a);cx.appendChild(status);
+    const b=acao('Conectar o Google Drive',async()=>{b.disabled=true;status.textContent='Levando você ao Google…';try{await driveAutorizarNoGoogle()}catch(e){status.textContent=e.message;b.disabled=false}});
+    const b2=acao('Conectar só desta vez',async()=>{b2.disabled=true;status.textContent='Abrindo a janela do Google…';try{await conectarGoogle('drive');tela()}catch(e){status.textContent=e.message}finally{b2.disabled=false}},'ghost');
+    a.appendChild(b);a.appendChild(b2);cx.appendChild(a);cx.appendChild(status);
     m.appendChild(bloco('dv-conectar','📁 Google Drive','conexão somente leitura',cx));
     return;
   }

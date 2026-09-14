@@ -25,6 +25,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 // O Strava mora em strava.ts: aqui só se confere o crachá e se despacha (14/09/2026).
 import { stravaAcao } from "./strava.ts";
+// O Google mora em google.ts: a autorização fica no servidor e a tela recebe só um crachá curto (14/09/2026).
+import { googleAcao } from "./google.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -252,6 +254,17 @@ Deno.serve(async (req: Request) => {
        banco, sincronizar com a API do Strava, montar a URL de autorização).
        O crachá é conferido AQUI, do mesmo jeito que nas outras ações; o
        módulo recebe o pedido já autorizado. */
+    /* ---- GOOGLE (14/09/2026) --------------------------------------
+       Mesmo desenho do Strava: o crachá de renovação fica aqui e a tela do
+       Drive recebe um crachá curto, de leitura. É o que faz a conexão
+       acontecer sozinha, sem o Léo clicar em "Conectar" toda sessão. */
+    if (typeof acao === "string" && acao.startsWith("google")) {
+      const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+      if (!(await tokenOk(t))) return json({ erro: "Não autorizado" }, 401);
+      if (acao === "googleAutorizarUrl") corpo.state = await crachaCurto(10);
+      return await googleAcao(acao, corpo, sb, req, new URL(req.url));
+    }
+
     if (typeof acao === "string" && acao.startsWith("strava")) {
       const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
       if (!(await tokenOk(t))) return json({ erro: "Não autorizado" }, 401);
@@ -510,6 +523,15 @@ Deno.serve(async (req: Request) => {
      redirect_uri usa o sub-caminho: URL limpa para o Strava acrescentar
      ?state=&code=&scope=). */
   // a conferência barata primeiro: só quem cheira a volta do Strava vira URL
+  // volta do Google: mesmo desenho do Strava — o `state` é o crachá curto
+  if (req.method === "GET" && req.url.includes("googleCallback")) {
+    const url = new URL(req.url);
+    if (!(await stateOk(url.searchParams.get("state")))) {
+      return json({ erro: "Crachá inválido ou vencido no retorno do Google. Abra a Central, entre de novo e conecte outra vez." }, 401);
+    }
+    return await googleAcao("googleCallback", {}, sb, req, url);
+  }
+
   if (req.method === "GET" && req.url.includes("stravaCallback")) {
     const url = new URL(req.url);
     if (url.searchParams.get("acao") === "stravaCallback" || /\/stravaCallback\/?$/.test(url.pathname)) {
