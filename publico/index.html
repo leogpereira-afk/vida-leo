@@ -9787,19 +9787,30 @@ function stvIconeModalidade(tipo){
    (nativos, evolução, curva, meta, dados das dicas); continua valendo para
    volume, calorias, streak etc. — ver stvGpsRuim/stvEsforcos. */
 
+/* TUDO o que o Strava mede, em metros. Não é o que a tela mostra — é o que o
+   código PRECISA SABER para transformar um tempo em pace. Separar as duas
+   coisas importa: o Léo não quer milha na tela, mas o detector de GPS ruim
+   continua tendo de enxergar "1 milha em 45 s" para jogar aquela corrida fora,
+   e a grafia de qualquer distância continua sendo acertada na entrada. */
+const STV_DIST_M={
+  Fastest400:400, FastestHalfMile:804.67, Fastest1k:1000, FastestMile:1609.34,
+  Fastest2Mile:3218.69, Fastest5k:5000, Fastest10k:10000, Fastest15k:15000,
+  Fastest10Mile:16093.4, Fastest20k:20000, FastestHalfMarathon:21097.5,
+  Fastest30k:30000, FastestMarathon:42195, Fastest50k:50000
+};
+/* O que a TELA mostra, nesta ordem. Só sistema métrico: milha não diz nada para
+   quem corre no Brasil (pedido do Léo, 14/09/2026). A distância vem do mapa
+   acima para as duas listas nunca discordarem. */
 const STV_DISTANCIAS=[
-  {tipo:'Fastest400',rotulo:'400m',distM:400},
-  {tipo:'FastestHalfMile',rotulo:'1/2 milha',distM:804.67},
-  {tipo:'Fastest1k',rotulo:'1K',distM:1000},
-  {tipo:'FastestMile',rotulo:'1 milha',distM:1609.34},
-  {tipo:'Fastest2Mile',rotulo:'2 milhas',distM:3218.69},
-  {tipo:'Fastest5k',rotulo:'5K',distM:5000},
-  {tipo:'Fastest10k',rotulo:'10K',distM:10000},
-  {tipo:'Fastest15k',rotulo:'15K',distM:15000},
-  {tipo:'Fastest10Mile',rotulo:'10 milhas',distM:16093.4},
-  {tipo:'Fastest20k',rotulo:'20K',distM:20000},
-  {tipo:'FastestHalfMarathon',rotulo:'Meia Maratona',distM:21097.5}
-];
+  {tipo:'Fastest400',rotulo:'400m'},
+  {tipo:'Fastest1k',rotulo:'1K'},
+  {tipo:'Fastest5k',rotulo:'5K'},
+  {tipo:'Fastest10k',rotulo:'10K'},
+  {tipo:'Fastest15k',rotulo:'15K'},
+  {tipo:'Fastest20k',rotulo:'20K'},
+  {tipo:'FastestHalfMarathon',rotulo:'Meia maratona 21K'},
+  {tipo:'FastestMarathon',rotulo:'Maratona 42K'}
+].map(d=>({tipo:d.tipo,rotulo:d.rotulo,distM:STV_DIST_M[d.tipo]}));
 const STV_TIPOS_CORRIDA=['Run','TrailRun','VirtualRun'];
 const STV_MODALIDADES=['corrida','musculacao','escada','outros'];
 
@@ -9842,25 +9853,29 @@ function stvFmtPace(p){const v=+p;if(p==null||!Number.isFinite(v)||v<0)return '�
 function stvFmtTempo(seg){const s=Math.round(+seg);if(seg==null||!Number.isFinite(s)||s<0)return '—';const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return h>0?h+':'+String(m).padStart(2,'0')+':'+String(x).padStart(2,'0'):m+':'+String(x).padStart(2,'0')}
 function stvFmtKm(m){const n=+m;if(m==null||!Number.isFinite(n))return '—';return (n/1000).toFixed(2).replace('.',',')+' km'}
 function stvDia(a){const s=String((a&&a.inicioLocal)||'');return /^\d{4}-\d{2}-\d{2}/.test(s)?s.slice(0,10):''}
-// GPS ruim: pico de velocidade acima de 7 m/s (25 km/h) ou algum best effort
-// que implica pace abaixo de 2:30/km (400 m em 45 s, 5K em 23 min numa corrida
-// de 10 h). velMax ausente não filtra. A atividade em si continua valendo.
-function stvGpsRuim(a){
-  if(!a||typeof a!=='object')return false;
-  const v=a.velMax==null?null:+a.velMax;if(v!=null&&Number.isFinite(v)&&v>7)return true;
-  for(const b of (Array.isArray(a.bestEfforts)?a.bestEfforts:[])){if(!b)continue;const d=STV_DISTANCIAS.find(x=>x.tipo===b.tipo);if(!d)continue;const p=stvPace(b.seg,d.distM);if(p!=null&&p<2.5)return true}
-  return false}
-// best efforts que valem para recorde: [] se não é corrida, não tem ou o GPS é ruim
 /* O Strava batiza a distância ora "1k", ora "1K", e a carga inicial guardou a
    forma antiga. Como o recorde casa pelo `tipo`, um "Fastest1K" que não bate com
    "Fastest1k" some em silêncio: o 1K ficou parado em 6:21 de 2020 enquanto havia
    5:08 guardado. A grafia é acertada aqui, na única porta por onde os esforços
    entram nos recordes. */
 const STV_TIPO_CANON=(()=>{const m={};
-  for(const d of STV_DISTANCIAS)m[d.tipo.toLowerCase()]=d.tipo;
-  for(const t of ['Fastest30k','Fastest50k','FastestMarathon'])m[t.toLowerCase()]=t;
+  for(const t in STV_DIST_M)m[t.toLowerCase()]=t;
   return m})();
 const stvTipoEsforco=t=>{const s=String(t||'');return STV_TIPO_CANON[s.toLowerCase()]||s};
+// GPS ruim: pico de velocidade acima de 7 m/s (25 km/h) ou algum best effort
+// que implica pace abaixo de 2:30/km (400 m em 45 s, 5K em 23 min numa corrida
+// de 10 h). velMax ausente não filtra. A atividade em si continua valendo.
+function stvGpsRuim(a){
+  if(!a||typeof a!=='object')return false;
+  const v=a.velMax==null?null:+a.velMax;if(v!=null&&Number.isFinite(v)&&v>7)return true;
+  /* A MÉDIA da própria atividade abaixo de 2:30/km também é impossível, e sem
+     esta linha ela escapava: velMax ausente não filtra e uma corrida sem best
+     efforts não tinha mais nada para barrá-la. Apareceu ao montar o relatório —
+     ia virar "melhor pace" na tela e no PDF. */
+  const pm=stvPace(a.movingTime,a.distanciaM);if(pm!=null&&pm<2.5)return true;
+  for(const b of (Array.isArray(a.bestEfforts)?a.bestEfforts:[])){if(!b)continue;const m=STV_DIST_M[stvTipoEsforco(b.tipo)];if(!m)continue;const p=stvPace(b.seg,m);if(p!=null&&p<2.5)return true}
+  return false}
+// best efforts que valem para recorde: [] se não é corrida, não tem ou o GPS é ruim
 function stvEsforcos(a){if(!stvEhCorrida(a)||!Array.isArray(a.bestEfforts)||stvGpsRuim(a))return [];
   return a.bestEfforts.filter(b=>b&&b.tipo&&+b.seg>0)
     .map(b=>{const t=stvTipoEsforco(b.tipo);return t===b.tipo?b:{...b,tipo:t}})}
@@ -10099,6 +10114,64 @@ function stvUsoTenisMes(atividades,mesStr){
   return Object.keys(por).map(k=>({gearId:k||null,km:+por[k].toFixed(2),pct:total?Math.round(por[k]/total*100):0})).sort((x,y)=>y.km-x.km)}
 
 /* ---------- o "d" das regras ---------- */
+/* ---------- relatório por período ----------
+   Um número só, calculado uma vez, servido à TELA e ao PDF pela mesma porta.
+   Se cada um fizesse a sua conta, o papel e a tela discordariam no dia em que
+   alguém mexesse num dos dois — e discordar em silêncio é o defeito caro. */
+const STV_REL_PERIODOS=[['mes','Este mês'],['ano','Este ano'],['12m','Últimos 12 meses'],['tudo','Tudo']];
+function stvJanelaRelatorio(periodo,hojeStr){
+  const h=stvDiaValido(hojeStr)?hojeStr:'';
+  const p=STV_REL_PERIODOS.some(x=>x[0]===periodo)?periodo:'ano';
+  if(!h)return {periodo:p,ini:'',fim:''};
+  if(p==='mes')return {periodo:p,ini:h.slice(0,7)+'-01',fim:h};
+  if(p==='ano')return {periodo:p,ini:h.slice(0,4)+'-01-01',fim:h};
+  if(p==='12m')return {periodo:p,ini:stvMesMais(h.slice(0,7),-11)+'-01',fim:h};
+  return {periodo:'tudo',ini:'',fim:h};
+}
+function stvRelatorio(atividades,gear,config,hojeStr,periodo){
+  const j=stvJanelaRelatorio(periodo,hojeStr);
+  const lista=stvLista(atividades).filter(a=>{const d=stvDia(a);return !!d&&(!j.ini||d>=j.ini)&&(!j.fim||d<=j.fim)});
+  const geral=stvResumo(lista,j.ini,j.fim);
+  const media=xs=>xs.length?xs.reduce((t,x)=>t+x,0)/xs.length:null;
+
+  /* por assunto: uma linha por modalidade, só as que tiveram treino */
+  const porAssunto=STV_MODALIDADES.map(mod=>{
+    const itens=lista.filter(a=>stvModalidade(a)===mod);
+    if(!itens.length)return null;
+    const seg=itens.reduce((t,a)=>t+stvNum(a.movingTime),0);
+    const km=itens.reduce((t,a)=>t+stvNum(a.distanciaM),0)/1000;
+    const fcs=itens.map(a=>stvNum(a.fcMedia)).filter(v=>v>0);
+    return {mod,n:itens.length,dias:new Set(itens.map(stvDia)).size,seg,
+      kcal:itens.reduce((t,a)=>t+stvNum(a.calorias),0),km,
+      mediaSeg:seg/itens.length,fcMedia:media(fcs)};
+  }).filter(Boolean).sort((a,b)=>b.seg-a.seg);
+
+  /* corrida: o que só faz sentido para quem corre */
+  const corridas=lista.filter(stvEhCorrida),plausiveis=corridas.filter(stvCorridaPlausivel);
+  let melhor=null,maior=null;
+  for(const a of plausiveis){const p=stvPace(a.movingTime,a.distanciaM);
+    if(p!=null&&(!melhor||p<melhor.pace))melhor={pace:p,dia:stvDia(a),atividadeId:stvId(a.id)}}
+  for(const a of corridas){const km=stvNum(a.distanciaM)/1000;
+    if(km>0&&(!maior||km>maior.km))maior={km,dia:stvDia(a),atividadeId:stvId(a.id)}}
+  const segC=corridas.reduce((t,a)=>t+stvNum(a.movingTime),0),kmC=corridas.reduce((t,a)=>t+stvNum(a.distanciaM),0)/1000;
+  const corrida={n:corridas.length,km:kmC,seg:segC,
+    paceMedio:kmC>0?(segC/60)/kmC:null,melhor,maior,
+    fcMedia:media(plausiveis.map(a=>stvNum(a.fcMedia)).filter(v=>v>0)),
+    recordes:stvRecordesNativos(lista)};
+
+  /* mês a mês, do mais recente para o mais antigo */
+  const porMes={};
+  for(const a of lista){const m=stvDia(a).slice(0,7);const x=porMes[m]||(porMes[m]={mes:m,treinos:0,km:0,seg:0,kcal:0,dias:new Set()});
+    x.treinos++;x.seg+=stvNum(a.movingTime);x.kcal+=stvNum(a.calorias);x.dias.add(stvDia(a));
+    if(stvEhCorrida(a))x.km+=stvNum(a.distanciaM)/1000}
+  const meses=Object.keys(porMes).sort().reverse().map(m=>({...porMes[m],dias:porMes[m].dias.size}));
+
+  const semanas=j.ini&&j.fim?Math.max(1,(stvDiasEntre(j.ini,j.fim)+1)/7):null;
+  return {janela:j,geral,porAssunto,corrida,meses,
+    porSemana:semanas?{treinos:geral.treinos/semanas,km:geral.kmCorrida/semanas}:null,
+    tenis:stvTenis(lista,gear,config,j.fim||hojeStr)};
+}
+
 function stvDados(atividades,gear,config,hojeStr){
   const lista=stvLista(atividades);
   const hoje=stvDiaValido(hojeStr)?hojeStr:(stvUltimoDia(lista)||'');
@@ -10408,7 +10481,7 @@ function vStrava(m){
 }
 
 /* ---------- abas (servem à gaveta e à tela) ---------- */
-const STRAVA_ABAS=[['resumo','Resumo'],['recordes','Recordes'],['tendencias','Tendências'],['tenis','Tênis']];
+const STRAVA_ABAS=[['resumo','Resumo'],['recordes','Recordes'],['tendencias','Tendências'],['tenis','Tênis'],['relatorios','Relatórios']];
 function stravaAbas(cx,{largo=false}={}){
   const ativa=STRAVA_ABAS.some(a=>a[0]===filtro.stravaAba)?filtro.stravaAba:'resumo';filtro.stravaAba=ativa;
   const antigo=cx.querySelector('.stv-corpo'),rolagem=antigo&&cx._stravaAba===ativa?antigo.scrollTop:0;cx._stravaAba=ativa;
@@ -10430,7 +10503,7 @@ function stravaAbas(cx,{largo=false}={}){
     corpo.replaceChildren();
     if(stravaAvisoVolta)corpo.appendChild(stravaCartaoVolta(()=>mostrar(dados)));
     if(precisa)corpo.appendChild(stravaCartaoConectar());
-    const f={resumo:stravaAbaResumo,recordes:stravaAbaRecordes,tendencias:stravaAbaTendencias,tenis:stravaAbaTenis}[ativa];
+    const f={resumo:stravaAbaResumo,recordes:stravaAbaRecordes,tendencias:stravaAbaTendencias,tenis:stravaAbaTenis,relatorios:stravaAbaRelatorios}[ativa];
     try{f(corpo,dados,largo)}
     catch(e){
       const nomeAba=(STRAVA_ABAS.find(a=>a[0]===ativa)||[])[1]||ativa;
@@ -10834,6 +10907,144 @@ function stravaModalMetas(recordes){
     };
     montar();
   },stravaAtualizarGaveta);
+}
+
+/* ================= ABA 5 — RELATÓRIOS =================
+   O que a tela mostra e o que o PDF imprime saem do MESMO stvRelatorio(). Dois
+   caminhos de conta é como um número passa a discordar do outro sem ninguém
+   perceber — e relatório que discorda de si mesmo não serve para decidir nada. */
+function stravaRelPeriodo(){return STV_REL_PERIODOS.some(x=>x[0]===filtro.stravaRelPeriodo)?filtro.stravaRelPeriodo:'ano'}
+const STRAVA_REL_ROTULO={mes:'Este mês',ano:'Este ano','12m':'Últimos 12 meses',tudo:'Todo o histórico'};
+function stravaRelJanelaTexto(j){
+  if(!j.ini)return 'todo o histórico'+(j.fim?' até '+fmtDataAno(j.fim):'');
+  return fmtDataAno(j.ini)+' a '+fmtDataAno(j.fim);
+}
+/* As linhas de cada quadro, em pares [rótulo, valor]. Servem à tela e ao papel. */
+function stravaRelLinhas(rel,nomeT){
+  const g=rel.geral,c=rel.corrida;
+  const geral=[
+    ['Treinos',stravaN(g.treinos)],
+    ['Dias com treino',stravaN(g.dias)],
+    ['Tempo em movimento',stravaDur(g.horas*3600)],
+    ['Calorias',stravaKcal(g.calorias)],
+    ['Corrida',stravaKmN(g.kmCorrida)],
+    ['Recordes no período',stravaN(g.prs)],
+  ];
+  if(rel.porSemana)geral.push(['Média por semana',stravaN(rel.porSemana.treinos,1)+' treinos · '+stravaKmN(rel.porSemana.km)]);
+  const corrida=[
+    ['Corridas',stravaN(c.n)],
+    ['Distância somada',stravaKmN(c.km)],
+    ['Tempo correndo',stravaDur(c.seg)],
+    ['Pace médio',c.paceMedio!=null?stvFmtPace(c.paceMedio):'—'],
+    ['Melhor pace',c.melhor?stvFmtPace(c.melhor.pace)+' · '+fmtDataAno(c.melhor.dia):'—'],
+    ['Corrida mais longa',c.maior?stravaKmN(c.maior.km)+' · '+fmtDataAno(c.maior.dia):'—'],
+    ['FC média',c.fcMedia!=null?stravaN(c.fcMedia,0)+' bpm':'—'],
+  ];
+  const assuntos=rel.porAssunto.map(x=>({
+    nome:STRAVA_MOD_NOME[x.mod]||x.mod,mod:x.mod,
+    celulas:[stravaN(x.n),stravaN(x.dias),stravaDur(x.seg),stravaDur(x.mediaSeg),stravaKcal(x.kcal),
+      x.mod==='corrida'?stravaKmN(x.km):(x.km>0?stravaKmN(x.km):'—'),
+      x.fcMedia!=null?stravaN(x.fcMedia,0)+' bpm':'—'],
+  }));
+  const meses=rel.meses.map(m=>({rot:stravaMesRot(m.mes),
+    celulas:[stravaN(m.dias),stravaN(m.treinos),m.km>0?stravaKmN(m.km):'—',stravaDur(m.seg),stravaKcal(m.kcal)]}));
+  const recordes=STV_DISTANCIAS.map(d=>{const x=c.recordes[d.tipo];
+    return {rot:d.rotulo,valor:x?stvFmtTempo(x.seg):'—',
+      sub:x?stvFmtPace(x.pace)+' · '+fmtDataAno(x.dia):'sem marca no período'}});
+  const tenis=(rel.tenis||[]).filter(t=>+t.kmAtividades>0)
+    .map(t=>({rot:(nomeT&&nomeT[String(t.gearId)])||t.nome||'sem registro',
+      valor:stravaKmN(t.kmAtividades)+' no período · '+stravaKmN(t.km)+' no total'}));
+  return {geral,corrida,assuntos,meses,recordes,tenis};
+}
+const STRAVA_REL_COL_ASSUNTO=['Assunto','Sessões','Dias','Tempo','Média','Calorias','Distância','FC média'];
+const STRAVA_REL_COL_MES=['Mês','Dias','Treinos','Corrida','Tempo','Calorias'];
+
+function stravaAbaRelatorios(cx,dados,largo){
+  const h=hoje(),cfg=stravaConfig(),A=dados.atividades||[],G=dados.gear||[],r=stravaR(cx);
+  if(!A.length){cx.appendChild(stravaVazio('Ainda não há treinos carregados do Strava. Sincronize e volte aqui.'));return}
+  const per=stravaRelPeriodo(),rel=stvRelatorio(A,G,cfg,h,per);
+  const nomeT=stravaMapaTenis(stvTenis(A,G,cfg,h)),L=stravaRelLinhas(rel,nomeT);
+
+  const barra=el('<div class="stv-filtros" role="group" aria-label="Período do relatório"></div>');
+  STV_REL_PERIODOS.forEach(([id,nome])=>{const b=acao(nome,()=>{filtro.stravaRelPeriodo=id;r()},id===per?'':'ghost');
+    b.setAttribute('aria-pressed',String(id===per));barra.appendChild(b)});
+  barra.appendChild(el('<span class="cresce"></span>'));
+  barra.appendChild(acao('🖨 Salvar em PDF',()=>stravaRelatorioImprimir(rel,nomeT),'ghost'));
+  cx.appendChild(barra);
+
+  if(!rel.geral.treinos){
+    cx.appendChild(stravaVazio('Nenhum treino em '+STRAVA_REL_ROTULO[per].toLowerCase()+'. Escolha outro período.'));
+    return;
+  }
+
+  const pares=linhas=>{const d=el('<div class="stv-meta-tab"></div>');
+    d.innerHTML=linhas.map(([k,v])=>`<span>${esc(k)}</span><span>${esc(v)}</span>`).join('');return d};
+  cx.appendChild(bloco('stv-rel-geral','Visão geral',esc(stravaRelJanelaTexto(rel.janela)),pares(L.geral)));
+
+  const tAss=el('<div class="stv-rol-x"></div>');
+  tAss.innerHTML='<table class="stv-tab"><thead><tr>'+STRAVA_REL_COL_ASSUNTO.map((c,i)=>`<th${i?' class="n"':''}>${esc(c)}</th>`).join('')+'</tr></thead><tbody>'
+    +L.assuntos.map(a=>`<tr><td>${stvIcone(a.mod)} ${esc(a.nome)}</td>`+a.celulas.map(v=>`<td class="n">${esc(v)}</td>`).join('')+'</tr>').join('')
+    +'</tbody></table>';
+  cx.appendChild(bloco('stv-rel-assunto','Por assunto','academia, corrida e o resto — tudo que o Strava registrou no período',tAss));
+
+  cx.appendChild(bloco('stv-rel-corrida','Corrida','',pares(L.corrida)));
+
+  const grade=el('<div class="stv-recs"></div>');
+  grade.innerHTML=L.recordes.map(x=>`<div class="stv-rec${x.valor==='—'?' stv-apagado':''}"><div class="stv-rec-cab">${stvIcone('medalha')} ${esc(x.rot)}</div><div class="stv-rec-val">${esc(x.valor)}</div><div class="stv-rec-sub">${esc(x.sub)}</div></div>`).join('');
+  cx.appendChild(bloco('stv-rel-recordes','Melhores marcas do período','',grade));
+
+  const tMes=el('<div class="stv-rol-x"></div>');
+  tMes.innerHTML='<table class="stv-tab"><thead><tr>'+STRAVA_REL_COL_MES.map((c,i)=>`<th${i?' class="n"':''}>${esc(c)}</th>`).join('')+'</tr></thead><tbody>'
+    +L.meses.map(m=>`<tr><td>${esc(m.rot)}</td>`+m.celulas.map(v=>`<td class="n">${esc(v)}</td>`).join('')+'</tr>').join('')
+    +'</tbody></table>';
+  cx.appendChild(bloco('stv-rel-meses','Mês a mês','do mais recente para o mais antigo',tMes));
+
+  if(L.tenis.length){
+    const tt=el('<div class="stv-meta-tab"></div>');
+    tt.innerHTML=L.tenis.map(x=>`<span>${stvIcone('tenis')} ${esc(x.rot)}</span><span>${esc(x.valor)}</span>`).join('');
+    cx.appendChild(bloco('stv-rel-tenis','Tênis','o que rodou no período e o total que o Strava acumula em cada par',tt));
+  }
+}
+
+/* O PDF: a mesma conta, em papel. Segue o jeito da casa — abre uma janela,
+   escreve o documento e manda imprimir; o navegador oferece "Salvar em PDF". */
+function stravaRelatorioImprimir(rel,nomeT){
+  const w=window.open('','_blank');
+  if(!w){alert('Libere o pop-up para gerar o PDF.');return}
+  const L=stravaRelLinhas(rel,nomeT);
+  const per=STRAVA_REL_ROTULO[rel.janela.periodo]||'Período';
+  const linhas=ls=>ls.map(([k,v])=>`<div class="l"><b>${esc(k)}</b>${esc(v)}</div>`).join('');
+  const tabela=(cols,corpo)=>`<table><thead><tr>${cols.map((c,i)=>`<th${i?' class="n"':''}>${esc(c)}</th>`).join('')}</tr></thead><tbody>${corpo}</tbody></table>`;
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>Strava — ${esc(per)}</title>
+  <style>
+    body{font:13px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#222;padding:26px 30px;max-width:900px;margin:0 auto}
+    h1{font-size:21px;margin:0 0 2px}h2{font-size:14px;margin:22px 0 8px;padding-bottom:4px;border-bottom:1px solid #ddd;text-transform:uppercase;letter-spacing:.05em;color:#555}
+    .cab{color:#888;font-size:12px;margin-bottom:6px}
+    .l{padding:4px 0;border-bottom:1px solid #f0ece4}.l b{display:inline-block;min-width:190px;color:#666;font-weight:600}
+    table{border-collapse:collapse;width:100%;margin-bottom:6px}
+    th,td{padding:6px 9px;border-bottom:1px solid #eee;text-align:left;vertical-align:top}
+    th{background:#f4f1ea;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:#555}
+    .n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .recs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+    .rec{border:1px solid #eee;border-radius:6px;padding:7px 9px}
+    .rec b{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:#666}
+    .rec .v{font-size:16px;font-variant-numeric:tabular-nums}.rec small{color:#888}
+    @media print{body{padding:0}h2{page-break-after:avoid}table,.recs{page-break-inside:avoid}}
+  </style>
+  <h1>Relatório de treinos</h1>
+  <div class="cab">${esc(per)} · ${esc(stravaRelJanelaTexto(rel.janela))}</div>
+  <h2>Visão geral</h2>${linhas(L.geral)}
+  <h2>Por assunto</h2>
+  ${tabela(STRAVA_REL_COL_ASSUNTO,L.assuntos.map(a=>`<tr><td>${esc(a.nome)}</td>${a.celulas.map(v=>`<td class="n">${esc(v)}</td>`).join('')}</tr>`).join(''))}
+  <h2>Corrida</h2>${linhas(L.corrida)}
+  <h2>Melhores marcas do período</h2>
+  <div class="recs">${L.recordes.map(x=>`<div class="rec"><b>${esc(x.rot)}</b><span class="v">${esc(x.valor)}</span><br><small>${esc(x.sub)}</small></div>`).join('')}</div>
+  <h2>Mês a mês</h2>
+  ${tabela(STRAVA_REL_COL_MES,L.meses.map(m=>`<tr><td>${esc(m.rot)}</td>${m.celulas.map(v=>`<td class="n">${esc(v)}</td>`).join('')}</tr>`).join(''))}
+  ${L.tenis.length?'<h2>Tênis</h2>'+linhas(L.tenis.map(x=>[x.rot,x.valor])):''}
+  <div class="cab" style="margin-top:24px">Central do Léo · dados do Strava · gerado em ${new Date().toLocaleDateString('pt-BR')}</div>`);
+  w.document.close();
+  setTimeout(()=>w.print(),400);
 }
 
 /* ================= BOTÃO FLUTUANTE + GAVETA ================= */
