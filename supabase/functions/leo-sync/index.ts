@@ -509,7 +509,8 @@ Deno.serve(async (req: Request) => {
      forma ?acao=stravaCallback e o sub-caminho /leo-sync/stravaCallback (o
      redirect_uri usa o sub-caminho: URL limpa para o Strava acrescentar
      ?state=&code=&scope=). */
-  if (req.method === "GET") {
+  // a conferência barata primeiro: só quem cheira a volta do Strava vira URL
+  if (req.method === "GET" && req.url.includes("stravaCallback")) {
     const url = new URL(req.url);
     if (url.searchParams.get("acao") === "stravaCallback" || /\/stravaCallback\/?$/.test(url.pathname)) {
       if (!(await stateOk(url.searchParams.get("state")))) {

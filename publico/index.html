@@ -1652,7 +1652,9 @@ function tela(){
   const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else if(atual==='caixavgv')organizarCaixaVGV(pagina,alvo);else if(atual==='config')organizarConfig(pagina,alvo);else if(atual==='demandas')organizarDemandasTopo(pagina);else indiceDaTela(pagina);prepararTabelas(pagina);if(typeof docIntegrarTela==='function')docIntegrarTela(pagina,atual);if(alvo)rolaAlvo(pagina,alvo)};
   const falhou=()=>{if(pagina.isConnected)pagina.appendChild(el('<p class="aviso" role="alert">Não foi possível concluir o carregamento. Abra esta seção novamente.</p>'))};
   try{const resultado=mod.render(pagina);if(resultado?.then)resultado.then(finalizar).catch(falhou);else finalizar()}catch(erro){falhou()}
-  if(typeof stravaMontarBotao==='function')stravaMontarBotao();
+  /* o botão flutuante é enfeite: se ele falhar (ou o DOM for simulado num teste),
+     a navegação não pode cair junto */
+  try{if(typeof stravaMontarBotao==='function')stravaMontarBotao()}catch(e){console.error('strava/botao',e)}
   return !!alvo;
 }
 const rr=id=>()=>{if(atual===id)tela()};
