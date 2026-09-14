@@ -10311,8 +10311,11 @@ const stravaSegunda=d=>stravaDiaOk(d)?stravaDiaMais(d,-((new Date(Date.UTC(+d.sl
 const stravaMesRot=m=>/^\d{4}-\d{2}/.test(String(m||''))?STRAVA_MESES[+m.slice(5,7)-1]+'/'+m.slice(0,4):'—';
 const stravaMesCurto=m=>/^\d{4}-\d{2}/.test(String(m||''))?STRAVA_MESES[+m.slice(5,7)-1]:'';
 const stravaN=(n,c=0)=>Number.isFinite(+n)&&n!==null&&n!==''?(+n).toLocaleString('pt-BR',{minimumFractionDigits:c,maximumFractionDigits:c}):'—';
-const stravaKcal=n=>stravaN(Math.round(+n||0))+' kcal';
-const stravaKmN=km=>stravaN(km,km>=100?0:1)+' km';
+/* Nada de número na casa do milhar: acima de mil vira "mil" por extenso
+   (32.631 kcal lido de relance engana; "32,6 mil kcal" não). */
+const stravaMil=(n,u)=>{const v=+n||0;return v>=1000?stravaN(v/1000,1)+' mil '+u:stravaN(v)+' '+u};
+const stravaKcal=n=>stravaMil(Math.round(+n||0),'kcal');
+const stravaKmN=km=>{const v=+km||0;return v>=1000?stravaN(v/1000,1)+' mil km':stravaN(v,v>=100?0:1)+' km'};
 function stravaDur(seg){const s=Math.round(+seg||0),h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?h+'h '+String(m).padStart(2,'0')+'min':m+' min'}
 const stravaMin=min=>min>=120?stravaN(min/60,1)+' h':stravaN(min,0)+' min';
 const stravaQuando=a=>{const s=String((a&&a.inicioLocal)||''),d=stvDia(a);return d?fmtDataAno(d)+(s.length>=16?' · '+s.slice(11,16):''):'—'};
