@@ -10951,9 +10951,10 @@ function stravaRelLinhas(rel,nomeT){
   const recordes=STV_DISTANCIAS.map(d=>{const x=c.recordes[d.tipo];
     return {rot:d.rotulo,valor:x?stvFmtTempo(x.seg):'—',
       sub:x?stvFmtPace(x.pace)+' · '+fmtDataAno(x.dia):'sem marca no período'}});
+  const tudo=rel.janela.periodo==='tudo';
   const tenis=(rel.tenis||[]).filter(t=>+t.kmAtividades>0)
     .map(t=>({rot:(nomeT&&nomeT[String(t.gearId)])||t.nome||'sem registro',
-      valor:stravaKmN(t.kmAtividades)+' no período · '+stravaKmN(t.km)+' no total'}));
+      valor:tudo?stravaKmN(t.km):stravaKmN(t.kmAtividades)+' no período · '+stravaKmN(t.km)+' no total'}));
   return {geral,corrida,assuntos,meses,recordes,tenis};
 }
 const STRAVA_REL_COL_ASSUNTO=['Assunto','Sessões','Dias','Tempo','Média','Calorias','Distância','FC média'];
@@ -11002,7 +11003,7 @@ function stravaAbaRelatorios(cx,dados,largo){
   if(L.tenis.length){
     const tt=el('<div class="stv-meta-tab"></div>');
     tt.innerHTML=L.tenis.map(x=>`<span>${stvIcone('tenis')} ${esc(x.rot)}</span><span>${esc(x.valor)}</span>`).join('');
-    cx.appendChild(bloco('stv-rel-tenis','Tênis','o que rodou no período e o total que o Strava acumula em cada par',tt));
+    cx.appendChild(bloco('stv-rel-tenis','Tênis',esc(stravaRelPeriodo()==='tudo'?'quilometragem que o Strava acumula em cada par':'o que rodou no período e o total que o Strava acumula em cada par'),tt));
   }
 }
 
