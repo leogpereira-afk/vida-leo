@@ -11,6 +11,7 @@
 // AÇÕES (POST, com crachá da Central no cabeçalho):
 //   googleToken        -> { token, vence, escopo } | { precisaAutorizar: true }
 //   googleAutorizarUrl -> { url }   (o `state` é o crachá CURTO que o index.ts cria)
+//   googleDesconectar  -> { ok: true }   apaga a chave de renovação daqui
 // GET (sem cabeçalho — é o navegador voltando do Google):
 //   /leo-sync/googleCallback?code=…&state=…
 //
@@ -184,6 +185,16 @@ async function callback(sb: Banco, url: URL): Promise<Response> {
   return voltar(escopo && !escopo.includes("drive.readonly") ? "escopo" : "");
 }
 
+/* Desligar de verdade: a chave de renovação é o que faz a conexão sobreviver ao
+   recarregamento, então desconectar é apagá-la daqui. Depois disso a tela volta a
+   pedir autorização — e o Léo pode tirar o acesso também do lado do Google, em
+   myaccount.google.com/connections. */
+async function desconectar(sb: Banco): Promise<Response> {
+  await configGravar(sb, "google_token", { token: "", exp: "", em: agoraIso() });
+  await configGravar(sb, "google_refresh", { token: "", em: agoraIso(), motivo: "desligado na Central" });
+  return json({ ok: true });
+}
+
 // ---------------------------------------------------------------- porta
 export async function googleAcao(
   acao: string, corpo: Registro, sb: Banco, _req: Request, url: URL,
@@ -195,6 +206,7 @@ export async function googleAcao(
       return json({ token: t.token, vence: t.vence, escopo: t.escopo });
     }
     if (acao === "googleAutorizarUrl") return autorizarUrl(corpo);
+    if (acao === "googleDesconectar") return await desconectar(sb);
     if (acao === "googleCallback") return await callback(sb, url);
     return json({ erro: "ação inválida" }, 400);
   } catch (e) {

@@ -9508,7 +9508,13 @@ function vDrive(m){
     const b=acao(rot,()=>{D.modo=modo;D.busca='';D.digitado='';if(modo==='pastas'){D.pasta='root';D.trilha=[{id:'root',nome:'Meu Drive'}];D.trilhaPendente=''}r()},(D.modo===modo?'':'ghost'));barra.appendChild(b)});
   barra.appendChild(el('<span class="cresce"></span>'));
   const cota=el('<div class="dv-cota" title="Espaço usado na conta Google inteira (Drive, Gmail e Fotos)"><span>Conta Google: …</span></div>');barra.appendChild(cota);
-  barra.appendChild(acao('Desconectar desta sessão',()=>{driveLimparCache();desligarGoogle('drive')},'ghost'));
+  /* Agora a autorização mora no servidor: desconectar de verdade é apagar de lá a
+     chave de renovação. Dizer “desta sessão” seria mentira — bastaria recarregar. */
+  barra.appendChild(acao('Desconectar o Drive',async()=>{
+    if(!confirm('Desconectar o Google Drive?\n\nA Central esquece a autorização. Para ver as pastas de novo, você terá de autorizar mais uma vez no Google.'))return;
+    try{await apiSync('POST',{acao:'googleDesconectar'})}catch(e){alert('Não deu para desconectar agora: '+((e&&e.message)||e));return}
+    driveLimparCache();desligarGoogle('drive');
+  },'ghost'));
   m.appendChild(barra);
   driveSobre().then(s=>{const q=s.storageQuota||{},uso=+q.usage||0,lim=+q.limit||0;const pct=lim?Math.min(100,uso/lim*100):0;
     cota.innerHTML=`<span>Conta Google: ${tamanho(uso)}${lim?' de '+tamanho(lim):''}</span>${lim?`<div class="tr"><div class="b${pct>90?' cheia':''}" style="width:${pct.toFixed(0)}%"></div></div>`:''}`;
