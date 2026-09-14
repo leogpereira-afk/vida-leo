@@ -112,6 +112,12 @@ const MODULOS_PAINEL = ["gestao", "contas-atrasadas", "orcamentos",
   // `conferir-sistemas.mjs`, que le esta aqui e teria acusado na hora.
   // O script agora roda no deploy do painel -- ver .github/workflows/pages.yml.
   "campanhas",
+  // 14/09/2026 — as duas telas de agenda so para ver no Painel: "agenda"
+  // (calendario e programacao da producao) e "calendario-empresa" (os eventos
+  // da casa). Entraram nas TRES listas na mesma hora, de proposito: e esta
+  // aqui, a terceira, que de fato concede -- as duas de cima ja estavam certas
+  // nas vezes em que permutas e campanhas nao funcionaram.
+  "agenda", "calendario-empresa",
   "patrimonio", "configuracoes"];
 // Calculado na hora de usar, não na carga do módulo: normalizarUsuario é um
 // const declarado mais abaixo, e chamá-lo aqui derruba a function inteira.
