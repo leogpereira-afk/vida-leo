@@ -43,7 +43,8 @@ h1,h2,h3,.serif{font-family:Fraunces,Georgia,serif;font-weight:600;letter-spacin
 .nav button:hover{background:var(--bg);color:var(--tinta)}
 .nav button.on{background:var(--verde-cl);color:var(--verde);font-weight:600}
 .nav button .fora{margin-left:auto;font-size:11px;opacity:.55}
-.nav .ic{width:20px;text-align:center;font-size:15px}
+.nav .ic{width:20px;text-align:center;font-size:15px;display:flex;justify-content:center}
+.nav .ic svg{width:18px;height:18px;display:block}
 .nav .sep{margin:12px 10px 6px;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--suave);opacity:.75}
 .ponte{display:flex;align-items:center;gap:10px;margin:14px 6px 0;padding:9px 10px;
   border:1px dashed var(--linha);border-radius:10px;text-decoration:none;color:var(--suave);
@@ -135,6 +136,52 @@ tr:hover .lixo{opacity:1}
 .cartao .pe{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
 .cartao .vl{font-family:Fraunces,serif;font-size:16px;margin-left:auto;font-variant-numeric:tabular-nums}
 
+/* Google Drive */
+.dv-trilha{display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:13px;margin:-6px 0 14px}
+.dv-trilha button{border:0;background:none;font:inherit;color:var(--verde);cursor:pointer;padding:3px 6px;border-radius:7px}
+.dv-trilha button:hover{background:var(--verde-cl)}
+.dv-trilha .atual{font-weight:600;padding:3px 6px} .dv-trilha .sep{color:var(--suave)}
+.dv-pastas{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+.dv-pasta{display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--card);border:1px solid var(--linha);border-radius:12px;cursor:pointer;text-align:left;font:inherit;color:inherit;transition:.15s;min-width:0}
+.dv-pasta:hover{border-color:var(--verde);transform:translateY(-1px)}
+.dv-pasta .ic{font-size:22px;flex:none} .dv-pasta .nm{font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dv-pasta .sub{font-size:11.5px;color:var(--suave);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dv-tab{width:100%;border-collapse:collapse;font-size:13px}
+.dv-tab th{text-align:left;font:600 10.5px Inter;letter-spacing:.06em;text-transform:uppercase;color:var(--suave);padding:6px 8px;border-bottom:1px solid var(--linha)}
+.dv-tab td{padding:7px 8px;border-bottom:1px solid var(--linha);vertical-align:middle}
+.dv-tab tr:last-child td{border-bottom:0} .dv-tab tr:hover td{background:color-mix(in srgb,var(--verde-cl) 55%,transparent)}
+.dv-tab .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--suave)}
+.dv-tab td.nm{max-width:0;width:100%;min-width:140px}
+.dv-tab .nome{border:0;background:none;font:inherit;color:inherit;cursor:pointer;text-align:left;padding:0;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.dv-tab .nome:hover{color:var(--verde);text-decoration:underline}
+.dv-tab .cam{font-size:11.5px;color:var(--suave);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.dv-tab .cam button{border:0;background:none;font:inherit;color:inherit;cursor:pointer;padding:0} .dv-tab .cam button:hover{color:var(--verde)}
+.dv-acoes{display:flex;gap:4px;justify-content:flex-end;white-space:nowrap}
+.dv-acoes button{border:1px solid var(--linha);background:var(--card);color:var(--suave);font:600 11.5px Inter;padding:4px 8px;border-radius:7px;cursor:pointer}
+.dv-acoes button:hover{color:var(--tinta);border-color:var(--tinta)}
+.dv-cota{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--suave);white-space:nowrap}
+.dv-cota .tr{width:110px;height:8px;background:color-mix(in srgb,var(--linha) 55%,transparent);border-radius:5px;overflow:hidden}
+.dv-cota .b{height:100%;background:var(--verde);border-radius:5px}
+.dv-cota .b.cheia{background:var(--vermelho)}
+.dv-visor{min-height:200px;background:var(--bg);border-radius:10px;overflow:hidden}
+.dv-visor iframe{width:100%;height:min(78vh,900px);border:0;background:#fff}
+.dv-visor img{display:block;max-width:100%;max-height:78vh;margin:0 auto;object-fit:contain}
+.dv-visor pre{padding:14px;font:12.5px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-word;max-height:78vh;overflow:auto;margin:0}
+.dv-visor .planilha{overflow:auto;max-height:78vh} .dv-visor .planilha table{border-collapse:collapse;font-size:12px}
+.dv-visor .planilha td,.dv-visor .planilha th{border:1px solid var(--linha);padding:3px 7px;white-space:nowrap;max-width:280px;overflow:hidden;text-overflow:ellipsis}
+.dv-visor .planilha th{background:var(--card);position:sticky;top:0;font-weight:600;color:var(--suave)}
+.dv-visor .planilha td.n{text-align:right;font-variant-numeric:tabular-nums}
+.dv-abas{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.dv-abas button{border:1px solid var(--linha);background:var(--card);font:600 12px Inter;padding:4px 10px;border-radius:20px;cursor:pointer;color:var(--suave)}
+.dv-abas button.on{background:var(--verde);border-color:var(--verde);color:#fff}
+.dv-det{border:1px solid var(--linha);border-radius:12px;padding:0 14px;margin-top:10px;background:var(--card)}
+.dv-det summary{cursor:pointer;padding:11px 0;font-weight:600;font-size:13.5px;list-style:none;display:flex;align-items:center;gap:8px}
+.dv-det summary::-webkit-details-marker{display:none} .dv-det summary:before{content:'▸';color:var(--suave);transition:.15s}
+.dv-det[open] summary:before{transform:rotate(90deg)} .dv-det summary .cont{margin-left:auto;font-weight:400;color:var(--suave);font-size:12px}
+.dv-det .dv-tab{margin-bottom:10px}
+.dv-nota{font-size:12px;color:var(--suave);margin:8px 0 2px}
+.modal.largo{max-width:min(1180px,97vw)}
+@media(max-width:640px){.dv-tab th.num,.dv-tab td.num{display:none}.dv-acoes{flex-direction:column;align-items:flex-end}.dv-tab .cam{max-width:110px}.dv-tab td.nm{min-width:110px}}
 /* modal */
 .fundo{position:fixed;inset:0;background:rgba(20,22,20,.45);backdrop-filter:blur(3px);
   display:flex;align-items:flex-start;justify-content:center;padding:34px 16px;z-index:60;overflow-y:auto}
@@ -324,7 +371,7 @@ function maisUsados(lista,campo,extras){
   return Object.keys(c).sort((a,b)=>c[b]-c[a]||a.localeCompare(b));
 }
 const urlSegura=u=>{try{const v=new URL(u);return ['https:','http:'].includes(v.protocol)?v.href:'#'}catch(_){return '#'}};
-const tamanho=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(0)+' KB':(b/1048576).toFixed(1)+' MB';
+const tamanho=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(0)+' KB':b<1073741824?(b/1048576).toFixed(1).replace('.',',')+' MB':(b/1073741824).toFixed(1).replace('.',',')+' GB';
 
 /* ================== ARQUIVOS ==================================
    Até 23/08/2026 os anexos moravam SÓ no IndexedDB: presos ao aparelho e ao
@@ -1231,6 +1278,8 @@ function areaArquivos(ref,dica,somenteLeitura=false){
 }
 
 /* ---------------- navegação ---------------- */
+// logos de verdade na lateral (o emoji não faz jus)
+const LOGO_DRIVE='<svg viewBox="0 0 87.3 78" aria-hidden="true"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>';
 const MODS=[
   {id:'inicio',ic:'🏠',nome:'Início',grupo:'',render:vInicio},
   {id:'rendimentos',ic:'📈',nome:'Rendimentos',grupo:'Dinheiro',render:vRendimentos},
@@ -1247,6 +1296,7 @@ const MODS=[
   {id:'bosques',ic:'🌳',nome:'Portal dos Bosques',url:'https://leogpereira-afk.github.io/bosques/'},
   {id:'oportunidades',ic:'💡',nome:'Oportunidades',grupo:'Extra',render:vOportunidades},
   {id:'documentos',ic:'🪪',nome:'Documentos',grupo:'',render:vDocumentos},
+  {id:'drive',ic:LOGO_DRIVE,nome:'Google Drive',grupo:'',render:vDrive},
   {id:'guia',ic:'🧭',nome:'Guia de vida',grupo:'',render:vGuia},
   {id:'config',ic:'⚙️',nome:'Configurações',grupo:'',render:vConfig},
 ];
@@ -5382,10 +5432,11 @@ function ranking(itens,{ac='var(--verde)',fmt=brl,max=8,titulo='',mostraPct=true
       // o primeiro colocado ganha a cor cheia; os outros recuam — é o
       // "emphasis" do guia: quem lidera salta, o resto é contexto
       const cor=x._resto?'var(--linha)':(i===0?ac:`color-mix(in srgb,${ac} ${Math.max(28,88-i*13)}%,transparent)`);
-      return `<div class="rank-l"${aoClicar&&!x._resto?` data-rk="${esc(x.r)}" style="cursor:pointer"`:''}>
+      const pctTxt=p=>p>0&&p<0.05?'<0,1':p.toFixed(p<10?1:0).replace('.',',');
+      return `<div class="rank-l"${aoClicar&&!x._resto?` data-rk="${esc(x.r)}"${x.id!=null?` data-rid="${esc(x.id)}"`:''} style="cursor:pointer"`:''}>
         <div class="rank-cab">
           <span class="rank-nome">${x.ic||''}${esc(x.r)}</span>
-          <span class="rank-val">${fmt(v)}${mostraPct&&total?`<span class="rank-pct">${pct.toFixed(pct<10?1:0)}%</span>`:''}</span>
+          <span class="rank-val">${fmt(v)}${mostraPct&&total?`<span class="rank-pct">${pctTxt(pct)}%</span>`:''}</span>
         </div>
         <div class="rank-tr"><div class="rank-b" style="width:${larg}%;background:${cor}"></div></div>
       </div>`;
@@ -5637,8 +5688,9 @@ const CONSULTA_GMAIL=
   '"reserva confirmada" OR "seu voo" OR itinerário OR itinerario) newer_than:1y';
 
 // Google: autorizações separadas, guardadas somente durante esta sessão.
-const GOOGLE_ESCOPOS={gmail:'https://www.googleapis.com/auth/gmail.readonly',agenda:'https://www.googleapis.com/auth/calendar.readonly',agendaEnviar:'https://www.googleapis.com/auth/calendar.app.created'};
-const googleSessao={gmail:null,agenda:null,agendaEnviar:null};
+const GOOGLE_ESCOPOS={gmail:'https://www.googleapis.com/auth/gmail.readonly',agenda:'https://www.googleapis.com/auth/calendar.readonly',agendaEnviar:'https://www.googleapis.com/auth/calendar.app.created',drive:'https://www.googleapis.com/auth/drive.readonly'};
+const GOOGLE_BASES={gmail:'https://gmail.googleapis.com/gmail/v1/users/me/',agenda:'https://www.googleapis.com/calendar/v3/',agendaEnviar:'https://www.googleapis.com/calendar/v3/',drive:'https://www.googleapis.com/drive/v3/'};
+const googleSessao={gmail:null,agenda:null,agendaEnviar:null,drive:null};
 let gisPendente=null;
 function carregarGis(){
   if(window.google?.accounts?.oauth2)return Promise.resolve();
@@ -5665,15 +5717,35 @@ async function conectarGoogle(servico){
   });
 }
 async function pedirTokenGmail(){return conectarGoogle('gmail')}
-async function googleLer(servico,caminho){
+/* Uma porta só para todos os serviços Google: quem quer JSON chama googleLer,
+   quem quer os bytes (PDF, imagem, planilha do Drive) chama googleFetch. */
+const GOOGLE_NOMES={gmail:'Gmail',agenda:'Google Agenda',agendaEnviar:'Google Agenda',drive:'Google Drive'};
+async function googleFetch(servico,caminho,tempo=20000,sinal=null){
   if(!googleConectado(servico))throw new Error('Conecte ou renove o acesso ao Google antes de consultar.');
-  const base=servico==='gmail'?'https://gmail.googleapis.com/gmail/v1/users/me/':'https://www.googleapis.com/calendar/v3/';
-  const r=await fetch(base+caminho,{headers:{authorization:'Bearer '+googleSessao[servico].token},signal:AbortSignal.timeout(20000)});
+  const limite=AbortSignal.timeout(tempo);
+  const signal=sinal&&AbortSignal.any?AbortSignal.any([limite,sinal]):limite;
+  let r;
+  try{r=await fetch(GOOGLE_BASES[servico]+caminho,{headers:{authorization:'Bearer '+googleSessao[servico].token},signal})}
+  catch(e){
+    if(sinal?.aborted)throw e; // quem cancelou foi a tela (fechou o visor): não é erro
+    if(e?.name==='TimeoutError'||e?.name==='AbortError')throw new Error('O Google demorou demais para responder. Tente de novo.');
+    throw new Error('Sem resposta do Google — a conexão caiu ou está lenta. Tente de novo.');
+  }
   if(r.status===401){googleSessao[servico]=null;if(servico==='gmail')_gmailToken='';throw new Error('O acesso venceu. Clique em Conectar para renovar.')}
-  if(r.status===403)throw new Error('O Google recusou o acesso. Confira a permissão e se a API deste serviço está ativada no projeto Google Cloud.');
+  if(r.status===403){
+    // o 403 do Google tem várias causas; o motivo vem no corpo e muda o que o Léo precisa fazer
+    let motivo='';try{motivo=(await r.json())?.error?.errors?.[0]?.reason||''}catch(_){}
+    if(motivo==='accessNotConfigured')throw new Error('A API do '+(GOOGLE_NOMES[servico]||'serviço')+' não está ativada no projeto Google Cloud da Central. Ative-a no console do Google e tente de novo.');
+    if(motivo==='exportSizeLimitExceeded')throw new Error('Este arquivo do Google é grande demais para exportar (limite de 10 MB). Abra-o no Drive.');
+    if(motivo==='rateLimitExceeded'||motivo==='userRateLimitExceeded')throw new Error('O Google pediu uma pausa (muitas consultas seguidas). Aguarde um minuto e tente de novo.');
+    if(motivo==='cannotDownloadFile'||motivo==='cannotDownloadAbusiveFile')throw new Error('O dono deste arquivo não permite baixar nem copiar. Abra-o no Drive.');
+    throw new Error('O Google recusou o acesso ao '+(GOOGLE_NOMES[servico]||'serviço')+'. Confira a permissão e se a API está ativada no projeto Google Cloud.');
+  }
+  if(r.status===404)throw new Error('O Google não encontrou este item — pode ter sido apagado ou movido no Drive.');
   if(!r.ok)throw new Error('Não foi possível consultar o Google (código '+r.status+').');
-  return r.json();
+  return r;
 }
+async function googleLer(servico,caminho){return (await googleFetch(servico,caminho)).json()}
 async function gmailApi(caminho){return googleLer('gmail',caminho)}
 function desligarGoogle(servico){googleSessao[servico]=null;if(servico==='gmail')_gmailToken='';tela()}
 function blocoGoogle(servico){
@@ -8922,6 +8994,454 @@ function statusDocumento(d){
   const dias=Math.round((data-new Date(hoje()+'T12:00'))/864e5);
   return dias<0?'Vencido':dias<=180?'Vencendo':'Em dia';
 }
+
+/* ================== GOOGLE DRIVE =================================
+   A Central NÃO manda no Drive. Pasta nasce e morre lá, direto no Google;
+   aqui só se navega, vê e baixa. Isso não é promessa de código — é o escopo
+   `drive.readonly`: o crachá que o Google entrega só sabe ler, então nem um
+   defeito daqui conseguiria apagar, mover ou renomear um arquivo.
+
+   O que a tela sabe fazer:
+     · andar pelas pastas iniciais do Meu Drive (e o que está compartilhado,
+       com estrela ou foi mexido há pouco);
+     · abrir PDF, imagem, planilha, Docs/Sheets/Slides e texto SEM baixar —
+       os bytes vêm pelo crachá e viram um visor dentro da Central; o que não
+       dá pra mostrar aqui abre no visualizador do próprio Drive, em outra aba;
+     · o Raio-X: um mapa de tudo que é seu (feito uma vez por sessão) que
+       responde "o que pesa", "o que está aberto pra qualquer um com o link",
+       "o que está duplicado" e "o que está solto na raiz".
+
+   Fechar QUALQUER modal re-renderiza a tela inteira (abrirModal → tela()).
+   Por isso tudo que custa uma ida ao Google fica em driveCache, e o que o
+   Léo digitou fica em filtro.drive — senão fechar o visor apagaria a busca. */
+const DRIVE_CAMPOS='id,name,mimeType,size,modifiedTime,viewedByMeTime,parents,shared,ownedByMe,webViewLink,md5Checksum,shortcutDetails,owners(displayName),permissions(type,role)';
+const DRIVE_PASTA='application/vnd.google-apps.folder', DRIVE_ATALHO='application/vnd.google-apps.shortcut';
+const driveCache={pastas:{},listas:{},nomes:{root:'Meu Drive'},pais:{},raiz:'',sobre:null,mapa:null,mapeando:null,erroMapa:''};
+function driveLimparCache(){Object.assign(driveCache,{pastas:{},listas:{},nomes:{root:'Meu Drive'},pais:{},raiz:'',sobre:null,mapa:null,mapeando:null,erroMapa:''})}
+// texto dentro do `q` da API vai entre aspas simples — escapar o que quebraria
+const driveQ=t=>String(t||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+// o Drive chama a raiz de 'root' na URL, mas nos `parents` vem o id de verdade
+async function driveRaiz(){
+  if(driveCache.raiz)return driveCache.raiz;
+  const r=await googleLer('drive','files/root?fields=id');
+  driveCache.raiz=r.id||'root';driveCache.nomes[driveCache.raiz]='Meu Drive';
+  return driveCache.raiz;
+}
+function driveTipo(f){
+  const m=f.mimeType||'',n=(f.name||'').toLowerCase();
+  if(m===DRIVE_PASTA)return {ic:'📁',rot:'Pasta',cat:'pasta'};
+  if(m===DRIVE_ATALHO)return {ic:'🔗',rot:'Atalho',cat:'atalho'};
+  if(m==='application/pdf')return {ic:'📕',rot:'PDF',cat:'pdf'};
+  if(m==='text/csv'||/\.csv$/.test(n))return {ic:'📊',rot:'Planilha (CSV)',cat:'csv'};
+  if(m==='application/vnd.google-apps.spreadsheet'||/spreadsheetml|ms-excel|\.xlsx?$|\.xlsm$/.test(m+' '+n))return {ic:'📊',rot:'Planilha',cat:'planilha'};
+  if(m==='application/vnd.google-apps.document'||/wordprocessingml|msword|\.docx?$/.test(m+' '+n))return {ic:'📝',rot:'Documento',cat:'documento'};
+  if(m==='application/vnd.google-apps.presentation'||/presentationml|ms-powerpoint/.test(m))return {ic:'📽️',rot:'Apresentação',cat:'apresentacao'};
+  if(m==='application/vnd.google-apps.form')return {ic:'📋',rot:'Formulário',cat:'outro'};
+  if(m.startsWith('image/'))return {ic:'🖼️',rot:'Imagem',cat:'imagem'};
+  if(m.startsWith('video/'))return {ic:'🎬',rot:'Vídeo',cat:'video'};
+  if(m.startsWith('audio/'))return {ic:'🎵',rot:'Áudio',cat:'audio'};
+  if(/zip|rar|7z|compressed/.test(m))return {ic:'🗜️',rot:'Compactado',cat:'outro'};
+  if(m.startsWith('text/')||/json|xml/.test(m))return {ic:'📄',rot:'Texto',cat:'texto'};
+  return {ic:'📄',rot:'Arquivo',cat:'outro'};
+}
+const driveGoogleNativo=f=>String(f.mimeType||'').startsWith('application/vnd.google-apps.')&&f.mimeType!==DRIVE_PASTA&&f.mimeType!==DRIVE_ATALHO;
+const driveData=t=>t?fmtDataAno(String(t).slice(0,10)):'—';
+const driveTam=f=>f.size!=null&&f.size!==''?tamanho(+f.size):(driveGoogleNativo(f)?'—':'');
+const driveEhPastaOuAtalho=f=>f.mimeType===DRIVE_PASTA||(f.mimeType===DRIVE_ATALHO&&f.shortcutDetails?.targetMimeType===DRIVE_PASTA);
+function driveOrdena(a,b){
+  const pa=a.mimeType===DRIVE_PASTA,pb=b.mimeType===DRIVE_PASTA;
+  if(pa!==pb)return pa?-1:1;
+  return String(a.name||'').localeCompare(String(b.name||''),'pt-BR',{numeric:true,sensitivity:'base'});
+}
+function driveGuardarNomes(arqs){arqs.forEach(f=>{driveCache.nomes[f.id]=f.name;if(f.parents?.length)driveCache.pais[f.id]=f.parents[0]})}
+/* Lista arquivos página a página. `limite` é o teto de páginas — sem ele uma
+   busca ampla viraria centenas de chamadas e a tela ficaria pendurada. */
+/* `minimo`: a API pode devolver página curta (ou vazia) COM nextPageToken; por
+   isso a leitura continua até juntar o que foi pedido, dentro do teto de páginas. */
+async function driveListar(q,{ordem='folder,name',tam=200,limite=10,minimo=Infinity,campos=DRIVE_CAMPOS}={}){
+  const tudo=[];let token='',paginas=0;
+  do{
+    const p=new URLSearchParams({q,pageSize:String(tam),fields:'nextPageToken,files('+campos+')',supportsAllDrives:'true',includeItemsFromAllDrives:'true'});
+    if(ordem)p.set('orderBy',ordem);
+    if(token)p.set('pageToken',token);
+    const r=await googleLer('drive','files?'+p);
+    tudo.push(...(r.files||[]));token=r.nextPageToken||'';
+  }while(token&&++paginas<limite&&tudo.length<minimo);
+  driveGuardarNomes(tudo);
+  return {arquivos:tudo,incompleto:!!token};
+}
+async function drivePasta(id,forcar){
+  if(!forcar&&driveCache.pastas[id])return driveCache.pastas[id];
+  const {arquivos,incompleto}=await driveListar(`'${driveQ(id)}' in parents and trashed=false`);
+  arquivos.sort(driveOrdena);
+  driveCache.pastas[id]={arquivos,incompleto,em:Date.now()};
+  return driveCache.pastas[id];
+}
+async function driveSobre(forcar){
+  if(!forcar&&driveCache.sobre)return driveCache.sobre;
+  driveCache.sobre=await googleLer('drive','about?fields=storageQuota(limit,usage,usageInDrive,usageInDriveTrash),user(displayName)');
+  return driveCache.sobre;
+}
+function driveFiltroTipo(tipo){
+  return {pdf:" and mimeType='application/pdf'",
+    planilha:" and (mimeType='application/vnd.google-apps.spreadsheet' or mimeType contains 'spreadsheetml' or mimeType contains 'ms-excel' or mimeType='text/csv')",
+    documento:" and (mimeType='application/vnd.google-apps.document' or mimeType contains 'wordprocessingml' or mimeType contains 'msword')",
+    imagem:" and mimeType contains 'image/'",pasta:" and mimeType='"+DRIVE_PASTA+"'"}[tipo]||'';
+}
+/* Busca e listas especiais ficam em cache pela chave modo|termo|tipo: fechar
+   o visor re-renderiza a tela, e sem isso cada fechada era outra ida ao Google. */
+async function driveLista(modo,busca,tipo,forcar){
+  const chave=modo+'|'+busca+'|'+tipo;
+  if(!forcar&&driveCache.listas[chave])return driveCache.listas[chave];
+  let r;
+  if(modo==='busca'){
+    const t=driveQ(busca.trim());
+    if(!t)r={arquivos:[],incompleto:false};
+    else{r=await driveListar(`trashed=false and (name contains '${t}' or fullText contains '${t}')`+driveFiltroTipo(tipo),{ordem:'',tam:60,limite:6,minimo:60});
+      r.arquivos.sort((a,b)=>String(b.modifiedTime||'').localeCompare(String(a.modifiedTime||'')))}
+  }else{
+    const desde=new Date(Date.now()-60*864e5).toISOString();
+    const q={compartilhados:'sharedWithMe=true and trashed=false',estrela:'starred=true and trashed=false',recentes:`trashed=false and modifiedTime > '${desde}'`}[modo];
+    r=await driveListar(q+driveFiltroTipo(tipo),{ordem:modo==='recentes'?'modifiedTime desc':'folder,name',tam:100,limite:6,minimo:modo==='recentes'?100:Infinity});
+  }
+  driveCache.listas[chave]=r;return r;
+}
+/* Caminho legível de um arquivo — pela cadeia de pais que já se conhece
+   (listagens, mapa). Se o pai é desconhecido, para ali. */
+function driveCaminho(f){
+  const partes=[];let pai=(f.parents||[])[0],volta=0;
+  while(pai&&volta++<12){
+    if(pai==='root'||pai===driveCache.raiz){partes.unshift('Meu Drive');break}
+    const nome=driveCache.nomes[pai];if(!nome)break;
+    partes.unshift(nome);pai=driveCache.pais[pai];
+  }
+  return partes.join(' › ');
+}
+/* Trilha verdadeira de uma pasta: sobe pelos pais, perguntando ao Google o
+   que ainda não se sabe. Chegando a uma pasta pela busca ou pelo Raio-X, a
+   trilha precisa mostrar de onde ela é — não a pasta anterior + esta. */
+async function driveMontarTrilha(id){
+  const raiz=await driveRaiz();const cadeia=[];let atual=id,volta=0;
+  while(atual&&atual!=='root'&&atual!==raiz&&volta++<12){
+    if(!driveCache.nomes[atual]||!(atual in driveCache.pais)){
+      const f=await googleLer('drive',`files/${encodeURIComponent(atual)}?fields=id,name,parents&supportsAllDrives=true`);
+      driveCache.nomes[atual]=f.name;driveCache.pais[atual]=(f.parents||[])[0]||'';
+    }
+    cadeia.unshift({id:atual,nome:driveCache.nomes[atual]});atual=driveCache.pais[atual];
+  }
+  const chegouNaRaiz=atual==='root'||atual===raiz;
+  return chegouNaRaiz?[{id:'root',nome:'Meu Drive'},...cadeia]:[{id:'',nome:'Pastas de outras pessoas'},...cadeia];
+}
+/* O Raio-X: varre TUDO que é seu (não o compartilhado) em páginas de 1000.
+   Custa poucas chamadas mesmo com milhares de arquivos; roda uma vez por
+   sessão e alimenta as contagens das pastas e as listas de achados. */
+async function mapearDrive(){
+  if(driveCache.mapeando)return driveCache.mapeando;
+  driveCache.erroMapa='';
+  driveCache.mapeando=(async()=>{
+    const campos='id,name,mimeType,size,modifiedTime,viewedByMeTime,parents,shared,webViewLink,md5Checksum,permissions(type,role)';
+    const {arquivos,incompleto}=await driveListar("'me' in owners and trashed=false",{tam:1000,limite:30,campos});
+    const raiz=await driveRaiz();
+    const porId={};arquivos.forEach(f=>{porId[f.id]=f});
+    const pastas={},tipos={},filhos={};let bytes=0,nArq=0,nPastas=0;
+    const grandes=[],abertos=[],compartilhados=[],esquecidos=[],soltos=[],porMd5={};
+    const doisAnos=Date.now()-730*864e5;
+    const entrada=(id,nome,topo)=>pastas[id]=pastas[id]||{id,nome,n:0,b:0,topo};
+    entrada('_soltos','Soltos na raiz do Meu Drive',true);entrada('_fora','Em pastas de outras pessoas',true);
+    arquivos.forEach(f=>{if(f.mimeType===DRIVE_PASTA)entrada(f.id,f.name,(f.parents||[])[0]===raiz)});
+    arquivos.forEach(f=>{
+      const ehPasta=f.mimeType===DRIVE_PASTA,tam=+f.size||0;
+      (f.parents||[]).forEach(p=>{filhos[p]=(filhos[p]||0)+1});
+      if(f.mimeType===DRIVE_ATALHO)return; // atalho não é arquivo: não pesa nem conta
+      if(ehPasta){nPastas++}else{nArq++;bytes+=tam;
+        const cat=driveTipo(f);tipos[cat.rot]=tipos[cat.rot]||{n:0,b:0};tipos[cat.rot].n++;tipos[cat.rot].b+=tam;
+        if(f.md5Checksum&&tam>0)(porMd5[f.md5Checksum]=porMd5[f.md5Checksum]||[]).push(f);
+        if(tam>0)grandes.push(f);
+        const visto=f.viewedByMeTime||f.modifiedTime;if(tam>=5*1048576&&visto&&new Date(visto).getTime()<doisAnos)esquecidos.push(f);
+        // sobe a cadeia de pais: cada pasta ancestral soma este arquivo
+        let pai=(f.parents||[])[0],volta=0,chegou=false;
+        if(pai===raiz){soltos.push(f);pastas._soltos.n++;pastas._soltos.b+=tam;chegou=true}
+        while(pai&&pai!==raiz&&volta++<40){const p=pastas[pai];if(!p)break;p.n++;p.b+=tam;pai=(porId[pai]?.parents||[])[0];if(pai===raiz)chegou=true}
+        if(!chegou){pastas._fora.n++;pastas._fora.b+=tam}
+      }
+      if((f.permissions||[]).some(p=>p.type==='anyone'))abertos.push(f);
+      else if(f.shared)compartilhados.push(f);
+    });
+    const duplicados=Object.values(porMd5).filter(g=>g.length>1).map(g=>({arquivos:g,sobra:(+g[0].size||0)*(g.length-1)})).sort((a,b)=>b.sobra-a.sobra);
+    const vazias=arquivos.filter(f=>f.mimeType===DRIVE_PASTA&&!filhos[f.id]);
+    grandes.sort((a,b)=>(+b.size||0)-(+a.size||0));esquecidos.sort((a,b)=>(+b.size||0)-(+a.size||0));
+    const mes=Date.now()-30*864e5;
+    driveCache.mapa={quando:Date.now(),raiz,porId,pastas,tipos,bytes,nArq,nPastas,incompleto,grandes:grandes.slice(0,15),abertos,compartilhados,duplicados,esquecidos:esquecidos.slice(0,15),soltos,vazias,
+      mexidos30:arquivos.filter(f=>f.mimeType!==DRIVE_PASTA&&f.mimeType!==DRIVE_ATALHO&&new Date(f.modifiedTime).getTime()>mes).length};
+    return driveCache.mapa;
+  })().catch(e=>{driveCache.erroMapa=e.message||'Não foi possível mapear o Drive.';throw e}).finally(()=>{driveCache.mapeando=null});
+  return driveCache.mapeando;
+}
+/* Navegar: `filho` = clicou numa pasta de dentro da atual (a trilha cresce).
+   Sem `filho` (busca, Raio-X, coluna Pasta) a trilha é remontada de verdade. */
+function driveIr(id,nome,{filho=false}={}){
+  const D=filtro.drive;if(id===driveCache.raiz)id='root';
+  nome=nome||driveCache.nomes[id]||'';
+  const i=D.trilha.findIndex(x=>x.id===id);
+  if(i>=0)D.trilha=D.trilha.slice(0,i+1);
+  else if(id==='root')D.trilha=[{id:'root',nome:'Meu Drive'}];
+  else if(filho)D.trilha.push({id,nome:nome||'Pasta'});
+  else{D.trilha=[{id,nome:nome||'Pasta'}];D.trilhaPendente=id}
+  D.pasta=id;D.modo='pastas';D.busca='';D.digitado='';tela();window.scrollTo(0,0);
+  if(D.trilhaPendente===id)driveMontarTrilha(id).then(tr=>{if(D.trilhaPendente!==id)return;D.trilhaPendente='';D.trilha=tr;if(atual==='drive'&&D.pasta===id)tela()}).catch(()=>{D.trilhaPendente=''});
+}
+function driveLinhaArquivo(f,{caminho=false}={}){
+  const t=driveTipo(f),ehPasta=f.mimeType===DRIVE_PASTA;
+  // <tr> não nasce via el(): fora de <table> o navegador o descarta calado
+  const tr=document.createElement('tr');tr.innerHTML=`<td style="width:28px;font-size:17px" title="${esc(t.rot)}">${t.ic}</td><td class="nm"><button class="nome" title="${esc(f.name)}">${esc(f.name)}</button>${f.owners?.[0]?.displayName&&f.ownedByMe===false?`<div class="cam">de ${esc(f.owners[0].displayName)}</div>`:''}</td>${caminho?`<td class="cam"></td>`:''}<td class="num">${driveData(f.modifiedTime)}</td><td class="num">${esc(driveTam(f))}</td><td><div class="dv-acoes"></div></td>`;
+  tr.querySelector('.nome').onclick=()=>ehPasta?driveIr(f.id,f.name,{filho:filtro.drive.modo==='pastas'}):verArquivoDrive(f);
+  if(caminho){const c=tr.querySelector('.cam');const pai=(f.parents||[])[0];const txt=driveCaminho(f);
+    if(pai){const b=el(`<button title="Abrir a pasta onde está">${esc(txt||'Abrir pasta')}</button>`);b.onclick=()=>driveIr(pai,driveCache.nomes[pai]||'');c.appendChild(b)}else c.textContent=f.ownedByMe===false?'compartilhado':''}
+  const ac=tr.querySelector('.dv-acoes');
+  if(!ehPasta){const v=el('<button title="Ver aqui na Central, sem baixar">Ver</button>');v.onclick=()=>verArquivoDrive(f);ac.appendChild(v)}
+  if(f.webViewLink){const a=el('<button title="Abre no Google Drive, em outra aba">Drive ↗</button>');a.onclick=()=>window.open(urlSegura(f.webViewLink),'_blank','noopener');ac.appendChild(a)}
+  if(!ehPasta&&f.mimeType!==DRIVE_ATALHO){const b=el('<button title="Baixar uma cópia para este aparelho">Baixar</button>');b.onclick=async()=>{b.disabled=true;try{await baixarDrive(f)}catch(e){alert(e.message)}finally{b.disabled=false}};ac.appendChild(b)}
+  return tr;
+}
+function driveTabela(arquivos,{caminho=false,vazio='Nada por aqui.'}={}){
+  if(!arquivos.length)return el(`<div class="vazio">${esc(vazio)}</div>`);
+  const t=el(`<div style="overflow-x:auto"><table class="dv-tab"><thead><tr><th></th><th>Nome</th>${caminho?'<th>Pasta</th>':''}<th class="num">Modificado</th><th class="num">Tamanho</th><th></th></tr></thead><tbody></tbody></table></div>`);
+  const tb=t.querySelector('tbody');arquivos.forEach(f=>tb.appendChild(driveLinhaArquivo(f,{caminho})));
+  return t;
+}
+/* ---------- a tela ---------- */
+function vDrive(m){
+  if(!filtro.drive)filtro.drive={pasta:'root',trilha:[{id:'root',nome:'Meu Drive'}],trilhaPendente:'',modo:'pastas',busca:'',digitado:'',tipo:''};
+  const D=filtro.drive,r=rr('drive');
+  m.appendChild(cab('Google Drive','Suas pastas e arquivos, para ver e baixar sem sair daqui. Nada aqui apaga, move ou renomeia — o acesso é somente de leitura.'));
+  if(!googleConectado('drive')){
+    const cx=el('<div class="corpo google-conexao"></div>');
+    cx.appendChild(el('<p><b>Conectar o Google Drive</b></p>'));
+    cx.appendChild(el('<p class="google-nota">A Central pede ao Google um acesso <b>somente de leitura</b>: dá para navegar, abrir e baixar; apagar, mover ou renomear continua sendo coisa que só se faz no próprio Drive. A autorização vale só nesta sessão — ao recarregar a página pode ser preciso conectar de novo.</p>'));
+    const a=el('<div class="google-acoes"></div>');const status=el('<p role="status" class="google-nota"></p>');
+    const b=acao('Conectar Google Drive',async()=>{b.disabled=true;status.textContent='Abrindo a janela do Google…';try{await conectarGoogle('drive');tela()}catch(e){status.textContent=e.message}finally{b.disabled=false}});
+    a.appendChild(b);cx.appendChild(a);cx.appendChild(status);
+    m.appendChild(bloco('dv-conectar','📁 Google Drive','conexão somente leitura',cx));
+    return;
+  }
+  // ---- barra: busca, atalhos, cota ----
+  const barra=el('<div class="painel"></div>');
+  const busca=el(`<input type="search" placeholder="Buscar no Drive inteiro…" aria-label="Buscar no Drive" style="min-width:220px">`);busca.value=D.digitado||D.busca||'';
+  busca.oninput=()=>{D.digitado=busca.value;if(!busca.value&&D.modo==='busca')buscar()};
+  const tipo=seletor(D.tipo||'',[['','Todos os tipos'],['pdf','PDF'],['planilha','Planilhas'],['documento','Documentos'],['imagem','Imagens'],['pasta','Pastas']],v=>{D.tipo=v;r()},'Tipo de arquivo');
+  const buscar=()=>{D.busca=busca.value.trim();D.digitado=D.busca;D.modo=D.busca?'busca':'pastas';r()};
+  busca.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();buscar()}};
+  barra.append(busca,tipo,acao('Buscar',buscar));
+  barra.appendChild(el('<span class="div"></span>'));
+  [['pastas','📁 Meu Drive'],['compartilhados','🤝 Compartilhados comigo'],['estrela','⭐ Com estrela'],['recentes','🕒 Recentes']].forEach(([modo,rot])=>{
+    const b=acao(rot,()=>{D.modo=modo;D.busca='';D.digitado='';if(modo==='pastas'){D.pasta='root';D.trilha=[{id:'root',nome:'Meu Drive'}];D.trilhaPendente=''}r()},(D.modo===modo?'':'ghost'));barra.appendChild(b)});
+  barra.appendChild(el('<span class="cresce"></span>'));
+  const cota=el('<div class="dv-cota" title="Espaço usado na conta Google inteira (Drive, Gmail e Fotos)"><span>Conta Google: …</span></div>');barra.appendChild(cota);
+  barra.appendChild(acao('Desconectar desta sessão',()=>{driveLimparCache();desligarGoogle('drive')},'ghost'));
+  m.appendChild(barra);
+  driveSobre().then(s=>{const q=s.storageQuota||{},uso=+q.usage||0,lim=+q.limit||0;const pct=lim?Math.min(100,uso/lim*100):0;
+    cota.innerHTML=`<span>Conta Google: ${tamanho(uso)}${lim?' de '+tamanho(lim):''}</span>${lim?`<div class="tr"><div class="b${pct>90?' cheia':''}" style="width:${pct.toFixed(0)}%"></div></div>`:''}`;
+  }).catch(()=>{cota.textContent=''});
+  // ---- trilha ----
+  const cabecalhoLista=el('<nav class="dv-trilha" aria-label="Caminho"></nav>');
+  if(D.modo==='pastas'){
+    D.trilha.forEach((p,i)=>{if(i)cabecalhoLista.appendChild(el('<span class="sep">›</span>'));
+      if(i===D.trilha.length-1||!p.id)cabecalhoLista.appendChild(el(`<span class="atual">${esc(p.nome)}</span>`));else{const b=el(`<button>${esc(p.nome)}</button>`);b.onclick=()=>driveIr(p.id,p.nome);cabecalhoLista.appendChild(b)}});
+    if(D.trilhaPendente)cabecalhoLista.appendChild(el('<span class="sep">· localizando o caminho…</span>'));
+  }
+  const at=acao('↻ Atualizar',async()=>{if(D.modo==='pastas')delete driveCache.pastas[D.pasta];else delete driveCache.listas[D.modo+'|'+D.busca+'|'+D.tipo];r()},'ghost');at.title='Buscar de novo no Google o que está nesta lista';at.style.marginLeft='auto';cabecalhoLista.appendChild(at);
+  m.appendChild(cabecalhoLista);
+  // ---- conteúdo ----
+  const cxPastas=el('<div class="corpo"><div class="vazio">Carregando…</div></div>');
+  const cxArq=el('<div class="corpo"><div class="vazio">Carregando…</div></div>');
+  const tituloLista={pastas:'📄 Arquivos',busca:'🔎 Resultado da busca',compartilhados:'🤝 Compartilhados comigo',estrela:'⭐ Com estrela',recentes:'🕒 Mexidos nos últimos 60 dias'}[D.modo];
+  const dicaLista={pastas:'nesta pasta',busca:'“'+esc(D.busca)+'” no começo das palavras do nome, ou dentro do conteúdo',compartilhados:'o que outras pessoas dividiram com você',estrela:'marcados no Drive',recentes:'os mais recentes primeiro'}[D.modo];
+  const vazioLista={pastas:'Nenhum arquivo nesta pasta.',busca:'Nada com “'+D.busca+'”. Tente outra palavra — a busca casa o começo das palavras do nome.',compartilhados:'Ninguém compartilhou nada com você.',estrela:'Nenhum item com estrela no Drive.',recentes:'Nada mexido nos últimos 60 dias.'}[D.modo];
+  if(D.modo==='pastas')m.appendChild(bloco('dv-pastas','📁 Pastas',D.trilha.length>1?'dentro de '+esc(D.trilha.at(-1).nome):'as pastas iniciais do seu Drive',cxPastas));
+  m.appendChild(bloco('dv-arquivos',tituloLista,dicaLista,cxArq));
+  const pintaPastas=(pastas,mapa)=>{
+    cxPastas.replaceChildren();
+    if(!pastas.length){cxPastas.appendChild(el('<div class="vazio">Nenhuma pasta aqui.</div>'));return}
+    const g=el('<div class="dv-pastas"></div>');
+    pastas.forEach(p=>{
+      const alvoId=p.mimeType===DRIVE_ATALHO?p.shortcutDetails?.targetId:p.id;
+      const info=mapa?.pastas?.[alvoId];
+      const sub=info?`${info.n} arquivo${info.n===1?'':'s'}${info.b?' · '+tamanho(info.b):''}`:(p.ownedByMe===false?'compartilhada':'modificada '+driveData(p.modifiedTime));
+      const b=el(`<button class="dv-pasta" title="${esc(p.name)}"><span class="ic">${p.mimeType===DRIVE_ATALHO?'🔗':'📁'}</span><span style="min-width:0"><div class="nm">${esc(p.name)}</div><div class="sub">${sub}</div></span></button>`);
+      b.onclick=()=>{if(alvoId)driveIr(alvoId,driveCache.nomes[alvoId]||p.name,{filho:p.mimeType!==DRIVE_ATALHO})};g.appendChild(b)});
+    cxPastas.appendChild(g);
+  };
+  const raio=blocoRaioXDrive(m);
+  let ultimaLista=[],ultimaIncompleta=false;
+  const notaIncompleta=()=>el(`<p class="dv-nota">${D.modo==='busca'?'Mostrando os 60 primeiros resultados. Refine a palavra para achar o resto.':'A lista é longa e parou nos primeiros itens. Use a busca para achar o resto.'}</p>`);
+  const pintaLista=()=>{
+    if(D.modo==='pastas'){
+      pintaPastas(ultimaLista.filter(driveEhPastaOuAtalho),driveCache.mapa);
+      cxArq.replaceChildren(driveTabela(ultimaLista.filter(f=>!driveEhPastaOuAtalho(f)).filter(f=>!D.tipo||driveTipo(f).cat===D.tipo||(D.tipo==='planilha'&&driveTipo(f).cat==='csv')),{vazio:vazioLista}));
+    }else cxArq.replaceChildren(driveTabela(ultimaLista,{caminho:true,vazio:vazioLista}));
+    if(ultimaIncompleta)cxArq.appendChild(notaIncompleta());
+  };
+  const carregar=async()=>{
+    try{
+      await driveRaiz();
+      const p=D.modo==='pastas'?await drivePasta(D.pasta):await driveLista(D.modo,D.busca,D.tipo);
+      if(!m.isConnected)return;
+      ultimaLista=p.arquivos;ultimaIncompleta=p.incompleto;pintaLista();
+      // o mapa roda sozinho na primeira visita: contagens e caminhos chegam sem ninguém pedir
+      if(!driveCache.mapa){(driveCache.mapeando||mapearDrive()).then(()=>{if(m.isConnected){pintaLista();raio.pinta()}}).catch(()=>{if(m.isConnected)raio.pinta()});raio.pinta()}
+    }catch(e){
+      if(!m.isConnected)return;
+      // crachá venceu no meio: voltar para a caixa de conectar, que é onde o botão está
+      if(!googleConectado('drive')){tela();return}
+      const av=el(`<div class="aviso" role="alert">${esc(e.message)}</div>`);cxArq.replaceChildren(av);cxPastas.replaceChildren(av.cloneNode(true));
+    }
+  };
+  carregar();
+  m.appendChild(raio.bloco);
+}
+/* ---------- Raio-X ---------- */
+function blocoRaioXDrive(m){
+  const cx=el('<div class="corpo"></div>');
+  const rodarMapa=async()=>{driveCache.mapa=null;const p=mapearDrive();pinta();try{await p}catch(_){}pinta()};
+  const pinta=()=>{
+    const mp=driveCache.mapa;cx.replaceChildren();
+    if(!mp){
+      if(driveCache.mapeando)cx.appendChild(el('<p class="dv-nota">Mapeando o seu Drive… as contagens das pastas e os achados aparecem sozinhos quando terminar.</p>'));
+      else{
+        if(driveCache.erroMapa)cx.appendChild(el(`<div class="aviso" role="alert">${esc(driveCache.erroMapa)}</div>`));
+        cx.appendChild(el('<p class="dv-nota">O mapa lê a lista de tudo que é seu no Drive (só nomes, tamanhos e datas — nenhum conteúdo) e responde o que pesa, o que está duplicado e o que está aberto a qualquer pessoa com o link.</p>'));
+        cx.appendChild(acao(driveCache.erroMapa?'Tentar de novo':'Mapear o Drive agora',rodarMapa));
+      }
+      return;
+    }
+    const k=el('<div class="grade"></div>');
+    k.innerHTML=kpi('Arquivos seus',mp.nArq.toLocaleString('pt-BR'),mp.nPastas.toLocaleString('pt-BR')+' pastas')+kpi('Seus arquivos pesam',tamanho(mp.bytes),'só o que é seu; a conta inteira está na barra')+kpi('Mexidos em 30 dias',mp.mexidos30.toLocaleString('pt-BR'),'criados ou alterados')+kpi('Abertos pelo link',mp.abertos.length.toLocaleString('pt-BR'),'qualquer pessoa com o link vê',mp.abertos.length?'r':'v');
+    cx.appendChild(k);
+    if(mp.incompleto)cx.appendChild(el('<div class="aviso">O Drive é grande demais: o mapa parou em 30 páginas de resultados. Os números abaixo são parciais.</div>'));
+    const dois=el('<div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))"></div>');
+    const pastas=Object.values(mp.pastas).filter(p=>p.topo&&p.b>0).map(p=>({r:p.nome,v:p.b,id:p.id.startsWith('_')?null:p.id}));
+    const c1=el('<div></div>');c1.innerHTML=ranking(pastas,{titulo:'Pastas que mais pesam',fmt:tamanho,max:8,aoClicar:true});
+    c1.querySelectorAll('[data-rid]').forEach(l=>{l.onclick=()=>driveIr(l.dataset.rid,driveCache.nomes[l.dataset.rid]||'')});
+    c1.querySelectorAll('[data-rk]:not([data-rid])').forEach(l=>{l.style.cursor='default';l.removeAttribute('data-rk')});
+    const c2=el('<div></div>');c2.innerHTML=ranking(Object.entries(mp.tipos).map(([r,x])=>({r,v:x.b})),{titulo:'Espaço por tipo de arquivo',fmt:tamanho,ac:'var(--azul)',max:6});
+    dois.append(c1,c2);cx.appendChild(dois);
+    /* os quadros lembram se estavam abertos (E.colapso, como os blocos): fechar
+       o visor re-renderiza a tela e sem isso todos se fechavam sozinhos */
+    const det=(chave,titulo,cont,corpo,abertoPadrao)=>{const id='dv-det-'+chave;const aberto=E.colapso[id]==null?!!abertoPadrao:!E.colapso[id];
+      const d=el(`<details class="dv-det"${aberto?' open':''}><summary>${titulo}<span class="cont">${cont}</span></summary></details>`);d.appendChild(corpo);
+      d.ontoggle=()=>{E.colapso[id]=!d.open;salvar()};return d};
+    const lista=arqs=>driveTabela(arqs,{caminho:true});
+    const comNota=(nota,arqs)=>{const d=el(`<div><p class="dv-nota">${nota}</p></div>`);d.appendChild(lista(arqs));return d};
+    const n=(q,s='arquivo')=>q+' '+s+(q===1?'':'s');
+    if(mp.abertos.length)cx.appendChild(det('abertos','🔓 Abertos para qualquer pessoa com o link',n(mp.abertos.length),comNota('Quem tiver o link enxerga — inclusive quem não devia. Se algum não precisa estar assim, feche o compartilhamento no próprio Drive.',mp.abertos.slice(0,40)),true));
+    cx.appendChild(det('grandes','🏋️ Maiores arquivos',tamanho(mp.grandes.reduce((t,f)=>t+(+f.size||0),0))+' nos '+mp.grandes.length+' maiores',lista(mp.grandes)));
+    if(mp.duplicados.length){const sobra=mp.duplicados.reduce((t,g)=>t+g.sobra,0);const corpo=el('<div><p class="dv-nota">Mesmo conteúdo, byte por byte, em mais de um lugar. Apagar a cópia é decisão sua, lá no Drive — aqui só se enxerga.</p></div>');
+      mp.duplicados.slice(0,25).forEach(g=>{corpo.appendChild(el(`<p style="margin:10px 0 2px;font-weight:600;font-size:12.5px">${esc(g.arquivos[0].name)} <span style="color:var(--suave);font-weight:400">· ${g.arquivos.length} cópias · ${tamanho(+g.arquivos[0].size||0)} cada</span></p>`));corpo.appendChild(lista(g.arquivos))});
+      cx.appendChild(det('duplicados','👯 Duplicados',n(mp.duplicados.length,'grupo')+' · '+tamanho(sobra)+' repetidos',corpo))}
+    if(mp.esquecidos.length)cx.appendChild(det('esquecidos','🕰️ Pesados que você não abre há mais de 2 anos',n(mp.esquecidos.length),lista(mp.esquecidos)));
+    if(mp.soltos.length)cx.appendChild(det('soltos','🧺 Soltos na raiz do Meu Drive',n(mp.soltos.length)+' fora de pasta',lista(mp.soltos.slice(0,40))));
+    if(mp.compartilhados.length)cx.appendChild(det('compartilhados','🤝 Compartilhados com pessoas específicas',n(mp.compartilhados.length),lista(mp.compartilhados.slice(0,40))));
+    if(mp.vazias.length)cx.appendChild(det('vazias','🫙 Pastas aparentemente vazias',n(mp.vazias.length,'pasta'),comNota('Sem nenhum arquivo seu dentro (podem guardar itens de outras pessoas).',mp.vazias)));
+    const pe=el(`<p class="dv-nota">Mapa feito às ${new Date(mp.quando).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}. </p>`);
+    pe.appendChild(acao('↻ Refazer o mapa',rodarMapa,'ghost'));cx.appendChild(pe);
+  };
+  pinta();
+  return {bloco:bloco('dv-raiox','🧠 Raio-X do Drive','o que pesa, o que repete, o que está aberto',cx),pinta};
+}
+/* ---------- ver sem baixar ---------- */
+const DRIVE_EXPORTA={ 'application/vnd.google-apps.document':['application/pdf','application/vnd.openxmlformats-officedocument.wordprocessingml.document','.docx'],
+  'application/vnd.google-apps.spreadsheet':['application/pdf','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','.xlsx'],
+  'application/vnd.google-apps.presentation':['application/pdf','application/vnd.openxmlformats-officedocument.presentationml.presentation','.pptx'],
+  'application/vnd.google-apps.drawing':['application/pdf','image/png','.png']};
+const DRIVE_TETO_VISOR=80*1048576;
+// iPhone/iPad: o Safari mostra só a 1ª página de um PDF em <iframe>; lá o visor ganha um "abrir inteiro"
+const ehIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+async function driveBytes(f,{exportar=null,sinal=null}={}){
+  const cam=exportar?`files/${encodeURIComponent(f.id)}/export?mimeType=${encodeURIComponent(exportar)}`:`files/${encodeURIComponent(f.id)}?alt=media&supportsAllDrives=true`;
+  const r=await googleFetch('drive',cam,180000,sinal);
+  return r.blob();
+}
+async function driveResolveAtalho(f){
+  if(f.mimeType!==DRIVE_ATALHO)return f;
+  const alvo=f.shortcutDetails?.targetId;if(!alvo)throw new Error('Este atalho não aponta para lugar nenhum.');
+  return googleLer('drive',`files/${encodeURIComponent(alvo)}?fields=${encodeURIComponent(DRIVE_CAMPOS)}&supportsAllDrives=true`);
+}
+async function verArquivoDrive(f0){
+  let f;try{f=await driveResolveAtalho(f0)}catch(e){alert(e.message);return}
+  if(f.mimeType===DRIVE_PASTA){driveIr(f.id,f.name);return}
+  const t=driveTipo(f),urls=[],ctrl=new AbortController();let fechado=false;
+  abrirModal(esc(f.name),`${t.rot}${driveTam(f)?' · '+driveTam(f):''} · modificado ${driveData(f.modifiedTime)}${f.owners?.[0]?.displayName&&f.ownedByMe===false?' · de '+esc(f.owners[0].displayName):''}`,(c,fechar)=>{
+    const modal=c.closest('.modal');modal.classList.add('largo');
+    const barra=el('<div class="secao" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"></div>');
+    if(f.webViewLink)barra.appendChild(acao('Abrir no Drive ↗',()=>window.open(urlSegura(f.webViewLink),'_blank','noopener'),'ghost'));
+    const bb=acao('Baixar',async()=>{bb.disabled=true;try{await baixarDrive(f)}catch(e){status.textContent=e.message}finally{bb.disabled=false}},'ghost');barra.appendChild(bb);
+    const status=el('<span class="dv-nota" role="status" style="margin:0"></span>');barra.appendChild(status);
+    c.appendChild(barra);
+    const sec=el('<div class="secao"><div class="dv-visor"><div class="vazio">Carregando…</div></div></div>');c.appendChild(sec);
+    const visor=sec.querySelector('.dv-visor');
+    const foraDaqui=motivo=>{visor.innerHTML=`<div class="vazio">${esc(motivo)}<br><br></div>`;if(f.webViewLink){const b=acao('Abrir no visualizador do Drive ↗',()=>window.open(urlSegura(f.webViewLink),'_blank','noopener'));visor.querySelector('.vazio').appendChild(b)}};
+    const guardaUrl=b=>{const u=URL.createObjectURL(b);if(fechado){URL.revokeObjectURL(u);return null}urls.push(u);return u};
+    const mostraPdf=b=>{const u=guardaUrl(b.type==='application/pdf'?b:new Blob([b],{type:'application/pdf'}));if(!u)return;
+      visor.innerHTML=`<iframe src="${u}" title="${esc(f.name)}"></iframe>`;
+      if(ehIOS()&&f.webViewLink){const p=el('<p class="dv-nota" style="padding:8px 12px">No iPhone e no iPad este quadro mostra só a primeira página. </p>');p.appendChild(acao('Ver inteiro no Drive ↗',()=>window.open(urlSegura(f.webViewLink),'_blank','noopener'),'ghost'));visor.prepend(p)}};
+    (async()=>{
+      try{
+        const tam=+f.size||0;
+        if(driveGoogleNativo(f)){
+          if(!DRIVE_EXPORTA[f.mimeType])return foraDaqui('Este tipo do Google ('+t.rot+') não tem visor aqui.');
+          return mostraPdf(await driveBytes(f,{exportar:'application/pdf',sinal:ctrl.signal}));
+        }
+        if(t.cat==='video'||t.cat==='audio')return foraDaqui('Vídeo e áudio tocam no visualizador do próprio Drive, sem baixar.');
+        if(t.cat==='documento'||t.cat==='apresentacao')return foraDaqui('Word e PowerPoint abrem no visualizador do próprio Drive, sem baixar.');
+        if(t.cat==='outro')return foraDaqui('Este tipo de arquivo não tem visor aqui.');
+        if(tam>DRIVE_TETO_VISOR)return foraDaqui('Arquivo grande demais para o visor daqui ('+tamanho(tam)+').');
+        const b=await driveBytes(f,{sinal:ctrl.signal});if(fechado)return;
+        if(t.cat==='pdf')return mostraPdf(b);
+        if(t.cat==='imagem'){const u=guardaUrl(b);if(u)visor.innerHTML=`<img src="${u}" alt="${esc(f.name)}">`;return}
+        if(t.cat==='texto'||t.cat==='csv'){const txt=await b.text();visor.innerHTML='';visor.appendChild(el('<pre></pre>')).textContent=txt.slice(0,400000)+(txt.length>400000?'\n… (cortado)':'');return}
+        if(t.cat==='planilha'){
+          // .xlsx/.xlsm é um ZIP ("PK" no começo); o .xls antigo não é, e o leitor de ZIP só saberia gritar
+          const cabeca=new Uint8Array(await b.slice(0,2).arrayBuffer());
+          if(cabeca[0]!==0x50||cabeca[1]!==0x4B)return foraDaqui('Esta planilha está no formato antigo do Excel (.xls), que só o Drive sabe mostrar.');
+          await drivePlanilhaNoVisor(b,visor);return;
+        }
+        foraDaqui('Sem visor para este tipo.');
+      }catch(e){if(!fechado)visor.innerHTML=`<div class="aviso" role="alert">${esc(e.message)}</div>`}
+    })();
+  },()=>{fechado=true;ctrl.abort();urls.forEach(u=>URL.revokeObjectURL(u))});
+}
+/* Planilha (.xlsx/.xlsm) desenhada com o mesmo leitor que importa a
+   Patrimonial — só valores, sem fórmula nem formatação, o bastante para
+   conferir sem abrir o Excel. */
+async function drivePlanilhaNoVisor(blob,visor){
+  const zip=await lerZipAuto(new Uint8Array(await blob.arrayBuffer()));
+  const abas=abasDoXlsx(zip);const nomes=Object.keys(abas);
+  if(!nomes.length)throw new Error('Não achei abas nesta planilha.');
+  visor.innerHTML='';const tabs=el('<div class="dv-abas" style="padding:10px 10px 0"></div>');const area=el('<div class="planilha"></div>');visor.append(tabs,area);
+  const pinta=nome=>{
+    tabs.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.aba===nome));
+    const cel=celulasDaAba(zip,abas[nome]);
+    let maxL=0,maxC=0;const colIdx=l=>{let n=0;for(const ch of l)n=n*26+(ch.charCodeAt(0)-64);return n};
+    Object.keys(cel).forEach(k=>{const [,c,l]=k.match(/^([A-Z]+)(\d+)$/)||[];if(!c)return;maxL=Math.max(maxL,+l);maxC=Math.max(maxC,colIdx(c))});
+    const L=Math.min(maxL,500),C=Math.min(maxC,60);
+    if(!L||!C){area.innerHTML='<div class="vazio">Aba vazia.</div>';return}
+    let h='<table><thead><tr><th></th>';for(let c=1;c<=C;c++)h+='<th>'+colLetra(c-1)+'</th>';h+='</tr></thead><tbody>';
+    for(let l=1;l<=L;l++){h+='<tr><th>'+l+'</th>';for(let c=1;c<=C;c++){const v=cel[colLetra(c-1)+l]??'';const n=numeroPlanilha(v);h+=`<td${n!=null&&v!==''?' class="n"':''}>${esc(n!=null&&v!==''&&/^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(String(v).trim())?(Number.isInteger(n)?n.toLocaleString('pt-BR'):n.toLocaleString('pt-BR',{maximumFractionDigits:4})):v)}</td>`}h+='</tr>'}
+    h+='</tbody></table>';area.innerHTML=h+((maxL>500||maxC>60)?'<p class="dv-nota" style="padding:0 10px 10px">Mostrando até 500 linhas × 60 colunas. Para tudo, abra no Drive.</p>':'');
+  };
+  nomes.forEach(n=>{const b=el(`<button data-aba="${esc(n)}">${esc(n)}</button>`);b.onclick=()=>pinta(n);tabs.appendChild(b)});
+  pinta(nomes[0]);
+}
+/* ---------- baixar (a única "saída" do Drive, e é pedida com clique) ---------- */
+async function baixarDrive(f0){
+  const f=await driveResolveAtalho(f0);
+  if(f.mimeType===DRIVE_PASTA)throw new Error('Pasta não baixa daqui — abra a pasta e baixe os arquivos.');
+  let blob,nome=f.name||'arquivo';
+  if(driveGoogleNativo(f)){const ex=DRIVE_EXPORTA[f.mimeType];if(!ex)throw new Error('Este tipo do Google não tem exportação.');blob=await driveBytes(f,{exportar:ex[1]});if(!nome.toLowerCase().endsWith(ex[2]))nome+=ex[2]}
+  else blob=await driveBytes(f);
+  const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000);
+}
+
 function vDocumentos(m){
   m.classList.add('workspace-layout','documentos-workspace','planos-documents');
   const lista=E.documentos,donos=[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...lista.map(d=>d.dono||'Léo')])];
