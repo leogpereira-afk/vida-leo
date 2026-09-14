@@ -204,6 +204,36 @@ async function crachaCurto(minutos: number): Promise<string> {
   return cab + "." + carga + "." + b64(String.fromCharCode(...mac));
 }
 
+/* A PORTA DA TAREFA AGENDADA (14/09/2026).
+   O pg_cron não tem — e não pode ter — o crachá do dono: o mesmo crachá abre o
+   estado, as obras, os anexos e o `crachaAdmin`. Também não vale a chave
+   service_role: ela é do projeto INTEIRO, compartilhado com os sistemas da
+   empresa, e girá-la derrubaria todos. Então a tarefa tem um segredo só dela,
+   que vale para UMA ação de leitura (puxar treinos do Strava para as tabelas do
+   próprio dono) e mais nada.
+
+   O segredo mora em `leo_config` (tabela com RLS e nenhuma política: só o
+   service_role enxerga), nunca no git nem nas variáveis. RECUSA POR OMISSÃO:
+   sem a linha, ou com menos de 32 caracteres, nenhum cabeçalho abre a porta —
+   "esqueci de configurar" não pode virar "porta aberta". A consulta ao banco só
+   acontece se o cabeçalho já vier com tamanho plausível, para um pedido anônimo
+   não conseguir fazer o servidor bater no banco à toa. */
+const CRON_ACAO = "stravaSincronizarCron";
+async function cronOk(req: Request): Promise<boolean> {
+  const dado = (req.headers.get("x-leo-cron") ?? "").trim();
+  if (dado.length < 32 || dado.length > 200) return false;
+  const { data, error } = await sb.from("leo_config").select("valor").eq("chave", "cron_token").maybeSingle();
+  if (error || !data) return false;
+  const v = data.valor as Record<string, unknown> | null;
+  const esperado = v && typeof v.token === "string" ? v.token.trim() : "";
+  if (esperado.length < 32) return false;
+  // comparação de tempo constante: não entrega o segredo letra por letra
+  if (esperado.length !== dado.length) return false;
+  let dif = 0;
+  for (let i = 0; i < esperado.length; i++) dif |= esperado.charCodeAt(i) ^ dado.charCodeAt(i);
+  return dif === 0;
+}
+
 // ---------------------------------------------------------------- senha
 // PBKDF2-SHA256; o registro no banco guarda { salt, iter, hash } em hex.
 
@@ -263,6 +293,14 @@ Deno.serve(async (req: Request) => {
       if (!(await tokenOk(t))) return json({ erro: "Não autorizado" }, 401);
       if (acao === "googleAutorizarUrl") corpo.state = await crachaCurto(10);
       return await googleAcao(acao, corpo, sb, req, new URL(req.url));
+    }
+
+    /* A tarefa agendada: uma ação, um segredo, corpo IGNORADO. O corpo é
+       reescrito à mão para que nem `forcar` nem qualquer outro campo vindo de
+       fora mude o que essa rodada faz. */
+    if (acao === CRON_ACAO && req.headers.has("x-leo-cron")) {
+      if (!(await cronOk(req))) return json({ erro: "Não autorizado" }, 401);
+      return await stravaAcao(CRON_ACAO, {}, sb, req, new URL(req.url));
     }
 
     if (typeof acao === "string" && acao.startsWith("strava")) {

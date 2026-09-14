@@ -55,7 +55,18 @@ const RESERVA = 4;                 // sobra para a renovação de token da próx
 const TENTATIVAS = 3;              // 429 / 5xx / rede: espera 1 s, 2 s e desiste
 const PRAZO_MS = 50_000;           // parada limpa antes do teto de tempo da função
 const PRAZO_CURTO_MS = 12_000;     // quando a tela pede "sincroniza e já me dá os dados"
+/* A rodada da tarefa agendada pode ser longa: ninguém está esperando na tela.
+   É ela que enche a janela de 15 min do Strava (~96 leituras) e faz a carga
+   terminar sozinha. NÃO subir sem subir TRAVA_MIN junto: trava mais velha que
+   TRAVA_MIN é ROUBADA, e duas rodadas vivas gastam o orçamento em dobro. */
+const PRAZO_CRON_MS = 85_000;
+/* 3 minutos continua de sobra: a chamada mais longa possível hoje é limitada
+   pelo que resta do prazo da rodada, então a rodada inteira acaba em ~110 s no
+   pior caso. Mais que isso só atrasaria a recuperação de uma execução que
+   morreu — a trava dela só vence aqui. O teste tests/strava-agendamento.mjs
+   guarda essa conta. */
 const TRAVA_MIN = 3;               // trava mais velha que isto é de uma execução que morreu
+const FOLGA_GEAR = 6;              // fichas que a etapa 2 deixa para os tênis da etapa 3
 const TTL_HOJE = 3600;             // janela curta: desde a última atividade conhecida − 2 dias
 const TTL_MES = 4 * 3600;          // últimos 31 dias: pega nome/tênis editados depois
 const TTL_ANO = 4 * 3600;          // desde 1º de janeiro: idem, e refaz os totais dos tênis
@@ -272,7 +283,8 @@ function rolaJanela(o: Orcamento): void {
   if (j !== o.janela) { o.janela = j; o.c15 = 0; }
   if (d !== o.dia) { o.dia = d; o.cDia = 0; }
 }
-const temOrcamento = (o: Orcamento) => o.c15 < LIMITE_15MIN - RESERVA && o.cDia < LIMITE_DIA - RESERVA;
+const temOrcamento = (o: Orcamento, folga = 0) =>
+  o.c15 < LIMITE_15MIN - RESERVA - folga && o.cDia < LIMITE_DIA - RESERVA - folga;
 
 // O Strava conta do lado dele e diz quanto já foi: se o contador de lá estiver
 // na frente do nosso, vale o de lá (outra execução pode ter morrido sem gravar).
@@ -302,10 +314,15 @@ async function chamar(s: Sessao, caminho: string): Promise<unknown> {
   for (let tentativa = 1; ; tentativa++) {
     o.c15++; o.cDia++; o.feitas++;
     let resp: Response | null = null;
+    /* O prazo da rodada vale aqui dentro também. Sem isto, UMA atividade com a
+       rede morta custa 20 s + 1 s + 20 s + 2 s + 20 s = 63 s sozinha — o
+       `paraTempo()` só olha ENTRE atividades — e atravessa o teto de tempo da
+       função, que mata o isolate sem rodar o `finally` que destrava. */
+    const sobra = s.prazo - Date.now();
     try {
       resp = await fetch(API + caminho, {
         headers: { authorization: "Bearer " + s.token },
-        signal: AbortSignal.timeout(20_000),
+        signal: AbortSignal.timeout(Math.max(3_000, Math.min(20_000, sobra))),
       });
     } catch (_) {
       resp = null;
@@ -339,6 +356,10 @@ async function chamar(s: Sessao, caminho: string): Promise<unknown> {
       }
       throw new ErroStrava("servidor",
         status ? "Strava fora do ar (HTTP " + status + ")." : "Sem resposta do Strava (rede ou tempo esgotado).", status);
+    }
+    // não adianta dormir para tentar de novo depois do fim da rodada
+    if (Date.now() + espera >= s.prazo) {
+      throw new ErroStrava("tempo", "Parou pelo tempo; a próxima sincronização continua.");
     }
     await dormir(espera);
     espera *= 2;
@@ -605,20 +626,34 @@ async function sincronizar(sb: Banco, corpo: Registro, prazoMs = PRAZO_MS): Prom
       }
     }
 
-    /* ---- 2. OS DETALHES. perf_lido=false é a fila: corrida ≥ 1 km (best
-       efforts) primeiro, depois quem ainda não tem calorias. Cada uma é uma
-       chamada; o orçamento manda quantas cabem nesta rodada. */
+    /* ---- 2. OS DETALHES. perf_lido=false é a fila INTEIRA, em ordem de
+       interesse: corrida ≥ 1 km primeiro (é dela que saem os recordes), depois
+       quem ainda não tem calorias, e por fim o resto. Cada uma é uma chamada; o
+       orçamento manda quantas cabem nesta rodada.
+
+       Por que a fila não filtra mais: filtrar deixava um CHÃO PERMANENTE —
+       linha com perf_lido=false, calorias já preenchidas pela carga inicial e
+       que não fosse corrida ≥ 1 km (6 pedaladas de 2020, aqui) nunca era lida
+       nem marcada. O contador jamais chegava a zero, e uma tarefa agendada
+       ligada a "ainda falta alguém" rodaria para sempre sem nada a fazer. */
     if (!s.parada) {
       const { data: pend, error: ePend } = await sb.from("leo_strava_atividades")
         .select("id, tipo, distancia_m, calorias").eq("perf_lido", false)
         .order("inicio", { ascending: false, nullsFirst: false }).limit(1000);
       if (ePend) throw new Error("pendentes: " + ePend.message);
-      const prioridade = (p: Registro) => ehCorrida(p.tipo) && (numero(p.distancia_m) ?? 0) >= 1000;
-      const fila = ((pend ?? []) as Registro[])
-        .filter((p) => prioridade(p) || p.calorias == null)
-        .sort((a, b) => Number(prioridade(b)) - Number(prioridade(a)));
+      const prioridade = (p: Registro) =>
+        ehCorrida(p.tipo) && (numero(p.distancia_m) ?? 0) >= 1000 ? 2 : p.calorias == null ? 1 : 0;
+      const fila = ((pend ?? []) as Registro[]).sort((a, b) => prioridade(b) - prioridade(a));
       for (const p of fila) {
         if (paraTempo()) break;
+        /* Parar ANTES de raspar o orçamento: a etapa 3 (os tênis) só roda se
+           esta não tiver parado, e sem fichas ela ficaria de fora todas as
+           rodadas enquanto a carga queima. */
+        if (!temOrcamento(s.o, FOLGA_GEAR)) {
+          s.parada = new ErroStrava("orcamento",
+            "Orçamento de leituras do Strava quase no fim; a próxima rodada continua.");
+          break;
+        }
         const id = String(p.id);
         let d: Registro;
         try {
@@ -685,7 +720,10 @@ async function sincronizar(sb: Banco, corpo: Registro, prazoMs = PRAZO_MS): Prom
     }
   } finally {
     r.chamadas = s.o.feitas;
-    const extra: Registro = { ultimo_erro: r.erro ?? r.aviso ?? null };
+    /* "Parou pelo tempo" e "orçamento quase no fim" são PAUSAS, não defeitos.
+       Guardadas numa coluna chamada `ultimo_erro`, a tela as mostraria como
+       falha — e com a tarefa agendada isso passa a acontecer o dia inteiro. */
+    const extra: Registro = { ultimo_erro: r.erro ?? null, ultimo_aviso: r.aviso ?? null };
     if (!r.erro) extra.ultima = agoraIso();
     await destravar(sb, s.o, extra);
   }
@@ -784,6 +822,7 @@ async function ler(sb: Banco, corpo: Registro): Promise<Response> {
     sync: {
       ultima: linha ? (texto(linha.ultima) || null) : null,
       ultimoErro: linha ? (texto(linha.ultimo_erro) || null) : null,
+      ultimoAviso: linha ? (texto(linha.ultimo_aviso) || null) : null,
       autorizado,
       emAndamento: !!(linha && linha.em_andamento) || (sync ? sync.emAndamento : false),
       chamadas15min: linha ? (inteiro(linha.chamadas_15min) ?? 0) : 0,
@@ -883,6 +922,9 @@ export async function stravaAcao(acao: string, corpo: Registro, sb: Banco, req: 
   try {
     if (acao === "stravaLer") return await ler(sb, c);
     if (acao === "stravaSincronizar") return json(await sincronizar(sb, c));
+    // rodada da tarefa agendada: prazo longo e corpo ignorado (nada de `forcar`,
+    // que releria o ano inteiro e queimaria o orçamento de que a fila precisa)
+    if (acao === "stravaSincronizarCron") return json(await sincronizar(sb, {}, PRAZO_CRON_MS));
     if (acao === "stravaAutorizarUrl") return autorizarUrl(c);
     if (acao === "stravaCallback") return await callback(sb, u);
     return json({ erro: "ação inválida" }, 400);
