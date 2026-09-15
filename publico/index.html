@@ -148,6 +148,15 @@ tr:hover .lixo{opacity:1}
 .dv-pasta:hover{border-color:var(--verde);transform:translateY(-1px)}
 .dv-pasta .ic{font-size:22px;flex:none} .dv-pasta .nm{font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dv-pasta .sub{font-size:11.5px;color:var(--suave);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* A celula da planilha: o cartao que abre + o lapis que renomeia. Sao DOIS
+   botoes, lado a lado, porque botao dentro de botao nao existe em HTML -- o
+   navegador desmonta o de fora e o clique passa a cair em lugar errado.
+   O lapis fica SEMPRE visivel, e nao so no hover: no celular nao ha hover, e
+   um botao invisivel que responde ao toque e pior do que botao nenhum. */
+.dv-cel{display:flex;align-items:stretch;gap:6px;min-width:0}
+.dv-cel .dv-pasta{flex:1;min-width:0}
+.dv-lapis{flex:none;padding:0 11px;background:var(--card);border:1px solid var(--linha);border-radius:12px;cursor:pointer;font:inherit;font-size:13px;color:var(--suave);transition:.15s}
+.dv-lapis:hover{border-color:var(--verde);color:var(--texto)}
 .dv-tab{width:100%;border-collapse:collapse;font-size:13px}
 .dv-tab th{text-align:left;font:600 10.5px Inter;letter-spacing:.06em;text-transform:uppercase;color:var(--suave);padding:6px 8px;border-bottom:1px solid var(--linha)}
 .dv-tab td{padding:7px 8px;border-bottom:1px solid var(--linha);vertical-align:middle}
@@ -9485,6 +9494,20 @@ function driveLinkPlanilha(url){
   return {sheetId:m[1],gid:g?g[1]:''};
 }
 const planilhaLista=()=>Array.isArray(E.planilhas)?E.planilhas:(E.planilhas=[]);
+/* A LISTA EM ORDEM ALFABETICA, numa COPIA.
+   Ordenar `E.planilhas` no lugar mexeria no que esta guardado na nuvem a cada
+   desenho da tela, e a ordem de cadastro -- o historico de como a lista
+   cresceu -- sumiria sem ninguem ter pedido.
+   `localeCompare` em pt-BR com `sensitivity:'base'` porque a ordem do code
+   point joga acento e maiuscula para fora do alfabeto: sem isso "ARVORE" vem
+   antes de "Abacate" e "Agua" cai depois de "zebra". `numeric` para "Casa 2"
+   vir antes de "Casa 10". Planilha sem nome vai para o fim: ela nao tem por
+   que abrir a lista. */
+const planilhaEmOrdem=lista=>[...(Array.isArray(lista)?lista:[])].sort((a,b)=>{
+  const x=String(a&&a.nome||'').trim(),y=String(b&&b.nome||'').trim();
+  if(!x!==!y)return x?-1:1;
+  return x.localeCompare(y,'pt-BR',{sensitivity:'base',numeric:true});
+});
 const planilhaUrlEditor=p=>'https://docs.google.com/spreadsheets/d/'+encodeURIComponent(p.sheetId)+'/edit?rm=minimal'+(p.gid?'&gid='+encodeURIComponent(p.gid):'');
 const planilhaUrlGoogle=p=>'https://docs.google.com/spreadsheets/d/'+encodeURIComponent(p.sheetId)+'/edit'+(p.gid?'#gid='+encodeURIComponent(p.gid):'');
 function planilhaAbrirNoGoogle(p){const u=urlSegura(planilhaUrlGoogle(p));if(u!=='#')window.open(u,'_blank','noopener')}
@@ -9563,13 +9586,20 @@ function blocoPlanilhas(r){
     return bloco('dv-planilhas','📊 Planilhas','as que você mexe, abertas e editadas dentro da Central',cx);
   }
   const g=el('<div class="dv-pastas"></div>');
-  lista.forEach(pl=>{
+  planilhaEmOrdem(lista).forEach(pl=>{
+    const cel=el('<div class="dv-cel"></div>');
     const b=el(`<button class="dv-pasta" title="${esc(pl.nome||'')}"><span class="ic">📊</span><span style="min-width:0"><div class="nm">${esc(pl.nome||'sem nome')}</div><div class="sub">abrir e editar aqui</div></span></button>`);
     b.onclick=()=>{filtro.drive.planilha=pl.id;r()};
-    g.appendChild(b);
+    /* RENOMEAR SEM PRECISAR ABRIR. O mesmo modal ja existia, mas so pela barra
+       de dentro da planilha aberta -- para trocar um nome era preciso carregar
+       o editor do Google inteiro antes. */
+    const lap=el(`<button class="dv-lapis" title="Renomear ou trocar o link" aria-label="Editar “${esc(pl.nome||'sem nome')}”">✏️</button>`);
+    lap.onclick=()=>modalPlanilha(pl,r);
+    cel.appendChild(b);cel.appendChild(lap);
+    g.appendChild(cel);
   });
   cx.appendChild(g);
-  return bloco('dv-planilhas','📊 Planilhas','as que você mexe, abertas e editadas dentro da Central',cx);
+  return bloco('dv-planilhas','📊 Planilhas','as que você mexe, abertas e editadas dentro da Central · em ordem alfabética, ✏️ para renomear',cx);
 }
 
 function vDrive(m){
