@@ -1267,7 +1267,7 @@ function tabela(lista,colunas,aoMudar,rodape,alvo,abrir){
     const tr=document.createElement('tr');
     tr.innerHTML=colunas.map(c=>{
       const v=it[c.k]??'';
-      if(c.tipo==='select') return `<td><select data-i="${i}" data-k="${c.k}">`+[...new Set([...c.opcoes,...(v?[v]:[])])].map(o=>`<option value="${esc(o)}"${o===v?' selected':''}>${esc(o)}</option>`).join('')+`</select></td>`;
+      if(c.tipo==='select') return `<td><select data-i="${i}" data-k="${c.k}">`+opcoesSelect(c.opcoes,v)+`</select></td>`;
       if(c.tipo==='calc') return `<td style="padding:8px 10px;${c.dir==='r'?'text-align:right;':''}color:var(--suave);font-variant-numeric:tabular-nums">${c.calc(it)}</td>`;
       if(c.tipo==='moeda') return `<td class="num"><input type="text" inputmode="decimal" class="moeda" data-i="${i}" data-k="${c.k}" value="${v?brl2(v):''}" placeholder="R$ 0,00"></td>`;
       const tipo=c.tipo||'text';
@@ -1384,12 +1384,29 @@ function abrirModal(titulo,sub,montar,aoFechar){
   f.querySelector('.fechar').focus();
   atualizarCamadasModais();
 }
+/* Opção de <select>: um texto puro vale para os dois lados (valor e rótulo);
+   {v,t} separa os dois, que é o que permite GUARDAR UM ID e MOSTRAR UM NOME.
+   Guardar o nome faria o vínculo apodrecer no dia em que alguém corrigisse um
+   acento na queixa — a chave é o id, o nome só exibe. */
+function opcoesSelect(opcoes,valor){
+  const lista=(Array.isArray(opcoes)?opcoes:[]).map(o=>o&&typeof o==='object'
+    ? {v:String(o.v??''),t:String(o.t??o.v??'')}
+    : {v:String(o??''),t:String(o??'')});
+  const v=valor==null?'':String(valor);
+  /* valor gravado que saiu da lista (queixa apagada, opção removida) não some
+     calado: aparece como está, para o dono ver e decidir */
+  if(v&&!lista.some(o=>o.v===v))lista.push({v,t:v});
+  const vistos=new Set();
+  return lista.filter(o=>vistos.has(o.v)?false:(vistos.add(o.v),true))
+    .map(o=>`<option value="${esc(o.v)}"${o.v===v?' selected':''}>${esc(o.t)}</option>`).join('');
+}
+
 function campos(obj,defs,aoMudar){
   const c=el('<div class="campos"></div>');
   defs.forEach(d=>{
     const w=el(`<div class="campo"><label>${d.t}</label></div>`);
     let inp;
-    if(d.tipo==='select'){inp=el(`<select>${[...new Set([...d.opcoes,...(obj[d.k]?[obj[d.k]]:[])])].map(o=>`<option value="${esc(o)}"${o===(obj[d.k]??'')?' selected':''}>${esc(o)}</option>`).join('')}</select>`)}
+    if(d.tipo==='select'){inp=el(`<select>${opcoesSelect(d.opcoes,obj[d.k])}</select>`)}
     else if(d.tipo==='textarea'){inp=el(`<textarea placeholder="${d.ph||''}"></textarea>`);inp.value=obj[d.k]??''}
     // sugestão: escreve o que quiser, com as opções já usadas à mão (datalist).
     // Aceita valor novo na hora — e ele passa a aparecer na próxima vez.
@@ -3411,8 +3428,8 @@ function novoCuidadoRotina(tipo){
     tratamentos:['Novo tratamento',E.tratamentos,{inicio:hoje(),fim:'',frequencia:'',status:'Em andamento'},[{k:'oque',t:'Tratamento / remédio',obrigatorio:true},{k:'motivo',t:'Motivo informado'},{k:'inicio',t:'Início',tipo:'date'},{k:'frequencia',t:'Frequência / dose prescrita'},{k:'medico',t:'Profissional responsável'}],'sa-trat'],
     vacinas:['Nova vacina',E.vacinas,{data:hoje(),proxima:'',viagem:'Não',obs:''},[{k:'vacina',t:'Vacina',obrigatorio:true},{k:'data',t:'Data da dose',tipo:'date',obrigatorio:true},{k:'proxima',t:'Próxima data informada',tipo:'date'},{k:'obs',t:'Observação'}],'sa-vac'],
     queixas:['Nova queixa',E.queixas,{data:hoje(),onde:'',intensidade:'',situacao:'Ativa',obs:''},[{k:'oque',t:'O que estou sentindo',obrigatorio:true},{k:'data',t:'Sinto desde',tipo:'date',obrigatorio:true},{k:'onde',t:'Onde',opcoes:['','Cabeça','Pescoço','Ombro','Braço','Cotovelo','Punho / mão','Peito','Costas','Lombar','Quadril','Joelho','Perna','Tornozelo / pé','Abdômen','Geral','Outro']},{k:'intensidade',t:'Intensidade de 0 a 10',tipo:'number'},{k:'obs',t:'O que melhora ou piora'}],'sa-quei'],
-    consultas:['Nova consulta',E.consultas,{data:hoje(),retorno:'',obs:''},[{k:'especialidade',t:'Especialidade',obrigatorio:true},{k:'data',t:'Data da consulta',tipo:'date',obrigatorio:true},{k:'profissional',t:'Profissional'},{k:'motivo',t:'Por que fui'},{k:'conduta',t:'O que ficou combinado'},{k:'retorno',t:'Retorno marcado para',tipo:'date'}],'sa-cons'],
-    fisio:['Nova sessão de fisioterapia',E.fisio,{data:hoje(),sessao:'',total:'',dorAntes:'',dorDepois:'',obs:''},[{k:'oque',t:'Para quê',obrigatorio:true},{k:'data',t:'Data da sessão',tipo:'date',obrigatorio:true},{k:'sessao',t:'Número da sessão',tipo:'number'},{k:'total',t:'De quantas sessões',tipo:'number'},{k:'dorAntes',t:'Dor antes, de 0 a 10',tipo:'number'},{k:'dorDepois',t:'Dor depois, de 0 a 10',tipo:'number'},{k:'profissional',t:'Profissional'}],'sa-fisio']
+    consultas:['Nova consulta',E.consultas,{data:hoje(),retorno:'',obs:''},[{k:'especialidade',t:'Especialidade',obrigatorio:true},{k:'data',t:'Data da consulta',tipo:'date',obrigatorio:true},{k:'profissional',t:'Profissional'},{k:'queixaId',t:'Por causa de qual queixa',tipo:'select',opcoes:[{v:'',t:'— nenhuma —'},...(E.queixas||[]).filter(q=>q&&q.id).map(q=>({v:q.id,t:q.oque||'queixa'}))]},{k:'motivo',t:'Por que fui'},{k:'conduta',t:'O que ficou combinado'},{k:'retorno',t:'Retorno marcado para',tipo:'date'}],'sa-cons'],
+    fisio:['Nova sessão de fisioterapia',E.fisio,{data:hoje(),queixaId:'',sessao:'',total:'',dorAntes:'',dorDepois:'',obs:''},[{k:'oque',t:'Para quê',obrigatorio:true},{k:'queixaId',t:'Por causa de qual queixa',tipo:'select',opcoes:[{v:'',t:'— nenhuma —'},...(E.queixas||[]).filter(q=>q&&q.id).map(q=>({v:q.id,t:q.oque||'queixa'}))]},{k:'data',t:'Data da sessão',tipo:'date',obrigatorio:true},{k:'sessao',t:'Número da sessão',tipo:'number'},{k:'total',t:'De quantas sessões',tipo:'number'},{k:'dorAntes',t:'Dor antes, de 0 a 10',tipo:'number'},{k:'dorDepois',t:'Dor depois, de 0 a 10',tipo:'number'},{k:'profissional',t:'Profissional'}],'sa-fisio']
   };
   const [titulo,lista,base,defs,blocoId]=opcoes[tipo];novoRegistroRotina(titulo,lista,base,defs,()=>{abreBloco(blocoId);rr('saude')()});
 }
@@ -3437,7 +3454,11 @@ function organizarSaude(pagina,alvo){
   opcoes.forEach(([id,nome])=>{const bt=el('<button type="button"></button>');bt.textContent=nome;bt.dataset.area=id;bt.setAttribute('aria-controls','saude-'+id);paineis[id].id='saude-'+id;bt.onclick=()=>selecionar(id);nav.appendChild(bt);pagina.appendChild(paineis[id])});
   const resumo=paineis.resumo.querySelector('.saude-resumo');if(resumo)paineis.resumo.prepend(resumo);
   selecionar(alvo?abaDoBlocoSaude(alvo):abaSaude);
-  pagina.querySelectorAll('.bloco').forEach(b=>{b.classList.remove('fechado');b.querySelector('header')?.setAttribute('aria-expanded','true')});
+  /* A tela FORÇAVA todo quadro aberto a cada render — e mesmo assim o bloco()
+     continuava gravando a escolha em E.colapso. Recolher, sair e voltar
+     devolvia tudo aberto: a preferência era salva e ignorada. Com os quadros
+     novos a aba ficou longa e isso passou a incomodar. Quem manda agora é a
+     escolha guardada, como no resto da Central. */
   pagina.querySelectorAll('table').forEach(t=>{const nomes=[...t.querySelectorAll('thead th')].map(x=>x.textContent);t.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>{td.dataset.label=nomes[i]||'Ações'}))});
   const painel=pagina.querySelector('.painel');
   if(painel){const botoes=[...painel.querySelectorAll('button')];const escolher=el('<select aria-label="Adicionar registro de saúde"><option value="">+ Adicionar registro</option></select>');
@@ -3458,6 +3479,13 @@ function vSaude(m) {
   const vit = E.vitais.filter(x=>dataISOValida(x.data)&&x.data<=hoje()).sort((a, b) => (a.data || '').localeCompare(b.data || ''));
   const uv = vit[vit.length - 1];
   const idade = idadeLeo();
+  /* IMC e cintura/altura JÁ eram calculados aqui e descartados sem aparecer em
+     lugar nenhum. Custam um cartão cada. As faixas são referência (OMS para o
+     IMC, 0,50 para cintura/altura) e continuam valendo o que a tela já diz:
+     precisam ser confirmadas na consulta. */
+  const n1 = v => (Math.round(v * 10) / 10).toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:1});
+  const n2 = v => (Math.round(v * 100) / 100).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const faixaIMC = v => v < 18.5 ? 'abaixo do peso' : v < 25 ? 'peso normal' : v < 30 ? 'sobrepeso' : 'obesidade';
 
   m.appendChild(cab('Saúde', 'Acompanhe medidas, exames, tratamentos e seu histórico de saúde.'));
   m.appendChild(painel(
@@ -3548,7 +3576,11 @@ function vSaude(m) {
 
   /* ---- 2. rastreios por idade ---- */
   const rc = el('<div class="rolagem"></div>');
-  const listaR = rastreiosPendentes(true);
+  /* Ordem de urgência, a MESMA régua do rastreiosPendentes() sem argumento:
+     nunca feito primeiro (venceEm nulo vira -9999), depois o mais atrasado, e
+     o que está em dia por último. Antes a linha vencida ganhava borda vermelha
+     e ficava perdida no meio de dez — cor não ordena. */
+  const listaR = rastreiosPendentes(true).slice().sort((a,b)=>(a.venceEm??-9999)-(b.venceEm??-9999));
   if (idade) {
     const t = document.createElement('table');
     t.innerHTML = '<thead><tr><th>Rastreio</th><th>A cada</th><th>Última vez</th><th>Situação</th><th>Para quê</th></tr></thead>';
@@ -3611,6 +3643,18 @@ function vSaude(m) {
      guardava. `situacao` existe para a lista não virar um depósito: uma queixa
      resolvida sai do caminho sem ser apagada, porque "já senti isso antes" é
      justamente o que se quer poder responder daqui a dois anos. */
+  /* A LIGAÇÃO ENTRE AS TRÊS LISTAS. Sem ela, queixa, consulta e fisioterapia
+     são três diários paralelos e ninguém responde "melhorou?". Guarda-se o
+     ID da queixa e mostra-se o texto dela: se o Léo corrigir a redação da
+     queixa amanhã, o vínculo continua de pé. Um vínculo salvo à mão precisa de
+     tela que o mostre — por isso a queixa ganhou a coluna que conta o que está
+     amarrado nela. */
+  const opcoesQueixa=[{v:'',t:'— nenhuma —'},...(E.queixas||[]).filter(q=>q&&q.id).map(q=>({
+    v:q.id,t:(q.oque||'queixa')+(dataISOValida(q.data)?' · desde '+fmtData(q.data):'')}))];
+  const ligados=id=>({
+    consultas:(E.consultas||[]).filter(x=>x&&x.queixaId===id).length,
+    fisio:(E.fisio||[]).filter(x=>x&&x.queixaId===id).length});
+
   m.appendChild(tabelaBloco('sa-quei', 'O que estou sentindo', 'queixas com data — é assim que se vê um problema voltar', E.queixas, [
     { k: 'data', t: 'Desde', tipo: 'date' },
     { k: 'oque', t: 'O que sinto', ph: 'ex.: dor ao levantar o braço' },
@@ -3618,6 +3662,12 @@ function vSaude(m) {
     { k: 'intensidade', t: 'Intensidade (0-10)', tipo: 'number', w: 130 },
     { k: 'situacao', t: 'Situação', tipo: 'select', opcoes: ['Ativa', 'Melhorando', 'Piorando', 'Resolvida'] },
     { k: 'obs', t: 'O que melhora / piora', ph: '—' },
+    { k: 'ligados', t: 'Ligado a', tipo: 'calc', calc: (q) => {
+        const n = ligados(q && q.id);
+        if (!n.consultas && !n.fisio) return '—';
+        return [n.consultas ? n.consultas + ' consulta' + (n.consultas > 1 ? 's' : '') : '',
+                n.fisio ? n.fisio + ' sessão' + (n.fisio > 1 ? 'ões' : '') : ''].filter(Boolean).join(' · ');
+      } },
   ], () => ({ data: hoje(), oque: '', onde: '', intensidade: '', situacao: 'Ativa', obs: '' }), r));
 
   /* ---- 6c. consultas médicas ----
@@ -3628,11 +3678,12 @@ function vSaude(m) {
     { k: 'data', t: 'Data', tipo: 'date' },
     { k: 'especialidade', t: 'Especialidade', ph: 'ex.: Ortopedia' },
     { k: 'profissional', t: 'Profissional', ph: '—' },
+    { k: 'queixaId', t: 'Por causa de', tipo: 'select', opcoes: opcoesQueixa },
     { k: 'motivo', t: 'Por que fui', ph: 'ex.: dor no ombro há 3 meses' },
     { k: 'conduta', t: 'O que ficou combinado', ph: 'ex.: fisioterapia 10 sessões' },
     { k: 'retorno', t: 'Retorno', tipo: 'date' },
     { k: 'obs', t: 'Observação', ph: '—' },
-  ], () => ({ data: hoje(), especialidade: '', profissional: '', motivo: '', conduta: '', retorno: '', obs: '' }), r));
+  ], () => ({ data: hoje(), especialidade: '', profissional: '', queixaId: '', motivo: '', conduta: '', retorno: '', obs: '' }), r));
 
   /* ---- 6d. fisioterapia ----
      UMA LINHA POR SESSÃO, e não uma linha por tratamento. Fisioterapia é uma
@@ -3644,13 +3695,14 @@ function vSaude(m) {
   m.appendChild(tabelaBloco('sa-fisio', 'Fisioterapia', 'uma linha por sessão — a dor antes e depois é o que mostra se está adiantando', E.fisio, [
     { k: 'data', t: 'Data', tipo: 'date' },
     { k: 'oque', t: 'Para quê', ph: 'ex.: ombro direito' },
+    { k: 'queixaId', t: 'Por causa de', tipo: 'select', opcoes: opcoesQueixa },
     { k: 'sessao', t: 'Sessão nº', tipo: 'number', w: 110 },
     { k: 'total', t: 'de', tipo: 'number', w: 90 },
     { k: 'dorAntes', t: 'Dor antes (0-10)', tipo: 'number', w: 130 },
     { k: 'dorDepois', t: 'Dor depois (0-10)', tipo: 'number', w: 130 },
     { k: 'profissional', t: 'Profissional', ph: '—' },
     { k: 'obs', t: 'O que foi feito', ph: '—' },
-  ], () => ({ data: hoje(), oque: '', sessao: '', total: '', dorAntes: '', dorDepois: '', profissional: '', obs: '' }), r));
+  ], () => ({ data: hoje(), oque: '', queixaId: '', sessao: '', total: '', dorAntes: '', dorDepois: '', profissional: '', obs: '' }), r));
 
   /* ---- 7. histórico familiar ---- */
   m.appendChild(tabelaBloco('sa-fam', 'Histórico familiar', 'informações familiares para compartilhar nas consultas', E.histFamiliar, [
@@ -3666,11 +3718,13 @@ function vSaude(m) {
   const pulsoRecente=ultimoRegistroSaude(E.vitais,['fc']);
   const resumo=el(`<div class="saude-resumo"><div class="saude-resumo-titulo"><span>SEU ACOMPANHAMENTO</span><h2>Últimos registros</h2><p>Cada medida mantém a data em que foi registrada.</p></div><div class="grade">
     ${kpi('Peso',pesoRecente?esc(pesoRecente.peso)+' kg':'—',pesoRecente?fmtDataAno(pesoRecente.data):'Sem pesagem registrada')}
+    ${kpi('IMC',imc?esc(n1(imc)):'—',imc?esc(faixaIMC(imc))+' · referência OMS':'Informe altura numa pesagem')}
+    ${kpi('Cintura / altura',cintAlt?esc(n2(cintAlt)):'—',cintAlt?esc(cintAlt<0.5?'abaixo de 0,50':'acima de 0,50')+' · referência usual':'Informe cintura e altura')}
     ${kpi('Pressão',pressaoRecente?esc(pressaoRecente.sis)+' / '+esc(pressaoRecente.dia):'—',pressaoRecente?fmtDataAno(pressaoRecente.data)+' · mmHg':'Sem medida completa')}
     ${kpi('Batimentos',pulsoRecente?esc(pulsoRecente.fc)+' bpm':'—',pulsoRecente?fmtDataAno(pulsoRecente.data):'Sem medida registrada')}
     ${kpi('Tratamentos',emTrat,'Em andamento ou contínuos')}
   </div></div>`);
-  ['sa-peso','sa-vit','sa-vit','sa-trat'].forEach((id,i)=>{const item=resumo.querySelectorAll('.kpi')[i];item.classList.add('rotina-saude-atalho');item.tabIndex=0;item.setAttribute('role','button');item.setAttribute('aria-label','Abrir '+(['pesagens','pressão arterial','batimentos','tratamentos'][i]));item.onclick=()=>{abreBloco(id);r()};item.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();item.click()}}});
+  ['sa-peso','sa-peso','sa-peso','sa-vit','sa-vit','sa-trat'].forEach((id,i)=>{const item=resumo.querySelectorAll('.kpi')[i];if(!item)return;item.classList.add('rotina-saude-atalho');item.tabIndex=0;item.setAttribute('role','button');item.setAttribute('aria-label','Abrir '+(['pesagens','IMC','cintura','pressão arterial','batimentos','tratamentos'][i]));item.onclick=()=>{abreBloco(id);r()};item.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();item.click()}}});
   m.appendChild(resumo);
   /* O RETORNO DA CONSULTA entra aqui junto do próximo exame e do próximo
      reforço. É a mesma pergunta -- "o que vem aí na minha saúde" -- e uma
@@ -3678,7 +3732,12 @@ function vSaude(m) {
      que se perde. */
   const datas=[...E.exames.filter(x=>x.proximo).map(x=>({data:x.proximo,nome:x.exame||'Exame',tipo:'Exame',abrir:()=>modalExame(x)})),
     ...E.vacinas.filter(x=>x.proxima).map(x=>({data:x.proxima,nome:x.vacina||'Vacina',tipo:'Vacina',abrir:()=>{abreBloco('sa-vac');r()}})),
-    ...E.consultas.filter(x=>dataISOValida(x.retorno)).map(x=>({data:x.retorno,nome:x.especialidade||x.profissional||'Consulta',tipo:'Retorno de consulta',abrir:()=>{abreBloco('sa-cons');r()}}))].sort((a,b)=>a.data.localeCompare(b.data));
+    ...E.consultas.filter(x=>dataISOValida(x.retorno)).map(x=>({data:x.retorno,nome:x.especialidade||x.profissional||'Consulta',tipo:'Retorno de consulta',abrir:()=>{abreBloco('sa-cons');r()}})),
+    /* A coluna "Até" do tratamento existia e NINGUÉM a consultava: o tratamento
+       vencia e ninguém ficava sabendo. É a mesma pergunta das outras linhas
+       daqui — "o que vem aí na minha saúde". Encerrado não cobra nada. */
+    ...E.tratamentos.filter(x=>x.status!=='Encerrado'&&dataISOValida(x.fim)).map(x=>({data:x.fim,nome:x.oque||'Tratamento',tipo:'Fim de tratamento',abrir:()=>{abreBloco('sa-trat');r()}}))
+  ].sort((a,b)=>a.data.localeCompare(b.data));
   const lembretes=el('<section class="saude-lembretes"><h2>Datas para acompanhar</h2><p>Somente datas informadas nos seus registros.</p></section>');
   if(!datas.length)lembretes.appendChild(el('<div class="saude-sem-dados">Nenhuma próxima data cadastrada. Você pode informá-la em um exame ou vacina.</div>'));
   datas.forEach(x=>{const bt=el(`<button type="button"><span>${esc(x.nome)}<small>${x.tipo}${x.data<hoje()?' · Data passada — conferir registro':''}</small></span><b>${fmtDataAno(x.data)} ›</b></button>`);bt.onclick=x.abrir;lembretes.appendChild(bt)});
