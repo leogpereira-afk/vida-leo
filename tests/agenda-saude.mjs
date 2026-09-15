@@ -214,3 +214,56 @@ test('Agenda: os chips saem todos do mesmo tamanho, em grade', () => {
   assert.ok(chips.every(c => c.querySelector('.pt')), 'chip sem o ponto da cor');
   assert.equal(chips.filter(c => c.classList.contains('on')).length, 1, 'sem filtro, só "Tudo" fica aceso');
 });
+
+/* O resumo do dia, no alto. E a regra que o protege: apagar vale só para o que
+   é DESTA Central. Viagem, documento e evento da empresa moram noutra tela ou
+   noutro sistema — apagar daqui seria apagar pelas costas de quem é dono. */
+const comAgenda = (estado = '') => {
+  const {run, document} = setup();
+  run("E.agenda=[];E.viagens=[];E.documentos=[];E.demandas=[];E.oportunidades=[];empresaDatasCache=null;" + estado);
+  run("atual='agenda';const m=document.getElementById('main');m.replaceChildren();vAgenda(m);organizarAgenda(m)");
+  return {run, document};
+};
+
+test('Hoje: o resumo do dia lista o que é de hoje, com hora', () => {
+  const {run, document} = comAgenda("E.agenda=[{id:'a',data:hoje(),hora:'14:00',titulo:'Reunião de hoje'},{id:'b',data:'2099-01-01',titulo:'Lá longe'}]");
+  const bloco = document.querySelector('[data-bid="ag-hoje"]');
+  assert.ok(bloco, 'o resumo do dia não foi montado');
+  const itens = [...bloco.querySelectorAll('.ag-hoje-item')];
+  assert.equal(itens.length, 1, 'trouxe o que não é de hoje');
+  assert.match(itens[0].textContent, /Reunião de hoje/);
+  assert.match(itens[0].textContent, /14:00/);
+});
+
+test('Hoje: dá para apagar o compromisso próprio', () => {
+  const {run, document} = comAgenda("E.agenda=[{id:'a',data:hoje(),titulo:'Sai fora'}]");
+  run("confirm=()=>true");
+  const bx = [...document.querySelectorAll('[data-bid="ag-hoje"] .acoes button')].find(b => b.textContent === '✕');
+  assert.ok(bx, 'não há botão de apagar no resumo do dia');
+  bx.click();
+  assert.equal(run('E.agenda.length'), 0, 'o compromisso não foi apagado');
+});
+
+test('Hoje: apagar pergunta antes, e "não" não apaga', () => {
+  const {run, document} = comAgenda("E.agenda=[{id:'a',data:hoje(),titulo:'Fica'}]");
+  run("confirm=()=>false");
+  [...document.querySelectorAll('[data-bid="ag-hoje"] .acoes button')].find(b => b.textContent === '✕').click();
+  assert.equal(run('E.agenda.length'), 1, 'apagou sem confirmação');
+});
+
+test('Hoje: o que é de outra tela não ganha botão de apagar', () => {
+  const {document} = comAgenda("E.documentos=[{id:'d',nome:'CNH',validade:hoje()}]");
+  const item = document.querySelector('[data-bid="ag-hoje"] .ag-hoje-item');
+  assert.ok(item, 'o documento vencendo não apareceu no dia');
+  const botoes = [...item.querySelectorAll('.acoes button')].map(b => b.textContent);
+  assert.ok(!botoes.includes('✕'), 'ofereceu apagar algo que mora noutra tela: ' + botoes.join(','));
+  assert.ok(botoes.some(b => /Ver/.test(b)), 'devia levar até onde se resolve');
+});
+
+test('Agenda: o topo junta Google e + Novo compromisso na mesma linha', () => {
+  const {document} = comAgenda();
+  const acoes = document.querySelector('.topo .agenda-topo-acoes');
+  assert.ok(acoes, 'a linha de ações do topo não existe');
+  assert.ok(acoes.querySelector('.agenda-google'), 'a barra do Google não subiu para o topo');
+  assert.match(acoes.textContent, /Novo compromisso/);
+});

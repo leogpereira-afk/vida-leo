@@ -402,17 +402,35 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 
 @media print{.stv-btn,.stv-gaveta{display:none}}
 /* fim Strava */
-.agenda-google{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-top:12px;
-  padding:10px 12px;border:1px solid var(--linha);border-radius:12px;background:var(--card)}
+/* A barra do Google agora mora DENTRO da linha do topo, ao lado do
+   "+ Novo compromisso": nada de cartão com borda, que ali viraria caixa
+   dentro de caixa. */
+.agenda-topo-acoes{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.agenda-google{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0}
 .agenda-google-selo{font:600 12px Inter;padding:4px 10px;border-radius:999px;border:1px solid var(--linha);white-space:nowrap}
 .agenda-google-selo.on{color:var(--verde);border-color:var(--verde);background:var(--verde-cl)}
 .agenda-google-selo.meio{color:#b8860b;border-color:currentColor}
 .agenda-google-selo.off{color:var(--suave)}
 .agenda-google-acoes{display:flex;gap:8px;flex-wrap:wrap}
 .agenda-google-acoes .btn{white-space:nowrap}
-.agenda-google-nota{font-size:12px;color:var(--suave);margin-left:auto;text-align:right}
-.agenda-google-status{font-size:12.5px;color:var(--suave);flex-basis:100%;margin:0}
-@media(max-width:820px){.agenda-google-nota{margin-left:0;text-align:left;flex-basis:100%}}
+.agenda-google-nota{font-size:11.5px;color:var(--suave)}
+.agenda-google-status{font-size:12.5px;color:var(--suave);flex-basis:100%;text-align:right;margin:0}
+@media(max-width:900px){.agenda-topo-acoes{justify-content:flex-start}
+  .agenda-google-nota,.agenda-google-status{flex-basis:100%;text-align:left}}
+
+/* O dia de hoje: uma linha por compromisso, hora à esquerda, ações à direita. */
+.ag-hoje{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.ag-hoje-item{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--linha)}
+.ag-hoje-item:last-child{border-bottom:0}
+.ag-hoje-item .hora{font:600 12.5px Inter;font-variant-numeric:tabular-nums;color:var(--suave);
+  min-width:64px;flex:0 0 auto}
+.ag-hoje-item .ponto{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.ag-hoje-item .txt{flex:1;min-width:0}
+.ag-hoje-item .txt b{display:block;font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ag-hoje-item .txt small{color:var(--suave);font-size:12px}
+.ag-hoje-item .acoes{display:flex;gap:6px;flex:0 0 auto}
+.ag-hoje-item .lixo{color:var(--vermelho)}
+@media(max-width:620px){.ag-hoje-item{flex-wrap:wrap}.ag-hoje-item .txt{flex-basis:100%;order:3}}
 
 /* Os chips da agenda: grade de larguras iguais, para as fileiras se alinharem.
    A cor da categoria vive no PONTO; o fundo só acende no que está escolhido. */
@@ -1659,7 +1677,7 @@ function organizarAgenda(pagina,alvo){
  const calendario=pagina.querySelector('[data-bid="ag-mes"]'),topo=pagina.querySelector('.topo');
  if(!calendario||!topo)return;
  const painel=pagina.querySelector('.painel');
- const novo=painel?.querySelector('button');if(novo)topo.appendChild(novo);
+ const novo=painel?.querySelector('button');
  const adicionar=pagina.querySelector('[data-bid="ag-lista"] .mais');if(adicionar)adicionar.onclick=()=>novoCompromissoRotina();
  const arquivos=el('<div class="agenda-arquivos"><h3>Arquivos de calendário</h3></div>');
  painel?.querySelectorAll('button').forEach(b=>{if(/\.ics/.test(b.textContent))arquivos.appendChild(b)});painel?.remove();
@@ -1671,8 +1689,15 @@ function organizarAgenda(pagina,alvo){
  const barraGoogle=pagina.querySelector('.agenda-google');
  calendario.classList.remove('fechado');
  const header=calendario.querySelector('header');header.onclick=null;header.onkeydown=null;header.removeAttribute('role');header.removeAttribute('tabindex');header.removeAttribute('aria-expanded');header.querySelector('.seta')?.remove();
- if(barraGoogle)topo.appendChild(barraGoogle);
+ /* Uma linha só no alto: estado do Google, os dois botões de busca e o
+    "+ Novo compromisso" — era isso que o Léo queria ver alinhado. */
+ const acoesTopo=el('<div class="agenda-topo-acoes"></div>');
+ if(barraGoogle)acoesTopo.appendChild(barraGoogle);
+ if(novo)acoesTopo.appendChild(novo);
+ topo.appendChild(acoesTopo);
+ const hojeBloco=pagina.querySelector('[data-bid="ag-hoje"]');
  topo.after(calendario);
+ if(hojeBloco)calendario.before(hojeBloco);
  const conteudoCal=calendario.querySelector('.conteudo');
  if(conteudoCal){
    if(aviso)conteudoCal.prepend(aviso);
@@ -3023,6 +3048,7 @@ function vAgenda(m){
   const nova=()=>novoCompromissoRotina();
   m.appendChild(cab('Agenda','Tudo que tem data nesta Central, num lugar só.'));
   m.appendChild(barraGoogleAgenda(r));
+  m.appendChild(blocoHojeAgenda(r));
   /* Só re-renderiza quando dado NOVO chega (o `em` muda). Com o cache válido a
      promessa devolve o mesmo objeto, e o laço morre aí. */
   /* UMA tentativa. Sem o freio, falhar re-renderiza, re-renderizar tenta de
@@ -6411,6 +6437,55 @@ function revisarEnvioGoogle(){
   cx.appendChild(send);cx.appendChild(status);c.appendChild(cx);
  });
 }
+
+/* O DIA DE HOJE, inteiro, logo no alto. A grade do mês mostra o mês; ela não
+   responde "o que eu tenho HOJE" sem o olho caçar a célula certa. Vem de
+   TODAS as fontes — compromisso próprio, viagem em curso, documento vencendo,
+   treino, calendário da empresa —, porque a pergunta é do dia, não da origem.
+
+   Apagar só vale para o que é DESTA Central (compromisso próprio). Viagem,
+   documento e evento da empresa moram noutra tela ou noutro sistema: apagar
+   daqui seria apagar pelas costas de quem é dono. Para esses, o clique leva
+   até onde se resolve. */
+function blocoHojeAgenda(r){
+  const h=hoje();
+  const doDia=eventosDoEcossistema()
+    .filter(e=>e.data<=h&&(e.ate||e.data)>=h)
+    .sort((a,b)=>(a.hora||'99:99').localeCompare(b.hora||'99:99')||String(a.titulo).localeCompare(String(b.titulo)));
+  const cx=el('<div class="corpo"></div>');
+  if(!doDia.length){
+    cx.appendChild(el('<div class="vazio">Nada marcado para hoje.</div>'));
+    return bloco('ag-hoje','📌 Hoje · '+esc(fmtDataLonga(h)),'',cx);
+  }
+  const lista=el('<ul class="ag-hoje"></ul>');
+  doDia.forEach(e=>{
+    const proprio=e.fonte==='compromissos'&&e.ref&&E.agenda.includes(e.ref);
+    const li=el(`<li class="ag-hoje-item">
+      <span class="hora">${esc(e.hora||'dia todo')}</span>
+      <span class="ponto" style="background:${esc(corFonte(e.fonte))}"></span>
+      <span class="txt"><b>${esc(e.titulo)}</b>${e.sub?'<small>'+esc(e.sub)+'</small>':''}</span>
+      <span class="acoes"></span></li>`);
+    const acoes=li.querySelector('.acoes');
+    if(proprio){
+      acoes.appendChild(acao('Abrir',()=>modalCompromisso(e.ref,r),'ghost mini'));
+      const bx=acao('✕',()=>{
+        if(!confirm('Apagar “'+(e.titulo||'compromisso')+'”?\\n\\nSai só desta Central. Se veio do Google, continua lá.'))return;
+        const i=E.agenda.indexOf(e.ref);
+        if(i<0)return;
+        E.agenda.splice(i,1);salvar();r();
+      },'ghost mini lixo');
+      bx.title='Apagar este compromisso';bx.setAttribute('aria-label','Apagar '+(e.titulo||'compromisso'));
+      acoes.appendChild(bx);
+    }else if(e.ir){
+      const b=acao('Ver →',()=>{if(e.col)abreBloco(e.col);irTela(e.ir)},'ghost mini');
+      b.title='Isto mora em outra tela; lá dá para mexer';acoes.appendChild(b);
+    }
+    lista.appendChild(li);
+  });
+  cx.appendChild(lista);
+  return bloco('ag-hoje','📌 Hoje · '+esc(fmtDataLonga(h)),agendaPlural(doDia.length)+' · apagar vale só para o que é desta Central',cx);
+}
+const agendaPlural=n=>n+(n===1?' compromisso':' compromissos');
 
 /* A BARRA DO GOOGLE, no alto da Agenda: diz se está conectado e traz UM botão
    que varre Gmail e Google Agenda de uma vez. Sete dias para trás, só coisa
