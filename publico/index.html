@@ -905,6 +905,15 @@ const SEED={
   assinaturas:[],seguros:[],planos:[],casa:[],documentos:[],metas:[],pessoas:[],paraEles:[],colapso:{},
   // saúde ampliada
   vitais:[],vacinas:[],histFamiliar:[],rastreios:[],acervoDocumental:[],
+  /* O QUE EU SINTO, QUEM EU CONSULTEI, E A FISIOTERAPIA (15/09/2026).
+     Antes disso a tela guardava o que MEDE (peso, pressão, exame) e o que TOMA
+     (remédio, vacina) -- e não guardava o que DÓI. A queixa era digitada na
+     observação de uma pesagem ("Como me senti") ou virava uma linha na tabela
+     de marcadores, que então a acusava como "registro a completar".
+     São três coisas diferentes e por isso três listas: a queixa é o que o
+     corpo avisa, a consulta é o que o médico respondeu, e a fisioterapia é uma
+     SÉRIE de sessões com número e evolução -- não cabe numa linha só. */
+  queixas:[],consultas:[],fisio:[],
   sos:{sangue:'',alergias:'',doencas:'',cirurgias:'',plano:'',carteirinha:'',contato1:'',contato2:'',medico:'',obs:''},
   // guia de vida ampliado
   norte:{proposito:'',valores:'',legado:''},
@@ -972,7 +981,7 @@ function carregar(){
   const base=structuredClone(SEED);
   const d=(s&&s.viagens)?{...base,...s}:base;
   // migração: todo registro precisa de id estável (arquivos são ligados por ele)
-  for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades','obras','obraAportes','contas','empreend','casas','reservas'])
+  for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','queixas','consultas','fisio','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades','obras','obraAportes','contas','empreend','casas','reservas'])
     (d[k]||[]).forEach(x=>{if(!x.id)x.id=uid()});
   d.viagens.forEach(v=>{if(!Array.isArray(v.custos))v.custos=[];
     if(!Array.isArray(v.passagens))v.passagens=[];
@@ -1010,7 +1019,7 @@ function carregar(){
   if(!Array.isArray(d.obraM2Fora))d.obraM2Fora=[];
   // objetos únicos: garante que existam mesmo em backup antigo
   for(const k of ['sos','norte','roda','perfil','comportamento']) d[k]={...structuredClone(SEED[k]),...(d[k]||{})};
-  for(const k of ['vitais','vacinas','histFamiliar','rastreios','rituais','instrucoes','seguros','planos','casa','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades']) if(!Array.isArray(d[k])) d[k]=[];
+  for(const k of ['vitais','vacinas','histFamiliar','rastreios','queixas','consultas','fisio','rituais','instrucoes','seguros','planos','casa','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades']) if(!Array.isArray(d[k])) d[k]=[];
   if(!Array.isArray(d.planejamentoEmpresas))d.planejamentoEmpresas=[];
   d.planejamentoEmpresas.forEach(p=>{if(!p.id)p.id=uid()});
   // toda oportunidade tem uma lista de links, mesmo que vazia
@@ -3352,19 +3361,26 @@ function novoCuidadoRotina(tipo){
     peso:['Nova pesagem',E.peso,{data:hoje(),altura:ultimoRegistroSaude(E.peso,['altura'])?.altura||'',obs:''},[{k:'data',t:'Data',tipo:'date',obrigatorio:true},{k:'peso',t:'Peso (kg)',tipo:'number',min:'0.1',obrigatorio:true},{k:'altura',t:'Altura (m)',tipo:'number'},{k:'cintura',t:'Cintura (cm)',tipo:'number'},{k:'obs',t:'Como me senti'}],'sa-peso'],
     vitais:['Novos sinais vitais',E.vitais,{data:hoje(),obs:''},[{k:'data',t:'Data',tipo:'date',obrigatorio:true},{k:'sis',t:'Pressão sistólica (mmHg)',tipo:'number'},{k:'dia',t:'Pressão diastólica (mmHg)',tipo:'number'},{k:'fc',t:'Batimentos (bpm)',tipo:'number'},{k:'obs',t:'Observação'}],'sa-vit'],
     tratamentos:['Novo tratamento',E.tratamentos,{inicio:hoje(),fim:'',frequencia:'',status:'Em andamento'},[{k:'oque',t:'Tratamento / remédio',obrigatorio:true},{k:'motivo',t:'Motivo informado'},{k:'inicio',t:'Início',tipo:'date'},{k:'frequencia',t:'Frequência / dose prescrita'},{k:'medico',t:'Profissional responsável'}],'sa-trat'],
-    vacinas:['Nova vacina',E.vacinas,{data:hoje(),proxima:'',viagem:'Não',obs:''},[{k:'vacina',t:'Vacina',obrigatorio:true},{k:'data',t:'Data da dose',tipo:'date',obrigatorio:true},{k:'proxima',t:'Próxima data informada',tipo:'date'},{k:'obs',t:'Observação'}],'sa-vac']
+    vacinas:['Nova vacina',E.vacinas,{data:hoje(),proxima:'',viagem:'Não',obs:''},[{k:'vacina',t:'Vacina',obrigatorio:true},{k:'data',t:'Data da dose',tipo:'date',obrigatorio:true},{k:'proxima',t:'Próxima data informada',tipo:'date'},{k:'obs',t:'Observação'}],'sa-vac'],
+    queixas:['Nova queixa',E.queixas,{data:hoje(),onde:'',intensidade:'',situacao:'Ativa',obs:''},[{k:'oque',t:'O que estou sentindo',obrigatorio:true},{k:'data',t:'Sinto desde',tipo:'date',obrigatorio:true},{k:'onde',t:'Onde',opcoes:['','Cabeça','Pescoço','Ombro','Braço','Cotovelo','Punho / mão','Peito','Costas','Lombar','Quadril','Joelho','Perna','Tornozelo / pé','Abdômen','Geral','Outro']},{k:'intensidade',t:'Intensidade de 0 a 10',tipo:'number'},{k:'obs',t:'O que melhora ou piora'}],'sa-quei'],
+    consultas:['Nova consulta',E.consultas,{data:hoje(),retorno:'',obs:''},[{k:'especialidade',t:'Especialidade',obrigatorio:true},{k:'data',t:'Data da consulta',tipo:'date',obrigatorio:true},{k:'profissional',t:'Profissional'},{k:'motivo',t:'Por que fui'},{k:'conduta',t:'O que ficou combinado'},{k:'retorno',t:'Retorno marcado para',tipo:'date'}],'sa-cons'],
+    fisio:['Nova sessão de fisioterapia',E.fisio,{data:hoje(),sessao:'',total:'',dorAntes:'',dorDepois:'',obs:''},[{k:'oque',t:'Para quê',obrigatorio:true},{k:'data',t:'Data da sessão',tipo:'date',obrigatorio:true},{k:'sessao',t:'Número da sessão',tipo:'number'},{k:'total',t:'De quantas sessões',tipo:'number'},{k:'dorAntes',t:'Dor antes, de 0 a 10',tipo:'number'},{k:'dorDepois',t:'Dor depois, de 0 a 10',tipo:'number'},{k:'profissional',t:'Profissional'}],'sa-fisio']
   };
   const [titulo,lista,base,defs,blocoId]=opcoes[tipo];novoRegistroRotina(titulo,lista,base,defs,()=>{abreBloco(blocoId);rr('saude')()});
 }
 let abaSaude='resumo';
-function abaDoBlocoSaude(id){return ['sa-ex','sa-rast','sa-pend'].includes(id)?'exames':['sa-vit','sa-peso'].includes(id)?'medidas':['sa-trat','sa-vac','sa-fam'].includes(id)?'cuidados':'resumo'}
+/* O CATCH-ALL DESTA FUNÇÃO É 'resumo'. Quadro novo que não for nomeado aqui
+   NÃO some da tela -- ele cai no Resumo, no meio dos KPIs e dos gráficos, e o
+   defeito não parece defeito: parece uma tela mal organizada. Por isso os três
+   quadros de 15/09 entram nomeados, na aba deles. */
+function abaDoBlocoSaude(id){return ['sa-ex','sa-rast','sa-pend'].includes(id)?'exames':['sa-vit','sa-peso'].includes(id)?'medidas':['sa-quei','sa-cons','sa-fisio'].includes(id)?'queixas':['sa-trat','sa-vac','sa-fam'].includes(id)?'cuidados':'resumo'}
 function ultimoRegistroSaude(lista,campos){
   return lista.filter(x=>dataISOValida(x.data)&&x.data<=hoje()&&campos.every(k=>Number.isFinite(+x[k])&&+x[k]>0)).slice().sort((a,b)=>b.data.localeCompare(a.data))[0]||null;
 }
 function organizarSaude(pagina,alvo){
   pagina.classList.add('saude-layout');
-  Object.entries({'sa-peso':'peso','sa-vit':'vitais','sa-trat':'tratamentos','sa-vac':'vacinas'}).forEach(([id,tipo])=>{const bt=pagina.querySelector('[data-bid="'+id+'"] .mais');if(bt)bt.onclick=()=>novoCuidadoRotina(tipo)});
-  const opcoes=[['resumo','Resumo'],['exames','Exames'],['medidas','Medidas'],['cuidados','Cuidados']];
+  Object.entries({'sa-peso':'peso','sa-vit':'vitais','sa-trat':'tratamentos','sa-vac':'vacinas','sa-quei':'queixas','sa-cons':'consultas','sa-fisio':'fisio'}).forEach(([id,tipo])=>{const bt=pagina.querySelector('[data-bid="'+id+'"] .mais');if(bt)bt.onclick=()=>novoCuidadoRotina(tipo)});
+  const opcoes=[['resumo','Resumo'],['exames','Exames'],['medidas','Medidas'],['queixas','Queixas e consultas'],['cuidados','Cuidados']];
   const paineis=Object.fromEntries(opcoes.map(([id])=>[id,el('<div class="saude-pane"></div>')]));
   const nav=el('<nav class="finance-tabs saude-tabs" aria-label="Áreas de saúde"></nav>');
   [...pagina.children].forEach(no=>{if(no.classList.contains('topo')||no.classList.contains('painel'))return;paineis[abaDoBlocoSaude(no.dataset.bid)].appendChild(no)});
@@ -3402,6 +3418,9 @@ function vSaude(m) {
     acao('+ Exame',()=>novoExameRotina(),'ghost'),
     acao('+ Tratamento',()=>novoCuidadoRotina('tratamentos'),'ghost'),
     acao('+ Vacina',()=>novoCuidadoRotina('vacinas'),'ghost'),
+    acao('+ Queixa',()=>novoCuidadoRotina('queixas'),'ghost'),
+    acao('+ Consulta',()=>novoCuidadoRotina('consultas'),'ghost'),
+    acao('+ Sessão de fisio',()=>novoCuidadoRotina('fisio'),'ghost'),
     acao('🆘 Ficha de emergência', () => modalSOS(), 'ghost'), '|'));
 
   const pend = rastreiosPendentes();
@@ -3538,6 +3557,53 @@ function vSaude(m) {
     { k: 'obs', t: 'Observação', ph: '—' },
   ], () => ({ vacina: '', data: hoje(), proxima: '', viagem: 'Não', obs: '' }), r));
 
+  /* ---- 6b. o que estou sentindo ----
+     A QUEIXA É O COMEÇO DA HISTÓRIA. É ela que se leva para a consulta e é ela
+     que a fisioterapia tenta resolver -- e era a única parte que a tela não
+     guardava. `situacao` existe para a lista não virar um depósito: uma queixa
+     resolvida sai do caminho sem ser apagada, porque "já senti isso antes" é
+     justamente o que se quer poder responder daqui a dois anos. */
+  m.appendChild(tabelaBloco('sa-quei', 'O que estou sentindo', 'queixas com data — é assim que se vê um problema voltar', E.queixas, [
+    { k: 'data', t: 'Desde', tipo: 'date' },
+    { k: 'oque', t: 'O que sinto', ph: 'ex.: dor ao levantar o braço' },
+    { k: 'onde', t: 'Onde', tipo: 'select', opcoes: ['', 'Cabeça', 'Pescoço', 'Ombro', 'Braço', 'Cotovelo', 'Punho / mão', 'Peito', 'Costas', 'Lombar', 'Quadril', 'Joelho', 'Perna', 'Tornozelo / pé', 'Abdômen', 'Geral', 'Outro'] },
+    { k: 'intensidade', t: 'Intensidade (0-10)', tipo: 'number', w: 130 },
+    { k: 'situacao', t: 'Situação', tipo: 'select', opcoes: ['Ativa', 'Melhorando', 'Piorando', 'Resolvida'] },
+    { k: 'obs', t: 'O que melhora / piora', ph: '—' },
+  ], () => ({ data: hoje(), oque: '', onde: '', intensidade: '', situacao: 'Ativa', obs: '' }), r));
+
+  /* ---- 6c. consultas médicas ----
+     `retorno` é o campo que faz a consulta valer depois de acontecer: ele entra
+     em "Datas para acompanhar" logo abaixo, junto do próximo exame e do próximo
+     reforço de vacina. Sem ele a consulta seria só um diário. */
+  m.appendChild(tabelaBloco('sa-cons', 'Consultas médicas', 'a quem fui, por quê, e o que ficou combinado', E.consultas, [
+    { k: 'data', t: 'Data', tipo: 'date' },
+    { k: 'especialidade', t: 'Especialidade', ph: 'ex.: Ortopedia' },
+    { k: 'profissional', t: 'Profissional', ph: '—' },
+    { k: 'motivo', t: 'Por que fui', ph: 'ex.: dor no ombro há 3 meses' },
+    { k: 'conduta', t: 'O que ficou combinado', ph: 'ex.: fisioterapia 10 sessões' },
+    { k: 'retorno', t: 'Retorno', tipo: 'date' },
+    { k: 'obs', t: 'Observação', ph: '—' },
+  ], () => ({ data: hoje(), especialidade: '', profissional: '', motivo: '', conduta: '', retorno: '', obs: '' }), r));
+
+  /* ---- 6d. fisioterapia ----
+     UMA LINHA POR SESSÃO, e não uma linha por tratamento. Fisioterapia é uma
+     série: o que interessa é "sessão 6 de 10" e se a dor de antes está menor
+     que a da sessão passada. Enfiar isso em Tratamentos (que tem uma linha só,
+     com início e fim) perderia exatamente a parte que responde "está
+     adiantando?". O tratamento continua sendo o lugar do plano; aqui fica o
+     que aconteceu em cada ida. */
+  m.appendChild(tabelaBloco('sa-fisio', 'Fisioterapia', 'uma linha por sessão — a dor antes e depois é o que mostra se está adiantando', E.fisio, [
+    { k: 'data', t: 'Data', tipo: 'date' },
+    { k: 'oque', t: 'Para quê', ph: 'ex.: ombro direito' },
+    { k: 'sessao', t: 'Sessão nº', tipo: 'number', w: 110 },
+    { k: 'total', t: 'de', tipo: 'number', w: 90 },
+    { k: 'dorAntes', t: 'Dor antes (0-10)', tipo: 'number', w: 130 },
+    { k: 'dorDepois', t: 'Dor depois (0-10)', tipo: 'number', w: 130 },
+    { k: 'profissional', t: 'Profissional', ph: '—' },
+    { k: 'obs', t: 'O que foi feito', ph: '—' },
+  ], () => ({ data: hoje(), oque: '', sessao: '', total: '', dorAntes: '', dorDepois: '', profissional: '', obs: '' }), r));
+
   /* ---- 7. histórico familiar ---- */
   m.appendChild(tabelaBloco('sa-fam', 'Histórico familiar', 'informações familiares para compartilhar nas consultas', E.histFamiliar, [
     { k: 'parente', t: 'Parente', tipo: 'select', opcoes: ['Pai', 'Mãe', 'Avô paterno', 'Avó paterna', 'Avô materno', 'Avó materna', 'Irmão', 'Irmã', 'Outro'] },
@@ -3558,8 +3624,13 @@ function vSaude(m) {
   </div></div>`);
   ['sa-peso','sa-vit','sa-vit','sa-trat'].forEach((id,i)=>{const item=resumo.querySelectorAll('.kpi')[i];item.classList.add('rotina-saude-atalho');item.tabIndex=0;item.setAttribute('role','button');item.setAttribute('aria-label','Abrir '+(['pesagens','pressão arterial','batimentos','tratamentos'][i]));item.onclick=()=>{abreBloco(id);r()};item.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();item.click()}}});
   m.appendChild(resumo);
+  /* O RETORNO DA CONSULTA entra aqui junto do próximo exame e do próximo
+     reforço. É a mesma pergunta -- "o que vem aí na minha saúde" -- e uma
+     consulta com retorno marcado que não aparece em lugar nenhum é um retorno
+     que se perde. */
   const datas=[...E.exames.filter(x=>x.proximo).map(x=>({data:x.proximo,nome:x.exame||'Exame',tipo:'Exame',abrir:()=>modalExame(x)})),
-    ...E.vacinas.filter(x=>x.proxima).map(x=>({data:x.proxima,nome:x.vacina||'Vacina',tipo:'Vacina',abrir:()=>{abreBloco('sa-vac');r()}}))].sort((a,b)=>a.data.localeCompare(b.data));
+    ...E.vacinas.filter(x=>x.proxima).map(x=>({data:x.proxima,nome:x.vacina||'Vacina',tipo:'Vacina',abrir:()=>{abreBloco('sa-vac');r()}})),
+    ...E.consultas.filter(x=>dataISOValida(x.retorno)).map(x=>({data:x.retorno,nome:x.especialidade||x.profissional||'Consulta',tipo:'Retorno de consulta',abrir:()=>{abreBloco('sa-cons');r()}}))].sort((a,b)=>a.data.localeCompare(b.data));
   const lembretes=el('<section class="saude-lembretes"><h2>Datas para acompanhar</h2><p>Somente datas informadas nos seus registros.</p></section>');
   if(!datas.length)lembretes.appendChild(el('<div class="saude-sem-dados">Nenhuma próxima data cadastrada. Você pode informá-la em um exame ou vacina.</div>'));
   datas.forEach(x=>{const bt=el(`<button type="button"><span>${esc(x.nome)}<small>${x.tipo}${x.data<hoje()?' · Data passada — conferir registro':''}</small></span><b>${fmtDataAno(x.data)} ›</b></button>`);bt.onclick=x.abrir;lembretes.appendChild(bt)});
