@@ -78,3 +78,19 @@ test('5c. vínculo apontando para queixa apagada não some calado', () => {
   const sel = [...document.querySelectorAll('[data-bid="sa-cons"] select')].find(s => s.value === 'sumiu');
   assert.ok(sel, 'o valor órfão foi descartado em silêncio');
 });
+
+/* A mesma armadilha existia em Gastos e Rendimentos — telas de análise, onde a
+   regra do Léo é antiga: quadro recolhível, com a escolha guardada. A escolha
+   era gravada pelo bloco() e desfeita no organizador, a cada render. */
+test('Gastos: recolher um quadro gruda, como na Saúde', () => {
+  const {run, document} = setup();
+  run("E.colapso={};E.gastos=[{id:'g',data:hoje(),valor:10,categoria:'Casa',descricao:'x'}]");
+  const bid = run(`(()=>{const m=document.getElementById('main');m.replaceChildren();vGastos(m);
+    const b=[...m.querySelectorAll('.bloco')].map(x=>x.dataset.bid).filter(Boolean)[0];return b||''})()`);
+  assert.ok(bid, 'não achei quadro na tela de gastos');
+  run(`E.colapso[${JSON.stringify(bid)}]=true;
+       const m=document.getElementById('main');m.replaceChildren();vGastos(m);organizarFinanceiro(m,'gastos')`);
+  const b = document.querySelector('[data-bid="' + bid + '"]');
+  assert.ok(b, 'o quadro sumiu');
+  assert.ok(b.classList.contains('fechado'), 'a escolha de recolher foi ignorada de novo');
+});

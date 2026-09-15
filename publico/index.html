@@ -1656,7 +1656,9 @@ function organizarFinanceiro(pagina,secao,alvo){
   function selecionar(id){abasFinanceiras[secao]=id;opcoes.forEach(([chave])=>{paineis[chave].hidden=chave!==id;paineis[chave].setAttribute('aria-hidden',String(chave!==id));const bt=nav.querySelector('[data-aba="'+chave+'"]');bt.setAttribute('aria-pressed',String(chave===id))})}
   selecionar(alvo?abaDoBlocoFinanceiro(alvo,secao):(abasFinanceiras[secao]||'resumo'));
   // Conteúdo aparece ao escolher a visão; recolhimento antigo não esconde os dados.
-  pagina.querySelectorAll('.bloco').forEach(b=>{b.classList.remove('fechado');b.querySelector('header')?.setAttribute('aria-expanded','true')});
+  /* Mesma armadilha que a Saúde tinha: a escolha de recolher era gravada pelo
+     bloco() e desfeita aqui a cada render. Telas de análise guardam o que o
+     dono recolheu — é regra dele, de antes. */
   const principal=paineis.resumo.querySelector('.grade');principal?.classList.add('finance-metrics');
   const painel=pagina.querySelector('.painel');
   if(painel){if(secao==='rendimentos')[...painel.querySelectorAll('select')].forEach((s,i)=>s.setAttribute('aria-label',['Ano dos rendimentos','Empresa dos rendimentos','Visão dos rendimentos'][i]||'Filtro de rendimentos'));const extra=el('<details class="finance-tools"><summary>Exportar e opções</summary></details>');
