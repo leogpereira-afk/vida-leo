@@ -23,9 +23,19 @@ test('Saúde: os três quadros novos existem e ficam na aba Queixas e consultas'
        vSaude(document.getElementById('main'))`);
   for (const id of ['sa-quei', 'sa-cons', 'sa-fisio'])
     assert.ok(document.querySelector('[data-bid="' + id + '"]'), 'falta o quadro ' + id);
-  assert.match(document.querySelector('[data-bid="sa-quei"]').textContent, /dor no ombro/);
-  assert.match(document.querySelector('[data-bid="sa-cons"]').textContent, /Ortopedia/);
-  assert.match(document.querySelector('[data-bid="sa-fisio"]').textContent, /ombro direito/);
+  /* O valor de um <input> NÃO aparece em textContent — a linha é editável, os
+     dados moram em .value. Conferir pelo texto do quadro dava falso negativo
+     com a tela funcionando: o <select> aparecia (as <option> são texto) e o
+     que a pessoa digitou, não. Confere-se o que está nos campos. */
+  const preenchido = (id) => {
+    const q = document.querySelector('[data-bid="' + id + '"]');
+    assert.ok(q, 'falta o quadro ' + id);
+    assert.equal(q.querySelectorAll('tbody tr').length, 1, id + ' não desenhou a linha do registro');
+    return [...q.querySelectorAll('input,select,textarea')].map((c) => c.value).join(' | ');
+  };
+  assert.match(preenchido('sa-quei'), /dor no ombro/);
+  assert.match(preenchido('sa-cons'), /Ortopedia/);
+  assert.match(preenchido('sa-fisio'), /ombro direito/);
   /* O catch-all de abaDoBlocoSaude é 'resumo': quadro não nomeado NÃO some --
      cai no meio dos KPIs, e o defeito parece só desorganização. */
   for (const id of ['sa-quei', 'sa-cons', 'sa-fisio'])
