@@ -402,6 +402,13 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 
 @media print{.stv-btn,.stv-gaveta{display:none}}
 /* fim Strava */
+.agenda-google{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.agenda-google-selo{font:600 12px Inter;padding:3px 9px;border-radius:999px;border:1px solid var(--linha);white-space:nowrap}
+.agenda-google-selo.on{color:var(--verde);border-color:var(--verde);background:var(--verde-cl)}
+.agenda-google-selo.meio{color:var(--amarelo,#b8860b);border-color:currentColor}
+.agenda-google-selo.off{color:var(--suave)}
+.agenda-google-nota{font-size:12px;color:var(--suave)}
+.agenda-google-status{font-size:12.5px;color:var(--suave);flex-basis:100%}
 /* modal */
 .fundo{position:fixed;inset:0;background:rgba(20,22,20,.45);backdrop-filter:blur(3px);
   display:flex;align-items:flex-start;justify-content:center;padding:34px 16px;z-index:60;overflow-y:auto}
@@ -1636,14 +1643,18 @@ function organizarAgenda(pagina,alvo){
  const adicionar=pagina.querySelector('[data-bid="ag-lista"] .mais');if(adicionar)adicionar.onclick=()=>novoCompromissoRotina();
  const arquivos=el('<div class="agenda-arquivos"><h3>Arquivos de calendário</h3></div>');
  painel?.querySelectorAll('button').forEach(b=>{if(/\.ics/.test(b.textContent))arquivos.appendChild(b)});painel?.remove();
- const filtros=el('<details class="agenda-filtros"><summary>Filtrar calendário por assunto</summary></details>');
- if(filtro.agSo)filtros.open=true;
- const chips=pagina.querySelector('.agenda-categorias');if(chips)filtros.appendChild(chips);
- const aviso=pagina.querySelector('.agenda-filtro-aviso');if(aviso)filtros.appendChild(aviso);
- calendario.querySelector('.conteudo').prepend(filtros);
+ /* Os chips ficam À VISTA, acima do calendário. Dentro de um "Filtrar por
+    assunto" recolhido eles viravam um recurso que só quem já sabia que existia
+    usava — e é por eles que se olha o mês de um assunto só. */
+ const chips=pagina.querySelector('.agenda-categorias');
+ const aviso=pagina.querySelector('.agenda-filtro-aviso');
+ const barraGoogle=pagina.querySelector('.agenda-google');
  calendario.classList.remove('fechado');
  const header=calendario.querySelector('header');header.onclick=null;header.onkeydown=null;header.removeAttribute('role');header.removeAttribute('tabindex');header.removeAttribute('aria-expanded');header.querySelector('.seta')?.remove();
+ if(barraGoogle)topo.appendChild(barraGoogle);
  topo.after(calendario);
+ if(aviso)calendario.before(aviso);
+ if(chips)calendario.before(chips);
  const nav=el('<nav class="agenda-abas" aria-label="Detalhes da agenda"></nav>');
  const panes={};
  [['compromissos','Compromissos'],['integracoes','Gmail e importações'],['resumo','Resumo']].forEach(([id,label])=>{
@@ -2988,6 +2999,7 @@ function vAgenda(m){
   const fut=proximosCompromissos(E.agenda).length;
   const nova=()=>novoCompromissoRotina();
   m.appendChild(cab('Agenda','Tudo que tem data nesta Central, num lugar só.'));
+  m.appendChild(barraGoogleAgenda(r));
   /* Só re-renderiza quando dado NOVO chega (o `em` muda). Com o cache válido a
      promessa devolve o mesmo objeto, e o laço morre aí. */
   /* UMA tentativa. Sem o freio, falhar re-renderiza, re-renderizar tenta de
@@ -6298,6 +6310,11 @@ function revisarConvitesGmail(resultado){
   abrirModal('Compromissos recebidos no Gmail','Datas de hoje em diante · aprovação obrigatória',(c,fechar)=>{
     const cx=el('<div class="secao"></div>'),selecionados=new Set();
     cx.appendChild(el('<p>Confira as datas e selecione o que deseja trazer. Atualizar substitui os campos importados da cópia local. Nenhuma resposta será enviada ao organizador.</p>'));
+    /* A régua de particular × empresa ORDENA e explica; não descarta. O que
+       parece da empresa vai para o fim, com o motivo à vista — se ela errar, o
+       Léo vê e marca assim mesmo. Descartar calado seria perder uma consulta
+       médica porque o e-mail veio de um domínio de trabalho. */
+    cx.appendChild(el('<p class="google-nota">A Central é a sua vida pessoal: o que tem cara de empresa desce para o fim da lista, com o motivo. Nada entra sem você marcar.</p>'));
     const importar=acao('Importar selecionados',()=>{
       if([...selecionados].some(x=>!LeoGoogleDatas.dateOK(x.reg.data)||x.reg.data<hoje())){alert('Confirme uma data válida de hoje em diante para cada item selecionado.');return;}
       const aprovados=new Set();
@@ -6305,9 +6322,13 @@ function revisarConvitesGmail(resultado){
         const existente=E.agenda.find(a=>a.gid===item.gid);if(existente)Object.assign(existente,item.reg);else E.agenda.push({id:uid(),...item.reg});aprovados.add(item.gid);n++}
       if(n){E.gmailPendentes=(E.gmailPendentes||[]).filter(x=>!aprovados.has(x.gid));salvar();}fechar();abreBloco('ag-lista');irTela('agenda');
     });importar.disabled=true;
-    resultado.plano.forEach(item=>{
-      if(!['adicionar','atualizar'].includes(item.acao))return;
-      const linha=el(`<label class="google-evento"><input type="checkbox"><span><b>${esc(item.reg.titulo)}</b><small>${fmtDataAno(item.reg.data)} · ${esc(item.reg.hora||'Dia inteiro')} · ${esc(item.reg.local||'Sem local')} · ${item.acao==='adicionar'?'Novo':'Atualização'}</small><small>${esc(item.reg.obs)}</small></span></label>`);
+    const PESO={particular:0,duvida:1,empresa:2},SELO={particular:'🏠 particular',duvida:'? não tenho certeza',empresa:'🏢 parece da empresa'};
+    resultado.plano
+      .filter(x=>['adicionar','atualizar'].includes(x.acao))
+      .map(x=>({item:x,pc:LeoGoogleDatas.personalCheck({subject:x.reg.titulo||'',body:x.reg.obs||''})}))
+      .sort((a,b)=>PESO[a.pc.classe]-PESO[b.pc.classe])
+      .forEach(({item,pc})=>{
+      const linha=el(`<label class="google-evento"><input type="checkbox"><span><b>${esc(item.reg.titulo)}</b><small>${esc(SELO[pc.classe])} · ${esc(pc.motivo)}</small><small>${fmtDataAno(item.reg.data)} · ${esc(item.reg.hora||'Dia inteiro')} · ${esc(item.reg.local||'Sem local')} · ${item.acao==='adicionar'?'Novo':'Atualização'}</small><small>${esc(item.reg.obs)}</small></span></label>`);
       if(item.reg.gmailRevisar){const label=el(`<span><small>Confirme a data</small><input type="date" value="${esc(item.reg.data||'')}" aria-label="Data do compromisso"></span>`);linha.querySelector('span').appendChild(label);const date=label.querySelector('input');const box=linha.querySelector('input[type=checkbox]');box.disabled=!item.reg.data;date.onchange=()=>{item.reg.data=date.value;item.reg.ate=date.value;box.disabled=!LeoGoogleDatas.dateOK(date.value)||date.value<hoje();if(box.disabled){box.checked=false;selecionados.delete(item);importar.disabled=!selecionados.size}};}
       linha.querySelector('input').onchange=e=>{if(e.target.checked)selecionados.add(item);else selecionados.delete(item);importar.disabled=!selecionados.size;importar.textContent='Importar '+selecionados.size+' selecionado(s)'};const descartar=acao('Descartar',e=>{e?.preventDefault();selecionados.delete(item);E.gmailPendentes=(E.gmailPendentes||[]).filter(x=>x.gid!==item.gid);E.gmailDispensados=[...(E.gmailDispensados||[]).filter(x=>x.gid!==item.gid),{gid:item.gid,seq:item.seq,emailEm:item.emailEm}];salvar();linha.remove();importar.disabled=!selecionados.size;importar.textContent='Importar '+selecionados.size+' selecionado(s)';},'ghost mini');linha.querySelector('span').appendChild(descartar);cx.appendChild(linha);
     });
@@ -6361,6 +6382,49 @@ function revisarEnvioGoogle(){
  });
 }
 
+/* A BARRA DO GOOGLE, no alto da Agenda: diz se está conectado e traz UM botão
+   que varre Gmail e Google Agenda de uma vez. Sete dias para trás, só coisa
+   particular, e NADA entra sem o Léo marcar — as três coisas que ele pediu.
+   O estado fica à vista de propósito: "atualizar" que não diz se está conectado
+   deixa a pessoa clicando num botão morto. */
+function barraGoogleAgenda(r){
+  const cx=el('<div class="agenda-google"></div>');
+  const ligado=s=>googleConectado(s);
+  const quais=[['gmail','Gmail'],['agenda','Google Agenda']].filter(([k])=>ligado(k)).map(([,n])=>n);
+  const tudo=ligado('gmail')&&ligado('agenda');
+  cx.appendChild(el(`<span class="agenda-google-selo ${tudo?'on':(quais.length?'meio':'off')}">${
+    tudo?'✓ Google conectado':quais.length?'✓ '+esc(quais.join(' e '))+' conectado':'○ Google desconectado'}</span>`));
+  const status=el('<span class="agenda-google-status" role="status"></span>');
+  const b=acao(tudo?'↻ Atualizar Gmail e Agenda':'Conectar e atualizar',async()=>{
+    b.disabled=true;status.textContent='Procurando nos últimos '+(LeoGoogleDatas.JANELA_DIAS||7)+' dias…';
+    try{await atualizarGoogleParticular(msg=>{status.textContent=msg},r)}
+    catch(e){status.textContent=(e&&e.message)||'Não deu para consultar o Google agora.'}
+    finally{b.disabled=false}
+  });
+  cx.appendChild(b);
+  cx.appendChild(el('<span class="agenda-google-nota">últimos '+(LeoGoogleDatas.JANELA_DIAS||7)+' dias · só coisa particular · nada entra sem você marcar</span>'));
+  cx.appendChild(status);
+  return cx;
+}
+
+/* Um clique, as duas fontes. Cada uma já tem a sua tela de aprovação — é lá que
+   o Léo marca o que entra. Aqui só se junta a varredura e se conta o resultado. */
+async function atualizarGoogleParticular(dizer,r){
+  if(!googleConectado('gmail')||!googleConectado('agenda')){
+    dizer('Conectando ao Google…');
+    await googleCrachaDoServidor();
+    for(const serv of ['gmail','agenda'])if(!googleConectado(serv))await conectarGoogle(serv);
+    if(typeof r==='function')r();
+  }
+  dizer('Lendo o Gmail dos últimos '+(LeoGoogleDatas.JANELA_DIAS||7)+' dias…');
+  gmailBuscaPagina='';gmailBuscaTotal=0;
+  const resultado=await consultarConvitesGmail('');
+  const aprovacao=guardarAprovacoesGmail(resultado);
+  const achou=(aprovacao.plano||[]).filter(x=>['adicionar','atualizar'].includes(x.acao)).length;
+  dizer(achou?achou+' data(s) para você conferir.':'Nada novo no Gmail nesta semana.');
+  revisarConvitesGmail(aprovacao);
+}
+
 function blocoAgendaGmail(){
   const cx=el('<div class="corpo"></div>');
   cx.appendChild(el('<p class="google-nota">Busca datas de hoje em diante em e-mails de qualquer época, sem filtro por assunto. Cada clique consulta até 50 mensagens; continue os lotes para percorrer a caixa. Tudo vai para aprovação. PDFs e imagens não são lidos.</p>'));
@@ -6388,7 +6452,7 @@ async function verEmailsGoogle(){
 async function escolherCalendarioGoogle(){
   const calendarios=[];let pagina='';
   do{const r=await googleLer('agenda','users/me/calendarList?maxResults=250'+(pagina?'&pageToken='+encodeURIComponent(pagina):''));calendarios.push(...(r.items||[]));pagina=r.nextPageToken||''}while(pagina);
-  abrirModal('Escolher calendário','Importação de compromissos: últimos 30 dias e próximos 12 meses.',c=>{
+  abrirModal('Escolher calendário','Importação de compromissos: últimos 7 dias e próximos 12 meses.',c=>{
     const cx=el('<div class="secao"></div>');
     const permitidos=calendarios.filter(x=>['owner','writer','reader'].includes(x.accessRole));
     if(!permitidos.length)cx.appendChild(el('<p class="vazio">Nenhum calendário com permissão de leitura.</p>'));
@@ -6412,7 +6476,9 @@ function prepararAgendaGoogle(eventos,calId,fuso,agenda){
   });
 }
 async function revisarAgendaGoogle(cal){
-  const inicio=new Date();inicio.setDate(inicio.getDate()-30);const fim=new Date();fim.setFullYear(fim.getFullYear()+1);
+  /* 7 dias para trás, ordem do Léo. Para FRENTE continua um ano: o passado
+     é o que não precisa ser re-arado; o futuro é justamente o que interessa. */
+  const inicio=new Date();inicio.setDate(inicio.getDate()-(LeoGoogleDatas.JANELA_DIAS||7));const fim=new Date();fim.setFullYear(fim.getFullYear()+1);
   const eventos=[];let pagina='',paginas=0;
   do{const q=new URLSearchParams({singleEvents:'true',orderBy:'startTime',maxResults:'250',timeMin:inicio.toISOString(),timeMax:fim.toISOString(),timeZone:'America/Sao_Paulo'});if(pagina)q.set('pageToken',pagina);
     const r=await googleLer('agenda','calendars/'+encodeURIComponent(cal.id)+'/events?'+q);eventos.push(...(r.items||[]));pagina=r.nextPageToken||'';

@@ -111,3 +111,36 @@ test('Agenda: evento da empresa entra pela data, e some se a leitura não veio',
   assert.equal(ev.length, 1);
   assert.equal(ev[0].data, '2026-12-25');
 });
+
+/* A barra do Google no topo da Agenda: ela existe para o Léo saber, de relance,
+   se está conectado — "atualizar" que não diz o estado deixa a pessoa clicando
+   num botão morto. E os chips saíram de dentro do recolhido. */
+test('Agenda: a barra do Google diz o estado e fica no topo', () => {
+  const {run, document} = setup();
+  run("atual='agenda';for(const k in googleSessao)googleSessao[k]=null");
+  run("const m=document.getElementById('main');m.replaceChildren();vAgenda(m);organizarAgenda(m)");
+  const barra = document.querySelector('.agenda-google');
+  assert.ok(barra, 'a barra do Google não foi montada');
+  assert.match(barra.textContent, /desconectado/i);
+  assert.match(barra.textContent, /7 dias/);
+  assert.match(barra.textContent, /sem você marcar/);
+  assert.ok(document.querySelector('.topo').contains(barra), 'a barra não ficou no topo');
+});
+
+test('Agenda: conectado, a barra muda de recado', () => {
+  const {run, document} = setup();
+  const vence = Date.now() + 3000e3;
+  run(`atual='agenda';googleSessao.gmail={token:'t',vence:${vence}};googleSessao.agenda={token:'t',vence:${vence}}`);
+  run("const m=document.getElementById('main');m.replaceChildren();vAgenda(m)");
+  const barra = document.querySelector('.agenda-google');
+  assert.match(barra.textContent, /Google conectado/);
+  assert.match(barra.textContent, /Atualizar Gmail e Agenda/);
+});
+
+test('Agenda: os chips ficam à vista, fora do recolhido', () => {
+  const {run, document} = setup();
+  run("atual='agenda';const m=document.getElementById('main');m.replaceChildren();vAgenda(m);organizarAgenda(m)");
+  const chips = document.querySelector('.agenda-categorias');
+  assert.ok(chips, 'os chips sumiram');
+  assert.equal(chips.closest('details'), null, 'os chips voltaram para dentro do recolhido');
+});

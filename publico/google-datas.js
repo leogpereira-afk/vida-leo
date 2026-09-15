@@ -58,7 +58,33 @@ function calendarEvent(item,id){
  const start=item.start||{date:item.date},end=item.end||{date:shift(item.date,1)};
  return {id,summary:item.title.slice(0,200),description:`${item.reason||''}\n${item.excerpt||''}\nOrigem: Gmail (${item.sender||''})\nhttps://mail.google.com/mail/u/0/#all/${item.sourceId}`,start,end,location:item.location||'',visibility:'private',transparency:'transparent',reminders:{useDefault:false,overrides:[{method:'popup',minutes:1440},{method:'popup',minutes:60}]},extendedProperties:{private:{leoSource:id}}};
 }
-function gmailQuery(){return '-in:spam -in:trash'}
+/* SETE DIAS PARA TRÁS, sempre. Ordem do Léo. A varredura existe para pegar o
+   que chegou desde a última vez, não para arar a caixa inteira a cada clique —
+   e a data ENCONTRADA continua podendo ser de qualquer época futura. */
+const JANELA_DIAS=7;
+function gmailQuery(){return 'newer_than:'+JANELA_DIAS+'d -in:spam -in:trash'}
 
-globalThis.LeoGoogleDatas={day,shift,decode,mailText,extractDates,extractICS,eventId,calendarEvent,gmailQuery,dateOK};
+/* PARTICULAR OU DA EMPRESA.
+   A Central é a vida pessoal do Léo; data de O.S., orçamento, nota fiscal ou
+   fornecedor pertence aos sistemas da empresa. Ele pediu que só entre coisa
+   particular.
+
+   A régua NÃO decide sozinha e não apaga nada: ela SEPARA em três montes e diz
+   por quê. Quem adiciona é ele, item por item. Classificador de texto erra —
+   o que não pode é errar calado, jogando fora uma consulta médica porque o
+   e-mail veio de um domínio de trabalho. Por isso "empresa" continua visível,
+   só que fora do monte principal e nunca pré-marcado. */
+const SINAIS_EMPRESA=['o.s.','ordem de servico','orcamento','nota fiscal','nfe','nf-e','danfe','boleto','fornecedor','faturamento','comissao','licitacao','cotacao','pedido de compra','folha de pagamento','holerite','colaborador','admissao','demissao','ferias do','cnpj','impresilk','minaslab','mubisys','fortemais','bosques','domo construtora','pcp','contabilidade','contador','simples nacional','das ','darf','fgts','inss patronal'];
+const SINAIS_PARTICULAR=['consulta','medic','dentista','exame','laboratorio','vacina','fisioterapia','dermato','cardiolog','oftalmo','escola','colegio','faculdade','aniversario','casamento','batizado','formatura','viagem','voo','embarque','check-in','hotel','reserva','passagem','academia','corrida','treino','restaurante','cinema','show','ingresso','veterinario','pet','condominio','iptu','ipva','cnh','passaporte','visto'];
+function personalCheck({from='',subject='',body='',organizer='',calendar=''}={}){
+  const texto=fold([from,subject,body,organizer,calendar].join(' \n '));
+  const achou=(lista)=>lista.find(t=>texto.includes(t))||'';
+  const daEmpresa=achou(SINAIS_EMPRESA);
+  if(daEmpresa)return {classe:'empresa',motivo:'fala de "'+daEmpresa.trim()+'" — parece coisa da empresa'};
+  const pessoal=achou(SINAIS_PARTICULAR);
+  if(pessoal)return {classe:'particular',motivo:'fala de "'+pessoal.trim()+'"'};
+  return {classe:'duvida',motivo:'não achei sinal de empresa nem de vida pessoal'};
+}
+
+globalThis.LeoGoogleDatas={day,shift,decode,mailText,extractDates,extractICS,eventId,calendarEvent,gmailQuery,dateOK,personalCheck,JANELA_DIAS};
 })();

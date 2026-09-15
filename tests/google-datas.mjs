@@ -1,6 +1,6 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import ICAL from 'ical.js';
 import '../publico/google-datas.js';
-const {extractDates,extractICS,eventId,calendarEvent,gmailQuery,mailText}=globalThis.LeoGoogleDatas;
+const {extractDates,extractICS,eventId,calendarEvent,gmailQuery,mailText,personalCheck}=globalThis.LeoGoogleDatas;
 const today='2026-09-06';
 function mail(body,subject='Aviso',id='m1'){return {id,internalDate:'123',payload:{mimeType:'text/plain',headers:[{name:'Subject',value:subject},{name:'From',value:'teste@example.com'}],body:{data:Buffer.from(body).toString('base64url')}}}}
 test('leitura de datas: vencimento explícito vai sempre para aprovação',()=>{const x=extractDates(mail('Vencimento: 10/09/2026'),today);assert.equal(x[0].date,'2026-09-10');assert.equal(x[0].status,'review')});
@@ -21,7 +21,43 @@ const ics=(extra='')=>'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nMETHOD:REQUEST\r\nBEGIN
 test('leitura de datas: ICS preserva início e duração',()=>{const x=extractICS(ics(),mail(''),ICAL,today)[0];assert.equal(x.start.dateTime,'2026-09-10T15:00:00.000Z');assert.equal(x.end.dateTime,'2026-09-10T16:00:00.000Z')});
 test('leitura de datas: série recorrente exige revisão',()=>assert.equal(extractICS(ics('RRULE:FREQ=WEEKLY\r\n'),mail(''),ICAL,today)[0].status,'review'));
 test('leitura de datas: cancelamento não apaga evento',()=>assert.equal(extractICS(ics('STATUS:CANCELLED\r\n'),mail(''),ICAL,today)[0].status,'review'));
-test('leitura de datas: busca não limita época nem assunto do e-mail',()=>{const q=gmailQuery();assert.doesNotMatch(q,/after:|before:|newer_than:|renova|convite/);assert.match(q,/-in:spam/)});
+/* A ÉPOCA passou a ser limitada — ordem do Léo em 15/09/2026: "sempre olhar de
+   7 dias pra trás apenas". Este teste guardava o contrário, que era a decisão
+   anterior; virou junto com a regra, e não foi apagado, para a próxima pessoa
+   ver que o limite é escolha e não descuido. O ASSUNTO continua sem filtro. */
+test('leitura de datas: a busca olha 7 dias para trás e não filtra assunto',()=>{
+  const q=gmailQuery();
+  assert.match(q,/newer_than:7d/);
+  assert.doesNotMatch(q,/subject:|renova|convite/);
+  assert.match(q,/-in:spam/);
+});
+
+/* A régua de particular × empresa: ela SEPARA e explica, nunca descarta. */
+test('particular: sinal de empresa manda para o monte da empresa',()=>{
+  const r=personalCheck({subject:'Aprovação do orçamento 4471',from:'x@exemplo.com'});
+  assert.equal(r.classe,'empresa');
+  assert.match(r.motivo,/orcamento/);
+});
+test('particular: consulta médica é coisa pessoal',()=>{
+  const r=personalCheck({subject:'Confirmação de consulta com o dermatologista'});
+  assert.equal(r.classe,'particular');
+});
+test('particular: acento e caixa não mudam o veredito',()=>{
+  assert.equal(personalCheck({subject:'ORÇAMENTO Nº 12'}).classe,'empresa');
+  assert.equal(personalCheck({subject:'Vacina da FEBRE amarela'}).classe,'particular');
+});
+test('particular: sem sinal nenhum vira dúvida, não vira descarte',()=>{
+  const r=personalCheck({subject:'Reunião dia 20'});
+  assert.equal(r.classe,'duvida');
+  assert.ok(r.motivo);
+});
+test('particular: empresa ganha da pessoal quando os dois aparecem',()=>{
+  // "almoço com fornecedor" é trabalho, mesmo tendo cara de coisa social
+  assert.equal(personalCheck({subject:'Almoço com fornecedor no restaurante'}).classe,'empresa');
+});
+test('particular: aguenta entrada vazia e lixo',()=>{
+  for(const x of [undefined,{},{subject:null},{from:123}]) assert.ok(personalCheck(x).classe);
+});
 
 test('leitura de datas: inclui hoje e amanhã, exclui ontem',()=>{const r=extractDates(mail('Datas: 05/09/2026, 06/09/2026 e 07/09/2026'),today);assert.deepEqual(r.map(x=>x.date),['2026-09-06','2026-09-07']);assert.ok(r.every(x=>x.status==='review'))});
 test('leitura de datas: preserva itens diferentes no mesmo dia',()=>{const r=extractDates(mail('Retirada do produto 10/09/2026\nAula de inglês 10/09/2026'),today);assert.equal(r.length,2);assert.notEqual(r[0].key,r[1].key)});
