@@ -1505,12 +1505,12 @@ const LOGO_DRIVE='<svg viewBox="0 0 87.3 78" aria-hidden="true"><path d="m6.6 66
 const LOGO_STRAVA='<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#FC4C02" d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>';
 const MODS=[
   {id:'inicio',ic:'🏠',nome:'Início',grupo:'',render:vInicio},
+  {id:'agenda',ic:'📅',nome:'Agenda',grupo:'',render:vAgenda},
   {id:'rendimentos',ic:'📈',nome:'Rendimentos',grupo:'Dinheiro',render:vRendimentos},
   {id:'gastos',ic:'💸',nome:'Gastos',grupo:'',render:vGastos},
   {id:'patrimonio',ic:'🏠',nome:'Patrimônio',grupo:'',render:vPatrimonio},
   {id:'caixavgv',ic:'💰',nome:'Caixa e VGV',grupo:'',render:vCaixaVGV},
   {id:'viagens',ic:'✈️',nome:'Viagens',grupo:'Vida',render:vViagens},
-  {id:'agenda',ic:'📅',nome:'Agenda',grupo:'',render:vAgenda},
   {id:'demandas',ic:'✅',nome:'Demandas',grupo:'',render:vDemandas},
   {id:'saude',ic:'🩺',nome:'Saúde',grupo:'',render:vSaude},
   {id:'strava',ic:LOGO_STRAVA,nome:'Strava',grupo:'',render:vStrava},
@@ -2636,6 +2636,7 @@ const FONTES_AGENDA=[
   {k:'demandas',    rot:'Demandas',ic:'✅',cor:'#0ca678'},
   {k:'empresas',    rot:'Empresas',ic:'🏢',cor:'#5145a5'},
   {k:'seguros',     rot:'Seguros renovando',ic:'🛡️',cor:'#c92a2a'},
+  {k:'saude',       rot:'Saúde',ic:'🩺',cor:'#0b7285'},
 ];
 const corFonte=k=>(FONTES_AGENDA.find(f=>f.k===k)||{}).cor||'var(--suave)';
 // MESES é abreviado (cabe em gráfico); no calendário o mês vai por extenso
@@ -2830,6 +2831,35 @@ function eventosDoEcossistema(){
     sub:[a.local,a.tipo].filter(Boolean).join(' · '),fonte:'compromissos',ic:'📅',proprio:true,ref:a});});
 
 
+  /* ---- SAÚDE: o que tem data e ainda vai acontecer ----
+     Rastreio SEM registro nenhum NÃO entra. Ele não tem data: tem ausência de
+     data. Jogá-lo no dia de hoje seria inventar um compromisso que ninguém
+     marcou, e calendário que inventa data deixa de ser calendário. Exame com
+     laudo pronto também não entra — já aconteceu, não é compromisso. */
+  if(on('saude')){
+    (E.vacinas||[]).forEach(v=>{if(dataISOValida(v.proxima))ev.push({
+      data:v.proxima,hora:'',titulo:(v.vacina||'Vacina')+' · próxima dose',
+      sub:dataISOValida(v.data)?'última em '+fmtDataAno(v.data):'',
+      fonte:'saude',ic:'💉',ir:'saude',col:'sa-vac',ref:v})});
+    (E.tratamentos||[]).forEach(t=>{if(t.status!=='Encerrado'&&dataISOValida(t.fim))ev.push({
+      data:t.fim,hora:'',titulo:(t.oque||'Tratamento')+' · término previsto',
+      sub:[t.motivo,t.medico].filter(Boolean).join(' · '),
+      fonte:'saude',ic:'💊',ir:'saude',col:'sa-trat',ref:t})});
+    (E.exames||[]).forEach(x=>{
+      if(!dataISOValida(x.data))return;
+      const aguardando=String(x.resultado||'').trim()==='Aguardando';
+      if(!aguardando&&x.data<=h)return;
+      ev.push({data:x.data,hora:'',titulo:(x.exame||'Exame')+(aguardando?' · resultado pendente':' · marcado'),
+        sub:x.medico||'',fonte:'saude',ic:'🧪',ir:'saude',col:'sa-ex',ref:x})});
+    (typeof rastreiosPendentes==='function'?rastreiosPendentes(true):[]).forEach(x=>{
+      if(!dataISOValida(x.ultima)||!(+x.cada>0))return;
+      const d=new Date(x.ultima+'T12:00');d.setMonth(d.getMonth()+(+x.cada));
+      const quando=d.toISOString().slice(0,10);
+      ev.push({data:quando,hora:'',titulo:x.nome+' · refazer',
+        sub:'último em '+fmtDataAno(x.ultima)+' · a cada '+x.cada+' meses',
+        fonte:'saude',ic:'🩺',ir:'saude',col:'sa-rast',ref:x})});
+  }
+
   if(on('documentos')) (E.documentos||[]).forEach(d=>{if(d.validade)ev.push({
     data:d.validade,hora:'',titulo:(d.nome||'Documento')+' vence',
     sub:'de '+(d.dono||'Léo')+(d.numero?' · '+d.numero:''),fonte:'documentos',ic:'🪪',ir:'documentos',col:'documentos',ref:d});});
@@ -2906,6 +2936,7 @@ function vAgenda(m){
   const cont=t=>E.agenda.filter(a=>a.tipo===t).length;
   m.appendChild(painel('Agenda',
     acao('+ Novo compromisso',nova),
+    acao('📤 Enviar ao Google Agenda',revisarEnvioGoogle,'ghost'),
     acao('⬇ Exportar .ics',exportarIcs,'ghost'),
     acao('⬆ Importar .ics',()=>pedirArquivo(importarIcs,'.ics'),'ghost'),'|'));
 
@@ -6082,7 +6113,7 @@ async function googleAgendaGravar(caminho,method='GET',body){
  return r.json();
 }
 async function enviarLembreteGoogle(a){
- if(!E.googleAgendaDestino){const cal=await googleAgendaGravar('calendars','POST',{summary:'Central do Léo · Gmail',timeZone:'America/Sao_Paulo'});E.googleAgendaDestino=cal.id;salvar();}
+ if(!E.googleAgendaDestino){const cal=await googleAgendaGravar('calendars','POST',{summary:'Central do Léo',timeZone:'America/Sao_Paulo'});E.googleAgendaDestino=cal.id;salvar();}
  const id=await LeoGoogleDatas.eventId('manual:'+(a.gid||a.id));
  const item={title:a.titulo,date:a.data,sourceId:a.gmailId,excerpt:a.obs||'',sender:'',reason:'Compromisso selecionado na Central',location:a.local||''};
  if(a.hora){item.start={dateTime:a.data+'T'+a.hora+':00-03:00',timeZone:'America/Sao_Paulo'};const start=Date.parse(item.start.dateTime),end=Date.parse(a.googleFim||'');item.end={dateTime:new Date(end>start?end:start+3600e3).toISOString(),timeZone:'America/Sao_Paulo'}}
@@ -6093,10 +6124,16 @@ async function enviarLembreteGoogle(a){
  a.gmailExportId=id;a.gmailExportLink=result.htmlLink||'';salvar();return result;
 }
 function revisarEnvioGoogle(){
- abrirModal('Enviar ao Google Agenda','Selecione os compromissos importados do Gmail',(c,fechar)=>{
+ abrirModal('Enviar ao Google Agenda','Selecione os compromissos de hoje em diante',(c,fechar)=>{
   const cx=el('<div class="secao"></div>'),selected=new Set();
-  cx.appendChild(el('<p>Cria ou atualiza os itens escolhidos no calendário Central do Léo · Gmail, com avisos 1 dia e 1 hora antes. Permita as notificações do Google Agenda no aparelho. Nada é enviado sem apertar o botão abaixo.</p>'));
-  const list=E.agenda.filter(a=>a.gmailId&&a.data>=hoje());
+  cx.appendChild(el('<p>Cria ou atualiza os itens escolhidos num calendário só desta Central, com avisos 1 dia e 1 hora antes. Permita as notificações do Google Agenda no aparelho. Nada é enviado sem apertar o botão abaixo.</p>'));
+  /* A permissão que a Central pede é `calendar.app.created`: ela só enxerga e
+     só escreve no calendário que ela mesma criou. Os calendários de sempre do
+     Léo continuam fora do alcance dela — não dá para mexer neles nem por
+     engano, porque o crachá não alcança. */
+  cx.appendChild(el('<p class="google-nota">O envio usa um calendário criado pela Central. Os seus outros calendários do Google não são lidos nem alterados.</p>'));
+  const list=E.agenda.filter(a=>dataISOValida(a.data)&&a.data>=hoje())
+    .sort((a,b)=>(a.data+(a.hora||'')).localeCompare(b.data+(b.hora||'')));
   const status=el('<p role="status"></p>');
   const send=acao('Conectar Google Agenda e enviar selecionados',async()=>{
    send.disabled=true;let n=0;
@@ -6104,8 +6141,8 @@ function revisarEnvioGoogle(){
    catch(e){status.textContent=n+' compromisso(s) confirmado(s). '+e.message;}
    finally{send.disabled=!selected.size;}
   });send.disabled=true;
-  list.forEach(a=>{const row=el(`<label class="google-evento"><input type="checkbox"><span><b>${esc(a.titulo)}</b><small>${fmtDataAno(a.data)} ${esc(a.hora||'Dia inteiro')} · ${a.gmailExportId?'Atualizar lembrete':'Novo lembrete'}</small></span></label>`);row.querySelector('input').onchange=e=>{if(e.target.checked)selected.add(a);else selected.delete(a);send.disabled=!selected.size};cx.appendChild(row)});
-  if(!list.length)cx.appendChild(el('<p>Importe primeiro as datas pelo botão Buscar datas no Gmail.</p>'));
+  list.forEach(a=>{const row=el(`<label class="google-evento"><input type="checkbox"><span><b>${esc(a.titulo)}</b><small>${fmtDataAno(a.data)} ${esc(a.hora||'Dia inteiro')} · ${a.gmailId?'veio do Gmail':'lançado à mão'} · ${a.gmailExportId?'Atualizar lembrete':'Novo lembrete'}</small></span></label>`);row.querySelector('input').onchange=e=>{if(e.target.checked)selected.add(a);else selected.delete(a);send.disabled=!selected.size};cx.appendChild(row)});
+  if(!list.length)cx.appendChild(el('<p class="vazio">Nenhum compromisso de hoje em diante. Crie um em “+ Novo compromisso”, ou importe datas do Gmail.</p>'));
   cx.appendChild(send);cx.appendChild(status);c.appendChild(cx);
  });
 }
@@ -6121,7 +6158,7 @@ function blocoAgendaGmail(){
     status.textContent=gmailBuscaTotal+' mensagens consultadas nesta busca. '+(gmailBuscaPagina?'Há mais mensagens: clique em Continuar busca.':'Fim da busca nesta caixa.');revisar.textContent='Revisar pendentes · '+(E.gmailPendentes||[]).length;revisarConvitesGmail(aprovacao);
   }catch(e){status.textContent=e.message||'Não foi possível consultar o Gmail.'}finally{b.disabled=false;b.textContent=rotulo()}});
   const reiniciar=acao('Reiniciar busca',()=>{gmailBuscaPagina='';gmailBuscaTotal=0;b.textContent=rotulo();status.textContent='A próxima busca começa pelas mensagens mais recentes. As aprovações pendentes foram mantidas.'},'ghost');
-  cx.appendChild(b);cx.appendChild(revisar);cx.appendChild(reiniciar);cx.appendChild(acao('Enviar selecionados ao Google Agenda',revisarEnvioGoogle,'ghost'));cx.appendChild(status);
+  cx.appendChild(b);cx.appendChild(revisar);cx.appendChild(reiniciar);cx.appendChild(status);
   return bloco('ag-gmail','Datas do Gmail para aprovação','De hoje em diante · importação somente após sua aprovação',cx);
 }
 
