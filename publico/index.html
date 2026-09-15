@@ -6309,7 +6309,7 @@ function guardarAprovacoesGmail(resultado){
  E.gmailPendentes=plano.filter(x=>['adicionar','atualizar'].includes(x.acao)&&!(E.gmailDispensados||[]).some(d=>d.gid===x.gid&&(d.seq>x.seq||(d.seq===x.seq&&d.emailEm>=x.emailEm))));salvar();
  return {...resultado,plano:[...E.gmailPendentes,...plano.filter(x=>!['adicionar','atualizar'].includes(x.acao))]};
 }
-function revisarConvitesGmail(resultado){
+function revisarConvitesGmail(resultado,aoFechar){
   abrirModal('Compromissos recebidos no Gmail','Datas de hoje em diante · aprovação obrigatória',(c,fechar)=>{
     const cx=el('<div class="secao"></div>'),selecionados=new Set();
     cx.appendChild(el('<p>Confira as datas e selecione o que deseja trazer. Atualizar substitui os campos importados da cópia local. Nenhuma resposta será enviada ao organizador.</p>'));
@@ -6419,13 +6419,36 @@ async function atualizarGoogleParticular(dizer,r){
     for(const serv of ['gmail','agenda'])if(!googleConectado(serv))await conectarGoogle(serv);
     if(typeof r==='function')r();
   }
-  dizer('Lendo o Gmail dos últimos '+(LeoGoogleDatas.JANELA_DIAS||7)+' dias…');
+  const dias=LeoGoogleDatas.JANELA_DIAS||7;
+
+  /* O CALENDÁRIO entra depois do Gmail, encadeado no fechar da primeira tela.
+     O rótulo do botão diz "Gmail e Agenda" — ele tem de ler os dois, senão é
+     um botão que mente, e botão que mente é pior que botão que falta. */
+  const depoisDoGmail=async()=>{
+    dizer('Lendo o Google Agenda dos últimos '+dias+' dias…');
+    try{
+      const cal=await googleLer('agenda','calendars/primary');
+      await revisarAgendaGoogle({id:cal.id||'primary',summary:cal.summary||'Google Agenda'},()=>dizer('Conferido.'));
+    }catch(e){
+      /* Falhar aqui não pode apagar o que o Gmail já trouxe, nem ficar mudo */
+      dizer('Gmail conferido. O Google Agenda não respondeu agora: '+((e&&e.message)||'erro desconhecido'));
+    }
+  };
+
+  dizer('Lendo o Gmail dos últimos '+dias+' dias…');
   gmailBuscaPagina='';gmailBuscaTotal=0;
   const resultado=await consultarConvitesGmail('');
   const aprovacao=guardarAprovacoesGmail(resultado);
   const achou=(aprovacao.plano||[]).filter(x=>['adicionar','atualizar'].includes(x.acao)).length;
-  dizer(achou?achou+' data(s) para você conferir.':'Nada novo no Gmail nesta semana.');
-  revisarConvitesGmail(aprovacao);
+  if(!achou){
+    /* Sem nada no Gmail, não vale abrir uma tela só para dizer "nada":
+       segue direto para o calendário. */
+    dizer('Nada novo no Gmail. Indo para o Google Agenda…');
+    await depoisDoGmail();
+    return;
+  }
+  dizer(achou+' data(s) do Gmail para você conferir. Depois vem o Google Agenda.');
+  revisarConvitesGmail(aprovacao,depoisDoGmail);
 }
 
 function blocoAgendaGmail(){
@@ -6478,7 +6501,7 @@ function prepararAgendaGoogle(eventos,calId,fuso,agenda){
     return {reg,idLocal:existente?.id,acao:existente?'atualizar':'adicionar'};
   });
 }
-async function revisarAgendaGoogle(cal){
+async function revisarAgendaGoogle(cal,aoFechar){
   /* 7 dias para trás, ordem do Léo. Para FRENTE continua um ano: o passado
      é o que não precisa ser re-arado; o futuro é justamente o que interessa. */
   const inicio=new Date();inicio.setDate(inicio.getDate()-(LeoGoogleDatas.JANELA_DIAS||7));const fim=new Date();fim.setFullYear(fim.getFullYear()+1);
@@ -6492,14 +6515,19 @@ async function revisarAgendaGoogle(cal){
     const cx=el('<div class="secao"></div>');
     cx.appendChild(el('<p>Escolha o que trazer. Eventos já importados podem ser atualizados; isso substitui data, título e local da cópia na Central. Nada será alterado no Google. Eventos cancelados ou ausentes no Google não são apagados automaticamente daqui.</p>'));
     const selecionados=new Set();
-    plano.forEach((item,i)=>{const l=el(`<label class="google-evento"><input type="checkbox"><span><b>${esc(item.reg.titulo)}</b><small>${fmtDataAno(item.reg.data)} ${esc(item.reg.hora||'dia inteiro')} · ${item.acao==='adicionar'?'novo':'atualizar cópia existente'}</small></span></label>`);l.querySelector('input').onchange=e=>{if(e.target.checked)selecionados.add(i);else selecionados.delete(i);atualizar()};cx.appendChild(l)});
+    /* A mesma régua do Gmail: o que tem cara de empresa desce, com o motivo.
+       Separar e explicar — nunca descartar. */
+    const PESO={particular:0,duvida:1,empresa:2},SELO={particular:'🏠 particular',duvida:'? não tenho certeza',empresa:'🏢 parece da empresa'};
+    plano.map((item,i)=>({item,i,pc:LeoGoogleDatas.personalCheck({subject:item.reg.titulo||'',body:item.reg.obs||'',calendar:cal.summary||''})}))
+      .sort((a,b)=>PESO[a.pc.classe]-PESO[b.pc.classe])
+      .forEach(({item,i,pc})=>{const l=el(`<label class="google-evento"><input type="checkbox"><span><b>${esc(item.reg.titulo)}</b><small>${esc(SELO[pc.classe])} · ${esc(pc.motivo)}</small><small>${fmtDataAno(item.reg.data)} ${esc(item.reg.hora||'dia inteiro')} · ${item.acao==='adicionar'?'novo':'atualizar cópia existente'}</small></span></label>`);l.querySelector('input').onchange=e=>{if(e.target.checked)selecionados.add(i);else selecionados.delete(i);atualizar()};cx.appendChild(l)});
     if(!plano.length)cx.appendChild(el('<p class="vazio">Nenhum compromisso no período.</p>'));
     const todos=acao('Selecionar todos',()=>{cx.querySelectorAll('input[type=checkbox]').forEach((b,i)=>{b.checked=true;selecionados.add(i)});atualizar()},'ghost');cx.appendChild(todos);
     const aplicar=acao('Importar selecionados',()=>{
       for(const i of selecionados){const item=plano[i];const existente=E.agenda.find(a=>a.googleId===item.reg.googleId);if(existente)Object.assign(existente,item.reg);else E.agenda.push({id:uid(),...item.reg})}
       salvar();fechar();
     });const atualizar=()=>{aplicar.disabled=!selecionados.size;aplicar.textContent='Importar '+selecionados.size+' selecionado(s)'};atualizar();cx.appendChild(aplicar);c.appendChild(cx);
-  });
+  },aoFechar);
 }
 
 // base64url do Gmail, com acento preservado

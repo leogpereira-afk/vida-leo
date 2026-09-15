@@ -148,3 +148,30 @@ test('Agenda: os chips ficam à vista, acima da grade do mês', () => {
   const grade = cal.querySelector('table, .cal-grade, .conteudo > *:not(.agenda-categorias):not(.agenda-filtro-aviso)');
   if (grade) assert.ok(chips.compareDocumentPosition(grade) & 4, 'os chips ficaram DEPOIS da grade');
 });
+
+/* O botão diz "Gmail e Agenda". Ele tinha de ler os dois — na primeira versão
+   lia só o Gmail, e botão que mente é pior que botão que falta. */
+test('Agenda: o botão lê o Gmail E o calendário', async () => {
+  const {run} = setup();
+  const vence = Date.now() + 3000e3;
+  run(`atual='agenda';for(const k of ['gmail','agenda','agendaEnviar','drive'])googleSessao[k]={token:'t',vence:${vence}}`);
+  run("window.__lidos=[];tela=()=>{};abrirModal=(t,s,montar,aoFechar)=>{window.__lidos.push('modal:'+t);if(aoFechar)aoFechar()}");
+  run("consultarConvitesGmail=async()=>{window.__lidos.push('gmail');return{plano:[],avisos:[],mensagens:0,proximaPagina:''}}");
+  run("googleLer=async(serv,caminho)=>{window.__lidos.push(serv+':'+caminho);return caminho.startsWith('calendars/primary')&&!caminho.includes('events')?{id:'primary',summary:'Principal'}:{items:[]}}");
+  await run("atualizarGoogleParticular(()=>{},()=>{})");
+  const lidos = JSON.parse(run('JSON.stringify(window.__lidos)'));
+  assert.ok(lidos.includes('gmail'), 'não leu o Gmail: ' + lidos.join(', '));
+  assert.ok(lidos.some(x => x.startsWith('agenda:calendars/primary')), 'não leu o calendário: ' + lidos.join(', '));
+});
+
+test('Agenda: calendário fora do ar não apaga o que o Gmail trouxe', async () => {
+  const {run} = setup();
+  const vence = Date.now() + 3000e3;
+  run(`atual='agenda';for(const k of ['gmail','agenda'])googleSessao[k]={token:'t',vence:${vence}}`);
+  run("window.__recado='';tela=()=>{};abrirModal=(t,s,m,aoFechar)=>{if(aoFechar)aoFechar()}");
+  run("consultarConvitesGmail=async()=>({plano:[],avisos:[],mensagens:0,proximaPagina:''})");
+  run("googleLer=async()=>{throw new Error('sem rede')}");
+  await run("atualizarGoogleParticular(m=>{window.__recado=m},()=>{})");
+  assert.match(run('window.__recado'), /Gmail conferido/);
+  assert.match(run('window.__recado'), /sem rede/);
+});
