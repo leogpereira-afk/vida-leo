@@ -137,10 +137,14 @@ test('Agenda: conectado, a barra muda de recado', () => {
   assert.match(barra.textContent, /Atualizar Gmail e Agenda/);
 });
 
-test('Agenda: os chips ficam à vista, fora do recolhido', () => {
+test('Agenda: os chips ficam à vista, acima da grade do mês', () => {
   const {run, document} = setup();
   run("atual='agenda';const m=document.getElementById('main');m.replaceChildren();vAgenda(m);organizarAgenda(m)");
   const chips = document.querySelector('.agenda-categorias');
   assert.ok(chips, 'os chips sumiram');
   assert.equal(chips.closest('details'), null, 'os chips voltaram para dentro do recolhido');
+  const cal = document.querySelector('[data-bid="ag-mes"]');
+  assert.ok(cal.contains(chips), 'os chips foram varridos para fora do quadro do calendário');
+  const grade = cal.querySelector('table, .cal-grade, .conteudo > *:not(.agenda-categorias):not(.agenda-filtro-aviso)');
+  if (grade) assert.ok(chips.compareDocumentPosition(grade) & 4, 'os chips ficaram DEPOIS da grade');
 });

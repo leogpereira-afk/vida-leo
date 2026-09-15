@@ -1653,8 +1653,11 @@ function organizarAgenda(pagina,alvo){
  const header=calendario.querySelector('header');header.onclick=null;header.onkeydown=null;header.removeAttribute('role');header.removeAttribute('tabindex');header.removeAttribute('aria-expanded');header.querySelector('.seta')?.remove();
  if(barraGoogle)topo.appendChild(barraGoogle);
  topo.after(calendario);
- if(aviso)calendario.before(aviso);
- if(chips)calendario.before(chips);
+ const conteudoCal=calendario.querySelector('.conteudo');
+ if(conteudoCal){
+   if(aviso)conteudoCal.prepend(aviso);
+   if(chips)conteudoCal.prepend(chips);
+ }
  const nav=el('<nav class="agenda-abas" aria-label="Detalhes da agenda"></nav>');
  const panes={};
  [['compromissos','Compromissos'],['integracoes','Gmail e importações'],['resumo','Resumo']].forEach(([id,label])=>{
