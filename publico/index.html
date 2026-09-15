@@ -2646,6 +2646,7 @@ const FONTES_AGENDA=[
   {k:'empresas',    rot:'Empresas',ic:'🏢',cor:'#5145a5'},
   {k:'seguros',     rot:'Seguros renovando',ic:'🛡️',cor:'#c92a2a'},
   {k:'saude',       rot:'Saúde',ic:'🩺',cor:'#0b7285'},
+  {k:'painel',      rot:'Calendário da empresa',ic:'🗓',cor:'#16334f'},
 ];
 const corFonte=k=>(FONTES_AGENDA.find(f=>f.k===k)||{}).cor||'var(--suave)';
 // MESES é abreviado (cabe em gráfico); no calendário o mês vai por extenso
@@ -2828,6 +2829,28 @@ function modalCompromisso(a){
 
 function abrirEventoCentral(e){if(e.proprio&&e.ref)modalCompromisso(e.ref);else if(e.col&&e.ref)abrirRegistro(e.ir,e.col,e.ref);else if(e.ir)irTela(e.ir)}
 
+/* ---- O calendário da empresa, vindo do Painel de Gestão ----
+   O dado é o mesmo que o Painel mostra (coleção `eventos`, dona: RH), mas NÃO
+   entra por lá: a porta do Painel exige crachá do Painel, e crachá é por
+   sistema. A Central tem a porta dela (`empresaDatas` no leo-sync), com o
+   crachá dela. Dinheiro e ficha de pessoa do RH não passam por essa porta --
+   não é a tela que filtra, é a porta que não traz. */
+let empresaDatasCache=null,empresaDatasPedido=null,empresaDatasErro='',empresaDatasDesistiu=false;
+const EMPRESA_DATAS_TTL=30*60*1000;
+const empresaDatasValido=()=>!!empresaDatasCache&&(Date.now()-empresaDatasCache.em)<EMPRESA_DATAS_TTL;
+function empresaDatasCarregar(forcar){
+  if(!forcar&&empresaDatasValido())return Promise.resolve(empresaDatasCache);
+  if(empresaDatasPedido)return empresaDatasPedido;
+  empresaDatasPedido=apiSync('POST',{acao:'empresaDatas'}).then(r=>{
+    if(!r||!Array.isArray(r.eventos))throw new Error('o servidor não devolveu o calendário da empresa');
+    empresaDatasCache={eventos:r.eventos.filter(e=>e&&typeof e==='object'&&dataISOValida(e.data)),em:Date.now()};
+    empresaDatasErro='';
+    return empresaDatasCache;
+  }).catch(e=>{empresaDatasErro=(e&&e.message)||'não foi possível ler o calendário da empresa';throw e})
+    .finally(()=>{empresaDatasPedido=null});
+  return empresaDatasPedido;
+}
+
 function eventosDoEcossistema(){
   const ev=[];
   const h=hoje();
@@ -2868,6 +2891,14 @@ function eventosDoEcossistema(){
         sub:'último em '+fmtDataAno(x.ultima)+' · a cada '+x.cada+' meses',
         fonte:'saude',ic:'🩺',ir:'saude',col:'sa-rast',ref:x})});
   }
+
+  /* Chega da nuvem, não do estado: se ainda não chegou, a lista sai sem ele e
+     a tela avisa. Calendário vazio por erro não pode parecer calendário vazio
+     de verdade. */
+  if(on('painel')) ((empresaDatasCache&&empresaDatasCache.eventos)||[]).forEach(e=>{if(!dataISOValida(e&&e.data))return;ev.push({
+    data:e.data,hora:e.hora||'',titulo:e.titulo||'(sem título)',
+    sub:[e.tipo,e.descricao].filter(Boolean).join(' · '),
+    fonte:'painel',ic:'🗓',cor:e.cor||'',ref:e});});
 
   if(on('documentos')) (E.documentos||[]).forEach(d=>{if(d.validade)ev.push({
     data:d.validade,hora:'',titulo:(d.nome||'Documento')+' vence',
@@ -2940,6 +2971,23 @@ function vAgenda(m){
   const fut=proximosCompromissos(E.agenda).length;
   const nova=()=>novoCompromissoRotina();
   m.appendChild(cab('Agenda','Tudo que tem data nesta Central, num lugar só.'));
+  /* Só re-renderiza quando dado NOVO chega (o `em` muda). Com o cache válido a
+     promessa devolve o mesmo objeto, e o laço morre aí. */
+  /* UMA tentativa. Sem o freio, falhar re-renderiza, re-renderizar tenta de
+     novo, e a tela entra em laço martelando o servidor — foi exatamente o que
+     aconteceu quando a suíte de testes rodou sem rede. Quem destrava é o Léo,
+     no botão. */
+  if(!empresaDatasDesistiu){
+    const empresaAntes=empresaDatasCache?empresaDatasCache.em:0;
+    empresaDatasCarregar()
+      .then(c=>{if(c&&c.em!==empresaAntes&&atual==='agenda')r()})
+      .catch(()=>{empresaDatasDesistiu=true;if(atual==='agenda')r()});
+  }
+  if(empresaDatasErro&&!empresaDatasCache){
+    const av=el('<div class="aviso">O calendário da empresa não pôde ser lido agora ('+esc(empresaDatasErro)+'). O resto da Agenda continua completo.</div>');
+    av.appendChild(acao('Tentar de novo',()=>{empresaDatasDesistiu=false;empresaDatasErro='';r()},'ghost'));
+    m.appendChild(av);
+  }
   m.appendChild(blocoAgendaGmail());
   if(filtro.agSo===undefined)filtro.agSo=null;
   const cont=t=>E.agenda.filter(a=>a.tipo===t).length;

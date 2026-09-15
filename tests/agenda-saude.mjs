@@ -71,3 +71,43 @@ test('Agenda fica logo abaixo de Início no menu', () => {
   assert.equal(ids[1], 'agenda');
   assert.equal(ids.filter(x => x === 'agenda').length, 1, 'Agenda duplicada no menu');
 });
+
+/* O calendário da empresa vem da rede. Quando a leitura falhava, a tela
+   re-renderizava para mostrar o aviso — e re-renderizar pedia de novo. O laço
+   apareceu de verdade: a suíte inteira travou. O freio é de uma tentativa. */
+const passo = () => new Promise(r => setImmediate(r));
+
+test('Agenda: calendário da empresa que falha não entra em laço', async () => {
+  const {run} = setup();
+  run("atual='agenda';window.__pedidos=0;window.__telas=0;tela=()=>{window.__telas++}");
+  run("apiSync=async(m,c)=>{if(c&&c.acao==='empresaDatas'){window.__pedidos++;throw new Error('sem rede')}return{}}");
+  run("empresaDatasCache=null;empresaDatasPedido=null;empresaDatasErro='';empresaDatasDesistiu=false");
+  run("vAgenda(document.createElement('div'))"); await passo(); await passo();
+  run("vAgenda(document.createElement('div'))"); await passo(); await passo();
+  run("vAgenda(document.createElement('div'))"); await passo(); await passo();
+  assert.equal(Number(run('window.__pedidos')), 1, 'pediu mais de uma vez depois de falhar');
+  assert.ok(Number(run('window.__telas')) <= 1, 'redesenhou em laço');
+  assert.match(run('empresaDatasErro'), /sem rede/);
+});
+
+test('Agenda: depois da falha, é o dono que destrava', async () => {
+  const {run} = setup();
+  run("atual='agenda';window.__pedidos=0;tela=()=>{}");
+  run("apiSync=async(m,c)=>{if(c&&c.acao==='empresaDatas'){window.__pedidos++;throw new Error('sem rede')}return{}}");
+  run("empresaDatasCache=null;empresaDatasPedido=null;empresaDatasErro='';empresaDatasDesistiu=false");
+  run("vAgenda(document.createElement('div'))"); await passo(); await passo();
+  assert.equal(Number(run('window.__pedidos')), 1);
+  run("empresaDatasDesistiu=false;empresaDatasErro=''");            // é o que o botão faz
+  run("vAgenda(document.createElement('div'))"); await passo(); await passo();
+  assert.equal(Number(run('window.__pedidos')), 2, 'o botão de tentar de novo não refez o pedido');
+});
+
+test('Agenda: evento da empresa entra pela data, e some se a leitura não veio', () => {
+  const {run} = setup();
+  run("empresaDatasCache=null;E.agenda=[];E.documentos=[];E.viagens=[]");
+  assert.equal(run("eventosDoEcossistema().filter(e=>e.fonte==='painel').length"), 0);
+  run("empresaDatasCache={em:Date.now(),eventos:[{id:'a',titulo:'Feriado',data:'2026-12-25',tipo:'Feriado',cor:'#dc2626',hora:'',descricao:''},{id:'b',titulo:'Sem data',data:'',tipo:'Outro'}]}");
+  const ev = JSON.parse(run("JSON.stringify(eventosDoEcossistema().filter(e=>e.fonte==='painel').map(e=>({data:e.data,titulo:e.titulo})))"));
+  assert.equal(ev.length, 1);
+  assert.equal(ev[0].data, '2026-12-25');
+});

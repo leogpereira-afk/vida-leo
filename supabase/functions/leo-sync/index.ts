@@ -27,6 +27,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { stravaAcao } from "./strava.ts";
 // O Google mora em google.ts: a autorização fica no servidor e a tela recebe só um crachá curto (14/09/2026).
 import { googleAcao } from "./google.ts";
+// O calendário da empresa entra pela porta da PRÓPRIA Central (15/09/2026):
+// a porta do Painel exige crachá do Painel, e crachá é por sistema.
+import { empresaAcao } from "./empresa.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -301,6 +304,12 @@ Deno.serve(async (req: Request) => {
     if (acao === CRON_ACAO && req.headers.has("x-leo-cron")) {
       if (!(await cronOk(req))) return json({ erro: "Não autorizado" }, 401);
       return await stravaAcao(CRON_ACAO, {}, sb, req, new URL(req.url));
+    }
+
+    if (acao === "empresaDatas") {
+      const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+      if (!(await tokenOk(t))) return json({ erro: "Não autorizado" }, 401);
+      return await empresaAcao(acao, sb, new Date().toISOString().slice(0, 10));
     }
 
     if (typeof acao === "string" && acao.startsWith("strava")) {
