@@ -31,8 +31,31 @@ type Banco = SupabaseClient;
 const OAUTH_AUTH = "https://accounts.google.com/o/oauth2/v2/auth";
 const OAUTH_TOKEN = "https://oauth2.googleapis.com/token";
 const APP_URL = "https://leogpereira-afk.github.io/vida-leo/";
-// Só leitura do Drive: é tudo o que a tela faz (navegar, ver, baixar).
-const ESCOPO = "https://www.googleapis.com/auth/drive.readonly";
+/* O QUE A CENTRAL PEDE AO GOOGLE, e por que cada um (15/09/2026).
+   Três são de LEITURA e um escreve, mas escreve num quarto fechado:
+
+   drive.readonly        navegar, ver e baixar. Nunca apagar, mover ou renomear.
+   gmail.readonly        achar datas de compromisso nos e-mails. Só lê.
+   calendar.readonly     mostrar os compromissos que já existem.
+   calendar.app.created  criar lembrete. Este escopo NÃO alcança os calendários
+                         de sempre do Léo: o app só enxerga e só escreve no
+                         calendário que ele mesmo criou. É a diferença entre
+                         "pode escrever na agenda dele" e "pode escrever na
+                         agenda que ele deu para o app".
+
+   O PREÇO, dito em voz alta: guardar a chave de renovação aqui é o que faz a
+   conexão acontecer sem janela nenhuma — e é também o que permite ao servidor
+   ler o Gmail e a agenda a qualquer momento, sem o Léo estar na frente. Foi
+   escolha dele, depois de eu levantar exatamente isto. Quem quiser desfazer:
+   o botão "Desconectar" da tela do Drive apaga a chave, e
+   myaccount.google.com/connections corta do lado do Google. */
+const ESCOPOS = [
+  "https://www.googleapis.com/auth/drive.readonly",
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/calendar.readonly",
+  "https://www.googleapis.com/auth/calendar.app.created",
+];
+const ESCOPO = ESCOPOS.join(" ");
 const FOLGA_SEG = 120;   // renova um pouco antes de vencer, para a tela não pegar crachá morto
 
 const CORS = {
@@ -182,7 +205,11 @@ async function callback(sb: Banco, url: URL): Promise<Response> {
   } catch (_) {
     return voltar("banco");
   }
-  return voltar(escopo && !escopo.includes("drive.readonly") ? "escopo" : "");
+  /* Escopo que o Léo desmarcou na tela do Google não pode virar surpresa
+     depois, na forma de uma tela vazia sem explicação. Volta dizendo QUAL
+     faltou. */
+  const faltando = ESCOPOS.filter((e) => escopo && !escopo.includes(e.split("/auth/")[1]));
+  return voltar(faltando.length ? "escopo-" + faltando.map((e) => e.split("/auth/")[1]).join(",") : "");
 }
 
 /* Desligar de verdade: a chave de renovação é o que faz a conexão sobreviver ao

@@ -6138,7 +6138,43 @@ function carregarGis(){
   }).catch(e=>{gisPendente=null;throw e});return gisPendente;
 }
 function googleConectado(servico){return !!googleSessao[servico]?.token&&googleSessao[servico].vence>Date.now()+30000}
+/* UM crachá do servidor serve os QUATRO serviços: o token que o Google devolve
+   carrega todos os escopos concedidos de uma vez. Quatro sessões separadas eram
+   herança do tempo em que cada uma nascia de uma janela diferente.
+
+   O que isso compra: nada de janela, nada de clicar em "Conectar" toda sessão —
+   o mesmo que o Drive já fazia. O que custa: a chave guardada no servidor passa
+   a alcançar Gmail e Agenda sem o Léo na frente. Escolha dele, feita depois de
+   eu levantar exatamente isso. */
+const GOOGLE_ESCOPO_DE={gmail:'gmail.readonly',agenda:'calendar.readonly',agendaEnviar:'calendar.app.created',drive:'drive.readonly'};
+let googleCrachaPedido=null;
+async function googleCrachaDoServidor(){
+  if(googleCrachaPedido)return googleCrachaPedido;
+  googleCrachaPedido=apiSync('POST',{acao:'googleToken'}).then(r=>{
+    if(!r||!r.token)return false;
+    const vence=Date.parse(r.vence),quando=Number.isFinite(vence)?vence:Date.now()+3000e3;
+    const concedidos=String(r.escopo||'');
+    let algum=false;
+    for(const serv in GOOGLE_ESCOPO_DE){
+      /* Autorização antiga não trazia a lista de escopos: nela só o Drive foi
+         concedido, e é só ele que vale. Assumir o resto encheria a tela de 403
+         sem explicação. */
+      const vale=concedidos?concedidos.includes(GOOGLE_ESCOPO_DE[serv]):serv==='drive';
+      if(!vale)continue;
+      googleSessao[serv]={token:r.token,vence:quando};
+      if(serv==='gmail')_gmailToken=r.token;
+      algum=true;
+    }
+    return algum;
+  }).catch(()=>false).finally(()=>{googleCrachaPedido=null});
+  return googleCrachaPedido;
+}
+
 async function conectarGoogle(servico){
+  /* O servidor primeiro: com a autorização já dada, não abre janela nenhuma.
+     A janela do Google fica como saída — primeira autorização, escopo que o
+     Léo recusou, ou servidor fora do ar. */
+  try{ await googleCrachaDoServidor(); if(googleConectado(servico))return googleSessao[servico].token }catch(e){}
   await carregarGis();
   return new Promise((ok,erro)=>{
     const cliente=google.accounts.oauth2.initTokenClient({client_id:GMAIL_CLIENT_ID,scope:GOOGLE_ESCOPOS[servico],include_granted_scopes:false,
@@ -9467,6 +9503,12 @@ let driveAvisoVolta=(()=>{try{const q=new URLSearchParams(location.search).get('
 function driveTextoVolta(m){
   if(m==='negado')return 'Você não autorizou o acesso no Google, então nada foi conectado. Para ligar, clique em “Conectar o Google Drive” e aceite na tela do Google.';
   if(m==='escopo')return 'A autorização saiu sem a permissão de leitura do Drive. Conecte de novo e deixe a caixa marcada.';
+  if(m.indexOf('escopo-')===0){
+    const nomes={'drive.readonly':'Google Drive','gmail.readonly':'Gmail','calendar.readonly':'Google Agenda (ler)','calendar.app.created':'Google Agenda (criar lembrete)'};
+    const faltou=m.slice(7).split(',').map(x=>nomes[x]||x).filter(Boolean);
+    return 'A autorização saiu sem '+(faltou.length===1?'esta permissão':'estas permissões')+': '+faltou.join(', ')
+      +'. O que veio continua valendo; para ligar o resto, conecte de novo e deixe todas as caixas marcadas.';
+  }
   if(m==='sem-renovacao')return 'O Google não devolveu a chave de renovação. Tente conectar de novo; se repetir, remova o acesso da Central em myaccount.google.com e conecte outra vez.';
   if(m==='config')return 'Faltam as chaves do Google no servidor. É configuração de uma vez só.';
   if(m==='rede')return 'Não foi possível falar com o Google agora. Tente de novo em alguns minutos.';
@@ -9478,11 +9520,8 @@ function driveTextoVolta(m){
    renovação) e devolve um crachá de leitura já pronto. Sem janela, sem clique.
    Só quando ele diz "precisa autorizar" é que a tela pede o clique — uma vez. */
 async function driveCrachaDoServidor(){
-  const r=await apiSync('POST',{acao:'googleToken'});
-  if(!r||!r.token)return false;
-  const vence=Date.parse(r.vence);
-  googleSessao.drive={token:r.token,vence:Number.isFinite(vence)?vence:Date.now()+3000e3};
-  return true;
+  await googleCrachaDoServidor();
+  return googleConectado('drive');
 }
 async function driveConectar(){
   // 1) o crachá que o servidor já tem; 2) se não houver, o caminho antigo pelo navegador
@@ -13247,7 +13286,13 @@ document.addEventListener('keydown',ev=>{
   ev.preventDefault();abrirBusca();
 });
 
-if(temSessao()){menu();tela();puxarNuvem().then(()=>{tela();arqSubirPendentes().then(r=>{if(r.subiu)tela()})});}
+if(temSessao()){menu();tela();puxarNuvem().then(()=>{tela();arqSubirPendentes().then(r=>{if(r.subiu)tela()})});
+  /* UMA tentativa, na abertura. Se a autorização já foi dada, Gmail, Agenda e
+     Drive nascem conectados e nenhuma tela pede clique. Falhou, fica como
+     estava: o botão "Conectar" de cada tela continua lá. Sem laço — isto roda
+     uma vez, no start, não a cada render. */
+  googleCrachaDoServidor().then(ok=>{if(ok)tela()}).catch(()=>{});
+}
 else telaLogin();
 </script>
 </body>
