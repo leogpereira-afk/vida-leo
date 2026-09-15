@@ -127,7 +127,25 @@ const MODULOS_PAINEL = ["gestao", "contas-atrasadas", "orcamentos",
   // segurada e a ficha dos carros e maquinas. A tela de conceder acesso
   // prometia o contrario, com todas as letras.
   "documentos",
-  "patrimonio", "configuracoes"];
+  "patrimonio",
+  // 15/09/2026 -- "planilhas": as planilhas do Google que a casa mexe (a
+  // Caixinha, os servicos de terceiro), abertas DENTRO do Painel, no molde da
+  // aba Planilhas da Central do Leo. Duas coisas que quem mexer aqui precisa
+  // saber:
+  //
+  // 1. O MODULO E PLANO DE PROPOSITO. Cada planilha pertence a um SETOR, e o
+  //    setor e concedido a parte -- nao como `planilhas:FIN` dentro desta
+  //    lista. Se fosse assim, o `filter(p => MODULOS_PAINEL.includes(p))` la
+  //    embaixo descartaria `planilhas:FIN` (includes e igualdade exata) e a
+  //    concessao de setor sumiria calada, que e o defeito que permutas e
+  //    campanhas ja pagaram. A regua de setor mora no SERVIDOR, na poda da
+  //    leitura, e nunca nesta string.
+  // 2. O PAINEL DECIDE QUEM ACHA A PLANILHA; O GOOGLE DECIDE QUEM LE. Sao duas
+  //    trancas, e a tela diz isso com todas as letras. Enquanto uma planilha
+  //    estiver compartilhada como "qualquer pessoa com o link", este modulo
+  //    organiza um menu -- nao fecha uma porta.
+  "planilhas",
+  "configuracoes"];
 // Calculado na hora de usar, não na carga do módulo: normalizarUsuario é um
 // const declarado mais abaixo, e chamá-lo aqui derruba a function inteira.
 const masterPainel = () => normalizarUsuario(Deno.env.get("PAINEL_AUTH_MASTER_USUARIO") || "leonardo");
