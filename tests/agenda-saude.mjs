@@ -134,7 +134,9 @@ test('Agenda: conectado, a barra muda de recado', () => {
   run("const m=document.getElementById('main');m.replaceChildren();vAgenda(m)");
   const barra = document.querySelector('.agenda-google');
   assert.match(barra.textContent, /Google conectado/);
-  assert.match(barra.textContent, /Atualizar Gmail e Agenda/);
+  assert.match(barra.textContent, /Buscar no Gmail/);
+  assert.match(barra.textContent, /Buscar no Google Agenda/);
+  assert.equal(barra.querySelectorAll('.agenda-google-acoes button').length, 2, 'tem de haver um botão por fonte');
 });
 
 test('Agenda: os chips ficam à vista, acima da grade do mês', () => {
@@ -174,4 +176,41 @@ test('Agenda: calendário fora do ar não apaga o que o Gmail trouxe', async () 
   await run("atualizarGoogleParticular(m=>{window.__recado=m},()=>{})");
   assert.match(run('window.__recado'), /Gmail conferido/);
   assert.match(run('window.__recado'), /sem rede/);
+});
+
+/* Cada botão puxa a SUA fonte, e só ela. Um botão que arrasta a outra junto
+   volta a obrigar a esperar as duas para ver qualquer uma. */
+test('Agenda: o botão do Gmail não lê o calendário, e vice-versa', async () => {
+  const montar = () => {
+    const {run} = setup();
+    const vence = Date.now() + 3000e3;
+    run(`atual='agenda';for(const k of ['gmail','agenda'])googleSessao[k]={token:'t',vence:${vence}}`);
+    run("window.__lidos=[];tela=()=>{};abrirModal=(t,s,m,aoFechar)=>{if(aoFechar)aoFechar()}");
+    run("consultarConvitesGmail=async()=>{window.__lidos.push('gmail');return{plano:[],avisos:[],mensagens:0,proximaPagina:''}}");
+    run("googleLer=async(serv,caminho)=>{window.__lidos.push('cal:'+caminho);return caminho.includes('events')?{items:[]}:{id:'primary',summary:'Principal'}}");
+    return run;
+  };
+  const a = montar();
+  await a("buscarNoGmailParticular(()=>{},()=>{})");
+  const soGmail = JSON.parse(a('JSON.stringify(window.__lidos)'));
+  assert.ok(soGmail.includes('gmail'));
+  assert.ok(!soGmail.some(x => x.startsWith('cal:')), 'o botão do Gmail puxou o calendário: ' + soGmail.join(', '));
+
+  const b = montar();
+  await b("buscarNoCalendarioParticular(()=>{},()=>{})");
+  const soCal = JSON.parse(b('JSON.stringify(window.__lidos)'));
+  assert.ok(soCal.some(x => x.startsWith('cal:')));
+  assert.ok(!soCal.includes('gmail'), 'o botão do calendário puxou o Gmail: ' + soCal.join(', '));
+});
+
+test('Agenda: os chips saem todos do mesmo tamanho, em grade', () => {
+  const {run, document} = setup();
+  run("atual='agenda';const m=document.getElementById('main');m.replaceChildren();vAgenda(m);organizarAgenda(m)");
+  const chips = [...document.querySelectorAll('.agenda-categorias .ag-chip')];
+  assert.ok(chips.length > 5, 'faltam chips');
+  // largura igual vem da grade, não do texto: nenhum chip carrega style de largura
+  assert.ok(chips.every(c => !/width/.test(c.getAttribute('style') || '')), 'chip com largura própria quebra a simetria');
+  // a cor da categoria mora no ponto, e só o escolhido acende
+  assert.ok(chips.every(c => c.querySelector('.pt')), 'chip sem o ponto da cor');
+  assert.equal(chips.filter(c => c.classList.contains('on')).length, 1, 'sem filtro, só "Tudo" fica aceso');
 });
