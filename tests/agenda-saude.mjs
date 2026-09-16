@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 /* Saúde entrou na Agenda. A regra que estes testes guardam é uma só e é a que
    quebra fácil: o calendário só recebe o que TEM data. Rastreio sem nenhum
    exame registrado não tem data — tem ausência de data — e jogá-lo no dia de
@@ -210,9 +211,149 @@ test('Agenda: os chips saem todos do mesmo tamanho, em grade', () => {
   assert.ok(chips.length > 5, 'faltam chips');
   // largura igual vem da grade, não do texto: nenhum chip carrega style de largura
   assert.ok(chips.every(c => !/width/.test(c.getAttribute('style') || '')), 'chip com largura própria quebra a simetria');
-  // a cor da categoria mora no ponto, e só o escolhido acende
-  assert.ok(chips.every(c => c.querySelector('.pt')), 'chip sem o ponto da cor');
+  /* A COR SAIU DO PONTO DE 9px PARA UM FILETE de 3px à esquerda (16/09/2026).
+     Isto é escolha, não descuido: o ponto custava 15px de largura por chip e um
+     nó a mais, e o filete diz a mesma coisa gastando só sombra. O que o teste
+     guarda continua sendo o mesmo: TODO chip carrega a cor da sua categoria e
+     só o escolhido acende. */
+  assert.ok(chips.every(c => /--cor:/.test(c.getAttribute('style') || '')), 'chip sem a cor da categoria');
   assert.equal(chips.filter(c => c.classList.contains('on')).length, 1, 'sem filtro, só "Tudo" fica aceso');
+  /* O emoji tem coluna PRÓPRIA. Colado ao rótulo no mesmo <span>, os doze
+     nomes começavam em doze posições diferentes — emoji não tem largura fixa. */
+  assert.ok(chips.every(c => c.querySelector('.ic')), 'chip sem a coluna do ícone');
+  /* A classe do chip zerado NÃO pode voltar a se chamar `vazio`: `.vazio` é o
+     estado-vazio do app inteiro e traz padding de 26-30px de duas folhas
+     diferentes, o que dobrava a altura de toda fileira que tivesse uma
+     categoria sem evento. Era esse o "ícones grandes demais" do dono. */
+  assert.ok(!chips.some(c => c.classList.contains('vazio')), 'a classe `vazio` colide e infla o chip');
+});
+
+/* O SELETOR DE DATA EM CHIPS (pedido do dono, 16/09/2026: "melhorar o seletor
+   de data em forma de chips" + "um seletor de ano"). Os doze meses ficam à
+   vista; o ano continua em seletor, porque doze chips não alcançam 2022. */
+test('Agenda: os doze meses viram chips, e o ano continua num seletor', () => {
+  const {run, document} = setup();
+  run("atual='agenda';const m=document.getElementById('main');m.replaceChildren();vAgenda(m);organizarAgenda(m)");
+  const meses = [...document.querySelectorAll('.ag-meses .ag-mes-chip')];
+  assert.equal(meses.length, 12, 'os doze meses, sempre — pular mês vazio desalinha a régua');
+  assert.equal(meses.filter(m => m.classList.contains('on')).length, 1, 'um mês aceso de cada vez');
+  // o ano NÃO virou chip: é seletor, e precisa alcançar bem além do ano corrente
+  const anoSel = document.querySelector('.ag-data select');
+  assert.ok(anoSel, 'o ano tem de continuar num seletor');
+  const anos = [...anoSel.querySelectorAll('option')].map(o => Number(o.value));
+  assert.ok(anos.length >= 6, 'o seletor de ano tem de alcançar mais que o ano corrente');
+  // e o mês NÃO pode ter sobrado como dropdown: era isso que ia virar chip
+  assert.equal(document.querySelectorAll('.ag-data select').length, 1, 'só o ano é seletor; o mês virou chip');
+});
+
+test('Agenda: cada chip de mês diz quantas coisas tem no mês', () => {
+  const {run, document} = setup();
+  run("E.agenda=[{id:'a',titulo:'Consulta',data:'2026-09-10'},{id:'b',titulo:'Outra',data:'2026-09-20'},{id:'c',titulo:'Longe',data:'2026-03-02'}];");
+  run("atual='agenda';const m=document.getElementById('main');m.replaceChildren();vAgenda(m);organizarAgenda(m)");
+  const chip = n => [...document.querySelectorAll('.ag-meses .ag-mes-chip')][n];
+  assert.match(chip(8).getAttribute('aria-label'), /Setembro de 2026 — 2 coisas/, 'setembro tem duas');
+  assert.match(chip(2).getAttribute('aria-label'), /Março de 2026 — 1 coisa/, 'março tem uma, no singular');
+  /* Mês sem nada esconde o número em vez de repetir "0" doze vezes — mas o
+     chip continua na régua, senão os doze desalinham a cada troca de mês. */
+  assert.ok(chip(0).classList.contains('ag-mes-zero'), 'janeiro vazio fica marcado como zero');
+  assert.ok(!chip(8).classList.contains('ag-mes-zero'));
+});
+
+test('Agenda: a régua de meses segue a categoria acesa', () => {
+  const {run, document} = setup();
+  run("E.agenda=[{id:'a',titulo:'Reunião',data:'2026-04-10'}];E.viagens=[{id:'v',destino:'Lisboa',ida:'2026-07-01',volta:'2026-07-05'}];");
+  run("filtro.agSo='viagens';atual='agenda';const m=document.getElementById('main');m.replaceChildren();vAgenda(m);organizarAgenda(m)");
+  const chips = [...document.querySelectorAll('.ag-meses .ag-mes-chip')];
+  // com "Viagens" aceso, abril (que só tem compromisso) some da contagem e
+  // julho aparece: a régua vira o panorama do ano daquele assunto
+  assert.ok(chips[3].classList.contains('ag-mes-zero'), 'abril não é viagem');
+  assert.ok(!chips[6].classList.contains('ag-mes-zero'), 'julho é a viagem');
+});
+
+/* O CHIP ACESO PINTA O FUNDO COM A COR DA CATEGORIA e escrevia por cima sempre
+   em branco. Em "Demandas" (#0ca678) isso dá 3,1:1 — o nome sumia justamente
+   no chip selecionado. Agora o texto é escolhido pelo contraste real. */
+test('Agenda: o texto do chip aceso é escolhido pelo contraste, não fixo em branco', () => {
+  const {run} = setup();
+  const escuro = ['#e8590c', '#b8860b', '#0ca678'];   // brancos ilegíveis
+  const claro  = ['#1f2b4d', '#5145a5', '#c92a2a', '#16334f'];
+  for (const h of escuro) assert.equal(run(`corTextoSobre('${h}')`), '#20211f', h + ' precisa de texto escuro');
+  for (const h of claro)  assert.equal(run(`corTextoSobre('${h}')`), '#fff',    h + ' precisa de texto branco');
+  // e a cor calculada tem de chegar ao chip, não ficar só na função
+  const {document} = (() => { const s = setup();
+    s.run("atual='agenda';const m=document.getElementById('main');m.replaceChildren();vAgenda(m);organizarAgenda(m)");
+    return s; })();
+  const chips = [...document.querySelectorAll('.agenda-categorias .ag-chip')];
+  assert.ok(chips.every(c => /--cor-txt:/.test(c.getAttribute('style') || '')), 'o chip tem de levar a cor do texto');
+});
+
+/* ACHADOS DA REVISÃO ADVERSARIAL DO PRÓPRIO CONSERTO (16/09/2026). Duas lentes
+   independentes acharam o mesmo defeito grave, e ele era meu. */
+test('Agenda: o chip do mês aceso não pode escrever branco fixo', () => {
+  const css = readFileSync(new URL('../publico/index.html', import.meta.url), 'utf8');
+  const regra = css.match(/\.ag-mes-chip\.on\{[^}]*\}/)[0];
+  /* `--tinta` vale #eceae5 no tema escuro: fundo quase branco. Com `color:#fff`
+     o mês selecionado dava 1,2:1 e sumia justamente por estar selecionado. */
+  assert.ok(!/#fff/.test(regra), 'branco fixo sobre --tinta some no tema escuro');
+  assert.match(regra, /color:var\(--card\)/, 'o texto tem de ser o inverso do fundo nos dois temas');
+});
+
+test('Agenda: a barra de data respeita a régua de dedo de 44px', () => {
+  const css = readFileSync(new URL('../publico/index.html', import.meta.url), 'utf8');
+  /* `.ag-data .btn.mini` (0,3,0) vence o `.btn.mini{min-height:44px}` (0,2,0)
+     do refinamento.css — dá para rebaixar o alvo de toque da navegação sem
+     ninguém notar. A régua de dedo não mora em media query. */
+  for (const sel of ['.ag-data .btn.mini', '.ag-data-nav']) {
+    const regra = css.match(new RegExp(sel.replace(/[.\s]/g, m => m === ' ' ? '\\s' : '\\.') + '\\{[^}]*\\}'))[0];
+    assert.match(regra, /min-height:44px/, sel + ' é navegação: 44px');
+  }
+});
+
+test('Agenda: o 🗓️ leva o seletor de variação em todos os lugares', () => {
+  const css = readFileSync(new URL('../publico/index.html', import.meta.url), 'utf8');
+  /* Sem o U+FE0F o Unicode manda renderizar como glifo de TEXTO: sai
+     monocromático e mais estreito que os outros dez ícones da mesma régua. */
+  const soltos = [...css.matchAll(/\u{1F5D3}(?!\u{FE0F})/gu)];
+  assert.equal(soltos.length, 0, 'ícone sem U+FE0F destoa dos vizinhos');
+});
+
+/* APAGAR DENTRO DO DIA ABERTO (pedido do dono, 16/09/2026). A mesma regra do
+   bloco "Hoje": some só o que é DESTA Central. */
+const abrirDia = (estado, iso) => {
+  const {run, document} = setup();
+  run("E.agenda=[];E.viagens=[];E.documentos=[];E.demandas=[];E.oportunidades=[];empresaDatasCache=null;" + estado);
+  run(`const ev=eventosDoEcossistema().filter(e=>e.data<='${iso}'&&(e.ate||e.data)>='${iso}');modalDia('${iso}',ev)`);
+  return {run, document};
+};
+
+test('Dia aberto: compromisso desta Central ganha o ✕ de apagar', () => {
+  const {document} = abrirDia("E.agenda=[{id:'c1',titulo:'Reunião de Liderança',data:'2026-09-22',hora:'14:00'}];", '2026-09-22');
+  const apagar = [...document.querySelectorAll('.fundo .acoes-dia button')]
+    .filter(b => /Apagar/.test(b.getAttribute('aria-label') || ''));
+  assert.equal(apagar.length, 1, 'o compromisso próprio precisa do ✕');
+  assert.match(apagar[0].getAttribute('aria-label'), /Reunião de Liderança/);
+});
+
+test('Dia aberto: o que mora em outra tela NÃO ganha o ✕', () => {
+  const {document} = abrirDia("E.viagens=[{id:'v1',destino:'Lisboa',ida:'2026-09-20',volta:'2026-09-25'}];", '2026-09-22');
+  const linhas = [...document.querySelectorAll('.fundo .acoes-dia')];
+  assert.ok(linhas.length, 'a viagem tem de aparecer no dia');
+  const apagar = [...document.querySelectorAll('.fundo .acoes-dia button')]
+    .filter(b => /Apagar/.test(b.getAttribute('aria-label') || ''));
+  assert.equal(apagar.length, 0, 'apagar viagem daqui seria apagar pelas costas da tela dona');
+});
+
+test('Dia aberto: o ✕ tira da Central e não abre a ficha do que sumiu', () => {
+  const {run, document} = abrirDia("E.agenda=[{id:'c1',titulo:'Mentoria',data:'2026-09-22'},{id:'c2',titulo:'Treino',data:'2026-09-22'}];", '2026-09-22');
+  run("globalThis.confirm=()=>true");
+  const bx = [...document.querySelectorAll('.fundo .acoes-dia button')]
+    .find(b => /Apagar Mentoria/.test(b.getAttribute('aria-label') || ''));
+  let subiu = false;
+  bx.onclick({ stopPropagation: () => { subiu = true; } });
+  assert.ok(subiu, 'o ✕ tem de comer o clique, senão a linha abre o que foi apagado');
+  assert.deepEqual([...run("E.agenda.map(c=>c.titulo)")], ['Treino'], 'só a Mentoria sai');
+  // e o subtítulo acompanha: contador que mente é pior que contador nenhum
+  assert.match(document.querySelector('.fundo .modal header p').textContent, /1 coisa$/);
 });
 
 /* O resumo do dia, no alto. E a regra que o protege: apagar vale só para o que

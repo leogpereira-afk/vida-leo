@@ -433,20 +433,87 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 @media(max-width:620px){.ag-hoje-item{flex-wrap:wrap}.ag-hoje-item .txt{flex-basis:100%;order:3}}
 
 /* Os chips da agenda: grade de larguras iguais, para as fileiras se alinharem.
-   A cor da categoria vive no PONTO; o fundo só acende no que está escolhido. */
-.agenda-categorias{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));
-  gap:7px;margin:0 0 14px}
-.ag-chip{display:flex;align-items:center;gap:7px;width:100%;min-width:0;
-  padding:7px 11px;border:1px solid var(--linha);border-radius:10px;background:var(--card);
-  color:inherit;font:500 12.5px Inter;cursor:pointer;text-align:left;transition:border-color .12s,background .12s}
-.ag-chip:hover{border-color:var(--tinta,#1f2b4d)}
-.ag-chip .pt{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
-.ag-chip span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ag-chip b{font-variant-numeric:tabular-nums;font-weight:600;color:var(--suave)}
-.ag-chip.vazio{opacity:.45}
-.ag-chip.on{background:var(--chip,var(--tinta,#1f2b4d));border-color:var(--chip,var(--tinta,#1f2b4d));color:#fff}
-.ag-chip.on b{color:rgba(255,255,255,.85)}
-.ag-chip.on .pt{background:#fff!important}
+
+   A CLASSE CHAMAVA-SE `vazio` E ISSO CUSTOU O DOBRO DA ALTURA. `.vazio` é o
+   estado-vazio do app inteiro (70 usos) e tem `padding:26px` aqui na linha 125
+   e `padding:30px 20px` no refinamento.css — mesma especificidade que
+   `.ag-chip`, folha carregada depois, então ganhava. Toda categoria zerada
+   media ~77px em vez de ~34px e, como a grade estica a fileira pela célula
+   mais alta E todo mês tem alguma categoria zerada, as TRÊS fileiras ficavam
+   altas. Era isso, e não o desenho, o "ícones grandes demais" do dono. O nome
+   agora é `ag-vazio`, que não colide com nada.
+
+   O chip é uma GRADE de três colunas iguais nos doze: âncora · rótulo · número.
+   Com o número numa coluna própria, alinhado à direita e tabular, os doze
+   formam uma coluna vertical que se varre com o olho — antes cada um parava no
+   fim do seu próprio texto. E a cor saiu do ponto de 9px para um filete de 3px
+   à esquerda: devolve largura, some um nó por chip, e continua sendo legenda
+   das faixas coloridas da grade logo abaixo. */
+.agenda-categorias{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));
+  gap:6px;margin:0 0 12px}
+.ag-chip{display:grid;grid-template-columns:15px minmax(0,1fr) auto;align-items:center;
+  gap:6px;width:100%;min-width:0;min-height:40px;
+  padding:4px 10px;border:1px solid var(--linha);border-radius:10px;background:var(--card);
+  box-shadow:inset 3px 0 0 var(--cor,var(--suave));
+  color:inherit;font:500 11.5px Inter;cursor:pointer;text-align:left;
+  transition:border-color .12s,background .12s}
+.ag-chip:hover{border-color:var(--cor,var(--tinta))}
+.ag-chip .ic{font-size:13px;line-height:1;text-align:center;font-style:normal}
+.ag-chip span{min-width:0;line-height:1.2;overflow:hidden;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.ag-chip b{font-variant-numeric:tabular-nums;font-weight:600;color:var(--suave);
+  min-width:16px;text-align:right}
+/* Zerada continua na tela, só mais leve: zero é um dado, não ausência de dado. */
+.ag-chip.ag-vazio{opacity:.5}
+.ag-chip.on{background:var(--cor,var(--tinta));border-color:var(--cor,var(--tinta));
+  color:var(--cor-txt,#fff);box-shadow:none;opacity:1}
+.ag-chip.on b{color:var(--cor-txt,#fff);opacity:.85}
+/* No tema escuro os azuis-marinho (#1f2b4d, #16334f) somem sobre o cartão
+   escuro: o filete é clareado até voltar a ser visível. A cor nunca é o único
+   portador da informação — o emoji e o nome continuam lá. */
+@media(prefers-color-scheme:dark){
+  .ag-chip{box-shadow:inset 3px 0 0 color-mix(in srgb,var(--cor,var(--suave)) 55%,#fff)}
+  .ag-chip.on{box-shadow:none}
+}
+
+/* ── O seletor de data em chips (pedido do dono, 16/09/2026) ──────────────
+   Era "‹ <select Setembro> <select 2026> › [Hoje]": dois dropdowns nativos,
+   que destoam de tudo e escondem o ano atrás de um clique e uma rolagem.
+   Agora os doze meses estão SEMPRE à vista, em chip, cada um com quantas
+   coisas tem naquele mês — e como a lista já vem filtrada pela categoria
+   acesa, com "Saúde" ligado a régua vira o panorama do ano inteiro de saúde.
+   O ANO continua num seletor ao lado (ordem do dono): doze chips de mês não
+   alcançam 2022 nem 2031, e trocar o seletor por mais uma régua de chips
+   empurraria o calendário para baixo de novo. */
+.ag-data{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:10px}
+/* 44px, não 40: ‹ › e "Hoje" são NAVEGAÇÃO, e a régua de dedo da casa não mora
+   em media query. Um `.ag-data .btn.mini` (0,3,0) aqui venceria o
+   `.btn.mini{min-height:44px}` (0,2,0) do refinamento e rebaixaria o alvo no
+   tablet sem ninguém notar — foi o que eu quase fiz. */
+.ag-data .btn.mini{min-height:44px}
+.ag-data-nav{min-width:44px;min-height:44px;font-size:16px;line-height:1}
+.ag-data select{min-height:44px}
+.ag-data select{border:1px solid var(--linha);border-radius:10px;
+  background:var(--card);color:inherit;font:600 13px Inter;padding:0 9px;cursor:pointer}
+.ag-data-fora{font-size:12px;color:var(--suave)}
+.ag-meses{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));
+  gap:5px;margin-bottom:12px}
+.ag-mes-chip{display:flex;align-items:center;justify-content:center;gap:5px;
+  min-height:40px;padding:0 6px;border:1px solid transparent;border-radius:9px;
+  background:var(--bg);color:var(--suave);font:500 12px Inter;cursor:pointer;
+  transition:border-color .12s,background .12s}
+.ag-mes-chip:hover{border-color:var(--linha);color:var(--tinta)}
+.ag-mes-chip b{font-variant-numeric:tabular-nums;font-weight:600;font-size:11px}
+/* Mês sem nada esconde o número em vez de repetir "0" doze vezes; o mês some
+   da contagem, nunca da régua — pular um mês faria os doze desalinharem. */
+.ag-mes-chip.ag-mes-zero b{display:none}
+.ag-mes-chip.hoje{box-shadow:inset 0 0 0 1px var(--verde)}
+/* O texto do mês aceso é `--card`, nunca #fff fixo: o fundo é `--tinta`, que
+   no tema escuro vale #eceae5 — quase branco. Branco sobre branco dá 1,2:1 e
+   o mês selecionado sumia justamente por estar selecionado. `--card` é o
+   inverso de `--tinta` nos dois temas, então o par sempre lê. */
+.ag-mes-chip.on{background:var(--tinta);border-color:var(--tinta);color:var(--card)}
+.ag-mes-chip.on b{color:var(--card);opacity:.85}
 /* modal */
 .fundo{position:fixed;inset:0;background:rgba(20,22,20,.45);backdrop-filter:blur(3px);
   display:flex;align-items:flex-start;justify-content:center;padding:34px 16px;z-index:60;overflow-y:auto}
@@ -2728,9 +2795,21 @@ const FONTES_AGENDA=[
   {k:'empresas',    rot:'Empresas',ic:'🏢',cor:'#5145a5'},
   {k:'seguros',     rot:'Seguros renovando',ic:'🛡️',cor:'#c92a2a'},
   {k:'saude',       rot:'Saúde',ic:'🩺',cor:'#0b7285'},
-  {k:'painel',      rot:'Calendário da empresa',ic:'🗓',cor:'#16334f'},
+  {k:'painel',      rot:'Calendário da empresa',ic:'🗓️',cor:'#16334f'},
 ];
 const corFonte=k=>(FONTES_AGENDA.find(f=>f.k===k)||{}).cor||'var(--suave)';
+/* BRANCO NEM SEMPRE LÊ. O chip aceso pinta o fundo com a cor da categoria e
+   escrevia por cima sempre em branco — em "Demandas" (#0ca678) isso dá 3,1:1,
+   abaixo do mínimo, e o nome some justamente no chip que está selecionado.
+   Aqui o texto é ESCOLHIDO: calcula o contraste real da cor contra branco e
+   contra a tinta escura, e fica com o melhor dos dois. */
+const _lumCanal=v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)};
+const luminancia=h=>{const n=parseInt(String(h).replace('#',''),16);
+  return .2126*_lumCanal((n>>16)&255)+.7152*_lumCanal((n>>8)&255)+.0722*_lumCanal(n&255)};
+function corTextoSobre(h){
+  const L=luminancia(h);
+  return (1.05/(L+.05))>=((L+.05)/.067)?'#fff':'#20211f';
+}
 // MESES é abreviado (cabe em gráfico); no calendário o mês vai por extenso
 const MESES_LONGO=['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -2757,21 +2836,51 @@ function gradeMes(eventos,r){
   const maxA=Math.max(anoH+3,ay,...(anosEv.length?anosEv:[anoH]));
   const anos=[];for(let y=minA;y<=maxA;y++)anos.push(y);
 
-  const topo=el('<div style="display:flex;align-items:center;gap:9px;margin-bottom:12px;flex-wrap:wrap"></div>');
-  const bAnt=el('<button class="btn ghost mini" title="Mês anterior" aria-label="Mês anterior">‹</button>');
+  const topo=el('<div class="ag-data" role="group" aria-label="Mês do calendário"></div>');
+  const bAnt=el('<button class="btn ghost mini ag-data-nav" title="Mês anterior" aria-label="Mês anterior">‹</button>');
   bAnt.onclick=()=>passo(-1);
   topo.appendChild(bAnt);
-  topo.appendChild(seletor(String(am),MESES_LONGO.map((nm,i)=>[String(i+1),nm]),v=>irPara(ay,+v),'Mês do calendário'));
-  topo.appendChild(seletor(String(ay),anos.map(y=>[String(y),String(y)]),v=>irPara(+v,am),'Ano do calendário'));
-  const bProx=el('<button class="btn ghost mini" title="Próximo mês" aria-label="Próximo mês">›</button>');
+  const bProx=el('<button class="btn ghost mini ag-data-nav" title="Próximo mês" aria-label="Próximo mês">›</button>');
   bProx.onclick=()=>passo(1);
   topo.appendChild(bProx);
+  /* O ANO FICA EM SELETOR (ordem do dono, 16/09/2026). Doze chips de mês não
+     alcançam 2022 nem 2031, e uma segunda régua de chips para o ano empurraria
+     o calendário para baixo — que é justamente o que estamos desfazendo. */
+  topo.appendChild(seletor(String(ay),anos.map(y=>[String(y),String(y)]),v=>irPara(+v,am),'Ano do calendário'));
   const bHoje=el('<button class="btn ghost mini">Hoje</button>');
   bHoje.onclick=()=>{filtro.agMes=hoje().slice(0,7);r()};
   topo.appendChild(bHoje);
   if(filtro.agMes!==h.slice(0,7))
-    topo.appendChild(el('<span style="font-size:12px;color:var(--suave)">você não está no mês atual</span>'));
+    topo.appendChild(el('<span class="ag-data-fora">você não está no mês atual</span>'));
   cx.appendChild(topo);
+
+  /* OS DOZE MESES EM CHIP, cada um com o que tem dentro. A contagem sai da
+     MESMA lista que desenha a grade, que já vem filtrada pela categoria acesa:
+     com "Saúde" ligado, a régua deixa de ser navegação e vira o panorama do
+     ano inteiro daquele assunto. Uma passada só monta as doze contagens —
+     chamar eventoNoMes doze vezes por render custaria doze varreduras. */
+  const porMes={};
+  for(const e of eventos){
+    if(!e.data)continue;
+    const de=e.data.slice(0,7),ate=(e.ate&&e.ate>=e.data?e.ate:e.data).slice(0,7);
+    for(let mo=1;mo<=12;mo++){
+      const k=ay+'-'+String(mo).padStart(2,'0');
+      if(de<=k&&ate>=k)porMes[k]=(porMes[k]||0)+1;
+    }
+  }
+  const reguaMeses=el('<div class="ag-meses" role="group" aria-label="Mês"></div>');
+  MESES.forEach((nm,i)=>{
+    const k=ay+'-'+String(i+1).padStart(2,'0');
+    const qtd=porMes[k]||0;
+    const aceso=i+1===am, ehHoje=k===h.slice(0,7);
+    const b=el(`<button type="button" class="ag-mes-chip${aceso?' on':''}${ehHoje?' hoje':''}${qtd?'':' ag-mes-zero'}"
+      aria-pressed="${aceso?'true':'false'}"
+      aria-label="${esc(MESES_LONGO[i])} de ${ay} — ${qtd} ${qtd===1?'coisa':'coisas'}${ehHoje?' (mês atual)':''}"
+      title="${esc(MESES_LONGO[i])} de ${ay} — ${qtd} ${qtd===1?'coisa':'coisas'}">${nm}<b>${qtd}</b></button>`);
+    b.onclick=()=>irPara(ay,i+1);
+    reguaMeses.appendChild(b);
+  });
+  cx.appendChild(reguaMeses);
 
   // a semana começa no domingo, como no calendário do RH
   const primeiro=new Date(ay,am-1,1);
@@ -2858,10 +2967,49 @@ function modalDia(iso,eventos){
           ${e.ate?`<div style="font-size:12px;color:var(--suave)">${fmtDataAno(e.data)} a ${fmtDataAno(e.ate)}</div>`:''}
           <div style="font-size:11px;color:var(--suave);opacity:.75;margin-top:3px">${esc((FONTES_AGENDA.find(f=>f.k===e.fonte)||{}).rot||'')}</div>
         </div>
-        ${e.proprio||e.ir?'<span style="color:var(--suave)">›</span>':''}</div>`);
+        <span class="acoes-dia" style="display:flex;align-items:center;gap:4px;flex:none"></span></div>`);
       if(e.proprio) li.onclick=()=>{fechar();modalCompromisso(e.ref)};
       else if(e.ir) li.onclick=()=>{fechar();abrirEventoCentral(e)};
       if(e.proprio||e.ir){li.tabIndex=0;li.setAttribute('role','button');li.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();li.click()}}}
+      const acoesDia=li.querySelector('.acoes-dia');
+      /* APAGAR AQUI DENTRO (pedido do dono, 16/09/2026: "tem que ser possível
+         apagar algum compromisso se eu não quiser que ele fique na tela").
+
+         A MESMA REGRA DO BLOCO "HOJE": some só o que é DESTA Central. Viagem,
+         documento, aniversário e evento da empresa moram em outra tela ou em
+         outro sistema — um ✕ aqui apagaria pelas costas de quem é dono do
+         registro. Por isso a conferência é a estrita: tem de ser compromisso E
+         continuar dentro de E.agenda, não basta o rótulo dizer que é.
+
+         O botão come o clique (`stopPropagation`): a linha inteira abre o
+         compromisso, e sem isso apagar abriria a ficha do que acabou de sumir. */
+      const proprioAqui=e.fonte==='compromissos'&&e.ref&&E.agenda.includes(e.ref);
+      if(proprioAqui){
+        const bx=el('<button class="btn ghost mini" style="color:var(--vermelho)" title="Apagar este compromisso">✕</button>');
+        bx.setAttribute('aria-label','Apagar '+(e.titulo||'compromisso'));
+        bx.onclick=ev=>{
+          ev.stopPropagation();
+          const varios=e.ate&&e.ate>e.data;
+          if(!confirm('Apagar \u201c'+(e.titulo||'compromisso')+'\u201d?'+
+            (varios?'\n\nEle ocupa de '+fmtDataAno(e.data)+' a '+fmtDataAno(e.ate)+' — some dos dias todos.':'')+
+            '\n\nSai só desta Central. Se veio do Google, continua lá.'))return;
+          const i=E.agenda.indexOf(e.ref);
+          if(i<0)return;
+          E.agenda.splice(i,1);salvar();
+          li.remove();
+          /* A janela continua aberta para apagar o próximo, então o subtítulo
+             tem de acompanhar — contador que mente é pior que contador nenhum.
+             Ao fechar, `abrirModal` repinta a tela inteira e a grade acerta. */
+          const restam=eventos.filter(x=>x!==e);
+          eventos.length=0;eventos.push(...restam);
+          const desc=c.closest('.modal')?.querySelector('header p');
+          if(desc)desc.textContent=['domingo','segunda','terça','quarta','quinta','sexta','sábado'][d.getDay()]+
+            ' · '+eventos.length+(eventos.length===1?' coisa':' coisas');
+          if(!eventos.length)lista.appendChild(el('<div class="vazio">Dia livre. Adicione um compromisso quando precisar.</div>'));
+        };
+        acoesDia.appendChild(bx);
+      }
+      if(e.proprio||e.ir)acoesDia.appendChild(el('<span style="color:var(--suave)">\u203a</span>'));
       lista.appendChild(li);
     });
     c.appendChild(lista);
@@ -2980,7 +3128,7 @@ function eventosDoEcossistema(){
   if(on('painel')) ((empresaDatasCache&&empresaDatasCache.eventos)||[]).forEach(e=>{if(!dataISOValida(e&&e.data))return;ev.push({
     data:e.data,hora:e.hora||'',titulo:e.titulo||'(sem título)',
     sub:[e.tipo,e.descricao].filter(Boolean).join(' · '),
-    fonte:'painel',ic:'🗓',cor:e.cor||'',ref:e});});
+    fonte:'painel',ic:'🗓️',cor:e.cor||'',ref:e});});
 
   if(on('documentos')) (E.documentos||[]).forEach(d=>{if(d.validade)ev.push({
     data:d.validade,hora:'',titulo:(d.nome||'Documento')+' vence',
@@ -3098,17 +3246,26 @@ function vAgenda(m){
      tempo nada se destacava, justamente quando nada está filtrado. Aceso de
      verdade é só o escolhido. */
   const chips=el('<div class="agenda-categorias"></div>');
-  const bTudo=el(`<button type="button" class="ag-chip${so?'':' on'}" aria-pressed="${so?'false':'true'}">
-    <i class="pt" style="background:var(--tinta,#1f2b4d)"></i><span>${so?'Ver tudo':'Tudo'}</span><b>${noMes.length}</b></button>`);
+  /* O emoji mora numa coluna PRÓPRIA de 15px, não colado ao texto: antes era
+     `${f.ic} ${rot}` dentro do mesmo <span> e os doze rótulos começavam em
+     doze posições diferentes, porque os emojis não têm a mesma largura.
+     O "Tudo" fica sem emoji de propósito — a coluna continua reservada, então
+     ele nasce no mesmo x dos outros e lê-se como cabeçalho da régua.
+     O aria-label leva o nome INTEIRO e a contagem: o rótulo visível pode
+     quebrar em duas linhas, e `title` não existe para quem usa o dedo. */
+  const bTudo=el(`<button type="button" class="ag-chip${so?'':' on'}" aria-pressed="${so?'false':'true'}"
+    style="--cor:var(--tinta);--cor-txt:var(--card)" aria-label="${so?'Ver tudo':'Tudo'} — ${noMes.length} neste mês">
+    <i class="ic" aria-hidden="true"></i><span>${so?'Ver tudo':'Tudo'}</span><b>${noMes.length}</b></button>`);
   bTudo.onclick=()=>{filtro.agSo=null;filtro.agEmpresaId='';r()};
   chips.appendChild(bTudo);
   FONTES_AGENDA.forEach(f=>{
     const qtd=noMes.filter(e=>e.fonte===f.k).length;
     const escolhido=so===f.k;
-    const b=el(`<button type="button" class="ag-chip${escolhido?' on':''}${qtd?'':' vazio'}"
+    const b=el(`<button type="button" class="ag-chip${escolhido?' on':''}${qtd?'':' ag-vazio'}"
       aria-pressed="${escolhido?'true':'false'}"
-      title="${escolhido?'clique para ver tudo de novo':'clique para ver só isto'}"
-      style="${escolhido?'--chip:'+f.cor:''}"><i class="pt" style="background:${f.cor}"></i><span>${f.ic} ${esc(f.rot)}</span><b>${qtd}</b></button>`);
+      aria-label="${esc(f.rot)} — ${qtd} neste mês. ${escolhido?'Clique para ver tudo de novo':'Clique para ver só isto'}"
+      title="${esc(f.rot)} — ${qtd} neste mês"
+      style="--cor:${f.cor};--cor-txt:${corTextoSobre(f.cor)}"><i class="ic" aria-hidden="true">${f.ic}</i><span>${esc(f.rot)}</span><b>${qtd}</b></button>`);
     b.onclick=()=>{filtro.agSo=(so===f.k?null:f.k);filtro.agEmpresaId='';r()};
     chips.appendChild(b);
   });
@@ -3119,7 +3276,7 @@ function vAgenda(m){
   // A grade é o retrato do mês; a lista logo abaixo é o mesmo mês escrito, em
   // ordem de data — dá para ler o detalhe que não cabe na célula.
   const visiveis=so?todosEv.filter(e=>e.fonte===so):todosEv;
-  m.appendChild(bloco('ag-mes','🗓 Calendário','clique num dia para abrir o que tem nele',
+  m.appendChild(bloco('ag-mes','🗓️ Calendário','clique num dia para abrir o que tem nele',
     gradeMes(visiveis,r)));
 
   /* ---- a lista: o mesmo mês da grade, escrito, em ordem de data ---- */
