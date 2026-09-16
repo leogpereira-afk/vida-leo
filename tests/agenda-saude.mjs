@@ -279,6 +279,18 @@ test('Agenda: o texto do chip aceso é escolhido pelo contraste, não fixo em br
   const claro  = ['#1f2b4d', '#5145a5', '#c92a2a', '#16334f'];
   for (const h of escuro) assert.equal(run(`corTextoSobre('${h}')`), '#20211f', h + ' precisa de texto escuro');
   for (const h of claro)  assert.equal(run(`corTextoSobre('${h}')`), '#fff',    h + ' precisa de texto branco');
+  /* A lista acima era escolhida a dedo — e pulava justamente Viagens (4,20:1) e
+     Ações do plano (4,37:1), as duas que ficavam abaixo do mínimo. Agora a
+     conta roda sobre TODAS as categorias que o app tem, lidas dele mesmo:
+     categoria nova com cor ruim deixa a suíte vermelha. */
+  const todas = [...run("FONTES_AGENDA.map(f=>f.cor)")];
+  assert.ok(todas.length >= 11, 'a varredura não achou as categorias');
+  for (const h of todas) {
+    const fundo = run(`corFundoAceso('${h}')`);
+    const texto = run(`corTextoSobre('${h}')`) === '#fff' ? '#ffffff' : '#20211f';
+    const r = run(`contrasteEntre('${fundo}','${texto}')`);
+    assert.ok(r >= 4.5, `${h}: chip aceso com ${r.toFixed(2)}:1, abaixo de 4,5:1`);
+  }
   // e a cor calculada tem de chegar ao chip, não ficar só na função
   const {document} = (() => { const s = setup();
     s.run("atual='agenda';const m=document.getElementById('main');m.replaceChildren();vAgenda(m);organizarAgenda(m)");
@@ -315,6 +327,31 @@ test('Agenda: o 🗓️ leva o seletor de variação em todos os lugares', () =>
      monocromático e mais estreito que os outros dez ícones da mesma régua. */
   const soltos = [...css.matchAll(/\u{1F5D3}(?!\u{FE0F})/gu)];
   assert.equal(soltos.length, 0, 'ícone sem U+FE0F destoa dos vizinhos');
+});
+
+/* ACHADOS DA SEGUNDA RODADA DA REVISÃO ADVERSARIAL (16/09/2026). */
+test('Agenda: as setas abraçam o nome do mês, longe do seletor de ano', () => {
+  const {run, document} = setup();
+  run("atual='agenda';const m=document.getElementById('main');m.replaceChildren();vAgenda(m);organizarAgenda(m)");
+  const barra = document.querySelector('.ag-data');
+  const filhos = [...barra.children].map(n => n.classList.contains('ag-data-nav') ? 'seta'
+    : n.classList.contains('ag-data-mes') ? 'mes' : n.tagName === 'SELECT' ? 'ano' : n.tagName === 'BUTTON' ? 'botao' : 'outro');
+  /* Coladas e logo antes do ano, as setas pareciam trocar o ANO — e trocavam
+     o mês. Com o nome do mês entre elas, não há o que adivinhar. */
+  assert.deepEqual(filhos.slice(0, 4), ['seta', 'mes', 'seta', 'ano']);
+  assert.equal(barra.getAttribute('aria-label'), 'Navegar no calendário', 'o grupo já não guarda só o mês');
+});
+
+test('Agenda: a régua de meses sai em fileiras cheias (12, 6 ou 4), nunca 5+5+2', () => {
+  const css = readFileSync(new URL('../publico/index.html', import.meta.url), 'utf8');
+  const base = css.match(/\.ag-meses\{[^}]*\}/)[0];
+  assert.ok(!/auto-fit|auto-fill/.test(base), 'auto-fit quebrava a régua em 5+5+2 no celular');
+  assert.match(base, /repeat\(6,/, 'sem @container, 6 colunas: duas fileiras cheias em qualquer largura');
+  assert.match(css, /@container \(min-width:\d+px\)\{\.ag-meses\{grid-template-columns:repeat\(12,/);
+  assert.match(css, /@container \(max-width:\d+px\)\{\.ag-meses\{grid-template-columns:repeat\(4,/);
+  assert.match(css, /\.ag-meses-caixa\{container-type:inline-size/, 'a consulta mede a caixa, não a janela');
+  // escolher o mês é navegação: 44px, como as setas
+  assert.match(css.match(/\.ag-mes-chip\{[^}]*\}/)[0], /min-height:44px/);
 });
 
 /* A SÉRIE FANTASMA DO GOOGLE (16/09/2026): "Treino | Full Time" em dezenas de

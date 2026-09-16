@@ -465,7 +465,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
   min-width:16px;text-align:right}
 /* Zerada continua na tela, só mais leve: zero é um dado, não ausência de dado. */
 .ag-chip.ag-vazio{opacity:.5}
-.ag-chip.on{background:var(--cor,var(--tinta));border-color:var(--cor,var(--tinta));
+.ag-chip.on{background:var(--cor-fundo,var(--cor,var(--tinta)));border-color:var(--cor-fundo,var(--cor,var(--tinta)));
   color:var(--cor-txt,#fff);box-shadow:none;opacity:1}
 .ag-chip.on b{color:var(--cor-txt,#fff);opacity:.85}
 /* No tema escuro os azuis-marinho (#1f2b4d, #16334f) somem sobre o cartão
@@ -496,10 +496,20 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 .ag-data select{border:1px solid var(--linha);border-radius:10px;
   background:var(--card);color:inherit;font:600 13px Inter;padding:0 9px;cursor:pointer}
 .ag-data-fora{font-size:12px;color:var(--suave)}
-.ag-meses{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));
-  gap:5px;margin-bottom:12px}
+.ag-data-mes{min-width:84px;text-align:center;font:600 14px Inter}
+/* DOZE DIVIDE POR 12, 6, 4 E 3 — e só por essas. Com auto-fit a régua saía
+   5+5+2 no celular e 11+1 no tablet: a última fileira meio vazia deixa de ler
+   como um ano. As colunas seguem a largura da PRÓPRIA caixa, não da janela: com
+   a lateral fixa, uma janela de 861px dá MENOS espaço que uma de 860px, e
+   media query de janela erraria justamente aí. Sem suporte a @container, fica
+   em 6 — duas fileiras cheias, que servem em qualquer largura. */
+.ag-meses-caixa{container-type:inline-size;margin-bottom:12px}
+.ag-meses{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px}
+@container (min-width:710px){.ag-meses{grid-template-columns:repeat(12,minmax(0,1fr))}}
+@container (max-width:348px){.ag-meses{grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* 44px: escolher o mês é NAVEGAÇÃO, como as setas ao lado. */
 .ag-mes-chip{display:flex;align-items:center;justify-content:center;gap:5px;
-  min-height:40px;padding:0 6px;border:1px solid transparent;border-radius:9px;
+  min-height:44px;padding:0 6px;border:1px solid transparent;border-radius:9px;
   background:var(--bg);color:var(--suave);font:500 12px Inter;cursor:pointer;
   transition:border-color .12s,background .12s}
 .ag-mes-chip:hover{border-color:var(--linha);color:var(--tinta)}
@@ -2810,6 +2820,25 @@ function corTextoSobre(h){
   const L=luminancia(h);
   return (1.05/(L+.05))>=((L+.05)/.067)?'#fff':'#20211f';
 }
+/* "O MELHOR DOS DOIS" NÃO É "ACIMA DO MÍNIMO". Viagens (#1c7ed6) dava 4,20:1 e
+   Ações do plano (#2b8a3e) 4,37:1 mesmo com o texto certo — abaixo dos 4,5:1
+   que texto de 11,5px pede. O fundo do chip ACESO escurece (texto branco) ou
+   clareia (texto escuro) em passos de 5% até passar. O filete do chip em
+   repouso continua com a cor verdadeira da categoria: é ela que faz de
+   legenda das faixas da grade. (Achado da revisão adversarial, 16/09/2026.) */
+function _misturar(h,alvo,t){
+  const a=parseInt(h.slice(1),16),b=parseInt(alvo.slice(1),16);
+  const ch=(x,s)=>(x>>s)&255;
+  const m=s=>Math.round(ch(a,s)+(ch(b,s)-ch(a,s))*t);
+  return '#'+[16,8,0].map(s=>m(s).toString(16).padStart(2,'0')).join('');
+}
+function contrasteEntre(x,y){const a=luminancia(x),b=luminancia(y);return (Math.max(a,b)+.05)/(Math.min(a,b)+.05)}
+function corFundoAceso(h){
+  const txt=corTextoSobre(h)==='#fff'?'#ffffff':'#20211f';
+  const alvo=txt==='#ffffff'?'#000000':'#ffffff';
+  for(let t=0;t<=.6;t+=.05){const f=t?_misturar(h,alvo,t):h;if(contrasteEntre(f,txt)>=4.5)return f}
+  return _misturar(h,alvo,.6);
+}
 // MESES é abreviado (cabe em gráfico); no calendário o mês vai por extenso
 const MESES_LONGO=['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -2836,10 +2865,14 @@ function gradeMes(eventos,r){
   const maxA=Math.max(anoH+3,ay,...(anosEv.length?anosEv:[anoH]));
   const anos=[];for(let y=minA;y<=maxA;y++)anos.push(y);
 
-  const topo=el('<div class="ag-data" role="group" aria-label="Mês do calendário"></div>');
+  /* AS SETAS ABRAÇAM O NOME DO MÊS. Coladas uma na outra e logo antes do
+     seletor de ano, pareciam trocar o ANO — e trocavam o mês. Com o nome entre
+     elas não há o que adivinhar. (Achado da revisão adversarial, 16/09/2026.) */
+  const topo=el('<div class="ag-data" role="group" aria-label="Navegar no calendário"></div>');
   const bAnt=el('<button class="btn ghost mini ag-data-nav" title="Mês anterior" aria-label="Mês anterior">‹</button>');
   bAnt.onclick=()=>passo(-1);
   topo.appendChild(bAnt);
+  topo.appendChild(el(`<span class="ag-data-mes" aria-live="polite">${esc(MESES_LONGO[am-1])}</span>`));
   const bProx=el('<button class="btn ghost mini ag-data-nav" title="Próximo mês" aria-label="Próximo mês">›</button>');
   bProx.onclick=()=>passo(1);
   topo.appendChild(bProx);
@@ -2868,7 +2901,9 @@ function gradeMes(eventos,r){
       if(de<=k&&ate>=k)porMes[k]=(porMes[k]||0)+1;
     }
   }
+  const caixaMeses=el('<div class="ag-meses-caixa"></div>');
   const reguaMeses=el('<div class="ag-meses" role="group" aria-label="Mês"></div>');
+  caixaMeses.appendChild(reguaMeses);
   MESES.forEach((nm,i)=>{
     const k=ay+'-'+String(i+1).padStart(2,'0');
     const qtd=porMes[k]||0;
@@ -2880,7 +2915,7 @@ function gradeMes(eventos,r){
     b.onclick=()=>irPara(ay,i+1);
     reguaMeses.appendChild(b);
   });
-  cx.appendChild(reguaMeses);
+  cx.appendChild(caixaMeses);
 
   // a semana começa no domingo, como no calendário do RH
   const primeiro=new Date(ay,am-1,1);
@@ -3328,7 +3363,7 @@ function vAgenda(m){
       aria-pressed="${escolhido?'true':'false'}"
       aria-label="${esc(f.rot)} — ${qtd} neste mês. ${escolhido?'Clique para ver tudo de novo':'Clique para ver só isto'}"
       title="${esc(f.rot)} — ${qtd} neste mês"
-      style="--cor:${f.cor};--cor-txt:${corTextoSobre(f.cor)}"><i class="ic" aria-hidden="true">${f.ic}</i><span>${esc(f.rot)}</span><b>${qtd}</b></button>`);
+      style="--cor:${f.cor};--cor-txt:${corTextoSobre(f.cor)};--cor-fundo:${corFundoAceso(f.cor)}"><i class="ic" aria-hidden="true">${f.ic}</i><span>${esc(f.rot)}</span><b>${qtd}</b></button>`);
     b.onclick=()=>{filtro.agSo=(so===f.k?null:f.k);filtro.agEmpresaId='';r()};
     chips.appendChild(b);
   });
