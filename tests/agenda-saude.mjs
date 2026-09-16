@@ -317,6 +317,71 @@ test('Agenda: o 🗓️ leva o seletor de variação em todos os lugares', () =>
   assert.equal(soltos.length, 0, 'ícone sem U+FE0F destoa dos vizinhos');
 });
 
+/* A SÉRIE FANTASMA DO GOOGLE (16/09/2026): "Treino | Full Time" em dezenas de
+   dias, apagado no Google e vivo na Central, porque a importação copia e nunca
+   apaga. Um toque tem de levar a série — e NADA além dela. */
+const TREINO = (id, data) => ({id, titulo: 'Treino | Full Time', data, hora: '05:15',
+  local: 'Academia', googleCalendar: 'primary', googleId: 'primary:abc123_' + data.replace(/-/g, '') + 'T081500Z'});
+const comSerie = () => {
+  const {run, document} = setup();
+  run(`E.agenda=[
+    ${JSON.stringify(TREINO('t1', '2026-09-09'))},
+    ${JSON.stringify(TREINO('t2', '2026-09-10'))},
+    ${JSON.stringify(TREINO('t3', '2026-10-09'))},
+    {id:'outra',titulo:'Treino | Full Time',data:'2026-09-11',hora:'05:15',local:'Academia',googleCalendar:'trabalho',googleId:'trabalho:zzz_20260911T081500Z'},
+    {id:'minha',titulo:'Treino | Full Time',data:'2026-09-12',hora:'05:15',local:'Academia'},
+    {id:'reuniao',titulo:'Reunião de Liderança',data:'2026-09-10',hora:'14:00',googleCalendar:'primary',googleId:'primary:rrr_20260910T170000Z'}
+  ];globalThis.confirm=()=>true;`);
+  return {run, document};
+};
+
+test('Série do Google: junta as cópias da mesma repetição, e só elas', () => {
+  const {run} = comSerie();
+  const ids = [...run("serieDoCompromisso(E.agenda[0]).map(x=>x.id)")];
+  assert.deepEqual(ids.sort(), ['t1', 't2', 't3'], 'as três cópias da série');
+  // o caso ruim primeiro: nome igual NÃO basta para levar junto
+  assert.ok(!ids.includes('outra'), 'mesmo nome, outra agenda do Google: não é a mesma série');
+  assert.ok(!ids.includes('minha'), 'mesmo nome, criado à mão na Central: não é do Google');
+  assert.ok(!ids.includes('reuniao'), 'mesma agenda, outro compromisso: fica');
+});
+
+test('Série do Google: "Apagar os N" tira a série inteira e mais nada', () => {
+  const {run, document} = comSerie();
+  run("apagarCompromissoAgenda(E.agenda[0],()=>{})");
+  const todos = [...document.querySelectorAll('.fundo .modal button')].find(b => /^Apagar os 3$/.test(b.textContent.trim()));
+  assert.ok(todos, 'a janela tem de oferecer apagar os 3, dizendo quantos');
+  assert.match(document.querySelector('.fundo .modal header p').textContent, /3 cópias iguais na Agenda, de 09\/09\/2026 a 09\/10\/2026/,
+    'quantos e de que data a que data, antes de apagar');
+  todos.onclick();
+  assert.deepEqual([...run("E.agenda.map(x=>x.id)")].sort(), ['minha', 'outra', 'reuniao']);
+});
+
+test('Série do Google: "Só este dia" tira um só', () => {
+  const {run, document} = comSerie();
+  run("apagarCompromissoAgenda(E.agenda[1],()=>{})");
+  const so = [...document.querySelectorAll('.fundo .modal button')].find(b => b.textContent.trim() === 'Só este dia');
+  so.onclick();
+  assert.deepEqual([...run("E.agenda.map(x=>x.id)")].sort(), ['minha', 'outra', 'reuniao', 't1', 't3']);
+});
+
+test('Compromisso sozinho não abre janela de série: pergunta e apaga', () => {
+  const {run, document} = comSerie();
+  run("apagarCompromissoAgenda(E.agenda.find(x=>x.id==='minha'),()=>{})");
+  assert.equal(document.querySelectorAll('.fundo .modal').length, 0, 'um só não precisa de escolha');
+  assert.ok(!run("E.agenda.some(x=>x.id==='minha')"), 'e sai');
+});
+
+test('O aviso de apagar pula linha de verdade, não escreve \\n', () => {
+  const {run} = comSerie();
+  let texto = '';
+  run("globalThis.confirm=t=>{globalThis.__aviso=t;return false}");
+  run("apagarCompromissoAgenda(E.agenda.find(x=>x.id==='minha'),()=>{})");
+  texto = run("globalThis.__aviso");
+  assert.ok(texto.includes('\n'), 'tem de ter quebra de linha');
+  assert.ok(!texto.includes('\\n'), 'a barra e o n apareciam escritos na janela');
+  assert.ok(run("E.agenda.some(x=>x.id==='minha')"), 'e "cancelar" não apaga');
+});
+
 /* APAGAR DENTRO DO DIA ABERTO (pedido do dono, 16/09/2026). A mesma regra do
    bloco "Hoje": some só o que é DESTA Central. */
 const abrirDia = (estado, iso) => {

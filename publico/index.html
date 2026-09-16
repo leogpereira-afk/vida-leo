@@ -2950,6 +2950,71 @@ function gradeMes(eventos,r){
   return cx;
 }
 
+/* A SÉRIE DE UM COMPROMISSO IMPORTADO DO GOOGLE.
+
+   Evento que se repete no Google vira UMA cópia por dia na Central: a busca
+   pede `singleEvents`, e cada ocorrência chega com o id da série seguido da
+   data (`abc123_20260916T081500Z`). E a importação COPIA, nunca apaga: quando
+   o dono tira o evento do Google, as cópias ficam aqui para sempre. Foi o
+   "Treino | Full Time" de 16/09/2026 — dezenas de dias ocupados por um treino
+   que já não existia em lugar nenhum, e apagar um por um custaria um toque por
+   dia.
+
+   A série é: mesma agenda do Google E (mesmo id-base da repetição OU mesmo
+   título, mesmo local e mesma hora). O segundo critério pega a série que foi
+   recriada no Google e ganhou id novo. Nunca decide sozinho: a tela mostra
+   quantos são e de que data a que data, e "só este dia" continua ao lado. */
+function serieDoCompromisso(ref){
+  if(!ref||!ref.googleId)return ref?[ref]:[];
+  const base=g=>String(g||'').replace(/_\d{8}(T\d{6}Z?)?$/,'');
+  const n=s=>String(s||'').trim().toLowerCase();
+  const b=base(ref.googleId);
+  return E.agenda.filter(x=>x===ref||(x.googleId&&x.googleCalendar===ref.googleCalendar&&(
+    (b!==ref.googleId&&base(x.googleId)===b)||
+    (n(x.titulo)===n(ref.titulo)&&n(x.local)===n(ref.local)&&(x.hora||'')===(ref.hora||''))
+  )));
+}
+
+/* APAGAR UM COMPROMISSO, sozinho ou com a série. Um lugar só para o ✕ do bloco
+   "Hoje" e o ✕ do dia aberto: duas cópias desta regra divergiriam na primeira
+   mudança. `depois(lista)` recebe o que saiu, para quem chamou decidir como
+   repintar. Apaga ANTES de fechar a janela, para o repinte do `abrirModal` já
+   desenhar a Agenda sem eles. */
+function apagarCompromissoAgenda(ref,depois){
+  if(!ref||!E.agenda.includes(ref))return;
+  const titulo=ref.titulo||'compromisso';
+  const tirar=lista=>{
+    const fora=new Set(lista);
+    for(let i=E.agenda.length-1;i>=0;i--)if(fora.has(E.agenda[i]))E.agenda.splice(i,1);
+    salvar();
+  };
+  const serie=serieDoCompromisso(ref);
+  if(serie.length<2){
+    const varios=ref.ate&&ref.ate>ref.data;
+    if(!confirm('Apagar “'+titulo+'”?'+
+      (varios?'\n\nEle ocupa de '+fmtDataAno(ref.data)+' a '+fmtDataAno(ref.ate)+' — some dos dias todos.':'')+
+      '\n\nSai só desta Central. Se veio do Google, continua lá.'))return;
+    tirar([ref]);depois&&depois([ref]);return;
+  }
+  const datas=serie.map(x=>x.data).filter(Boolean).sort();
+  abrirModal('Apagar “'+esc(titulo)+'”',
+    serie.length+' cópias iguais na Agenda, de '+fmtDataAno(datas[0])+' a '+fmtDataAno(datas[datas.length-1]),
+    (c,fechar)=>{
+      const sec=el('<div class="secao"></div>');
+      sec.appendChild(el('<p style="font-size:13px;color:var(--suave);margin-bottom:12px">Este compromisso veio do Google Agenda e se repete. Apagar aqui tira só da Central — no Google não muda nada.</p>'));
+      const linha=el('<div style="display:flex;gap:9px;flex-wrap:wrap"></div>');
+      const todos=el('<button class="btn" style="background:var(--vermelho)"></button>');
+      todos.textContent='Apagar os '+serie.length;
+      todos.onclick=()=>{tirar(serie);fechar();depois&&depois(serie)};
+      const so=el('<button class="btn ghost">Só este dia</button>');
+      so.onclick=()=>{tirar([ref]);fechar();depois&&depois([ref])};
+      const nao=el('<button class="btn ghost">Cancelar</button>');
+      nao.onclick=fechar;
+      linha.appendChild(todos);linha.appendChild(so);linha.appendChild(el('<span class="cresce"></span>'));linha.appendChild(nao);
+      sec.appendChild(linha);c.appendChild(sec);
+    });
+}
+
 // o dia aberto: aqui cabe o detalhe que não cabe na célula
 function modalDia(iso,eventos){
   const d=new Date(iso+'T12:00');
@@ -2989,13 +3054,10 @@ function modalDia(iso,eventos){
         bx.setAttribute('aria-label','Apagar '+(e.titulo||'compromisso'));
         bx.onclick=ev=>{
           ev.stopPropagation();
-          const varios=e.ate&&e.ate>e.data;
-          if(!confirm('Apagar \u201c'+(e.titulo||'compromisso')+'\u201d?'+
-            (varios?'\n\nEle ocupa de '+fmtDataAno(e.data)+' a '+fmtDataAno(e.ate)+' — some dos dias todos.':'')+
-            '\n\nSai só desta Central. Se veio do Google, continua lá.'))return;
-          const i=E.agenda.indexOf(e.ref);
-          if(i<0)return;
-          E.agenda.splice(i,1);salvar();
+          apagarCompromissoAgenda(e.ref,saiu=>{
+          /* Saiu mais que este dia (a série): a janela deste dia já não conta
+             a verdade dos outros — fecha, e o repinte acerta a grade inteira. */
+          if(saiu.length>1||saiu[0]!==e.ref){fechar();return}
           li.remove();
           /* A janela continua aberta para apagar o próximo, então o subtítulo
              tem de acompanhar — contador que mente é pior que contador nenhum.
@@ -3006,6 +3068,7 @@ function modalDia(iso,eventos){
           if(desc)desc.textContent=['domingo','segunda','terça','quarta','quinta','sexta','sábado'][d.getDay()]+
             ' · '+eventos.length+(eventos.length===1?' coisa':' coisas');
           if(!eventos.length)lista.appendChild(el('<div class="vazio">Dia livre. Adicione um compromisso quando precisar.</div>'));
+          });
         };
         acoesDia.appendChild(bx);
       }
@@ -6631,12 +6694,9 @@ function blocoHojeAgenda(r){
     const acoes=li.querySelector('.acoes');
     if(proprio){
       acoes.appendChild(acao('Abrir',()=>modalCompromisso(e.ref,r),'ghost mini'));
-      const bx=acao('✕',()=>{
-        if(!confirm('Apagar “'+(e.titulo||'compromisso')+'”?\\n\\nSai só desta Central. Se veio do Google, continua lá.'))return;
-        const i=E.agenda.indexOf(e.ref);
-        if(i<0)return;
-        E.agenda.splice(i,1);salvar();r();
-      },'ghost mini lixo');
+      /* O aviso daqui escrevia "\\n\\n" com barra dupla no fonte: a janela de
+         confirmação mostrava a barra e o n, em vez de pular linha. */
+      const bx=acao('✕',()=>apagarCompromissoAgenda(e.ref,()=>r()),'ghost mini lixo');
       bx.title='Apagar este compromisso';bx.setAttribute('aria-label','Apagar '+(e.titulo||'compromisso'));
       acoes.appendChild(bx);
     }else if(e.ir){
