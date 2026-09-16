@@ -1697,6 +1697,10 @@ function organizarAgenda(pagina,alvo){
  if(barraGoogle)acoesTopo.appendChild(barraGoogle);
  if(novo)acoesTopo.appendChild(novo);
  topo.appendChild(acoesTopo);
+ /* O DIA DE HOJE É O PRIMEIRO da página, acima do calendário — ordem do Léo.
+    Ele ficava logo abaixo do topo por um instante e o laço que distribui os
+    blocos pelas abas o levava embora, jogando-o para o fim; era o mesmo
+    escorregão dos chips. A guarda está lá embaixo, no `return` do laço. */
  const hojeBloco=pagina.querySelector('[data-bid="ag-hoje"]');
  topo.after(calendario);
  if(hojeBloco)calendario.before(hojeBloco);
@@ -1712,7 +1716,7 @@ function organizarAgenda(pagina,alvo){
   const button=el(`<button type="button" data-agenda-aba="${id}" aria-controls="agenda-${id}">${label}</button>`);button.onclick=()=>selecionar(id);nav.appendChild(button);
  });
  [...pagina.children].forEach(node=>{
-  if(node===topo||node===calendario)return;
+  if(node===topo||node===calendario||node===hojeBloco)return;
   const id=node.dataset.bid;
   const pane=id==='ag-gmail'||id==='google-agenda'?'integracoes':id==='ag-dash'||node.classList.contains('grade')?'resumo':'compromissos';
   panes[pane].appendChild(node);

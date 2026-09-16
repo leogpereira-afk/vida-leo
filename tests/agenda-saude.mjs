@@ -229,6 +229,14 @@ test('Hoje: o resumo do dia lista o que é de hoje, com hora', () => {
   const {run, document} = comAgenda("E.agenda=[{id:'a',data:hoje(),hora:'14:00',titulo:'Reunião de hoje'},{id:'b',data:'2099-01-01',titulo:'Lá longe'}]");
   const bloco = document.querySelector('[data-bid="ag-hoje"]');
   assert.ok(bloco, 'o resumo do dia não foi montado');
+  /* PRIMEIRO da página, acima do calendário: achar o bloco em qualquer lugar
+     não bastava — ele estava sendo varrido para dentro de uma aba e aparecia
+     lá no fim. */
+  assert.equal(bloco.closest('.agenda-pane'), null, 'o resumo do dia caiu dentro de uma aba');
+  const cal = document.querySelector('[data-bid="ag-mes"]');
+  assert.ok(bloco.compareDocumentPosition(cal) & 4, 'o resumo do dia ficou depois do calendário');
+  const topo = document.querySelector('.topo');
+  assert.ok(topo.compareDocumentPosition(bloco) & 4, 'o resumo do dia ficou antes do cabeçalho');
   const itens = [...bloco.querySelectorAll('.ag-hoje-item')];
   assert.equal(itens.length, 1, 'trouxe o que não é de hoje');
   assert.match(itens[0].textContent, /Reunião de hoje/);
