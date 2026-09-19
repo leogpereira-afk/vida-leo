@@ -633,7 +633,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 }
 </style>
 <link rel="stylesheet" href="./refinamento.css?v=9a36b4c81f55">
-<link rel="stylesheet" href="empresas.css?v=6">
+<link rel="stylesheet" href="empresas.css?v=7">
 <link rel="stylesheet" href="organograma.css?v=1">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
@@ -9269,6 +9269,7 @@ function bancoExcluir(b){
 }
 function bancoTexto(b){return [b.banco,b.titular,b.doc&&'CPF/CNPJ: '+b.doc,b.agencia&&'Agência: '+b.agencia,b.conta&&'Conta: '+b.conta,b.pix&&'PIX: '+b.pix].filter(Boolean).join('\n')}
 async function bancoCopiar(texto,botao){try{await navigator.clipboard.writeText(texto);botao.textContent='Copiado ✓'}catch{botao.textContent='Não foi possível copiar'}}
+function bancoEmpresa(b){return empresaPorId(b.empresaId)?.nome||b.titular||'Sem titular'}
 async function vBancos(m){
   m.classList.add('workspace-layout','bancos-layout');const topo=cab('Bancos','Contas, titulares e chaves PIX em um só lugar.');topo.appendChild(acao('+ Nova conta',()=>bancoModal()));m.appendChild(topo);
   const busca=el('<div class="bancos-filtros"><label>Buscar conta<input type="search" aria-label="Buscar conta" placeholder="Banco, titular, agência, conta ou PIX"></label><div class="bancos-escopo"></div></div>');
@@ -9276,10 +9277,18 @@ async function vBancos(m){
   input.oninput=()=>{filtro.bancoBusca=input.value;pintar()};
   function pintar(){
     if(!m.isConnected)return;lista.replaceChildren();
-    const todas=bancosReunidos(E.bancos,bancosFonte.contas),titulares=[...new Set(todas.map(b=>b.titular||'Sem titular'))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    const todas=bancosReunidos(E.bancos,bancosFonte.contas),titulares=[...new Set(todas.map(bancoEmpresa))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
     if(filtro.bancoTitular&&!titulares.includes(filtro.bancoTitular))filtro.bancoTitular='';
-    const filtros=busca.querySelector('.bancos-escopo');filtros.replaceChildren();const titularLabel=el('<label>Titular</label>');titularLabel.appendChild(seletor(filtro.bancoTitular||'', [['','Todos os titulares'],...titulares.map(t=>[t,t])],v=>{filtro.bancoTitular=v;pintar()},'Titular das contas'));filtros.appendChild(titularLabel);
-    const contas=financeiroBusca(todas,filtro.bancoBusca,['banco','titular','agencia','conta','pix','doc']).filter(b=>!filtro.bancoTitular||(b.titular||'Sem titular')===filtro.bancoTitular);
+    const filtros=busca.querySelector('.bancos-escopo');filtros.replaceChildren();
+    const chips=el('<nav class="bancos-empresas" aria-label="Bancos por empresa"></nav>');
+    for(const [valor,nome]of [['','Todas as empresas'],...titulares.map(t=>[t,t])]){
+      const quantidade=valor?todas.filter(b=>bancoEmpresa(b)===valor).length:todas.length;
+      const chip=acao('',()=>{const pos=chips.scrollLeft;filtro.bancoTitular=valor;pintar();const nav=busca.querySelector('.bancos-empresas');nav.scrollLeft=pos;nav.querySelector('[aria-pressed="true"]').focus({preventScroll:true})},'ghost');
+      chip.className='banco-empresa-chip';chip.setAttribute('aria-pressed',String((filtro.bancoTitular||'')===valor));
+      chip.innerHTML='<span>'+esc(nome)+'</span><b>'+quantidade+'</b>';chips.appendChild(chip);
+    }
+    filtros.appendChild(chips);
+    const contas=financeiroBusca(todas,filtro.bancoBusca,['banco','titular','agencia','conta','pix','doc']).filter(b=>!filtro.bancoTitular||bancoEmpresa(b)===filtro.bancoTitular);
     const estado=el('<div class="bancos-origem"></div>');
     estado.appendChild(el('<p><b>'+contas.length+'</b> de '+todas.length+' contas'+(bancosFonte.contas?' · '+bancosFonte.contas.length+' cadastros na gestão':bancosFonte.erro?' · origem indisponível':' · consultando cadastro da gestão…')+'</p>'));
     estado.appendChild(acao('Atualizar gestão',async()=>{const p=bancosCarregar(true);pintar();await p;pintar()},'ghost mini'));lista.appendChild(estado);
