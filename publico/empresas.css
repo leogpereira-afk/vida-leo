@@ -72,3 +72,5 @@
 .banco-card .banco-campo-amplo{grid-column:1/-1}@media(max-width:600px){.banco-card dd .btn{min-height:44px}}
 
 .bancos-filtros{display:grid;grid-template-columns:minmax(0,2fr) minmax(190px,1fr);gap:16px;align-items:end}.bancos-filtros label{max-width:none}.bancos-filtros .bancos-escopo{display:block;margin:0}.bancos-filtros select{width:100%;min-height:48px}.central-metrica-alerta strong{color:var(--vermelho)}@media(max-width:600px){.bancos-filtros{grid-template-columns:1fr;gap:12px}}
+
+.banco-titular-origem{font-size:12px;line-height:1.6;padding:10px 12px;border-left:3px solid var(--areia);background:var(--areia-cl);margin:0 0 12px;overflow-wrap:anywhere}

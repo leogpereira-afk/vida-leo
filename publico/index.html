@@ -633,7 +633,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 }
 </style>
 <link rel="stylesheet" href="./refinamento.css?v=9a36b4c81f55">
-<link rel="stylesheet" href="empresas.css?v=5">
+<link rel="stylesheet" href="empresas.css?v=6">
 <link rel="stylesheet" href="organograma.css?v=1">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
@@ -9213,10 +9213,13 @@ function financeiroBusca(lista,termo,campos){const q=normaliza(termo||'');return
 let bancosFonte={contas:null,erro:'',em:'',pendente:null};
 function bancosIguais(a,b){
   const txt=v=>normaliza(String(v||'')).replace(/[^a-z0-9]/g,'');
-  if(!txt(a.banco)||!txt(a.conta)||!txt(b.conta))return false;
-  if(['banco','agencia','conta'].some(k=>txt(a[k])!==txt(b[k])))return false;
+  const banco=v=>{const n=txt(v);return n==='bb'?'bancodobrasil':n};
+  if(!banco(a.banco)||!txt(a.conta)||!txt(b.conta))return false;
+  if(banco(a.banco)!==banco(b.banco)||['agencia','conta'].some(k=>txt(a[k])!==txt(b[k])))return false;
   const da=txt(a.doc),db=txt(b.doc);if(da&&db)return da===db;
-  return !!txt(a.titular)&&txt(a.titular)===txt(b.titular);
+  // Banco + agência + conta identificam a conta, mesmo com titular abreviado.
+  // Documentos conflitantes acima impedem a reunião; os nomes permanecem visíveis.
+  return (!!txt(a.titular)&&txt(a.titular)===txt(b.titular))||!!txt(a.agencia);
 }
 function bancosReunidos(locais,origem){
   const saida=locais.map(b=>({...b,_local:b,_fonte:'Central'}));
@@ -9285,6 +9288,7 @@ async function vBancos(m){
     const grade=el('<div class="bancos-grade"></div>');lista.appendChild(grade);
     for(const b of contas){const card=el('<article class="banco-card"><header><span class="banco-icone">🏦</span><div><h2>'+esc(b.banco||'Banco não informado')+'</h2><p>'+esc(b.titular||'Titular não informado')+'</p></div><small>'+esc(b._fonte)+'</small></header><dl></dl><footer></footer></article>');
       for(const [t,v]of [['Tipo de conta',b.tipo],['CPF / CNPJ',b.doc],['Agência',b.agencia],['Conta',b.conta],['PIX'+(b.pixTipo?' · '+b.pixTipo:''),b.pix],['Gerente',b.gerente],['Telefone',b.telefone]])if(v){const d=el('<div><dt>'+esc(t)+'</dt><dd></dd></div>'),c=acao(v,()=>bancoCopiar(v,c),'ghost mini');c.title='Copiar '+t;if(t.startsWith('PIX'))d.classList.add('banco-campo-amplo');d.querySelector('dd').appendChild(c);card.querySelector('dl').appendChild(d)}
+      if(b._local&&b._gestao&&normaliza(b._local.titular||'')!==normaliza(b._gestao.titular||''))card.appendChild(el('<p class="banco-titular-origem">Titular na gestão: <b>'+esc(b._gestao.titular||'não informado')+'</b>. Confira o titular antes de usar os dados.</p>'));
       if(!b.conta&&!b.pix)card.appendChild(el('<p class="empresa-nota">Conta e PIX ainda não informados.</p>'));
       if(b.obs){const detalhes=el('<details><summary>Observações</summary><p>'+esc(b.obs)+'</p></details>');card.appendChild(detalhes)}
       const copiar=acao('Copiar dados',()=>bancoCopiar(bancoTexto(b),copiar),'ghost mini');card.querySelector('footer').appendChild(copiar);
