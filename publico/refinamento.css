@@ -106,7 +106,7 @@ body:has(.fundo){overflow:hidden}
 @media(max-width:540px){.compromisso-resumo>span:first-of-type{flex-basis:calc(100% - 70px)!important}}
 
 /* Finance: a compact overview, then dedicated workspaces. */
-.financeiro{--finance-accent:#176453}
+.financeiro{--finance-accent:var(--marca)}
 .financeiro .topo{margin-bottom:16px}.financeiro .topo h1{font-family:Inter,system-ui,sans-serif;font-weight:750;letter-spacing:-.045em}
 .financeiro>.painel{border:0;background:transparent;padding:0;gap:8px;margin-bottom:18px}
 .financeiro>.painel select{background:var(--card);border:1px solid var(--linha);border-radius:10px;padding:8px 10px}
@@ -117,8 +117,8 @@ body:has(.fundo){overflow:hidden}
 .finance-pane[hidden]{display:none!important}
 .financeiro .finance-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border:1px solid var(--linha);border-radius:18px;overflow:hidden;background:var(--card);margin-bottom:20px}
 .finance-metrics .kpi{border:0;border-radius:0;box-shadow:none;padding:16px;min-height:0;background:transparent}
-.finance-metrics .kpi:first-child{grid-column:1/-1;background:#173e35;color:#fff;padding:24px}
-.finance-metrics .kpi:first-child .rot,.finance-metrics .kpi:first-child .sub{color:#d3e5de}
+.finance-metrics .kpi:first-child{grid-column:1/-1;background:#3036a4;color:#fff;padding:24px}
+.finance-metrics .kpi:first-child .rot,.finance-metrics .kpi:first-child .sub{color:#e1e4ff}
 .finance-metrics .kpi:first-child .val{font-family:Inter,system-ui,sans-serif;font-size:clamp(29px,5vw,42px);font-weight:700;letter-spacing:-.035em;color:#fff;margin:7px 0}
 .finance-metrics .kpi:not(:first-child){border-bottom:1px solid var(--linha)}
 .finance-metrics .kpi .val{font-family:Inter,system-ui,sans-serif;font-size:19px;font-weight:650;letter-spacing:-.025em;margin:5px 0}
@@ -145,7 +145,7 @@ body:has(.fundo){overflow:hidden}
 .saude-layout>.painel select{flex:1;min-width:0;background:var(--verde);color:var(--card);border:0;border-radius:10px;padding:12px;font-weight:600;min-height:44px}
 .saude-layout>.painel .btn{font-size:12px;min-height:44px}.saude-pane[hidden]{display:none!important}
 .saude-resumo{border:1px solid var(--linha);background:var(--card);border-radius:18px;overflow:hidden;margin-bottom:18px}
-.saude-resumo-titulo{background:#173e35;color:#fff;padding:20px}.saude-resumo-titulo>span{font-size:10px;letter-spacing:.12em;color:#d3e5de}.saude-resumo-titulo h2{margin:6px 0;font-size:23px}.saude-resumo-titulo p{margin:0;color:#d3e5de;font-size:12px}
+.saude-resumo-titulo{background:#3036a4;color:#fff;padding:20px}.saude-resumo-titulo>span{font-size:10px;letter-spacing:.12em;color:#e1e4ff}.saude-resumo-titulo h2{margin:6px 0;font-size:23px}.saude-resumo-titulo p{margin:0;color:#e1e4ff;font-size:12px}
 .saude-resumo .grade{grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:0}.saude-resumo .kpi{border:0;border-radius:0;box-shadow:none;padding:14px 16px;border-bottom:1px solid var(--linha)}.saude-resumo .kpi .val{font-family:Inter,system-ui,sans-serif;font-size:21px;font-weight:650;margin:5px 0}.saude-resumo .kpi .rot{font-size:10px}.saude-resumo .kpi .sub{font-size:11px}
 .saude-layout .bloco{box-shadow:none;margin-bottom:16px;border-radius:14px}.saude-layout .bloco>header{padding:14px 16px}.saude-layout .bloco>header h2{font-size:16px}.saude-layout .bloco>header .dica{font-size:12px;line-height:1.5}
 .saude-lembretes{border:1px solid var(--linha);background:var(--card);border-radius:14px;padding:16px;margin-bottom:18px}.saude-lembretes h2{font-size:16px;margin:0}.saude-lembretes>p{font-size:12px;color:var(--suave);margin:5px 0 12px}.saude-lembretes button,.saude-exames-mobile button{display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;width:100%;background:transparent;color:var(--tinta);border:0;border-bottom:1px solid var(--linha);padding:14px 0;min-height:48px;font-size:14px}.saude-lembretes button span,.saude-exames-mobile button>span{min-width:0;overflow-wrap:anywhere}.saude-lembretes small,.saude-exames-mobile small{display:block;color:var(--suave);font-size:11px;margin-top:4px}.saude-lembretes button>b{font-size:12px;white-space:nowrap}.saude-sem-dados{font-size:13px;color:var(--suave);padding:10px 0}.saude-exames-mobile{display:none}.saude-exame-valor{text-align:right;font-weight:650}
@@ -313,7 +313,7 @@ input[type=range]{min-height:44px;cursor:pointer}
  .estrategia-workspace .workspace-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.estrategia-workspace .workspace-metrics .kpi{display:flex;align-items:center;gap:8px;min-height:64px;padding:10px}.estrategia-workspace .workspace-metrics .val{order:-1;font-size:23px;margin:0}.estrategia-workspace .workspace-metrics .sub{display:none}.estrategia-workspace .workspace-metrics .rot{min-height:0;font-size:9px;margin:0}.strategy-hero p{display:none}
  .workspace-card{padding:20px}.workspace-grid{grid-template-columns:minmax(0,1fr);gap:14px}.workspace-filters{padding:14px;gap:10px}.workspace-filters input[type=search],.workspace-filters>select,.strategy-filters label{flex:1 1 100%;width:100%}.workspace-filters input,.workspace-filters select,.annual-form input,.annual-form select{font-size:16px}.workspace-document,.workspace-opportunity{padding:20px}.workspace-layout .bloco>header{padding:16px;flex-wrap:wrap}.workspace-layout .bloco>header .dica{flex:1 1 100%;order:3}.workspace-editor{margin:12px 10px}.workspace-empty{padding:30px 20px}.strategy-filters>.btn{width:100%}.workspace-heading h2{font-size:21px}
 }
-@media(prefers-color-scheme:dark){.workspace-layout{--workspace-accent:#b4b1ff}.workspace-hero{background:linear-gradient(120deg,var(--card),#203932)}.strategy-year{background:#343345}.workspace-eyebrow{color:#a8d7c5}}
+@media(prefers-color-scheme:dark){.workspace-layout{--workspace-accent:#b4b1ff}.workspace-hero{background:linear-gradient(120deg,var(--card),#25294d)}.strategy-year{background:#343345}.workspace-eyebrow{color:#a5adff}}
 @media print{.workspace-tabs,.workspace-filters,.workspace-actions{display:none}.workspace-pane[hidden]{display:none!important}.workspace-hero{break-inside:avoid}}
 /* Desenvolvimento pessoal — leitura antes dos formulários. */
 .dev-title{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:10px 0 24px}.dev-title h2{font-size:clamp(22px,2.1vw,29px);line-height:1.25;margin:7px 0 8px;max-width:25ch}.dev-title p{margin:0;color:var(--suave);font-size:14px}.dev-title>.btn{flex-shrink:0}
@@ -369,3 +369,7 @@ input[type=range]{min-height:44px;cursor:pointer}
 @media(max-width:600px){.gastos-categorias{padding:10px}.gasto-categoria{padding:10px}.gasto-categoria .finance-expense-open{flex-wrap:wrap}.gasto-categoria summary{font-size:15px}}
 
 .gastos-categorias[hidden],.gasto-categoria .finance-expense-row[hidden]{display:none}
+
+/* Azul da logomarca; botão sólido mantém contraste também no modo escuro. */
+.btn:not(.ghost){background:var(--marca-solida);color:#fff}
+.kpi.v .val{color:var(--sucesso)}

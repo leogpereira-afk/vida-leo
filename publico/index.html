@@ -17,13 +17,15 @@
 <style>
 :root{
   --bg:#f7f6f3; --card:#fff; --linha:#e8e5df; --tinta:#20211f; --suave:#6f7269;
-  --verde:#1f6f5c; --verde-cl:#e7f2ee; --areia:#c98a4b; --areia-cl:#fbf0e5;
+  --marca:#3e45ee; --marca-cl:#eeefff; --marca-solida:#3e45ee;
+  --sucesso:#1f6f5c; --sucesso-cl:#e7f2ee; --verde:var(--marca); --verde-cl:var(--marca-cl); --areia:#c98a4b; --areia-cl:#fbf0e5;
   --vermelho:#b4443a; --vermelho-cl:#fbeae8; --azul:#3d5a80; --azul-cl:#e9eef5;
   --roxo:#6d5a8c; --r:14px; --sombra:0 1px 2px rgba(30,32,28,.05),0 6px 20px -8px rgba(30,32,28,.12);
 }
 @media(prefers-color-scheme:dark){:root{
   --bg:#16171a; --card:#1e2024; --linha:#2c2f35; --tinta:#eceae5; --suave:#9a9d96;
-  --verde:#4bbf9c; --verde-cl:#16302a; --areia:#e0a468; --areia-cl:#33261a;
+  --marca:#a5adff; --marca-cl:#25294d;
+  --sucesso:#4bbf9c; --sucesso-cl:#16302a; --verde:var(--marca); --verde-cl:var(--marca-cl); --areia:#e0a468; --areia-cl:#33261a;
   --vermelho:#e08379; --vermelho-cl:#33211f; --azul:#8fb0d8; --azul-cl:#1d2733;
   --roxo:#a894c4; --sombra:0 1px 2px rgba(0,0,0,.3),0 6px 20px -8px rgba(0,0,0,.5);
 }}
@@ -632,9 +634,9 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css?v=9a36b4c81f55">
+<link rel="stylesheet" href="./refinamento.css?v=35e03ac04929">
 <link rel="stylesheet" href="empresas.css?v=8">
-<link rel="stylesheet" href="organograma.css?v=1">
+<link rel="stylesheet" href="organograma.css?v=5075861ba133">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
 <link rel="stylesheet" href="./planos-fluidos.css?v=1f6fdc37af07">
@@ -674,7 +676,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 <script src="./vendor/ical-2.2.1.min.js"></script>
 <script src="./google-datas.js?v=85c5d36986f3"></script>
 <script src="./documentos-revisao.js?v=f54d2ba958f9"></script>
-<script src="./organograma.js?v=5fd26884ff16"></script>
+<script src="./organograma.js?v=49273e1653d7"></script>
 <script>
 /* ============================================================
    Central do Léo — painel pessoal, um arquivo só.
@@ -1164,18 +1166,18 @@ function carregar(){
 const salvar=()=>{E._mt=Math.max(Date.now(),(+E._mt||0)+1);localStorage.setItem(CHAVE,JSON.stringify(E));agendaPush()};
 
 /* ---------------- visual ---------------- */
-const CORES_STATUS={'Realizado':['var(--verde-cl)','var(--verde)'],'Confirmado':['var(--azul-cl)','var(--azul)'],
+const CORES_STATUS={'Realizado':['var(--sucesso-cl)','var(--sucesso)'],'Confirmado':['var(--azul-cl)','var(--azul)'],
   'Em Planejamento':['var(--areia-cl)','var(--areia)'],'Cancelado':['var(--vermelho-cl)','var(--vermelho)'],
   'Aberta':['var(--areia-cl)','var(--areia)'],'Fazendo':['var(--azul-cl)','var(--azul)'],
-  'Concluída':['var(--verde-cl)','var(--verde)'],'Parada':['var(--vermelho-cl)','var(--vermelho)'],
-  'Semente':['var(--areia-cl)','var(--areia)'],'Estudando':['var(--azul-cl)','var(--azul)'],'Decidindo':['var(--areia-cl)','var(--areia)'],'Tocando':['var(--verde-cl)','var(--verde)'],'Arquivada':['var(--bg)','var(--suave)'],
-  'Ativa':['var(--verde-cl)','var(--verde)'],'Cancelar':['var(--vermelho-cl)','var(--vermelho)'],
-  'Em dia':['var(--verde-cl)','var(--verde)'],'Vencendo':['var(--areia-cl)','var(--areia)'],
+  'Concluída':['var(--sucesso-cl)','var(--sucesso)'],'Parada':['var(--vermelho-cl)','var(--vermelho)'],
+  'Semente':['var(--areia-cl)','var(--areia)'],'Estudando':['var(--azul-cl)','var(--azul)'],'Decidindo':['var(--areia-cl)','var(--areia)'],'Tocando':['var(--sucesso-cl)','var(--sucesso)'],'Arquivada':['var(--bg)','var(--suave)'],
+  'Ativa':['var(--sucesso-cl)','var(--sucesso)'],'Cancelar':['var(--vermelho-cl)','var(--vermelho)'],
+  'Em dia':['var(--sucesso-cl)','var(--sucesso)'],'Vencendo':['var(--areia-cl)','var(--areia)'],
   'Vencido':['var(--vermelho-cl)','var(--vermelho)'],'Em andamento':['var(--azul-cl)','var(--azul)'],
-  'Encerrado':['var(--verde-cl)','var(--verde)'],'Contínuo':['var(--areia-cl)','var(--areia)']};
+  'Encerrado':['var(--sucesso-cl)','var(--sucesso)'],'Contínuo':['var(--areia-cl)','var(--areia)']};
 const chip=t=>{const c=CORES_STATUS[t]||['var(--bg)','var(--suave)'];
   return `<span class="chip" style="background:${c[0]};color:${c[1]}">${esc(t||'—')}</span>`};
-const PALETA=['#1f6f5c','#c98a4b','#3d5a80','#b4443a','#6d5a8c','#7a8b53','#a8674b','#4a8fa0'];
+const PALETA=['#3e45ee','#c98a4b','#3d5a80','#b4443a','#6d5a8c','#7a8b53','#a8674b','#4a8fa0'];
 
 /* ---- identidade visual das empresas: cor fixa + logo em bolinha ----------
    A cor deixa de depender da posição no ranking (que muda a cada ano) e passa
