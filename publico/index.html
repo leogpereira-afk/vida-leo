@@ -9277,6 +9277,7 @@ async function vBancos(m){
   function pintar(){
     if(!m.isConnected)return;lista.replaceChildren();
     const todas=bancosReunidos(E.bancos,bancosFonte.contas),titulares=[...new Set(todas.map(b=>b.titular||'Sem titular'))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    if(filtro.bancoTitular&&!titulares.includes(filtro.bancoTitular))filtro.bancoTitular='';
     const filtros=busca.querySelector('.bancos-escopo');filtros.replaceChildren();const titularLabel=el('<label>Titular</label>');titularLabel.appendChild(seletor(filtro.bancoTitular||'', [['','Todos os titulares'],...titulares.map(t=>[t,t])],v=>{filtro.bancoTitular=v;pintar()},'Titular das contas'));filtros.appendChild(titularLabel);
     const contas=financeiroBusca(todas,filtro.bancoBusca,['banco','titular','agencia','conta','pix','doc']).filter(b=>!filtro.bancoTitular||(b.titular||'Sem titular')===filtro.bancoTitular);
     const estado=el('<div class="bancos-origem"></div>');
@@ -9674,6 +9675,7 @@ function vEmpresas(m){
   const setas=escolha.querySelectorAll('.empresas-seta');setas[0].onclick=()=>opcoes.scrollBy({left:-Math.max(240,opcoes.clientWidth*.7),behavior:'smooth'});setas[1].onclick=()=>opcoes.scrollBy({left:Math.max(240,opcoes.clientWidth*.7),behavior:'smooth'});
   const indicar=()=>{const max=opcoes.scrollWidth-opcoes.clientWidth;setas[0].disabled=(opcoes.scrollLeft||0)<=1;setas[1].disabled=max<1||(opcoes.scrollLeft||0)>=max-1};opcoes.onscroll=()=>{filtro.empresaTrilho=opcoes.scrollLeft;indicar()};
   const posicionar=()=>{opcoes.scrollLeft=filtro.empresaTrilho||0;indicar()};if(window.requestAnimationFrame)window.requestAnimationFrame(posicionar);else posicionar();
+  if(window.ResizeObserver){const observar=new window.ResizeObserver(()=>{if(!opcoes.isConnected){observar.disconnect();return}indicar()});observar.observe(opcoes)}
   if(!emp){const empty=el('<section class="workspace-empty"><h2>Sua direção começa pela empresa</h2><p>Cadastre a empresa para reunir estratégia, lideranças e referências.</p></section>');empty.appendChild(acao('Cadastrar empresa',()=>empresaModalFicha()));m.appendChild(empty);return;}
   filtro.empresaId=emp.id;filtro.estrEmpresaId=emp.id;
   const contexto=el('<div class="empresa-contexto"><div><h2>'+esc(emp.nome||'Empresa sem nome')+'</h2><span>'+esc(emp.status||'Situação não informada')+'</span></div><small>'+esc(emp.cnpj||'')+'</small></div>');contexto.querySelector('div').prepend(empresaImagem(emp,'empresa-logo-cabecalho'));m.appendChild(contexto);
