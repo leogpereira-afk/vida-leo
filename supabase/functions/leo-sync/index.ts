@@ -30,6 +30,7 @@ import { googleAcao } from "./google.ts";
 // O calendário da empresa entra pela porta da PRÓPRIA Central (15/09/2026):
 // a porta do Painel exige crachá do Painel, e crachá é por sistema.
 import { empresaAcao } from "./empresa.ts";
+import { lerBancosGestao } from "./bancos.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -304,6 +305,14 @@ Deno.serve(async (req: Request) => {
     if (acao === CRON_ACAO && req.headers.has("x-leo-cron")) {
       if (!(await cronOk(req))) return json({ erro: "Não autorizado" }, 401);
       return await stravaAcao(CRON_ACAO, {}, sb, req, new URL(req.url));
+    }
+
+    if (acao === "bancosGestao") {
+      const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+      if (!(await tokenOk(t))) return json({ erro: "Não autorizado" }, 401);
+      const resposta = json(await lerBancosGestao(sb));
+      resposta.headers.set("Cache-Control", "no-store");
+      return resposta;
     }
 
     if (acao === "empresaDatas") {
