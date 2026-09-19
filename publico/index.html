@@ -633,7 +633,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 }
 </style>
 <link rel="stylesheet" href="./refinamento.css?v=9a36b4c81f55">
-<link rel="stylesheet" href="empresas.css?v=2">
+<link rel="stylesheet" href="empresas.css?v=3">
 <link rel="stylesheet" href="organograma.css?v=1">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
@@ -1039,7 +1039,7 @@ const SEED={
   sos:{sangue:'',alergias:'',doencas:'',cirurgias:'',plano:'',carteirinha:'',contato1:'',contato2:'',medico:'',obs:''},
   // guia de vida ampliado
   norte:{proposito:'',valores:'',legado:''},
-  roda:{},desenvolvimento:{fontes:[],leituras:[],revisoes:[],reflexoes:[],validacoes:[]},rituais:[],instrucoes:[],protecao:[],planoAno:[],pdi:[],livros:[],bancos:[],empresasPJ:[],patrimonio:[],
+  roda:{},desenvolvimento:{fontes:[],leituras:[],revisoes:[],reflexoes:[],validacoes:[]},rituais:[],instrucoes:[],protecao:[],planoAno:[],pdi:[],livros:[],bancos:[],liderancas:[],empresasPJ:[],patrimonio:[],
   oportunidades:[],
   estrategia:{},planejamentoEmpresas:[],organogramas:[],
   comportamento:{temperamentos:{},disc:{},discAdaptado:{},big5:{},valores:{},lideranca:{},
@@ -7477,13 +7477,19 @@ function modalObjetivo(o,aoSalvar,novo,plano){
     ],'Salvar objetivo',v=>{if(plano?.encerrado)return;Object.assign(o,v);if(novo&&plano&&!plano.objetivos.some(x=>x.id===o.id))plano.objetivos.push(o);salvar();filtro.estrAba='plano';filtro.estrObjetivo=o.id;if(novo){filtro.estrFiltro='todas';filtro.estrBusca=''}fechar()});c.appendChild(box);
   },()=>{if(novo&&!String(o.titulo||'').trim()){const dono=plano||(E.planejamentoEmpresas||[]).find(p=>p.objetivos?.includes(o));if(dono&&dono.objetivos.includes(o)){dono.objetivos=dono.objetivos.filter(x=>x!==o);salvar()}}aoSalvar&&aoSalvar()});
 }
+function centralResponsavelAcao(est,v){
+  if(!v.liderId)return v;
+  const p=centralLideres({id:est.empresaId}).find(p=>p.id===v.liderId);
+  if(!p)throw Error('Escolha uma liderança vinculada a esta empresa.');
+  return {...v,quem:p.nome};
+}
 function modalAcaoEstrategia(est,o,a,r,status){
   if(est.encerrado)return;
   abrirModal(a?'Editar ação':'Nova ação',esc(o.titulo),(c,fechar)=>{const box=el('<div class="secao"></div>');
     formularioEstrategia(box,{status:'A fazer',...a,...(status?{status}:{})},[
-      {k:'oque',t:'O que será feito?',req:true,full:true},{k:'quem',t:'Responsável'},{k:'ate',t:'Prazo',tipo:'date'},
+      {k:'oque',t:'O que será feito?',req:true,full:true},{k:'liderId',t:'Liderança responsável',tipo:'select',opcoes:[['','Usar responsável informado abaixo'],...centralLideres({id:est.empresaId}).map(p=>[p.id,p.nome])]},{k:'quem',t:'Responsável informado (sem vínculo)'},{k:'ate',t:'Prazo',tipo:'date'},
       {k:'status',t:'Situação',tipo:'select',opcoes:STATUS_ACAO},{k:'travaPor',t:'Impedimento, se houver',tipo:'textarea',full:true}
-    ],'Salvar ação',v=>{if(est.encerrado)return;if(v.status!=='Travada')v.travaPor='';if(a)Object.assign(a,v);else o.acoes.push({id:uid(),...v});salvar();filtro.estrObjetivo=o.id;fechar()});c.appendChild(box);
+    ],'Salvar ação',v=>{if(est.encerrado)return;v=centralResponsavelAcao(est,v);if(v.status!=='Travada')v.travaPor='';if(a)Object.assign(a,v);else o.acoes.push({id:uid(),...v});salvar();filtro.estrObjetivo=o.id;fechar()});c.appendChild(box);
   },r);
 }
 function historicoResultadoObjetivo(o){
@@ -9202,7 +9208,7 @@ function financeiroBusca(lista,termo,campos){const q=normaliza(termo||'');return
    somente documentos e obrigações exclusivos da empresa ficam aninhados. */
 function normalizarEmpresas(d){
   for(const e of d.empresasPJ||[]){
-    for(const k of ['documentosEmpresa','obrigacoesEmpresa']){
+    for(const k of ['documentosEmpresa','obrigacoesEmpresa','contatosEmpresa','sistemasEmpresa']){
       if(e[k]===undefined)e[k]=[];
       if(Array.isArray(e[k]))for(const x of e[k])if(!x.id)x.id=uid();
     }
@@ -9250,6 +9256,8 @@ function empresaDependencias(emp){
   for(const [mapa,titulo] of [[E.estrategia,'Planejamento anterior'],[E.rendHist?.empresas,'Histórico de rendimentos']]){
     const n=Object.keys(mapa||{}).filter(igual).length;if(n)refs.push({titulo,n});
   }
+  const liderancas=centralLideres(emp);if(liderancas.length)refs.push({titulo:'Lideranças vinculadas',n:liderancas.length});
+  for(const k of ['contatosEmpresa','sistemasEmpresa'])if(emp[k]?.length)refs.push({titulo:k==='contatosEmpresa'?'Contatos da empresa':'Sistemas da empresa',n:emp[k].length});
   const organogramas=(E.organogramas||[]).filter(o=>(o.nos||[]).some(n=>n.empresaId===emp.id));if(organogramas.length)refs.push({titulo:'Organogramas vinculados',n:organogramas.length});
   const n=Object.values(E.rendHist?.detalhe||{}).filter(ano=>Object.keys(ano||{}).some(igual)).length;
   if(n)refs.push({titulo:'Anos com rendimentos detalhados',n});return refs;
@@ -9460,9 +9468,78 @@ function empresaBloco(titulo,id,sub,acaoTexto,fn){
 }
 function empresaLinha(titulo,sub,botao,fn){const b=el('<div class="empresa-linha"><div><b>'+esc(titulo)+'</b><small>'+esc(sub||'')+'</small></div></div>');if(fn)b.appendChild(acao(botao,fn,'ghost mini'));return b}
 function empresaAbrirPlano(emp,p){filtro.estrEmpresaId=emp.id;filtro.estrPlano=p?.id||'';filtro.estrAba='resumo';irTela('estrategia')}
+/* Central de controle: identidades permanentes; planos anuais continuam na origem. */
+function centralLideres(emp){return (E.liderancas||[]).filter(p=>(p.vinculos||[]).some(v=>v.empresaId===emp.id))}
+function centralSalvarLider(emp,id,dados){
+  if(!empresaPorId(emp.id))throw Error('Empresa não encontrada.');
+  const nome=String(dados.nome||'').trim();if(!nome)throw Error('Informe o nome da liderança.');
+  if(dados.foto)empresaValidarUrl(dados.foto);
+  const existente=(E.liderancas||[]).find(p=>p.id===id);if(id&&!existente)throw Error('A liderança não foi encontrada. Reabra o cadastro.');
+  const p=existente||{id:uid(),vinculos:[],registros:[]};
+  for(const k of ['nome','telefone','email','foto','pontosFortes','desenvolvimento','comunicacao'])p[k]=String(dados[k]||'').trim();
+  let v=p.vinculos.find(x=>x.empresaId===emp.id);if(!v){v={empresaId:emp.id};p.vinculos.push(v)}
+  for(const k of ['responsabilidade','entregas','autonomia'])v[k]=String(dados[k]||'').trim();
+  p.atualizadoEm=hoje();if(!existente)(E.liderancas||(E.liderancas=[])).push(p);salvar();return p;
+}
+function centralModalLider(emp,p){
+  abrirModal(p?'Perfil da liderança':'Adicionar liderança',esc(emp.nome)+' · cadastro permanente, independente do ano.',(c,fechar)=>{
+    if(!p){const disponiveis=(E.liderancas||[]).filter(x=>!centralLideres(emp).some(y=>y.id===x.id));if(disponiveis.length){c.appendChild(el('<p class="empresa-nota">Esta pessoa já está em outra empresa? Selecione para manter um único perfil.</p>'));c.appendChild(seletor('',[['','Escolher liderança existente'],...disponiveis.map(x=>[x.id,x.nome])],id=>{if(id){fechar();centralModalLider(emp,(E.liderancas||[]).find(x=>x.id===id))}},'Liderança já cadastrada'))}}
+    const v=p?.vinculos?.find(x=>x.empresaId===emp.id)||{};
+    formularioEstrategia(c,{...p,...v},[
+      {k:'nome',t:'Nome',req:true},{k:'foto',t:'Link da foto (opcional)'},{k:'telefone',t:'Telefone'},{k:'email',t:'E-mail'},
+      {k:'responsabilidade',t:'Papel nesta empresa',req:true,full:true},{k:'entregas',t:'Entregas e resultados esperados',tipo:'textarea',full:true},
+      {k:'autonomia',t:'O que decide e o que precisa de você',tipo:'textarea',full:true},
+      {k:'pontosFortes',t:'Pontos fortes observados',tipo:'textarea',full:true},{k:'desenvolvimento',t:'Pontos a desenvolver',tipo:'textarea',full:true},{k:'comunicacao',t:'Como conduzir nossas conversas',tipo:'textarea',full:true}
+    ],'Salvar liderança',d=>{centralSalvarLider(emp,p?.id,d);fechar()});
+    c.appendChild(el('<p class="empresa-nota">Nome, contato e perfil acompanham a pessoa nas empresas vinculadas. Papel, entregas e autonomia são específicos desta empresa. Registre suas observações, sem deduzir avaliações.</p>'));
+  },rr('empresas'));
+}
+function centralModalConversa(emp,p){
+  abrirModal('Registrar acompanhamento',esc(p.nome)+' · '+esc(emp.nome),(c,fechar)=>{
+    formularioEstrategia(c,{data:hoje()},[{k:'data',t:'Data da conversa',tipo:'date',req:true},{k:'prazo',t:'Prazo do combinado',tipo:'date'},{k:'assunto',t:'Assunto ou decisão',req:true,full:true},{k:'combinado',t:'Próximo passo combinado',tipo:'textarea',full:true}], 'Salvar acompanhamento',d=>{
+      if(!centralLideres(emp).some(x=>x.id===p.id))throw Error('O vínculo mudou. Reabra a ficha.');
+      (p.registros||(p.registros=[])).push({id:uid(),empresaId:emp.id,...d,concluido:false});salvar();fechar();
+    });
+  },rr('empresas'));
+}
+function centralModalItem(emp,tipo,item){
+  const sistema=tipo==='sistemasEmpresa',campos=sistema?[{k:'nome',t:'Nome do sistema',req:true},{k:'url',t:'Endereço do sistema',req:true,full:true},{k:'descricao',t:'Para que usar',full:true}]:[{k:'nome',t:'Nome',req:true},{k:'funcao',t:'Função / assunto'},{k:'telefone',t:'Telefone'},{k:'email',t:'E-mail'},{k:'obs',t:'Observações',tipo:'textarea',full:true}];
+  abrirModal(sistema?'Sistema da empresa':'Contato da empresa',esc(emp.nome),(c,fechar)=>formularioEstrategia(c,item||{},campos,'Salvar',d=>{
+    if(sistema)d.url=empresaValidarUrl(d.url);
+    if(item)Object.assign(item,d);else(emp[tipo]||(emp[tipo]=[])).push({id:uid(),...d});salvar();fechar();
+  }),rr('empresas'));
+}
+function centralEmpresa(emp,ficha,planos){
+  const lideres=centralLideres(emp),plano=planos.find(p=>!p.encerrado)||planos[0],s=plano?resumoEstrategia(plano):null;
+  const resumo=empresaBloco('🧭 Visão de direção','direcao','Prioridades e decisões desta empresa. Cada informação continua na sua origem.');
+  const metricas=el('<div class="central-metricas"></div>');
+  for(const [t,n,sub,fn] of [['♟️ Objetivos',s?.objetivos.length??'—',plano?'Plano '+plano.ano:'Planejamento não cadastrado',()=>plano?empresaAbrirPlano(emp,plano):modalAnoEmpresa(emp)],['👥 Lideranças',lideres.length,'Selecionadas por você',()=>document.getElementById('empresa-liderancas')?.scrollIntoView({block:'start'})],['⏳ Prazos vencidos',s?.atrasadas.length??'—','Ações do planejamento',()=>plano?empresaAbrirPlano(emp,plano):modalAnoEmpresa(emp)],['🚧 Bloqueios',s?.travadas.length??'—','Precisam de uma decisão',()=>plano?empresaAbrirPlano(emp,plano):modalAnoEmpresa(emp)]]){const b=acao('',fn,'ghost');b.className='central-metrica';b.innerHTML='<span>'+esc(t)+'</span><strong>'+esc(n)+'</strong><small>'+esc(sub)+'</small>';metricas.appendChild(b)}
+  resumo.lastElementChild.appendChild(metricas);
+  if(s){if(s.semQuem.length)resumo.lastElementChild.appendChild(el('<p class="empresa-nota">⚠️ '+s.semQuem.length+' ação(ões) sem responsável. Defina quem conduz cada entrega no planejamento.</p>'));for(const o of s.objetivos.slice(0,4))resumo.lastElementChild.appendChild(empresaLinha(o.titulo||'Objetivo sem título',o.meta||o.indicador||'Definir como medir','Acompanhar',()=>{empresaAbrirPlano(emp,plano);filtro.estrAba='plano';filtro.estrObjetivo=o.id;rr('estrategia')()}));}
+  resumo.lastElementChild.appendChild(acao(plano?'Abrir estratégia · '+plano.ano:'Definir estratégia',()=>plano?empresaAbrirPlano(emp,plano):modalAnoEmpresa(emp),'ghost'));ficha.appendChild(resumo);
+  const pessoas=empresaBloco('👥 Minhas lideranças','liderancas','Pessoas escolhidas por você, com responsabilidades e acompanhamento.','+ Liderança',()=>centralModalLider(emp));
+  if(!lideres.length)pessoas.lastElementChild.appendChild(el('<p class="empresa-nota">Quem responde pelas áreas desta empresa? Adicione apenas suas lideranças. Nenhuma pessoa do RH ou dos planos é importada automaticamente.</p>'));
+  const grade=el('<div class="central-lideres"></div>');for(const p of lideres){const v=p.vinculos.find(v=>v.empresaId===emp.id),card=el('<article class="central-lider"><h3>'+esc(p.nome)+'</h3><p>'+esc(v.responsabilidade||'Papel a definir')+'</p></article>');
+    card.prepend(empresaImagem({nome:p.nome},'central-avatar',p.foto||''));
+    const entregas=s?.abertas.filter(x=>x.a.liderId===p.id)||[];if(entregas.length)card.appendChild(empresaLinha(entregas.length+' ação(ões) em aberto no plano','Responsabilidade vinculada à liderança','Ver ações',()=>{empresaAbrirPlano(emp,plano);filtro.estrAba='plano';rr('estrategia')()}));
+    for(const [rotulo,valor] of [['Entregas',v.entregas],['Autonomia',v.autonomia],['Pontos fortes',p.pontosFortes],['Desenvolvimento',p.desenvolvimento],['Comunicação',p.comunicacao]])if(valor)card.appendChild(el('<p><b>'+rotulo+'</b><br>'+esc(valor)+'</p>'));
+    if(p.telefone||p.email)card.appendChild(el('<p>'+esc([p.telefone,p.email].filter(Boolean).join(' · '))+'</p>'));
+    const a=el('<div class="empresa-acoes"></div>');a.append(acao('Editar perfil',()=>centralModalLider(emp,p),'ghost mini'),acao('Registrar conversa',()=>centralModalConversa(emp,p),'ghost mini'));card.appendChild(a);grade.appendChild(card);
+  }pessoas.lastElementChild.appendChild(grade);ficha.appendChild(pessoas);
+  const conversas=empresaBloco('💬 Acompanhamento e decisões','acompanhamento','Combinados por liderança, com histórico e próximo passo.');
+  const registros=lideres.flatMap(p=>(p.registros||[]).filter(r=>r.empresaId===emp.id).map(r=>({p,r}))).sort((a,b)=>(b.r.data||'').localeCompare(a.r.data||''));
+  for(const {p,r} of registros){const linha=empresaLinha(p.nome+' · '+r.assunto,[r.data&&fmtDataAno(r.data),r.combinado,r.prazo?'Prazo '+fmtDataAno(r.prazo):'',r.concluido?'Concluído':'Em acompanhamento'].filter(Boolean).join(' · '),r.concluido?'Reabrir':'Concluir',()=>{r.concluido=!r.concluido;salvar();rr('empresas')()});if(!r.concluido&&r.prazo&&r.prazo<hoje())linha.classList.add('empresa-atencao');conversas.lastElementChild.appendChild(linha)}
+  if(!registros.length)conversas.lastElementChild.appendChild(el('<p class="empresa-nota">Use “Registrar conversa” no perfil de uma liderança para guardar decisões e combinados.</p>'));ficha.appendChild(conversas);
+  for(const [tipo,id,titulo,sub] of [['contatosEmpresa','contatos','☎️ Contatos-chave','Contabilidade, jurídico, fornecedores e quem procurar.'],['sistemasEmpresa','sistemas','🔗 Sistemas da empresa','Acesse a operação no sistema de origem. Não guarde senhas nestes campos.']]){
+    const bloco=empresaBloco(titulo,id,sub,'+ Adicionar',()=>centralModalItem(emp,tipo));
+    for(const item of emp[tipo]||[]){const row=empresaLinha(item.nome,[item.funcao,item.telefone,item.email,item.obs,item.descricao].filter(Boolean).join(' · '),'Editar',()=>centralModalItem(emp,tipo,item));if(item.url){try{row.appendChild(el('<a class="btn ghost mini" target="_blank" rel="noopener noreferrer" href="'+esc(empresaValidarUrl(item.url))+'">Abrir sistema ↗</a>'))}catch{row.appendChild(el('<small>Confira o endereço do sistema.</small>'))}}bloco.lastElementChild.appendChild(row)}
+    if(!(emp[tipo]||[]).length)bloco.lastElementChild.appendChild(el('<p class="empresa-nota">Nenhum registro ainda. Cadastre o que você precisa consultar nesta empresa.</p>'));ficha.appendChild(bloco);
+  }
+}
+
 function vEmpresas(m){
-  m.classList.add('workspace-layout','empresas-layout');const topo=cab('Empresas','Dados, documentos e compromissos conectados à sua empresa.');if(filtro.empresaAba!=='organograma')topo.appendChild(acao('+ Nova empresa',()=>empresaModalFicha()));m.appendChild(topo);
-  const abas=abasWorkspace(m,'empresas',[['cadastros','Cadastros'],['organograma','Organograma']],filtro.empresaAba||'cadastros',id=>{filtro.empresaAba=id;rr('empresas')()});
+  m.classList.add('workspace-layout','empresas-layout');const topo=cab('Empresas','Sua central de direção: estratégia, lideranças, bancos, contatos e sistemas.');if(filtro.empresaAba!=='organograma')topo.appendChild(acao('+ Nova empresa',()=>empresaModalFicha()));m.appendChild(topo);
+  const abas=abasWorkspace(m,'empresas',[['cadastros','Central de controle'],['organograma','Organograma']],filtro.empresaAba||'cadastros',id=>{filtro.empresaAba=id;rr('empresas')()});
   if(filtro.empresaAba==='organograma'){
     if(typeof LeoOrganograma==='undefined'){abas.paineis.organograma.appendChild(el('<p class="empresa-nota">Não foi possível carregar o organograma. Atualize a página para tentar novamente.</p>'));return;}
     LeoOrganograma.render(abas.paineis.organograma,{getState:()=>E,save:salvar,openModal:(titulo,sub,montar)=>abrirModal(esc(titulo),esc(sub),montar),openCompany:empresaAbrir,logo:nome=>marcaDe(nome).logo,selectedId:filtro.empresaOrganogramaId||'',onSelect:id=>{filtro.empresaOrganogramaId=id}});return;
@@ -9478,10 +9555,11 @@ function vEmpresas(m){
   if(!emp){const empty=el('<section class="workspace-empty"><h2>'+((E.empresasPJ||[]).length?'Nenhuma empresa neste filtro':'Sua base empresarial começa aqui')+'</h2><p>Reúna contatos, contas e documentos. Os planejamentos anuais continuarão ligados à mesma empresa.</p></section>');empty.appendChild(acao((E.empresasPJ||[]).length?'Limpar busca':'Cadastrar empresa',(E.empresasPJ||[]).length?()=>{filtro.empresaBusca='';rr('empresas')()}:()=>empresaModalFicha()));ficha.appendChild(empty);return;}
   filtro.empresaId=emp.id;
   const docs=empresaDocumentos(emp),obs=empresaObrigacoes(emp),pend=obs.filter(o=>!['Pago','Cancelado'].includes(o.status)),contas=empresaContas(emp),bens=empresaRegistros(emp,'patrimonio'),planos=(E.planejamentoEmpresas||[]).filter(p=>p.empresaId===emp.id).sort((a,b)=>b.ano-a.ano);
-  const hero=el('<section class="empresa-cabecalho"><div><span class="workspace-eyebrow">FICHA EMPRESARIAL · '+esc(emp.status||'Situação não informada')+'</span><h2>'+esc(emp.nome||'Empresa sem nome')+'</h2><p>'+esc([emp.razaoSocial,emp.cnpj].filter(Boolean).join(' · ')||'Complete o CNPJ e os dados gerais.')+'</p></div><div class="empresa-resumo"><span><b>'+contas.length+'</b> contas</span><span><b>'+docs.length+'</b> documentos</span><span><b>'+pend.length+'</b> obrigações em aberto</span></div></section>');ficha.appendChild(hero);
+  const hero=el('<section class="empresa-cabecalho"><div><span class="workspace-eyebrow">CENTRAL DE CONTROLE · '+esc(emp.status||'Situação não informada')+'</span><h2>'+esc(emp.nome||'Empresa sem nome')+'</h2><p>'+esc([emp.razaoSocial,emp.cnpj].filter(Boolean).join(' · ')||'Complete o CNPJ e os dados gerais.')+'</p></div><div class="empresa-resumo"><span><b>'+contas.length+'</b> contas</span><span><b>'+docs.length+'</b> documentos</span><span><b>'+pend.length+'</b> obrigações em aberto</span></div></section>');ficha.appendChild(hero);
   const identidade=el('<div class="empresa-identidade"></div>');identidade.append(empresaImagem(emp,'empresa-logo-cabecalho'),hero.firstElementChild);hero.prepend(identidade);
   const acoesFicha=el('<div class="empresa-acoes empresa-acoes-ficha"></div>');acoesFicha.append(acao(marcaDe(emp.nome).logo?'Trocar logo':'Adicionar logo',()=>empresaModalLogo(emp),'ghost mini'),acao('Excluir empresa',()=>empresaModalExcluir(emp),'ghost mini empresa-btn-excluir'));hero.appendChild(acoesFicha);
-  const nav=el('<nav class="empresa-indice" aria-label="Seções da empresa"></nav>');for(const [id,t] of [['gerais','Dados e contatos'],['bancos','Bancos'],['documentos','Documentos'],['imoveis','Imóveis e obrigações'],['conexoes','Conexões']])nav.appendChild(acao(t,()=>document.getElementById('empresa-'+id)?.scrollIntoView({block:'start'}),'ghost mini'));ficha.appendChild(nav);
+  const nav=el('<nav class="empresa-indice" aria-label="Seções da empresa"></nav>');for(const [id,t] of [['direcao','🧭 Visão geral'],['liderancas','👥 Lideranças'],['acompanhamento','💬 Acompanhamento'],['bancos','🏦 Bancos'],['contatos','☎️ Contatos'],['sistemas','🔗 Sistemas'],['gerais','Dados cadastrais'],['documentos','Documentos'],['imoveis','Obrigações'],['conexoes','Conexões']])nav.appendChild(acao(t,()=>document.getElementById('empresa-'+id)?.scrollIntoView({block:'start'}),'ghost mini'));ficha.appendChild(nav);
+  centralEmpresa(emp,ficha,planos);
   const geral=empresaBloco('🏢 Dados e contatos','gerais','Informações cadastrais e quem procurar.','Editar dados',()=>empresaModalFicha(emp));
   const dl=el('<dl class="empresa-dados"></dl>');for(const [t,v] of [['CNPJ',emp.cnpj],['Abertura',emp.abertura?fmtDataAno(emp.abertura):''],['Atividade / CNAE',emp.atividade],['Inscrição estadual',emp.inscricaoEstadual],['Inscrição municipal',emp.inscricaoMunicipal],['Regime',emp.regime],['Sócios',emp.socios],['Endereço',[emp.endereco,emp.cidade,emp.uf,emp.cep].filter(Boolean).join(' · ')],['Contato',[emp.contato,emp.telefone,emp.email].filter(Boolean).join(' · ')],['Contabilidade',[emp.contador,emp.contadorContato].filter(Boolean).join(' · ')],['Referência bancária anterior',emp.banco],['Observações',emp.obs]])if(v)dl.appendChild(el('<div><dt>'+t+'</dt><dd>'+esc(v)+'</dd></div>'));
   if(!dl.children.length)dl.appendChild(el('<p class="empresa-nota">Preencha endereço, contatos e dados da empresa para facilitar a consulta.</p>'));geral.lastElementChild.appendChild(dl);if(emp.site){try{const url=empresaValidarUrl(emp.site);geral.lastElementChild.appendChild(el('<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Abrir site ↗</a>'))}catch{geral.lastElementChild.appendChild(el('<p class="empresa-nota">Confira o endereço do site no cadastro.</p>'))}}ficha.appendChild(geral);
@@ -13519,6 +13597,12 @@ function pedirArquivo(cb,accept){const i=document.createElement('input');i.type=
    Agora grava pelo caminho normal (salvar + envio com a trava de concorrência),
    e o estado de antes fica em "Versão descartada". */
 function validarBackupEmpresas(j){
+  const idsLideres=new Set();
+  for(const p of j.liderancas||[]){
+    if(!p.id||idsLideres.has(p.id))throw Error('ID de liderança ausente ou duplicado.');idsLideres.add(p.id);
+    const vinculos=new Set();for(const v of p.vinculos||[]){if(!v.empresaId||vinculos.has(v.empresaId)||(j.empresasPJ||[]).every(e=>e.id!==v.empresaId))throw Error('Vínculo de liderança inválido.');vinculos.add(v.empresaId)}
+    for(const r of p.registros||[])if(!vinculos.has(r.empresaId))throw Error('Acompanhamento sem vínculo empresarial.');
+  }
   const empresasIds=new Set(),internos=new Set();
   for(const e of j.empresasPJ||[]){
     if(e.id){if(empresasIds.has(e.id))throw Error('ID de empresa duplicado no backup.');empresasIds.add(e.id)}
@@ -13538,7 +13622,7 @@ function validarBackup(j){
       if(!Array.isArray(j[k])||j[k].some(x=>k==='obraM2Fora'?typeof x!=='string':(!x||typeof x!=='object'||Array.isArray(x))))throw new Error('Lista inválida: '+k);
     }else if(v&&typeof v==='object'&&(!j[k]||typeof j[k]!=='object'||Array.isArray(j[k])))throw new Error('Seção inválida: '+k);
   }
-  const listasInternas={acervoDocumental:['registros'],empresasPJ:['documentosEmpresa','obrigacoesEmpresa'],viagens:['custos','passagens','hoteis','tickets','roteiro','lugares'],metas:['passos'],oportunidades:['links'],planejamentoEmpresas:['objetivos','valores','zonas','pecas']};
+  const listasInternas={acervoDocumental:['registros'],empresasPJ:['documentosEmpresa','obrigacoesEmpresa','contatosEmpresa','sistemasEmpresa'],liderancas:['vinculos','registros'],viagens:['custos','passagens','hoteis','tickets','roteiro','lugares'],metas:['passos'],oportunidades:['links'],planejamentoEmpresas:['objetivos','valores','zonas','pecas']};
   for(const [col,camposLista] of Object.entries(listasInternas))for(const x of j[col]||[])for(const k of camposLista){
     if(x[k]!==undefined&&(!Array.isArray(x[k])||x[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))throw new Error('Lista inválida: '+col+'.'+k);
   }

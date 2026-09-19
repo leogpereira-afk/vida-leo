@@ -34,3 +34,11 @@
 .empresas-layout .btn,.empresa-modal .btn{font-family:inherit}
 
 .empresa-form-grupo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-column:1/-1;gap:14px 18px;border:0;border-top:1px solid var(--linha);padding:18px 0 6px;margin:8px 0 0;min-width:0}.empresa-form-grupo legend{font-size:14px;font-weight:700;color:var(--verde);padding-right:12px}.empresa-form-grupo>.ff-field{min-width:0}@media(max-width:600px){.empresa-form-grupo{grid-template-columns:minmax(0,1fr)}}
+
+/* Central de direção: resumo legível e contexto de empresa sempre visível. */
+.central-metricas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:18px 0}
+.central-metrica{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:10px;padding:18px;border:1px solid var(--linha);border-radius:14px;background:var(--verde-claro,#edf5f1);color:var(--tinta);font:inherit;cursor:pointer;min-width:0}
+.central-metrica strong{font-size:32px;line-height:1}.central-metrica span{font-size:13px;font-weight:700}.central-metrica small{color:var(--suave);font-size:11px;line-height:1.5}.central-metrica:hover{border-color:var(--verde);transform:translateY(-2px)}
+.central-lideres{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding-top:16px}.central-lider{border:1px solid var(--linha);border-radius:16px;padding:20px;min-width:0;background:var(--bg)}.central-lider h3{margin:12px 0 5px;font-size:19px}.central-lider p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.65;color:var(--suave)}.central-lider p b{color:var(--tinta)}.central-avatar{width:54px;height:54px;font-size:20px;border-radius:16px}.central-avatar img{object-fit:cover}.central-lider .empresa-acoes{margin-top:16px}
+@media(max-width:1100px){.central-metricas{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.central-lideres{grid-template-columns:minmax(0,1fr)}.central-metrica{padding:12px}.central-metrica strong{font-size:27px}.central-lider{padding:16px}.empresa-indice .btn{min-height:42px}}
