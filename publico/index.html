@@ -9255,10 +9255,11 @@ function bancosConferirImportacao(contas){
 function bancoModal(b,origem){
   const novo=!b,registro=b||{id:uid(),_ffNovo:true};
   const defs=[{k:'banco',t:'Banco',req:true,grupo:'Identificação'},{k:'titular',t:'Titular',req:true,sugestoes:(E.empresasPJ||[]).map(e=>e.nome)},
-    {k:'doc',t:'CPF / CNPJ do titular'},{k:'tipo',t:'Tipo de conta',opcoes:['',...CFG('tiposContaBanco')]},
+    {k:'codigoBanco',t:'Código do banco',ph:'3 dígitos',ajuda:'Número do banco, diferente da agência e da conta.'},{k:'doc',t:'CPF / CNPJ do titular'},{k:'tipo',t:'Tipo de conta',opcoes:['',...CFG('tiposContaBanco')]},
     {k:'agencia',t:'Agência',grupo:'Conta e PIX'},{k:'conta',t:'Conta com dígito'},{k:'pix',t:'Chave PIX'},{k:'pixTipo',t:'Tipo da chave',opcoes:['','CNPJ','CPF','E-mail','Telefone','Aleatória','Conta e agência']},
     {k:'gerente',t:'Gerente / contato',grupo:'Contato e observações'},{k:'telefone',t:'Telefone'},{k:'obs',t:'Observações',tipo:'textarea',full:true}];
   empresaFormulario(novo?'Nova conta':'Editar conta','Banco e titular são obrigatórios. Agência, conta e PIX são opcionais. Não registre senhas.',defs,registro,(v,patch)=>{
+    if(v.codigoBanco&&!/^\d{3}$/.test(v.codigoBanco))throw Error('Informe o código do banco com 3 dígitos.');
     const emp=empresaPorId(registro.empresaId);if(emp&&normaliza(v.titular)!==normaliza(emp.nome))throw Error('O titular está vinculado à empresa '+emp.nome+'. Altere o nome na ficha da empresa.');
     if(emp){v.titular=emp.nome;if(registro.titular!==emp.nome)patch.titular=emp.nome;else delete patch.titular;}
     if(E.bancos.some(x=>x.id!==registro.id&&bancosIguais(x,v)))throw Error('Esta conta já está cadastrada. Abra a conta existente.');
@@ -9267,12 +9268,29 @@ function bancoModal(b,origem){
     financeiroSalvarRegistro(E.bancos,registro,{...v,...patch},patch);rr('bancos')();
   });
 }
+function bancoSalvarLogo(b,logo){
+  if(!E.bancos.includes(b))throw Error('O cadastro mudou. Abra a conta novamente.');
+  if(logo&&!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(logo))throw Error('Escolha novamente a imagem.');
+  b.logo=logo;salvar();
+}
+function bancoModalLogo(b){
+  abrirModal('Logo do banco',esc(b.banco),(c,fechar)=>{
+    let logo=b.logo||'',versao=0;
+    const box=el('<div class="empresa-logo-editor"><div class="empresa-logo-previa"></div><p>PNG, JPG ou WebP · até 10 MB. A logo será usada nesta conta.</p><p role="alert"></p><div class="empresa-acoes"></div></div>');c.appendChild(box);
+    const previa=box.querySelector('.empresa-logo-previa'),erro=box.querySelector('[role=alert]'),acoes=box.querySelector('.empresa-acoes');
+    const pintar=()=>{previa.replaceChildren();if(logo){const img=el('<img alt="Prévia da logo" style="width:80px;height:80px;object-fit:contain">');img.src=logo;previa.appendChild(img)}else previa.textContent='🏦'};
+    const salvarLogo=acao('Salvar logo',()=>{try{bancoSalvarLogo(b,logo);fechar()}catch(e){erro.textContent=e.message}});
+    acoes.appendChild(acao('Escolher imagem',()=>pedirArquivo(file=>{const atual=++versao;salvarLogo.disabled=true;erro.textContent='';lerLogo(file,uri=>{if(atual!==versao||!box.isConnected)return;logo=uri;salvarLogo.disabled=false;pintar()},msg=>{if(atual!==versao)return;erro.textContent=msg;salvarLogo.disabled=false})},'image/png,image/jpeg,image/webp'),'ghost'));
+    acoes.appendChild(acao('Remover logo',()=>{versao++;logo='';salvarLogo.disabled=false;pintar()},'ghost'));
+    acoes.append(acao('Cancelar',fechar,'ghost'),salvarLogo);pintar();
+  });
+}
 function bancoExcluir(b){
   if(!confirm('Excluir este cadastro da Central? A conta da gestão e o banco original não serão alterados.'))return;
   const i=E.bancos.indexOf(b);if(i<0){alert('O cadastro mudou. Abra a lista novamente.');return}
   E.bancos.splice(i,1);salvar();rr('bancos')();
 }
-function bancoTexto(b){return [b.banco,b.titular,b.doc&&'CPF/CNPJ: '+b.doc,b.agencia&&'Agência: '+b.agencia,b.conta&&'Conta: '+b.conta,b.pix&&'PIX: '+b.pix].filter(Boolean).join('\n')}
+function bancoTexto(b){return [b.banco,b.codigoBanco&&'Código do banco: '+b.codigoBanco,b.titular,b.doc&&'CPF/CNPJ: '+b.doc,b.agencia&&'Agência: '+b.agencia,b.conta&&'Conta: '+b.conta,b.pix&&'PIX: '+b.pix].filter(Boolean).join('\n')}
 async function bancoCopiar(texto,botao){try{await navigator.clipboard.writeText(texto);botao.textContent='Copiado ✓'}catch{botao.textContent='Não foi possível copiar'}}
 function bancoEmpresa(b){return empresaPorId(b.empresaId)?.nome||b.titular||'Sem titular'}
 async function vBancos(m){
@@ -9294,7 +9312,7 @@ async function vBancos(m){
       chip.innerHTML='<span>'+esc(nome)+'</span><b>'+quantidade+'</b>';chips.appendChild(chip);
     }
     filtros.appendChild(chips);
-    const contas=financeiroBusca(todas,filtro.bancoBusca,['banco','titular','agencia','conta','pix','doc']).filter(b=>!filtro.bancoTitular||bancoEmpresa(b)===filtro.bancoTitular);
+    const contas=financeiroBusca(todas,filtro.bancoBusca,['banco','codigoBanco','titular','agencia','conta','pix','doc']).filter(b=>!filtro.bancoTitular||bancoEmpresa(b)===filtro.bancoTitular);
     const estado=el('<div class="bancos-origem"></div>');
     estado.appendChild(el('<p><b>'+contas.length+'</b> conta(s) · '+esc(filtro.bancoTitular||'Nenhuma empresa')+(bancosFonte.contas?' · '+bancosFonte.contas.length+' cadastros na gestão':bancosFonte.erro?' · origem indisponível':' · consultando cadastro da gestão…')+'</p>'));
     estado.appendChild(acao('Atualizar gestão',async()=>{const p=bancosCarregar(true);pintar();await p;pintar()},'ghost mini'));lista.appendChild(estado);
@@ -9302,15 +9320,16 @@ async function vBancos(m){
     if(bancosFonte.erro)lista.appendChild(el('<p class="bancos-erro" role="alert">'+esc(bancosFonte.erro)+(bancosFonte.contas?' Exibindo a última consulta.':' As contas da gestão ainda não estão incluídas nesta lista.')+'</p>'));
     const novas=todas.filter(b=>b._gestao&&!b._local);if(novas.length)estado.appendChild(acao('Conferir '+novas.length+' contas',()=>bancosConferirImportacao(bancosFonte.contas),'ghost mini'));
     const grade=el('<div class="bancos-grade"></div>');lista.appendChild(grade);
-    for(const b of contas){const card=el('<article class="banco-card banco-linha"><header><span class="banco-icone">🏦</span><div><h2>'+esc(b.banco||'Banco não informado')+'</h2><p>'+esc(b.titular||'Titular não informado')+'</p></div></header><dl class="banco-dados-rapidos"></dl><div class="banco-atalhos"></div></article>');
+    for(const b of contas){const card=el('<article class="banco-card banco-linha"><header><span class="banco-icone">🏦</span><div><h2>'+esc(b.banco||'Banco não informado')+(b.codigoBanco?' · '+esc(b.codigoBanco):'')+'</h2><p>'+esc(b.titular||'Titular não informado')+'</p></div></header><dl class="banco-dados-rapidos"></dl><div class="banco-atalhos"></div></article>');
+      if(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(b.logo||'')){const img=el('<img alt="Logo do banco">');img.src=b.logo;img.style.cssText='width:100%;height:100%;object-fit:contain';card.querySelector('.banco-icone').replaceChildren(img)}
       const rapido=card.querySelector('dl');
       for(const [t,v]of [['Agência',b.agencia],['Conta',b.conta],['PIX',b.pix]]){const d=el('<div><dt>'+t+'</dt><dd></dd></div>');if(v){const c=acao(v,()=>bancoCopiar(v,c),'ghost mini');c.title='Copiar '+t;d.querySelector('dd').appendChild(c)}else d.querySelector('dd').textContent='—';rapido.appendChild(d)}
       const copiar=acao('Copiar',()=>bancoCopiar(bancoTexto(b),copiar),'ghost mini');copiar.title='Copiar dados bancários';card.querySelector('.banco-atalhos').appendChild(copiar);
       const detalhes=el('<details class="banco-detalhes"><summary>Detalhes</summary><div class="banco-detalhes-corpo"><dl></dl><footer></footer></div></details>');card.appendChild(detalhes);
-      for(const [t,v]of [['Origem',b._fonte],['Tipo de conta',b.tipo],['CPF / CNPJ',b.doc],['Tipo do PIX',b.pixTipo],['Gerente',b.gerente],['Telefone',b.telefone],['Observações',b.obs]])if(v)detalhes.querySelector('dl').appendChild(el('<div><dt>'+esc(t)+'</dt><dd>'+esc(v)+'</dd></div>'));
+      for(const [t,v]of [['Origem',b._fonte],['Código do banco',b.codigoBanco],['Tipo de conta',b.tipo],['CPF / CNPJ',b.doc],['Tipo do PIX',b.pixTipo],['Gerente',b.gerente],['Telefone',b.telefone],['Observações',b.obs]])if(v)detalhes.querySelector('dl').appendChild(el('<div><dt>'+esc(t)+'</dt><dd>'+esc(v)+'</dd></div>'));
       if(b._local&&b._gestao&&normaliza(b._local.titular||'')!==normaliza(b._gestao.titular||''))detalhes.querySelector('dl').appendChild(el('<div class="banco-nomes-cadastro"><dt>Nomes nos cadastros</dt><dd>Central: '+esc(b._local.titular||'não informado')+'<br>Gestão Impresilk: '+esc(b._gestao.titular||'não informado')+'</dd></div>'));
       const rodape=detalhes.querySelector('footer');const copiarTudo=acao('Copiar dados',()=>bancoCopiar(bancoTexto(b),copiarTudo),'ghost mini');rodape.appendChild(copiarTudo);
-      if(b._local){rodape.appendChild(acao('Editar',()=>bancoModal(b._local,b._gestao),'ghost mini'));rodape.appendChild(acao('Excluir cadastro',()=>bancoExcluir(b._local),'ghost mini'));}
+      if(b._local){rodape.appendChild(acao('Editar',()=>bancoModal(b._local,b._gestao),'ghost mini'));rodape.appendChild(acao('Logo do banco',()=>bancoModalLogo(b._local),'ghost mini'));rodape.appendChild(acao('Excluir cadastro',()=>bancoExcluir(b._local),'ghost mini'));}
       else rodape.appendChild(acao('Guardar na Central',()=>bancosConferirImportacao([b._gestao]),'ghost mini'));
       grade.appendChild(card);
     }
