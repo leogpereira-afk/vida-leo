@@ -9227,7 +9227,7 @@ function bancosReunidos(locais,origem){
   const saida=locais.map(b=>({...b,_local:b,_fonte:'Central'}));
   for(const b of origem||[]){
     const encontrado=saida.find(x=>(b.id&&x.origemGestao===b.id)||bancosIguais(x,b));
-    if(encontrado){for(const [k,v]of Object.entries(b))if(k!=='id'&&!encontrado[k])encontrado[k]=v;encontrado._fonte=encontrado._local?'Central + Gestão':'Gestão Impresilk';encontrado._gestao=b;continue}
+    if(encontrado){for(const [k,v]of Object.entries(b))if(k!=='id'&&!encontrado[k]&&!(encontrado.camposEditadosCentral||[]).includes(k))encontrado[k]=v;encontrado._fonte=encontrado._local?'Central + Gestão':'Gestão Impresilk';encontrado._gestao=b;continue}
     saida.push({...b,id:'gestao:'+b.id,_gestao:b,_fonte:'Gestão Impresilk'});
   }
   return saida;
@@ -9252,7 +9252,7 @@ function bancosConferirImportacao(contas){
     const a=el('<div class="empresa-acoes"></div>');a.append(acao('Cancelar',fechar,'ghost'),acao('Guardar '+novas.length+' contas',()=>{bancosGuardar(contas);fechar()}));c.appendChild(a);
   },rr('bancos'));
 }
-function bancoModal(b){
+function bancoModal(b,origem){
   const novo=!b,registro=b||{id:uid(),_ffNovo:true};
   const defs=[{k:'banco',t:'Banco',req:true,grupo:'Identificação'},{k:'titular',t:'Titular',req:true,sugestoes:(E.empresasPJ||[]).map(e=>e.nome)},
     {k:'doc',t:'CPF / CNPJ do titular'},{k:'tipo',t:'Tipo de conta',opcoes:['',...CFG('tiposContaBanco')]},
@@ -9262,7 +9262,9 @@ function bancoModal(b){
     const emp=empresaPorId(registro.empresaId);if(emp&&normaliza(v.titular)!==normaliza(emp.nome))throw Error('O titular está vinculado à empresa '+emp.nome+'. Altere o nome na ficha da empresa.');
     if(emp){v.titular=emp.nome;if(registro.titular!==emp.nome)patch.titular=emp.nome;else delete patch.titular;}
     if(E.bancos.some(x=>x.id!==registro.id&&bancosIguais(x,v)))throw Error('Esta conta já está cadastrada. Abra a conta existente.');
-    financeiroSalvarRegistro(E.bancos,registro,v,patch);rr('bancos')();
+    patch.camposEditadosCentral=[...new Set([...(registro.camposEditadosCentral||[]),...Object.keys(patch)])];
+    if(origem?.id)patch.origemGestao=origem.id;
+    financeiroSalvarRegistro(E.bancos,registro,{...v,...patch},patch);rr('bancos')();
   });
 }
 function bancoExcluir(b){
@@ -9308,7 +9310,7 @@ async function vBancos(m){
       for(const [t,v]of [['Origem',b._fonte],['Tipo de conta',b.tipo],['CPF / CNPJ',b.doc],['Tipo do PIX',b.pixTipo],['Gerente',b.gerente],['Telefone',b.telefone],['Observações',b.obs]])if(v)detalhes.querySelector('dl').appendChild(el('<div><dt>'+esc(t)+'</dt><dd>'+esc(v)+'</dd></div>'));
       if(b._local&&b._gestao&&normaliza(b._local.titular||'')!==normaliza(b._gestao.titular||''))detalhes.querySelector('dl').appendChild(el('<div class="banco-nomes-cadastro"><dt>Nomes nos cadastros</dt><dd>Central: '+esc(b._local.titular||'não informado')+'<br>Gestão Impresilk: '+esc(b._gestao.titular||'não informado')+'</dd></div>'));
       const rodape=detalhes.querySelector('footer');const copiarTudo=acao('Copiar dados',()=>bancoCopiar(bancoTexto(b),copiarTudo),'ghost mini');rodape.appendChild(copiarTudo);
-      if(b._local){rodape.appendChild(acao('Editar',()=>bancoModal(b._local),'ghost mini'));rodape.appendChild(acao('Excluir cadastro',()=>bancoExcluir(b._local),'ghost mini'));}
+      if(b._local){rodape.appendChild(acao('Editar',()=>bancoModal(b._local,b._gestao),'ghost mini'));rodape.appendChild(acao('Excluir cadastro',()=>bancoExcluir(b._local),'ghost mini'));}
       else rodape.appendChild(acao('Guardar na Central',()=>bancosConferirImportacao([b._gestao]),'ghost mini'));
       grade.appendChild(card);
     }
