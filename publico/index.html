@@ -9281,10 +9281,10 @@ async function vBancos(m){
   function pintar(){
     if(!m.isConnected)return;lista.replaceChildren();
     const todas=bancosReunidos(E.bancos,bancosFonte.contas),titulares=[...new Set(todas.map(bancoEmpresa))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
-    if(filtro.bancoTitular&&!titulares.includes(filtro.bancoTitular))filtro.bancoTitular='';
+    if(!titulares.includes(filtro.bancoTitular))filtro.bancoTitular=titulares[0]||'';
     const filtros=busca.querySelector('.bancos-escopo');filtros.replaceChildren();
     const chips=el('<nav class="bancos-empresas" aria-label="Bancos por empresa"></nav>');
-    for(const [valor,nome]of [['','Todas as empresas'],...titulares.map(t=>[t,t])]){
+    for(const [valor,nome]of titulares.map(t=>[t,t])){
       const quantidade=valor?todas.filter(b=>bancoEmpresa(b)===valor).length:todas.length;
       const chip=acao('',()=>{const pos=chips.scrollLeft;filtro.bancoTitular=valor;pintar();const nav=busca.querySelector('.bancos-empresas');nav.scrollLeft=pos;nav.querySelector('[aria-pressed="true"]').focus({preventScroll:true})},'ghost');
       chip.className='banco-empresa-chip';chip.setAttribute('aria-pressed',String((filtro.bancoTitular||'')===valor));
@@ -9293,7 +9293,7 @@ async function vBancos(m){
     filtros.appendChild(chips);
     const contas=financeiroBusca(todas,filtro.bancoBusca,['banco','titular','agencia','conta','pix','doc']).filter(b=>!filtro.bancoTitular||bancoEmpresa(b)===filtro.bancoTitular);
     const estado=el('<div class="bancos-origem"></div>');
-    estado.appendChild(el('<p><b>'+contas.length+'</b> de '+todas.length+' contas'+(bancosFonte.contas?' · '+bancosFonte.contas.length+' cadastros na gestão':bancosFonte.erro?' · origem indisponível':' · consultando cadastro da gestão…')+'</p>'));
+    estado.appendChild(el('<p><b>'+contas.length+'</b> conta(s) · '+esc(filtro.bancoTitular||'Nenhuma empresa')+(bancosFonte.contas?' · '+bancosFonte.contas.length+' cadastros na gestão':bancosFonte.erro?' · origem indisponível':' · consultando cadastro da gestão…')+'</p>'));
     estado.appendChild(acao('Atualizar gestão',async()=>{const p=bancosCarregar(true);pintar();await p;pintar()},'ghost mini'));lista.appendChild(estado);
     if(bancosFonte.pendente)lista.appendChild(el('<p class="empresa-nota">Atualizando as contas da gestão…</p>'));
     if(bancosFonte.erro)lista.appendChild(el('<p class="bancos-erro" role="alert">'+esc(bancosFonte.erro)+(bancosFonte.contas?' Exibindo a última consulta.':' As contas da gestão ainda não estão incluídas nesta lista.')+'</p>'));
@@ -9305,7 +9305,7 @@ async function vBancos(m){
       const copiar=acao('Copiar',()=>bancoCopiar(bancoTexto(b),copiar),'ghost mini');copiar.title='Copiar dados bancários';card.querySelector('.banco-atalhos').appendChild(copiar);
       const detalhes=el('<details class="banco-detalhes"><summary>Detalhes</summary><div class="banco-detalhes-corpo"><dl></dl><footer></footer></div></details>');card.appendChild(detalhes);
       for(const [t,v]of [['Origem',b._fonte],['Tipo de conta',b.tipo],['CPF / CNPJ',b.doc],['Tipo do PIX',b.pixTipo],['Gerente',b.gerente],['Telefone',b.telefone],['Observações',b.obs]])if(v)detalhes.querySelector('dl').appendChild(el('<div><dt>'+esc(t)+'</dt><dd>'+esc(v)+'</dd></div>'));
-      if(b._local&&b._gestao&&normaliza(b._local.titular||'')!==normaliza(b._gestao.titular||''))card.appendChild(el('<p class="banco-titular-origem">Titular na gestão: <b>'+esc(b._gestao.titular||'não informado')+'</b>. Confira antes de usar.</p>'));
+      if(b._local&&b._gestao&&normaliza(b._local.titular||'')!==normaliza(b._gestao.titular||''))detalhes.querySelector('dl').appendChild(el('<div class="banco-nomes-cadastro"><dt>Nomes nos cadastros</dt><dd>Central: '+esc(b._local.titular||'não informado')+'<br>Gestão Impresilk: '+esc(b._gestao.titular||'não informado')+'</dd></div>'));
       const rodape=detalhes.querySelector('footer');const copiarTudo=acao('Copiar dados',()=>bancoCopiar(bancoTexto(b),copiarTudo),'ghost mini');rodape.appendChild(copiarTudo);
       if(b._local){rodape.appendChild(acao('Editar',()=>bancoModal(b._local),'ghost mini'));rodape.appendChild(acao('Excluir cadastro',()=>bancoExcluir(b._local),'ghost mini'));}
       else rodape.appendChild(acao('Guardar na Central',()=>bancosConferirImportacao([b._gestao]),'ghost mini'));
