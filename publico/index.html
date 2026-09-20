@@ -9259,7 +9259,8 @@ function bancoModal(b){
     {k:'agencia',t:'Agência',grupo:'Conta e PIX'},{k:'conta',t:'Conta com dígito'},{k:'pix',t:'Chave PIX'},{k:'pixTipo',t:'Tipo da chave',opcoes:['','CNPJ','CPF','E-mail','Telefone','Aleatória','Conta e agência']},
     {k:'gerente',t:'Gerente / contato',grupo:'Contato e observações'},{k:'telefone',t:'Telefone'},{k:'obs',t:'Observações',tipo:'textarea',full:true}];
   empresaFormulario(novo?'Nova conta':'Editar conta','Banco e titular são obrigatórios. Agência, conta e PIX são opcionais. Não registre senhas.',defs,registro,(v,patch)=>{
-    const emp=empresaPorId(registro.empresaId);if(emp&&v.titular!==emp.nome)throw Error('O titular está vinculado à empresa '+emp.nome+'. Altere o nome na ficha da empresa.');
+    const emp=empresaPorId(registro.empresaId);if(emp&&normaliza(v.titular)!==normaliza(emp.nome))throw Error('O titular está vinculado à empresa '+emp.nome+'. Altere o nome na ficha da empresa.');
+    if(emp){v.titular=emp.nome;if(registro.titular!==emp.nome)patch.titular=emp.nome;else delete patch.titular;}
     if(E.bancos.some(x=>x.id!==registro.id&&bancosIguais(x,v)))throw Error('Esta conta já está cadastrada. Abra a conta existente.');
     financeiroSalvarRegistro(E.bancos,registro,v,patch);rr('bancos')();
   });
