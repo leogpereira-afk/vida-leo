@@ -15,6 +15,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+html[data-fonte-interface] body,html[data-fonte-interface] body *{font-family:var(--fonte-interface)!important}
+
 :root{
   --bg:#f7f6f3; --card:#fff; --linha:#e8e5df; --tinta:#20211f; --suave:#6f7269;
   --marca:#3e45ee; --marca-cl:#eeefff; --marca-solida:#3e45ee;
@@ -1833,6 +1835,7 @@ function prepararTabelas(pagina){
 }
 
 function tela(){
+  aplicarFonteInterface();
   const m=document.getElementById('main'),pagina=el('<div class="pagina"></div>');m.replaceChildren(pagina);
   const alvo=_alvoBloco;_alvoBloco=null;
   const mod=MODS.find(x=>x.id===atual&&!x.url);document.title=mod.nome+' · Central do Léo';
@@ -13439,12 +13442,25 @@ function renomeiaEmpresa(de,para,registro){
   salvar();return true;
 }
 
+const FONTES_INTERFACE={padrao:'',inter:'Inter, system-ui, sans-serif',sistema:'system-ui, sans-serif',arial:'Arial, sans-serif',georgia:'Georgia, serif'};
+function aplicarFonteInterface(){
+  const fonte=FONTES_INTERFACE[E.config?.fonteInterface]||'',raiz=document.documentElement;if(!raiz)return;
+  if(fonte){raiz.setAttribute('data-fonte-interface','');raiz.style.setProperty('--fonte-interface',fonte)}else{raiz.removeAttribute('data-fonte-interface');raiz.style.removeProperty('--fonte-interface')}
+}
+function escolherFonteInterface(valor){
+  if(!Object.hasOwn(FONTES_INTERFACE,valor))throw Error('Escolha uma fonte da lista.');
+  E.config=E.config||{};E.config.fonteInterface=valor;salvar();aplicarFonteInterface();
+}
 async function vConfig(m){
   const r=rr('config');
   m.classList.add('config-fluida');m.appendChild(cab('Configurações','Gerencie conexões, preferências, listas e cópias de segurança.'));
   const bancosAtalho=el('<section class="bancos-config"><div class="corpo"><h2>🏦 Bancos cadastrados</h2><p>Edite banco, titular, agência, conta e PIX na lista organizada por empresa.</p></div></section>');
   bancosAtalho.querySelector('.corpo').appendChild(acao('Gerenciar contas bancárias',()=>irTela('bancos'),'ghost'));m.appendChild(bancosAtalho);
   m.appendChild(painel('Seções', 'Abra o assunto que deseja ajustar'));
+  const aparencia=el('<div class="corpo"><p>Escolha a fonte das letras em todo o sistema. A mudança é aplicada imediatamente.</p></div>');
+  aparencia.appendChild(seletor(E.config?.fonteInterface||'padrao',[['padrao','Padrão do sistema'],['inter','Inter'],['sistema','Fonte do aparelho'],['arial','Arial'],['georgia','Georgia']],escolherFonteInterface,'Fonte das letras'));
+  m.appendChild(bloco('cf-aparencia','🎨 Aparência','fonte das letras, títulos e campos',aparencia));
+
   m.appendChild(blocoConferenciaCadastros());m.appendChild(blocoGoogle('gmail'));m.appendChild(blocoGoogle('agenda'));
   const t=await arqTotal();
   if(atual!=='config')return;

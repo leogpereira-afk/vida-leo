@@ -1,0 +1,4 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {setup} from './helpers/dom.mjs';
+test('fonte escolhida é aplicada e restaurada ao abrir outra tela',()=>{const a=setup();a.run('E=structuredClone(SEED);agendaPush=()=>{};escolherFonteInterface("georgia")');assert.equal(a.run('E.config.fonteInterface'),'georgia');assert.equal(a.document.documentElement.style.getPropertyValue('--fonte-interface'),'Georgia, serif');a.document.documentElement.style.removeProperty('--fonte-interface');a.run('aplicarFonteInterface()');assert.equal(a.document.documentElement.style.getPropertyValue('--fonte-interface'),'Georgia, serif');a.run('escolherFonteInterface("padrao")');assert.equal(a.document.documentElement.hasAttribute('data-fonte-interface'),false);assert.throws(()=>a.run('escolherFonteInterface("invalida")'));});
