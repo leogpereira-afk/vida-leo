@@ -13423,7 +13423,7 @@ function renomeiaEmpresa(de,para,registro){
 async function vConfig(m){
   const r=rr('config');
   m.classList.add('config-fluida');m.appendChild(cab('Configurações','Gerencie conexões, preferências, listas e cópias de segurança.'));
-  const bancosAtalho=el('<section class="painel"><div class="corpo"><h2>🏦 Bancos cadastrados</h2><p>Edite banco, titular, agência, conta e PIX na lista organizada por empresa.</p></div></section>');
+  const bancosAtalho=el('<section class="bancos-config"><div class="corpo"><h2>🏦 Bancos cadastrados</h2><p>Edite banco, titular, agência, conta e PIX na lista organizada por empresa.</p></div></section>');
   bancosAtalho.querySelector('.corpo').appendChild(acao('Gerenciar contas bancárias',()=>irTela('bancos'),'ghost'));m.appendChild(bancosAtalho);
   m.appendChild(painel('Seções', 'Abra o assunto que deseja ajustar'));
   m.appendChild(blocoConferenciaCadastros());m.appendChild(blocoGoogle('gmail'));m.appendChild(blocoGoogle('agenda'));
