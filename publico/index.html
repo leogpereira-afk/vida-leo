@@ -3824,9 +3824,19 @@ function importarExamesRotina(){
       const tb=document.createElement('tbody');
       const linhas=r.bons.map(x=>{
         const repetido=jaTemExame(x);
-        const tr=el('<tr><td><input type="checkbox"></td><td>'+esc(fmtDataAno(x.data))+'</td>'+
+        /* A LINHA NASCE COMO <tr> DE VERDADE, não por `el()`.
+           `el()` monta o HTML dentro de uma <div>, e o navegador DESCARTA as
+           tags <tr> e <td> soltas fora de uma tabela — medido: de
+           '<tr><td><input></td><td>x</td></tr>' sobra literalmente
+           '<input>x'. Então `firstElementChild` não volta null: volta o
+           próprio <input>, procurar o <input> DENTRO dele dá nada, e a
+           montagem morre ali. A janela ficava em branco sem erro à vista.
+           O simulador de DOM dos testes é tolerante e aceita o <tr> — por
+           isso os sete testes passavam com a tela quebrada. */
+        const tr=document.createElement('tr');
+        tr.innerHTML='<td><input type="checkbox"></td><td>'+esc(fmtDataAno(x.data))+'</td>'+
           '<td>'+esc(x.exame)+'</td><td>'+esc([x.valor,x.unidade].filter(Boolean).join(' ')||'—')+'</td>'+
-          '<td>'+(repetido?'<span class="badge" style="background:var(--areia-cl);color:var(--areia)">já registrado nesta data</span>':'novo')+'</td></tr>');
+          '<td>'+(repetido?'<span class="badge" style="background:var(--areia-cl);color:var(--areia)">já registrado nesta data</span>':'novo')+'</td>';
         const cx=tr.querySelector('input');
         /* A marca vai por PROPRIEDADE, não pelo atributo `checked` do HTML: o
            atributo só diz o estado INICIAL, e é ele que alguns ambientes não

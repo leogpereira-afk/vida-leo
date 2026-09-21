@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {setup} from './helpers/dom.mjs';
+import {readFileSync} from 'node:fs';
 
 /* IMPORTAR LAUDO. O dono manda um check-up com 40 marcadores; digitar um por
  * um não acontece, e o que não acontece não vira histórico. A regra que estes
@@ -101,4 +102,17 @@ test('marcadores: nenhum valor fora da faixa impressa sai como "No alvo"', () =>
     assert.notEqual(abaixo, 'ok', `${nome}: ${piso / 3} está abaixo da faixa ${faixa} e saiu como "No alvo"`);
   }
   assert.ok(forte.length >= 5, 'a varredura não achou as faixas de dois lados');
+});
+
+/* O SIMULADOR DE DOM DOS TESTES É MAIS TOLERANTE QUE O NAVEGADOR.
+ * `el()` monta o HTML dentro de uma <div>. O navegador descarta <tr>, <td>,
+ * <th> e <tbody> soltos fora de uma tabela, então `firstElementChild` volta
+ * null e a montagem morre no meio, em silêncio — foi assim que a janela de
+ * importar apareceu em branco com sete testes verdes. O simulador aceita, e
+ * por isso a guarda tem de ser sobre o FONTE, não sobre o DOM. */
+test('el(): nenhuma linha de tabela é montada por el(), porque o navegador a descarta', () => {
+  const fonte = readFileSync(new URL('../publico/index.html', import.meta.url), 'utf8');
+  const proibidos = [...fonte.matchAll(/\bel\(\s*[`'"]\s*<\s*(tr|td|th|tbody|thead|tfoot)\b/gi)];
+  assert.equal(proibidos.length, 0,
+    'use document.createElement("tr") + innerHTML: ' + proibidos.map(m => m[0]).join(', '));
 });
