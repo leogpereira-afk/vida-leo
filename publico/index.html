@@ -3718,6 +3718,77 @@ const MARCADORES = [
   ['Ácido úrico', 'mg/dL', '3,5 a 7,2', '< 6', v => v > 7.2 || v < 3.5, v => v >= 6],
   ['Ferritina', 'ng/mL', '30 a 400', '50 a 150', v => v > 400 || v < 30, v => v < 50 || v > 150],
 ];
+function faixaDoExameHTML(g){
+  if(g.ult.origemDocumental)return esc(g.ult.referenciaLaudo||'Consultar laudo original');
+  if(g.mk&&normaliza(unidadeSaude(g.ult))===normaliza(g.mk[1]))return esc(g.mk[3]);
+  const r=referenciaExtra(g.ult);
+  /* A ORIGEM DA RÉGUA VAI JUNTO. Saber que a faixa é do laudo, e não uma
+     média de internet, é metade da informação — e a única forma de o dono
+     perceber quando as duas discordam. */
+  if(r)return esc(r[2])+(r[5]==='geral'?' <span style="opacity:.7">· referência geral</span>':'');
+  return 'Consultar laudo';
+}
+
+/* FAIXAS DE REFERÊNCIA DOS DEMAIS EXAMES.
+
+   A régua aqui é a do LAUDO, não a de um site: intervalo de laboratório
+   depende do método que mediu a amostra, e faixa de internet diverge entre si
+   e às vezes mede outra coisa com o mesmo nome — nos EUA reporta-se "BUN"
+   (10 a 20 mg/dL) onde aqui se reporta "ureia" (15 a 40 mg/dL), escalas
+   diferentes que fariam um resultado normal parecer o dobro do limite. Onde o
+   laudo não deu régua utilizável, a faixa é geral e vem DITA como tal, e
+   quando nem isso existe o campo fica em texto, sem cor.
+
+   Formato: [nome, unidade, texto da faixa, fora(v) ou null, atenção(v) ou null,
+   origem]. `fora` null quer dizer: mostre a faixa, não pinte nada — é melhor
+   não afirmar do que afirmar errado sobre saúde.
+
+   Homem adulto, que é de quem são os registros desta Central. */
+const REFERENCIAS_EXTRA = [
+  ['Colesterol total','mg/dL','< 200 ótimo · 200 a 239 limite · ≥ 240 alto', v=>v>=240, v=>v>=200,'laudo'],
+  ['Hemoglobina','g%','14,0 a 18,0', v=>v<14||v>18, null,'laudo'],
+  ['Hematócrito','%','40,0 a 52,0', v=>v<40||v>52, null,'laudo'],
+  ['Hemácias','milh/mm3','4,2 a 5,80', v=>v<4.2||v>5.8, null,'laudo'],
+  ['Leucócitos','/mm3','4.000 a 10.000', v=>v<4000||v>10000, null,'laudo'],
+  ['Plaquetas','/mm3','150.000 a 450.000', v=>v<150000||v>450000, null,'laudo'],
+  ['RDW','%','12,8 a 15,0', v=>v<12.8||v>15, null,'laudo'],
+  ['VHS (hemossedimentação)','mm/1h','até 18 (homens)', v=>v>18, null,'laudo'],
+  ['Fibrinogênio','mg/dL','200 a 400', v=>v<200||v>400, null,'laudo'],
+  ['Homocisteína','µmol/L','5,5 a 16,2 (homens)', v=>v<5.5||v>16.2, null,'laudo'],
+  ['TGO (AST)','U/L','11 a 39 (homens)', v=>v<11||v>39, null,'laudo'],
+  ['TGP (ALT)','U/L','5 a 38', v=>v<5||v>38, null,'laudo'],
+  ['Gama GT','U/L','< 55 (homens)', v=>v>=55, null,'laudo'],
+  ['Ureia','mg/dL','15 a 40', v=>v<15||v>40, null,'laudo'],
+  ['T4 livre','ng/dL','0,61 a 1,12', v=>v<0.61||v>1.12, null,'laudo'],
+  ['Vitamina B12','pg/mL','180 a 914', v=>v<180||v>914, null,'laudo'],
+  ['Ácido fólico','ng/mL','acima de 5,9', v=>v<=5.9, null,'laudo'],
+  ['Vitamina C','mg/dL','0,2 a 2,1 (homens)', v=>v<0.2||v>2.1, null,'laudo'],
+  ['Cálcio','mg/dL','8,8 a 11,0', v=>v<8.8||v>11, null,'laudo'],
+  ['Magnésio','mg/dL','1,6 a 2,6', v=>v<1.6||v>2.6, null,'laudo'],
+  ['Zinco','µg/dL','70,0 a 120,0', v=>v<70||v>120, null,'laudo'],
+  ['Cromo','µg/L','até 5,0', v=>v>5, null,'laudo'],
+  ['Ferro sérico','µg/dL','65 a 170 (homens)', v=>v<65||v>170, null,'laudo'],
+  ['Alumínio','µg/L','< 10,0', v=>v>=10, null,'laudo'],
+  ['Potássio','mg/dL','3,6 a 5,6', v=>v<3.6||v>5.6, null,'laudo'],
+  ['Sódio','mg/dL','135 a 145', v=>v<135||v>145, null,'laudo'],
+  ['Estradiol','pg/mL','abaixo de 31,5 (homens acima de 18 anos)', v=>v>=31.5, null,'laudo'],
+  ['Prolactina','ng/mL','2,64 a 13,13 (homens)', v=>v<2.64||v>13.13, null,'laudo'],
+  ['PTH (paratormônio)','pg/mL','12 a 88', v=>v<12||v>88, null,'laudo'],
+  ['DHT (di-hidrotestosterona)','pg/mL','143 a 842 (homens)', v=>v<143||v>842, null,'laudo'],
+  ['SHBG','nmol/L','10 a 50 (referência geral, não do laudo)', v=>v<10||v>50, null,'geral'],
+  /* Estes três o laudo se recusa a enquadrar, e com razão declarada nele
+     mesmo. Mostrar a explicação e NÃO pintar é a leitura honesta. */
+  ['PSA livre','ng/mL','o laudo diz que não há referência estabelecida para o PSA livre isolado', null, null,'laudo'],
+  ['PSA livre / total','%','só se interpreta quando o PSA total fica entre 4 e 10 ng/mL', null, null,'laudo'],
+  ['Testosterona livre (calculada)','ng/dL','o laudo imprime a referência em nmol/L, unidade diferente do resultado', null, null,'laudo'],
+];
+function referenciaExtra(x){
+  const r = REFERENCIAS_EXTRA.find(y => normaliza(y[0]) === normaliza(x.exame||''));
+  if(!r) return null;
+  const u = unidadeSaude(x);
+  return (u && normaliza(u) !== normaliza(r[1])) ? null : r;   // unidade diferente não compara
+}
+
 // Rastreios recomendados por idade (homem). [nome, idadeInicio, cadaXMeses, porquê]
 // [nome, idade que começa, a cada N meses, para quê, onde procurar se já foi feito]
 // o 5º item evita o rastreio ficar "nunca feito" para sempre: 'marcadores' olha os exames
@@ -3748,7 +3819,13 @@ const ultimoDe = (nome) => E.exames.filter(x => x.exame === nome && x.valor !== 
   .sort((a, b) => (b.data || '').localeCompare(a.data || ''))[0];
 function numeroResultadoSaude(valor){
   if(typeof valor==='number')return Number.isFinite(valor)?valor:NaN;
-  const texto=String(valor??'').trim();
+  let texto=String(valor??'').trim();
+  /* PONTO DE MILHAR NÃO É VÍRGULA. "5.820" leucócitos virava 5,82 e "201.000"
+     plaquetas virava 201 — números que, comparados a qualquer faixa, gritariam
+     alarme falso. Só tira o ponto quando TODOS os grupos depois dele têm
+     exatamente três dígitos e não há vírgula na frente: aí é milhar e não
+     decimal. "1.48" e "94.0" continuam decimais. */
+  if(/^[+-]?\d{1,3}(\.\d{3})+$/.test(texto))texto=texto.replace(/\./g,'');
   if(!/^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:e[+-]?\d+)?$/i.test(texto))return NaN;
   const n=Number(texto.replace(',','.'));return Number.isFinite(n)?n:NaN;
 }
@@ -3759,7 +3836,13 @@ function semaforo(x) {
   const m = MARCADORES.find(y => y[0] === x.exame);
   const v = numeroResultadoSaude(x.valor);
   if(x.resultado==='Aguardando')return '';
-  if (!m || isNaN(v) || x.unidade&&normaliza(x.unidade)!==normaliza(m[1])) return x.resultado === 'Alterado' ? 'ruim' : x.resultado === 'Atenção' ? 'atencao' : x.resultado === 'Normal' ? 'ok' : '';
+  if (!m || isNaN(v) || x.unidade&&normaliza(x.unidade)!==normaliza(m[1])) {
+    /* Sem marcador do painel, ainda pode haver a faixa do laudo. Só pinta quem
+       tem regra: as três que o laudo se recusa a enquadrar ficam sem cor. */
+    const r = isNaN(v) ? null : referenciaExtra(x);
+    if (r && r[3]) return r[3](v) ? 'ruim' : (r[4] && r[4](v)) ? 'atencao' : 'ok';
+    return x.resultado === 'Alterado' ? 'ruim' : x.resultado === 'Atenção' ? 'atencao' : x.resultado === 'Normal' ? 'ok' : '';
+  }
   if (m[4](v)) return 'ruim';          // fora da referência cadastrada no painel
   if (m[5] && m[5](v)) return 'atencao'; // dentro da referência cadastrada, fora do alvo do painel
   return 'ok';
@@ -4009,7 +4092,7 @@ function vSaude(m) {
       tr.innerHTML = `<td style="padding:10px"><b style="font-size:14px">${esc(g.nome)}</b>${g.pendentes?'<small class="rotina-nota">'+g.pendentes+' registro(s) a completar</small>':''}</td>
         <td style="padding:10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:14px">${
           g.ult.valor !== '' && g.ult.valor != null ? esc(g.ult.valor) + (unidadeSaude(g.ult) ? ' <span style="font-weight:400;font-size:11.5px;color:var(--suave)">' + esc(unidadeSaude(g.ult)) + '</span>' : '') : '—'}</td>
-        <td style="padding:10px;color:var(--suave);font-size:12.5px">${g.ult.origemDocumental ? esc(g.ult.referenciaLaudo||'Consultar laudo original') : g.mk&&normaliza(unidadeSaude(g.ult))===normaliza(g.mk[1]) ? esc(g.mk[3]) : 'Consultar laudo'}</td>
+        <td style="padding:10px;color:var(--suave);font-size:12.5px">${faixaDoExameHTML(g)}</td>
         <td style="padding:10px">${c ? `<span class="chip" style="background:${c[0]};color:${c[1]}">${c[2]}</span>` : '—'}</td>
         <td style="padding:10px;color:${corT};font-size:12.5px;font-variant-numeric:tabular-nums">${
           td ? td.seta + ' ' + (td.pct > 0 ? '+' : '') + td.pct.toFixed(0) + '%' : '<span style="color:var(--suave)">'+(g.resultados>1?'Sem comparação numérica':g.resultados?'1ª medição':'Aguardando resultado')+'</span>'}</td>
