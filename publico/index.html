@@ -1514,14 +1514,30 @@ function abrirModal(titulo,sub,montar,aoFechar){
    {v,t} separa os dois, que é o que permite GUARDAR UM ID e MOSTRAR UM NOME.
    Guardar o nome faria o vínculo apodrecer no dia em que alguém corrigisse um
    acento na queixa — a chave é o id, o nome só exibe. */
-function opcoesSelect(opcoes,valor){
+/* A LISTA DE QUEIXAS MORA AQUI, NUM LUGAR SÓ. Ela existia em dois: a célula
+   da tabela rotulava "Dor no ombro · desde 12/03" e o formulário de "+
+   Adicionar" rotulava só "Dor no ombro" -- e duas queixas com o mesmo nome
+   (a dor que voltou, que é justamente o motivo de a queixa ter data) ficavam
+   indistinguíveis na hora de criar a consulta. Lista copiada não avisa quando
+   as duas divergem. */
+function opcoesDeQueixa(){
+  return [{v:'',t:'— nenhuma —'},...(E.queixas||[]).filter(q=>q&&q.id).map(q=>({
+    v:q.id,t:(q.oque||'queixa')+(dataISOValida(q.data)?' · desde '+fmtData(q.data):'')}))];
+}
+
+/* `preservarFora` decide o que fazer com um valor que não está na lista.
+   Em registro SALVO (célula da tabela, `campos`) preservar é o certo: a
+   queixa foi apagada, a opção saiu das Configurações, e sumir com o valor
+   calado apagaria escolha do dono. Em registro NOVO é o contrário -- ali o
+   valor é só o padrão embutido no código, e ressuscitá-lo devolve à tela uma
+   opção que o dono APAGOU das Configurações, já marcada. Foi o que aconteceu
+   com "Trabalho" em Nova viagem. */
+function opcoesSelect(opcoes,valor,preservarFora=true){
   const lista=(Array.isArray(opcoes)?opcoes:[]).map(o=>o&&typeof o==='object'
     ? {v:String(o.v??''),t:String(o.t??o.v??'')}
     : {v:String(o??''),t:String(o??'')});
   const v=valor==null?'':String(valor);
-  /* valor gravado que saiu da lista (queixa apagada, opção removida) não some
-     calado: aparece como está, para o dono ver e decidir */
-  if(v&&!lista.some(o=>o.v===v))lista.push({v,t:v});
+  if(preservarFora&&v&&!lista.some(o=>o.v===v))lista.push({v,t:v});
   const vistos=new Set();
   return lista.filter(o=>vistos.has(o.v)?false:(vistos.add(o.v),true))
     .map(o=>`<option value="${esc(o.v)}"${o.v===v?' selected':''}>${esc(o.t)}</option>`).join('');
@@ -2082,7 +2098,7 @@ function novoRegistroRotina(titulo,lista,base,defs,abrir){
          este caminho. opcoesSelect (linha ~1517) já trata as duas formas, já
          marca o valor atual e já preserva valor gravado que saiu da lista, e é
          a mesma função que a célula da tabela usa. */
-      const inp=d.opcoes?el('<select>'+opcoesSelect(d.opcoes,registro[d.k])+'</select>'):el('<input type="'+(d.tipo||'text')+'">');
+      const inp=d.opcoes?el('<select>'+opcoesSelect(d.opcoes,registro[d.k],false)+'</select>'):el('<input type="'+(d.tipo||'text')+'">');
       inp.name=d.k;inp.value=registro[d.k]??'';inp.required=!!d.obrigatorio;
       if(d.tipo==='number'){inp.step='any';inp.inputMode='decimal';inp.min=d.min??'0'}
       if(d.ph)inp.placeholder=d.ph;
@@ -3973,8 +3989,8 @@ function novoCuidadoRotina(tipo){
     tratamentos:['Novo tratamento',E.tratamentos,{inicio:hoje(),fim:'',frequencia:'',status:'Em andamento'},[{k:'oque',t:'Tratamento / remédio',obrigatorio:true},{k:'motivo',t:'Motivo informado'},{k:'inicio',t:'Início',tipo:'date'},{k:'frequencia',t:'Frequência / dose prescrita'},{k:'medico',t:'Profissional responsável'}],'sa-trat'],
     vacinas:['Nova vacina',E.vacinas,{data:hoje(),proxima:'',viagem:'Não',obs:''},[{k:'vacina',t:'Vacina',obrigatorio:true},{k:'data',t:'Data da dose',tipo:'date',obrigatorio:true},{k:'proxima',t:'Próxima data informada',tipo:'date'},{k:'obs',t:'Observação'}],'sa-vac'],
     queixas:['Nova queixa',E.queixas,{data:hoje(),onde:'',intensidade:'',situacao:'Ativa',obs:''},[{k:'oque',t:'O que estou sentindo',obrigatorio:true},{k:'data',t:'Sinto desde',tipo:'date',obrigatorio:true},{k:'onde',t:'Onde',opcoes:['','Cabeça','Pescoço','Ombro','Braço','Cotovelo','Punho / mão','Peito','Costas','Lombar','Quadril','Joelho','Perna','Tornozelo / pé','Abdômen','Geral','Outro']},{k:'intensidade',t:'Intensidade de 0 a 10',tipo:'number'},{k:'obs',t:'O que melhora ou piora'}],'sa-quei'],
-    consultas:['Nova consulta',E.consultas,{data:hoje(),retorno:'',obs:''},[{k:'especialidade',t:'Especialidade',obrigatorio:true},{k:'data',t:'Data da consulta',tipo:'date',obrigatorio:true},{k:'profissional',t:'Profissional'},{k:'queixaId',t:'Por causa de qual queixa',tipo:'select',opcoes:[{v:'',t:'— nenhuma —'},...(E.queixas||[]).filter(q=>q&&q.id).map(q=>({v:q.id,t:q.oque||'queixa'}))]},{k:'motivo',t:'Por que fui'},{k:'conduta',t:'O que ficou combinado'},{k:'retorno',t:'Retorno marcado para',tipo:'date'}],'sa-cons'],
-    fisio:['Nova sessão de fisioterapia',E.fisio,{data:hoje(),queixaId:'',sessao:'',total:'',dorAntes:'',dorDepois:'',obs:''},[{k:'oque',t:'Para quê',obrigatorio:true},{k:'queixaId',t:'Por causa de qual queixa',tipo:'select',opcoes:[{v:'',t:'— nenhuma —'},...(E.queixas||[]).filter(q=>q&&q.id).map(q=>({v:q.id,t:q.oque||'queixa'}))]},{k:'data',t:'Data da sessão',tipo:'date',obrigatorio:true},{k:'sessao',t:'Número da sessão',tipo:'number'},{k:'total',t:'De quantas sessões',tipo:'number'},{k:'dorAntes',t:'Dor antes, de 0 a 10',tipo:'number'},{k:'dorDepois',t:'Dor depois, de 0 a 10',tipo:'number'},{k:'profissional',t:'Profissional'}],'sa-fisio']
+    consultas:['Nova consulta',E.consultas,{data:hoje(),retorno:'',obs:''},[{k:'especialidade',t:'Especialidade',obrigatorio:true},{k:'data',t:'Data da consulta',tipo:'date',obrigatorio:true},{k:'profissional',t:'Profissional'},{k:'queixaId',t:'Por causa de qual queixa',tipo:'select',opcoes:opcoesDeQueixa()},{k:'motivo',t:'Por que fui'},{k:'conduta',t:'O que ficou combinado'},{k:'retorno',t:'Retorno marcado para',tipo:'date'}],'sa-cons'],
+    fisio:['Nova sessão de fisioterapia',E.fisio,{data:hoje(),queixaId:'',sessao:'',total:'',dorAntes:'',dorDepois:'',obs:''},[{k:'oque',t:'Para quê',obrigatorio:true},{k:'queixaId',t:'Por causa de qual queixa',tipo:'select',opcoes:opcoesDeQueixa()},{k:'data',t:'Data da sessão',tipo:'date',obrigatorio:true},{k:'sessao',t:'Número da sessão',tipo:'number'},{k:'total',t:'De quantas sessões',tipo:'number'},{k:'dorAntes',t:'Dor antes, de 0 a 10',tipo:'number'},{k:'dorDepois',t:'Dor depois, de 0 a 10',tipo:'number'},{k:'profissional',t:'Profissional'}],'sa-fisio']
   };
   const [titulo,lista,base,defs,blocoId]=opcoes[tipo];novoRegistroRotina(titulo,lista,base,defs,()=>{abreBloco(blocoId);rr('saude')()});
 }
@@ -4197,8 +4213,7 @@ function vSaude(m) {
      queixa amanhã, o vínculo continua de pé. Um vínculo salvo à mão precisa de
      tela que o mostre — por isso a queixa ganhou a coluna que conta o que está
      amarrado nela. */
-  const opcoesQueixa=[{v:'',t:'— nenhuma —'},...(E.queixas||[]).filter(q=>q&&q.id).map(q=>({
-    v:q.id,t:(q.oque||'queixa')+(dataISOValida(q.data)?' · desde '+fmtData(q.data):'')}))];
+  const opcoesQueixa=opcoesDeQueixa();
   const ligados=id=>({
     consultas:(E.consultas||[]).filter(x=>x&&x.queixaId===id).length,
     fisio:(E.fisio||[]).filter(x=>x&&x.queixaId===id).length});

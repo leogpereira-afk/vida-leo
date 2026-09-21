@@ -98,21 +98,80 @@ test('Saúde: resumo de peso abre o histórico de medidas',()=>{
    opções são {v,t} -- valor é o id da queixa, texto é o nome dela. Até
    21/09/2026 o formulário montava as opções com esc() direto sobre o objeto,
    e as duas saíam "[object Object]", com o mesmo valor: não dava para ligar
-   nada pelo botão "+ Adicionar", só editando a célula da tabela depois.
-   Conferimos o HTML gerado, e não o .value: o ajudante de DOM daqui não
-   simula a seleção de <select>, então um teste que olhasse .value passaria
-   mesmo com o defeito de volta. */
-for (const [tipo, rotulo] of [['consultas', 'consulta'], ['fisio', 'sessão de fisioterapia']]) {
-  test(`entrada: ${rotulo} pode ser ligada à queixa pelo botão de adicionar`, () => {
+   nada pelo botão "+ Adicionar", só editando a célula da tabela depois. */
+function escolher(form, nome, valor) {
+  const c = form.querySelector('[name="' + nome + '"]');
+  assert.ok(c, 'campo ' + nome);
+  /* Num <select> deste ajudante de DOM, `value` é só de leitura: quem manda é
+     o atributo `selected` da opção, e o getter responde a partir dele. Num
+     <input> é o contrário, e `.options` nem existe. */
+  if (c.tagName === 'SELECT') {
+    const o = [...(c.querySelectorAll('option'))].find(o => o.getAttribute('value') === valor);
+    assert.ok(o, 'não há opção com valor ' + valor + ' em ' + nome);
+    for (const outra of c.querySelectorAll('option')) outra.removeAttribute('selected');
+    o.setAttribute('selected', '');
+  } else {
+    c.value = valor;
+  }
+  return c;
+}
+
+for (const [tipo, lista, rotulo, obrig] of [
+  ['consultas', 'consultas', 'consulta', 'especialidade'],
+  ['fisio', 'fisio', 'sessão de fisioterapia', 'oque'],
+]) {
+  test(`entrada: ${rotulo} guarda o ID da queixa escolhida no botão de adicionar`, () => {
     const {run, document} = setup();
-    run("E.queixas=[{id:'q1',oque:'Dor no ombro'},{id:'q2',oque:'Enxaqueca'}];novoCuidadoRotina('" + tipo + "')");
-    const sel = document.querySelector('.rotina-form [name="queixaId"]');
+    run("E.queixas=[{id:'q1',oque:'Dor no ombro',data:'2026-03-12'},{id:'q2',oque:'Enxaqueca',data:'2026-05-02'}];novoCuidadoRotina('" + tipo + "')");
+    const form = document.querySelector('.rotina-form');
+    const sel = form.querySelector('[name="queixaId"]');
     assert.ok(sel, 'o campo de ligação tem de existir no formulário');
-    const html = sel.innerHTML;
-    assert.doesNotMatch(html, /\[object Object\]/, 'a opção virou [object Object]: o id da queixa não chega ao value');
-    assert.match(html, /value="q1"/, 'o value da opção tem de ser o id da queixa');
-    assert.match(html, /value="q2"/);
-    assert.match(html, /Dor no ombro/, 'o texto da opção tem de ser o nome da queixa');
-    assert.match(html, /Enxaqueca/);
+    assert.doesNotMatch(sel.innerHTML, /\[object Object\]/, 'a opção virou [object Object]: o id da queixa não chega ao value');
+
+    /* NÃO BASTA O HTML SAIR CERTO -- o que importa é o id CHEGAR ao registro
+       gravado. Um seletor bonito que grava vazio não liga nada. O ajudante de
+       DOM daqui simula a seleção de <select> (é o que tests/financeiro-fluido
+       já faz), então dá para conferir de ponta a ponta. */
+    escolher(form, obrig, 'Teste');
+    escolher(form, 'queixaId', 'q2');
+    form.onsubmit({preventDefault() {}});
+    assert.equal(run(`E.${lista}.length`), 1, 'o registro não foi gravado');
+    assert.equal(run(`E.${lista}[0].queixaId`), 'q2', 'a queixa escolhida não chegou ao registro');
+  });
+
+  /* A lista da tabela rotula "Dor no ombro · desde 12/03"; a do formulário
+     rotulava só "Dor no ombro". Duas queixas com o mesmo nome -- a dor que
+     voltou, que é o motivo de a queixa ter data -- ficavam indistinguíveis
+     na hora de criar o registro. Uma lista só, nos dois lugares. */
+  test(`entrada: ${rotulo} distingue duas queixas de mesmo nome pela data`, () => {
+    const {run, document} = setup();
+    run("E.queixas=[{id:'q1',oque:'Dor no ombro',data:'2026-03-12'},{id:'q2',oque:'Dor no ombro',data:'2026-09-15'}];novoCuidadoRotina('" + tipo + "')");
+    const html = document.querySelector('.rotina-form [name="queixaId"]').innerHTML;
+    assert.match(html, /12\/03/, 'falta a data que separa uma queixa da outra');
+    assert.match(html, /15\/09/);
   });
 }
+
+/* OPÇÃO QUE O DONO APAGOU NÃO VOLTA NUM REGISTRO NOVO.
+   `opcoesSelect` preserva valor fora da lista de propósito -- em registro
+   SALVO, sumir com a escolha do dono seria apagar dado. Mas em registro NOVO
+   o valor é só o padrão embutido no código: quando o conserto de 21/09/2026
+   passou o formulário a usar essa função, "Trabalho" -- apagado dos Tipos de
+   viagem nas Configurações -- voltava à lista E já vinha marcado. */
+test('entrada: tipo apagado das Configurações não ressuscita em registro novo', () => {
+  const {run, document} = setup();
+  run("E.config=E.config||{};E.config.tiposViagem=['Família','Casal','Amigos'];novaViagemRotina()");
+  const sel = document.querySelector('.rotina-form [name="tipo"]');
+  const valores = [...sel.querySelectorAll('option')].map(o => o.getAttribute('value'));
+  assert.deepEqual(valores, ['Família', 'Casal', 'Amigos'], 'voltou opção que o dono apagou');
+  assert.doesNotMatch(sel.innerHTML, /selected/, 'uma opção apagada não pode vir marcada');
+});
+
+/* E o outro lado: em registro SALVO o valor fora da lista continua à vista,
+   senão o conserto acima vira apagador silencioso. */
+test('campos: valor gravado fora da lista continua aparecendo em registro salvo', () => {
+  const {run} = setup();
+  const html = run("opcoesSelect(['Família','Casal'],'Trabalho')");
+  assert.match(html, /value="Trabalho"/, 'o valor gravado sumiu da lista');
+  assert.match(html, /selected/);
+});
