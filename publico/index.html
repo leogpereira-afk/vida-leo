@@ -2074,7 +2074,15 @@ function novoRegistroRotina(titulo,lista,base,defs,abrir){
     const grade=form.querySelector('.rotina-form-campos');
     defs.forEach(d=>{
       const label=el('<label></label>');label.appendChild(el('<span>'+esc(d.t)+(d.obrigatorio?' *':'')+'</span>'));
-      const inp=d.opcoes?el('<select>'+d.opcoes.map(o=>'<option value="'+esc(o)+'">'+esc(o)+'</option>').join('')+'</select>'):el('<input type="'+(d.tipo||'text')+'">');
+      /* AS OPÇÕES SAEM DE opcoesSelect, NÃO DE esc() DIRETO. Montar à mão aqui
+         só funcionava com opção de texto puro; quando a opção é {v,t} -- como
+         em "Por causa de qual queixa", cujo valor é o id da queixa e o texto é
+         o nome dela -- esc() de um objeto vira "[object Object]", e as opções
+         saíam todas iguais e sem id: o vínculo não tinha como ser gravado por
+         este caminho. opcoesSelect (linha ~1517) já trata as duas formas, já
+         marca o valor atual e já preserva valor gravado que saiu da lista, e é
+         a mesma função que a célula da tabela usa. */
+      const inp=d.opcoes?el('<select>'+opcoesSelect(d.opcoes,registro[d.k])+'</select>'):el('<input type="'+(d.tipo||'text')+'">');
       inp.name=d.k;inp.value=registro[d.k]??'';inp.required=!!d.obrigatorio;
       if(d.tipo==='number'){inp.step='any';inp.inputMode='decimal';inp.min=d.min??'0'}
       if(d.ph)inp.placeholder=d.ph;

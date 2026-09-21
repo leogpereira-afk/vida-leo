@@ -92,3 +92,27 @@ test('Saúde: resultado informa a unidade do laudo, inclusive no celular',()=>{
 test('Saúde: resumo de peso abre o histórico de medidas',()=>{
  const {run,document}=setup();run("atual='saude';vSaude(document.getElementById('main'));organizarSaude(document.getElementById('main'));");document.querySelector('.rotina-saude-atalho').click();assert.equal(document.querySelector('#saude-medidas').hidden,false);
 });
+
+/* O SELETOR DE LIGAÇÃO GRAVA O ID, NÃO O NOME.
+   Consulta e sessão de fisioterapia são os dois únicos campos do app cujas
+   opções são {v,t} -- valor é o id da queixa, texto é o nome dela. Até
+   21/09/2026 o formulário montava as opções com esc() direto sobre o objeto,
+   e as duas saíam "[object Object]", com o mesmo valor: não dava para ligar
+   nada pelo botão "+ Adicionar", só editando a célula da tabela depois.
+   Conferimos o HTML gerado, e não o .value: o ajudante de DOM daqui não
+   simula a seleção de <select>, então um teste que olhasse .value passaria
+   mesmo com o defeito de volta. */
+for (const [tipo, rotulo] of [['consultas', 'consulta'], ['fisio', 'sessão de fisioterapia']]) {
+  test(`entrada: ${rotulo} pode ser ligada à queixa pelo botão de adicionar`, () => {
+    const {run, document} = setup();
+    run("E.queixas=[{id:'q1',oque:'Dor no ombro'},{id:'q2',oque:'Enxaqueca'}];novoCuidadoRotina('" + tipo + "')");
+    const sel = document.querySelector('.rotina-form [name="queixaId"]');
+    assert.ok(sel, 'o campo de ligação tem de existir no formulário');
+    const html = sel.innerHTML;
+    assert.doesNotMatch(html, /\[object Object\]/, 'a opção virou [object Object]: o id da queixa não chega ao value');
+    assert.match(html, /value="q1"/, 'o value da opção tem de ser o id da queixa');
+    assert.match(html, /value="q2"/);
+    assert.match(html, /Dor no ombro/, 'o texto da opção tem de ser o nome da queixa');
+    assert.match(html, /Enxaqueca/);
+  });
+}
