@@ -4065,32 +4065,7 @@ function vSaude(m) {
   /* ---- 1. exames: um por marcador, com a evolução dentro ---- */
   const cx = el('<div></div>');
   const rol = el('<div class="rolagem"></div>');
-  // agrupa as medições por marcador; a linha mostra a última e para onde está indo
-  const porMarcador = {};
-  E.exames.forEach(x => {
-    const k = (x.exame || '').trim(); if (!k) return;
-    (porMarcador[k] = porMarcador[k] || []).push(x);
-  });
-  const grupos = Object.entries(porMarcador).map(([nome, itens]) => {
-    itens.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
-    const resultados=registrosResultadoSaude(itens);
-    const ult = resultados.at(-1)||itens.at(-1), ant = resultados.at(-2);
-    const nUlt = numeroResultadoSaude(ult.valor);
-    const nAnt = ant ? numeroResultadoSaude(ant.valor) : NaN;
-    let tend = null;
-    if (!isNaN(nUlt) && !isNaN(nAnt) && nAnt !== 0 && normaliza(unidadeSaude(ult))===normaliza(unidadeSaude(ant))) {
-      const dif = nUlt - nAnt, pct = dif / Math.abs(nAnt) * 100;
-      // "melhor" depende do marcador: sair do alvo é pior, entrar é melhor
-      const semU = semaforo(ult), semA = semaforo(ant);
-      const ordem = { ruim: 0, atencao: 1, ok: 2, '': 1 };
-      const rumo = ordem[semU] - ordem[semA];
-      tend = { dif, pct, rumo, seta: Math.abs(pct) < 2 ? '→' : dif > 0 ? '↑' : '↓' };
-    }
-    return { nome, itens, ult, resultados:resultados.length, pendentes:itens.length-resultados.length, sem: resultados.length?semaforo(ult):'', tend, mk: MARCADORES.find(y => y[0] === nome) };
-  }).sort((a, b) => {
-    const ord = { ruim: 0, atencao: 1, ok: 2, '': 3 };
-    return (ord[a.sem] ?? 3) - (ord[b.sem] ?? 3) || a.nome.localeCompare(b.nome);
-  });
+  const grupos = gruposExames();
 
   if (grupos.length) {
     const t = document.createElement('table');
@@ -4129,7 +4104,10 @@ function vSaude(m) {
   pe.appendChild(bt);
   const bImp = el('<button class="btn ghost mini" style="margin-left:9px">📄 Importar laudo</button>');
   bImp.onclick = () => importarExamesRotina();
-  pe.appendChild(bImp); cx.appendChild(pe);
+  pe.appendChild(bImp);
+  const bPdf = el('<button class="btn ghost mini" style="margin-left:9px">🖨 Salvar em PDF</button>');
+  bPdf.onclick = () => imprimirExames();
+  pe.appendChild(bPdf); cx.appendChild(pe);
   m.appendChild(bloco('sa-ex', 'Exames e marcadores', 'um por marcador — clique para ver a evolução e anexar o laudo', cx));
 
   const incompletos=E.exames.filter(x=>!String(x.exame||'').trim()||!resultadoSaudeRegistrado(x));
@@ -4340,6 +4318,139 @@ function rastreiosPendentes(todos) {
 }
 
 // histórico de um marcador: gráfico, todas as medições e o caminho até o alvo
+/* OS GRUPOS DE EXAME, CALCULADOS NUM LUGAR SÓ — a tela e o PDF leem daqui.
+   Duas cópias desta conta divergiriam na primeira mudança, e aí o papel que o
+   médico tem na mão diria uma coisa e a tela do dono outra.
+
+   O RUMO NÃO É O SINAL DA DIFERENÇA. Subir é bom no HDL e ruim no LDL: o que
+   conta é ter se aproximado ou se afastado do alvo, por isso a comparação é
+   entre os SEMÁFOROS da medição de agora e da anterior. E só compara quando a
+   unidade é a mesma nas duas — µg/dL contra mg/dL daria uma variação inventada. */
+function gruposExames(){
+  const porMarcador = {};
+  (E.exames||[]).forEach(x => {
+    const k = (x.exame || '').trim(); if (!k) return;
+    (porMarcador[k] = porMarcador[k] || []).push(x);
+  });
+  return Object.entries(porMarcador).map(([nome, itens]) => {
+    itens.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+    const resultados=registrosResultadoSaude(itens);
+    const ult = resultados.at(-1)||itens.at(-1), ant = resultados.at(-2);
+    const nUlt = numeroResultadoSaude(ult.valor);
+    const nAnt = ant ? numeroResultadoSaude(ant.valor) : NaN;
+    let tend = null;
+    if (!isNaN(nUlt) && !isNaN(nAnt) && nAnt !== 0 && normaliza(unidadeSaude(ult))===normaliza(unidadeSaude(ant))) {
+      const dif = nUlt - nAnt, pct = dif / Math.abs(nAnt) * 100;
+      const semU = semaforo(ult), semA = semaforo(ant);
+      const ordem = { ruim: 0, atencao: 1, ok: 2, '': 1 };
+      const rumo = ordem[semU] - ordem[semA];
+      tend = { dif, pct, rumo, seta: Math.abs(pct) < 2 ? '→' : dif > 0 ? '↑' : '↓' };
+    }
+    return { nome, itens, ult, resultados:resultados.length, pendentes:itens.length-resultados.length, sem: resultados.length?semaforo(ult):'', tend, mk: MARCADORES.find(y => y[0] === nome) };
+  }).sort((a, b) => {
+    // urgência primeiro: alterado, fora do alvo, no alvo, sem régua
+    const ord = { ruim: 0, atencao: 1, ok: 2, '': 3 };
+    return (ord[a.sem] ?? 3) - (ord[b.sem] ?? 3) || a.nome.localeCompare(b.nome);
+  });
+}
+
+/* OS EXAMES EM PAPEL, com para onde cada um está indo.
+
+   É o que se leva para a consulta: o médico não quer rolar uma tela, quer ver
+   a folha. Por isso a ordem é a da urgência (alterado, fora do alvo, no alvo,
+   sem régua), a mesma da tela — e não a alfabética.
+
+   A EVOLUÇÃO VAI EM PALAVRA, não só em seta. "↑ +48%" numa folha impressa em
+   preto e branco não diz se melhorou ou piorou; "subiu 48% — aproximou do
+   alvo" diz. A cor some na fotocópia, a frase não.
+
+   De onde a régua veio também vai junto: faixa do laudo e referência geral não
+   são a mesma coisa, e quem lê o papel tem de saber qual está usando. */
+function textoEvolucaoExame(g){
+  if(!g.tend)return g.resultados>1?'sem comparação numérica':g.resultados?'1ª medição':'aguardando resultado';
+  const t=g.tend, pct=Math.abs(t.pct);
+  const quanto=pct<2?'praticamente igual':(t.dif>0?'subiu ':'caiu ')+pct.toFixed(0)+'%';
+  const rumo=t.rumo>0?' — aproximou do alvo':t.rumo<0?' — afastou do alvo':'';
+  return quanto+rumo;
+}
+function imprimirExames(){
+  const grupos=gruposExames();
+  if(!grupos.length){alert('Ainda não há exames registrados para imprimir.');return}
+  const w=window.open('','_blank');
+  if(!w){alert('Libere o pop-up para gerar o PDF.');return}
+  const rotulo={ruim:'Alterado',atencao:'Fora do alvo',ok:'No alvo','':'Sem régua cadastrada'};
+  const conta=s=>grupos.filter(g=>g.sem===s).length;
+  const faixa=g=>{
+    if(g.ult.origemDocumental)return esc(g.ult.referenciaLaudo||'consultar laudo original');
+    if(g.mk&&normaliza(unidadeSaude(g.ult))===normaliza(g.mk[1]))return esc(g.mk[3]);
+    const r=referenciaExtra(g.ult);
+    return r?esc(r[2])+(r[5]==='geral'?' (referência geral)':''):'—';
+  };
+  const linha=g=>`<tr class="s-${g.sem||'nada'}">
+    <td><b>${esc(g.nome)}</b></td>
+    <td class="n">${g.ult.valor!==''&&g.ult.valor!=null?esc(g.ult.valor):'—'} <span class="u">${esc(unidadeSaude(g.ult)||'')}</span></td>
+    <td class="ref">${faixa(g)}</td>
+    <td>${esc(rotulo[g.sem]||'—')}</td>
+    <td>${esc(textoEvolucaoExame(g))}</td>
+    <td class="n">${g.ult.data?esc(fmtDataAno(g.ult.data)):'—'}</td></tr>`;
+  /* O histórico só entra para quem tem mais de uma medição: repetir uma linha
+     de um valor só encheria a folha sem dizer nada novo. */
+  const comHistorico=grupos.filter(g=>g.resultados>1);
+  const historico=comHistorico.map(g=>{
+    const regs=registrosResultadoSaude(g.itens);
+    const pts=regs.map(x=>({v:numeroResultadoSaude(x.valor),r:fmtData(x.data)})).filter(x=>!isNaN(x.v));
+    const u=unidadeSaude(g.ult);
+    return `<section class="hist"><h3>${esc(g.nome)} <span class="u">${esc(u||'')}</span></h3>
+      <div class="linhas">${regs.map(x=>`<span><b>${esc(fmtDataAno(x.data))}</b> ${esc(x.valor!==''&&x.valor!=null?x.valor:'—')}</span>`).join('')}</div>
+      ${pts.length>1?gLinha(pts,{fmt:v=>String(v)}):''}
+    </section>`;
+  }).join('');
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>Exames e marcadores</title>
+  <style>
+  :root{--linha:#dcdcdc;--suave:#666;--verde:#1f6f5c}
+  body{font:13px/1.5 -apple-system,Segoe UI,sans-serif;padding:26px;color:#1a1a1a}
+  h1{font-size:21px;margin:0 0 2px}
+  .sub{color:#666;font-size:12px;margin-bottom:14px}
+  .resumo{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 16px;font-size:12.5px}
+  .resumo b{font-size:17px;display:block}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#666;
+     border-bottom:1.5px solid #333;padding:5px 6px}
+  td{padding:6px;border-bottom:1px solid #eee;vertical-align:top}
+  td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .u{color:#777;font-size:10.5px}
+  .ref{color:#555}
+  /* a situação também vai em traço na lateral: numa cópia em preto e branco a
+     cor de fundo some, a barra não */
+  tr.s-ruim td:first-child{box-shadow:inset 3px 0 0 #b4443a}
+  tr.s-atencao td:first-child{box-shadow:inset 3px 0 0 #c98a4b}
+  tr.s-ok td:first-child{box-shadow:inset 3px 0 0 #1f6f5c}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#666;margin:24px 0 8px;
+     border-top:1px solid #ddd;padding-top:14px}
+  .hist{break-inside:avoid;page-break-inside:avoid;margin-bottom:16px}
+  .hist h3{font-size:13.5px;margin:0 0 4px}
+  .linhas{display:flex;flex-wrap:wrap;gap:10px;color:#444;font-size:11.5px;margin-bottom:4px}
+  .rodape{margin-top:22px;padding-top:10px;border-top:1px solid #ddd;color:#777;font-size:10.5px;line-height:1.5}
+  @media print{body{padding:0}thead{display:table-header-group}tr{break-inside:avoid}}
+  </style>
+  <h1>Exames e marcadores</h1>
+  <div class="sub">Leonardo Gonçalves${idadeLeo()?' · '+idadeLeo()+' anos':''} · gerado em ${new Date().toLocaleDateString('pt-BR')}</div>
+  <div class="resumo">
+    <div><b>${grupos.length}</b> marcadores</div>
+    <div><b>${conta('ruim')}</b> alterados</div>
+    <div><b>${conta('atencao')}</b> fora do alvo</div>
+    <div><b>${conta('ok')}</b> no alvo</div>
+    <div><b>${conta('')}</b> sem régua</div>
+  </div>
+  <table><thead><tr><th>Exame</th><th class="n">Último</th><th>Faixa de referência</th><th>Situação</th><th>Desde a medição anterior</th><th class="n">Data</th></tr></thead>
+  <tbody>${grupos.map(linha).join('')}</tbody></table>
+  ${historico?'<h2>Evolução dos que têm mais de uma medição</h2>'+historico:''}
+  <div class="rodape">A situação compara o resultado com a faixa de referência indicada ao lado — do laudo quando o laudo trouxe,
+  e referência geral quando não trouxe. Não é laudo nem parecer médico: quem interpreta é o profissional que acompanha o caso.</div>`);
+  w.document.close();
+  setTimeout(()=>w.print(),400);
+}
+
 function modalMarcador(nome) {
   const mk = MARCADORES.find(y => y[0] === nome);
   const itens = E.exames.filter(x => (x.exame || '').trim() === nome)
