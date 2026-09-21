@@ -3693,16 +3693,21 @@ const MARCADORES = [
   ['HDL', 'mg/dL', '> 40', '> 50', v => v < 40, v => v < 50],
   ['Triglicérides', 'mg/dL', '< 150', '< 100', v => v >= 150, v => v >= 100],
   ['Lp(a)', 'mg/dL', '< 50', '< 30 (1x na vida)', v => v >= 50, v => v >= 30],
-  ['Glicemia jejum', 'mg/dL', '70 a 99', '< 90', v => v >= 100, v => v >= 90],
+  ['Glicemia jejum', 'mg/dL', '70 a 99', '< 90', v => v >= 100 || v < 70, v => v >= 90],
   ['HbA1c', '%', '< 5,7', '< 5,4', v => v >= 5.7, v => v >= 5.4],
-  ['Insulina', 'µU/mL', '2 a 25', '< 8', v => v > 10, v => v >= 8],
+  ['Insulina', 'µU/mL', '2 a 25', '< 8', v => v > 10 || v < 2, v => v >= 8],
   ['PCR ultrassensível', 'mg/L', '< 3', '< 1', v => v >= 3, v => v >= 1],
-  ['Testosterona total', 'ng/dL', '250 a 950', '> 500', v => v < 350, v => v < 500],
+  /* O TETO ESTAVA FALTANDO: a régua diz "250 a 950" e a regra só olhava o piso,
+     então um resultado bem acima do topo impresso aqui saía em verde, "No
+     alvo". Tela que imprime uma faixa e pinta de verde o que está fora dela
+     mente na direção mais perigosa. (Nenhum valor de exame entra neste arquivo:
+     ele é público.) */
+  ['Testosterona total', 'ng/dL', '250 a 950', '> 500', v => v < 350 || v > 950, v => v < 500],
   ['Vitamina D', 'ng/mL', '30 a 100', '40 a 60', v => v < 30, v => v < 40 || v > 60],
   ['TSH', 'µUI/mL', '0,4 a 4,0', '1,0 a 2,5', v => v > 4 || v < 0.4, v => v > 2.5 || v < 1],
   ['PSA', 'ng/mL', '< 4', '< 2,5', v => v >= 4, v => v >= 2.5],
-  ['Creatinina', 'mg/dL', '0,7 a 1,3', 'até 1,1', v => v > 1.3, v => v > 1.1],
-  ['Ácido úrico', 'mg/dL', '3,5 a 7,2', '< 6', v => v > 7.2, v => v >= 6],
+  ['Creatinina', 'mg/dL', '0,7 a 1,3', 'até 1,1', v => v > 1.3 || v < 0.7, v => v > 1.1],
+  ['Ácido úrico', 'mg/dL', '3,5 a 7,2', '< 6', v => v > 7.2 || v < 3.5, v => v >= 6],
   ['Ferritina', 'ng/mL', '30 a 400', '50 a 150', v => v > 400 || v < 30, v => v < 50 || v > 150],
 ];
 // Rastreios recomendados por idade (homem). [nome, idadeInicio, cadaXMeses, porquê]
@@ -3757,6 +3762,105 @@ const CHIP_SEM = { ok: ['var(--verde-cl)', 'var(--verde)', 'No alvo'], atencao: 
 function unidadeSaude(x){if(x.origemDocumental)return x.unidade||'';return x.unidade||MARCADORES.find(m=>m[0]===x.exame)?.[1]||''}
 function resultadoSaudeRegistrado(x){return dataISOValida(x.data)&&x.data<=hoje()&&x.resultado!=='Aguardando'&&(String(x.valor??'').trim()!==''||['Normal','Atenção','Alterado'].includes(x.resultado))}
 function registrosResultadoSaude(lista){return lista.filter(resultadoSaudeRegistrado).slice().sort((a,b)=>a.data.localeCompare(b.data))}
+/* IMPORTAR UM LAUDO INTEIRO.
+
+   Um laudo de check-up traz 40 e poucos marcadores. Digitar um por um não
+   acontece — e o que não acontece não vira histórico. Aqui entra uma lista
+   pronta (arquivo .json ou texto colado), a tela MOSTRA o que entendeu, e só
+   entra o que o dono marcar. Nada é gravado antes do clique.
+
+   O QUE JÁ EXISTE VEM DESMARCADO, não escondido: mesmo exame na mesma data já
+   registrado aparece com o aviso, para o dono decidir. Esconder viraria
+   "sumiu", e reimportar o mesmo laudo duplicaria o histórico calado.
+
+   O QUE NÃO FOI ENTENDIDO É DITO. Linha sem exame ou sem data entra na conta
+   dos descartados com o motivo — lista que descarta em silêncio faz o dono
+   acreditar que importou tudo. */
+function lerLaudoImportado(texto){
+  let bruto;
+  try{bruto=JSON.parse(texto)}catch{return{erro:'Não consegui ler o arquivo: ele precisa ser a lista de exames em JSON.'}}
+  const lista=Array.isArray(bruto)?bruto:Array.isArray(bruto&&bruto.exames)?bruto.exames:null;
+  if(!lista)return{erro:'O arquivo não tem uma lista de exames.'};
+  const bons=[],descartados=[];
+  for(const r of lista){
+    const nome=String((r&&r.exame)||'').trim();
+    const data=String((r&&r.data)||'').trim();
+    if(!nome){descartados.push('sem nome de exame');continue}
+    if(!dataISOValida(data)){descartados.push((nome||'registro')+': data inválida');continue}
+    bons.push({data,exame:nome,
+      valor:r.valor==null?'':String(r.valor).trim(),
+      unidade:String(r.unidade||'').trim(),
+      medico:String(r.medico||'').trim(),
+      resultado:['','Aguardando','Normal','Atenção','Alterado'].includes(r.resultado)?r.resultado:'',
+      proximo:dataISOValida(String(r.proximo||''))?String(r.proximo):'',
+      obs:String(r.obs||'').trim()});
+  }
+  return{bons,descartados};
+}
+function jaTemExame(r){return (E.exames||[]).some(x=>normaliza(x.exame||'')===normaliza(r.exame)&&String(x.data||'')===r.data)}
+function importarExamesRotina(){
+  abrirModal('Importar resultados de laudo','Escolha o arquivo .json (ou cole o conteúdo). Nada entra sem você conferir.',(c,fechar)=>{
+    const topo=el('<div class="secao"></div>');
+    const arq=el('<input type="file" accept=".json,.txt,application/json,text/plain" aria-label="Arquivo do laudo">');
+    const cola=el('<textarea placeholder="…ou cole aqui o conteúdo do arquivo" style="width:100%;min-height:70px;margin-top:9px;border:1px solid var(--linha);background:var(--bg);color:inherit;padding:8px 10px;border-radius:9px;font:inherit"></textarea>');
+    const bLer=el('<button class="btn ghost" style="margin-top:9px">Conferir o que veio</button>');
+    topo.appendChild(arq);topo.appendChild(cola);topo.appendChild(bLer);c.appendChild(topo);
+    const previa=el('<div class="secao"></div>');c.appendChild(previa);
+    const rodape=el('<div class="secao" style="display:flex;gap:9px;align-items:center"></div>');c.appendChild(rodape);
+    arq.onchange=()=>{const f=arq.files&&arq.files[0];if(!f)return;const fr=new FileReader();
+      fr.onload=()=>{cola.value=String(fr.result||'');mostrar()};
+      fr.onerror=()=>{previa.replaceChildren(el('<div class="aviso">Não consegui abrir o arquivo.</div>'))};
+      fr.readAsText(f)};
+    bLer.onclick=mostrar;
+    function mostrar(){
+      previa.replaceChildren();rodape.replaceChildren();
+      const texto=cola.value.trim();
+      if(!texto){previa.appendChild(el('<div class="vazio">Escolha o arquivo ou cole o conteúdo.</div>'));return}
+      const r=lerLaudoImportado(texto);
+      if(r.erro){previa.appendChild(el('<div class="aviso">'+esc(r.erro)+'</div>'));return}
+      if(!r.bons.length){previa.appendChild(el('<div class="aviso">Nenhum exame utilizável no arquivo.</div>'));return}
+      const t=document.createElement('table');
+      t.innerHTML='<thead><tr><th></th><th>Data</th><th>Exame</th><th>Resultado</th><th>Situação</th></tr></thead>';
+      const tb=document.createElement('tbody');
+      const linhas=r.bons.map(x=>{
+        const repetido=jaTemExame(x);
+        const tr=el('<tr><td><input type="checkbox"></td><td>'+esc(fmtDataAno(x.data))+'</td>'+
+          '<td>'+esc(x.exame)+'</td><td>'+esc([x.valor,x.unidade].filter(Boolean).join(' ')||'—')+'</td>'+
+          '<td>'+(repetido?'<span class="badge" style="background:var(--areia-cl);color:var(--areia)">já registrado nesta data</span>':'novo')+'</td></tr>');
+        const cx=tr.querySelector('input');
+        /* A marca vai por PROPRIEDADE, não pelo atributo `checked` do HTML: o
+           atributo só diz o estado INICIAL, e é ele que alguns ambientes não
+           refletem na propriedade — a caixa aparecia marcada e valia `undefined`
+           na hora de contar. */
+        cx.checked=!repetido;
+        tb.appendChild(tr);return{x,cx};
+      });
+      t.appendChild(tb);
+      const rol=el('<div class="rolagem"></div>');rol.appendChild(t);previa.appendChild(rol);
+      const repetidos=linhas.filter(l=>jaTemExame(l.x)).length;
+      previa.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin-top:9px">'+
+        r.bons.length+' exame(s) no arquivo'+(repetidos?' · '+repetidos+' já registrado(s) nesta data, vêm desmarcados':'')+
+        (r.descartados.length?' · <b>'+r.descartados.length+' não entendi:</b> '+esc(r.descartados.slice(0,4).join('; '))+(r.descartados.length>4?'…':''):'')+'</p>'));
+      const bOk=el('<button class="btn"></button>');
+      const contar=()=>linhas.filter(l=>l.cx.checked).length;
+      const rotular=()=>{bOk.textContent='Adicionar '+contar()+' exame(s)';bOk.disabled=!contar()};
+      linhas.forEach(l=>l.cx.onchange=rotular);rotular();
+      bOk.onclick=()=>{
+        const escolhidos=linhas.filter(l=>l.cx.checked).map(l=>l.x);
+        if(!escolhidos.length)return;
+        escolhidos.forEach(x=>E.exames.push({id:uid(),...x}));
+        salvar();fechar();
+        alert(escolhidos.length+' exame(s) adicionados à Saúde.');
+      };
+      const bTodos=el('<button class="btn ghost">Marcar todos</button>');
+      bTodos.onclick=()=>{const ligar=contar()<linhas.length;linhas.forEach(l=>l.cx.checked=ligar);rotular()};
+      rodape.appendChild(bOk);rodape.appendChild(bTodos);
+      rodape.appendChild(el('<span class="cresce"></span>'));
+      const bNao=el('<button class="btn ghost">Cancelar</button>');bNao.onclick=fechar;rodape.appendChild(bNao);
+    }
+    mostrar();
+  });
+}
 function novoExameRotina(nome=''){novoRegistroRotina('Novo exame',E.exames,{data:hoje(),exame:nome,valor:'',medico:'',resultado:'',proximo:'',obs:''},[
   {k:'exame',t:'Exame / marcador',obrigatorio:true,ph:'Ex.: Hemograma, LDL ou consulta'},
   {k:'data',t:'Data da coleta / atendimento',tipo:'date',obrigatorio:true},{k:'valor',t:'Resultado (se disponível)'},
@@ -3905,7 +4009,10 @@ function vSaude(m) {
   const pe = el('<div style="padding:0 17px 15px"></div>');
   const bt = el('<button class="mais">+ Novo exame</button>');
   bt.onclick = () => novoExameRotina();
-  pe.appendChild(bt); cx.appendChild(pe);
+  pe.appendChild(bt);
+  const bImp = el('<button class="btn ghost mini" style="margin-left:9px">📄 Importar laudo</button>');
+  bImp.onclick = () => importarExamesRotina();
+  pe.appendChild(bImp); cx.appendChild(pe);
   m.appendChild(bloco('sa-ex', 'Exames e marcadores', 'um por marcador — clique para ver a evolução e anexar o laudo', cx));
 
   const incompletos=E.exames.filter(x=>!String(x.exame||'').trim()||!resultadoSaudeRegistrado(x));
