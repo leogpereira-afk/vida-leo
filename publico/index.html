@@ -637,7 +637,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 }
 </style>
 <link rel="stylesheet" href="./refinamento.css?v=35e03ac04929">
-<link rel="stylesheet" href="empresas.css?v=14cee7a15f49">
+<link rel="stylesheet" href="empresas.css?v=64f97d79ee6f">
 <link rel="stylesheet" href="organograma.css?v=5075861ba133">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
@@ -9662,6 +9662,59 @@ function bancoExcluir(b){
 function bancoTexto(b){return [b.banco,b.codigoBanco&&'Código do banco: '+b.codigoBanco,b.titular,b.doc&&'CPF/CNPJ: '+b.doc,b.agencia&&'Agência: '+b.agencia,b.conta&&'Conta: '+b.conta,b.pix&&'PIX: '+b.pix].filter(Boolean).join('\n')}
 async function bancoCopiar(texto,botao){try{await navigator.clipboard.writeText(texto);botao.textContent='Copiado ✓'}catch{botao.textContent='Não foi possível copiar'}}
 function bancoEmpresa(b){return empresaPorId(b.empresaId)?.nome||b.titular||'Sem titular'}
+/* O NÚMERO DO BANCO, PUXADO DO NOME quando não foi cadastrado.
+
+   O dono abriu a tela e não viu número nenhum: quase nenhuma conta tem o
+   campo preenchido, e o cartão só mostrava o que estava lá. A lista abaixo
+   cobre os bancos que a casa usa e os grandes do país, com o código da
+   compensação e a cor da marca — que é o que permite um crachá reconhecível
+   sem embutir logo de terceiro num repositório público.
+
+   UM CÓDIGO ERRADO É PIOR QUE NENHUM: ele vai para dentro de uma TED. Por isso
+   a busca casa por palavra inteira do nome, o código deduzido aparece MARCADO
+   como deduzido ("pelo nome"), e o cadastro sempre vence a dedução. */
+const BANCOS_BR=[
+  ['756','sicoob','#003641'],['748','sicredi','#3FA110'],['001','banco do brasil','#FCEF00','bb'],
+  ['237','bradesco','#CC092F'],['341','itau','#EC7000','itaú'],['033','santander','#EC0000'],
+  ['104','caixa','#0070AF','cef'],['077','inter','#FF7A00'],['260','nubank','#820AD1','nu pagamentos'],
+  ['336','c6','#242424','c6 bank'],['208','btg','#0D1B2A','btg pactual'],['422','safra','#00285E'],
+  ['041','banrisul','#0D6AB4'],['070','brb','#0A5EA8'],['389','mercantil','#006341'],
+  ['318','bmg','#F58220'],['212','original','#00A868'],['707','daycoval','#004B8D'],
+  ['246','abc brasil','#0B2A5B'],['623','pan','#00A9E0'],['655','votorantim','#004B8D','bv'],
+  ['290','pagbank','#00AA4F','pagseguro'],['323','mercado pago','#00AEEF'],['380','picpay','#21C25E'],
+  ['085','ailos','#00A5A8'],['136','unicred','#00539B'],['133','cresol','#00843D'],
+  ['021','banestes','#0067B1'],['003','banco da amazonia','#005C3C','basa'],['004','banco do nordeste','#004B8D','bnb'],
+  ['613','omni','#F47920'],['637','sofisa','#004990'],['643','pine','#0B3C5D'],['224','fibra','#0A3D62'],
+];
+/* Casa por PALAVRA INTEIRA: "interior" não pode virar Inter, nem "banestado"
+   virar Banestes. Nome sem correspondência devolve nada, e nada é resposta. */
+function bancoConhecido(nome){
+  const n=' '+normaliza(nome).replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim()+' ';
+  for(const [cod,chave,cor,...apelidos] of BANCOS_BR){
+    for(const alvo of [chave,...apelidos]){
+      const a=' '+normaliza(alvo)+' ';
+      if(n.includes(a))return {codigo:cod,cor,chave};
+    }
+  }
+  return null;
+}
+/* O código que o cartão mostra, e de onde ele veio. Cadastro manda. */
+function codigoDoBanco(b){
+  if(/^\d{3}$/.test(String(b.codigoBanco||'').trim()))return {codigo:String(b.codigoBanco).trim(),deduzido:false};
+  const k=bancoConhecido(b.banco||'');
+  return k?{codigo:k.codigo,deduzido:true}:null;
+}
+/* A MARCA DO BANCO, na ordem: logo que o dono anexou > logo registrada no
+   sistema para esse nome > cor da marca conhecida > cor automática do nome.
+   Nenhuma imagem de terceiro entra no repositório: o que existe aqui é cor. */
+function marcaDoBanco(b){
+  const nome=b.banco||'';
+  const daCentral=marcaDe(nome);
+  const conhecido=bancoConhecido(nome);
+  const logo=/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(b.logo||'')?b.logo:(daCentral.logo||'');
+  return {logo,cor:(E.marcas&&E.marcas[nome]&&E.marcas[nome].cor)||(conhecido&&conhecido.cor)||daCentral.cor};
+}
+
 async function vBancos(m){
   m.classList.add('workspace-layout','bancos-layout');const topo=cab('Bancos','Contas, titulares e chaves PIX em um só lugar.');topo.appendChild(acao('+ Nova conta',()=>bancoModal()));m.appendChild(topo);
   const busca=el('<div class="bancos-filtros"><label>Buscar conta<input type="search" aria-label="Buscar conta" placeholder="Banco, titular, agência, conta ou PIX"></label><div class="bancos-escopo"></div></div>');
@@ -9699,18 +9752,38 @@ async function vBancos(m){
         +'<p>'+esc(b.titular||'Titular não informado')+'</p></div></header>'
         +'<dl class="banco-dados-rapidos"></dl><div class="banco-contato"></div><div class="banco-atalhos"></div></article>');
       const icone=card.querySelector('.banco-icone');
-      if(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(b.logo||'')){
-        const img=el('<img alt="Logo do '+esc(b.banco||'banco')+'">');img.src=b.logo;icone.replaceChildren(img);
+      const marca=marcaDoBanco(b),cod=codigoDoBanco(b);
+      if(marca.logo){
+        const img=el('<img alt="Logo do '+esc(b.banco||'banco')+'">');img.src=marca.logo;icone.replaceChildren(img);
       }else{
-        /* Sem logo cadastrada, o crachá é o NÚMERO do banco — que é o que
-           distingue um do outro. Emoji igual em todos não distingue nada.
-           (Logo de banco é marca de terceiro: não entra no repositório, o
-           dono anexa a dele em "Logo do banco".) */
+        /* Sem logo, o crachá é o NÚMERO do banco na cor da marca — distingue
+           de longe, e emoji igual em todos não distinguia nada. Logo de banco
+           é marca de terceiro e não entra no repositório: o dono anexa a dele,
+           e a Central reaproveita a que já estiver registrada para esse nome. */
         icone.classList.add('banco-icone-texto');
-        icone.textContent=b.codigoBanco||iniciaisDe(b.banco||'')||'🏦';
+        /* Branco nem sempre lê: o amarelo do Banco do Brasil (#FCEF00) com
+           texto branco dá 1,1:1 e o número some. A mesma função de contraste
+           dos exames escolhe entre claro e escuro pelo que realmente lê. */
+        icone.style.background=marca.cor;
+        icone.style.color=/^#[0-9a-f]{6}$/i.test(marca.cor)?corTextoSobre(marca.cor):'#fff';
+        icone.textContent=(cod&&cod.codigo)||iniciaisDe(b.banco||'')||'🏦';
       }
-      if(b.codigoBanco)card.querySelector('header>div').insertBefore(
-        el('<span class="banco-codigo">Banco '+esc(b.codigoBanco)+'</span>'),card.querySelector('header h2').nextSibling);
+      if(cod){
+        const selo=el('<span class="banco-codigo'+(cod.deduzido?' banco-codigo-deduzido':'')+'">Banco '+esc(cod.codigo)+
+          (cod.deduzido?' <i>pelo nome</i>':'')+'</span>');
+        /* Deduzido não é cadastrado: o número vai para dentro de uma TED, e
+           quem lê tem de saber se alguém conferiu ou se o app adivinhou. */
+        if(cod.deduzido)selo.title='Código deduzido do nome do banco. Confira e salve no cadastro para confirmar.';
+        card.querySelector('header>div').insertBefore(selo,card.querySelector('header h2').nextSibling);
+      }
+      /* A logo da EMPRESA titular, quando a Central já tem: diz de quem é a
+         conta sem precisar ler. */
+      const marcaEmp=marcaDe(b.titular||'');
+      if(marcaEmp.logo){
+        const selo=el('<span class="banco-titular-logo"><img alt=""></span>');
+        selo.querySelector('img').src=marcaEmp.logo;
+        card.querySelector('header p').prepend(selo);
+      }
       const contato=card.querySelector('.banco-contato');
       if(b.gerente)contato.appendChild(el('<span class="banco-gerente"><i aria-hidden="true">👤</i>'+esc(b.gerente)+'</span>'));
       if(b.telefone){

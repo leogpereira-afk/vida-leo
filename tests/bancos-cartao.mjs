@@ -60,3 +60,65 @@ test('bancos: sem gerente nem telefone, o cartão diz que falta', async () => {
   await run("(async()=>{atual='bancos';const m=document.getElementById('main');m.replaceChildren();await vBancos(m)})()");
   assert.match(document.querySelector('.banco-contato').textContent, /Sem gerente ou telefone cadastrado/);
 });
+
+/* O DONO ABRIU A TELA E NÃO VIU NÚMERO NENHUM: quase nenhuma conta tem o campo
+ * preenchido. O número passa a ser deduzido do nome — mas um código errado vai
+ * para dentro de uma TED, então o caso ruim vem primeiro. */
+test('código do banco: casa por palavra inteira, e nome desconhecido não inventa', () => {
+  const {run} = setup();
+  const k = n => run(`bancoConhecido(${JSON.stringify(n)})`);
+  assert.equal(k('Sicoob Credinor').codigo, '756');
+  assert.equal(k('BANCO DO BRASIL S.A.').codigo, '001');
+  assert.equal(k('Itaú Unibanco').codigo, '341', 'acento não separa');
+  assert.equal(k('Caixa Econômica Federal').codigo, '104');
+  // os que NÃO podem casar
+  assert.equal(k('Banco Interior de Crédito'), null, '"interior" não é o Inter');
+  assert.equal(k('Banestado'), null, '"banestado" não é Banestes');
+  assert.equal(k('Cooperativa Qualquer'), null, 'sem correspondência, nada');
+  assert.equal(k(''), null);
+});
+
+test('código do banco: o cadastro vence a dedução, e a dedução vem marcada', () => {
+  const {run} = setup();
+  const c = b => run(`codigoDoBanco(${JSON.stringify(b)})`);
+  assert.deepEqual({...c({banco: 'Sicoob Credinor', codigoBanco: '999'})}, {codigo: '999', deduzido: false},
+    'quem cadastrou conferiu; o app não corrige por cima');
+  assert.deepEqual({...c({banco: 'Sicoob Credinor'})}, {codigo: '756', deduzido: true});
+  assert.equal(c({banco: 'Banco Desconhecido'}), null);
+  // código cadastrado fora do formato não é usado como se fosse válido
+  assert.deepEqual({...c({banco: 'Sicoob Credinor', codigoBanco: '75'})}, {codigo: '756', deduzido: true});
+});
+
+test('bancos: o número aparece no cartão mesmo sem estar cadastrado, dizendo que é deduzido', async () => {
+  const s = setup();
+  s.run('E.bancos=[{id:"x",banco:"Sicoob Credinor",titular:"Empresa Teste",agencia:"3144",conta:"74.448-4"}];bancosFonte={contas:[],erro:"",em:"",pendente:null}');
+  s.run("atual='bancos';const m=document.getElementById('main');m.replaceChildren();vBancos(m)");
+  const selo = s.document.querySelector('.banco-codigo');
+  assert.ok(selo, 'o selo do número tem de existir');
+  assert.match(selo.textContent, /Banco 756/);
+  assert.ok(selo.classList.contains('banco-codigo-deduzido'), 'deduzido tem de parecer deduzido');
+  assert.match(selo.getAttribute('title') || '', /Confira e salve no cadastro/);
+  assert.equal(s.document.querySelector('.banco-icone').textContent.trim(), '756', 'o crachá vira o número');
+});
+
+test('bancos: o seletor de empresa fica na coluna da esquerda', () => {
+  assert.match(css, /\.bancos-layout\{display:grid;grid-template-columns:\d+px minmax\(0,1fr\)/);
+  assert.match(css, /\.bancos-layout>\.bancos-filtros\{grid-column:1/, 'o seletor na coluna 1');
+  assert.match(css, /\.bancos-layout>\.bancos-conteudo\{grid-column:2/, 'as contas na coluna 2');
+  assert.match(css, /\.bancos-layout \.bancos-empresas\{flex-direction:column/, 'empilhado, não em fileira');
+  // e volta a ser fileira quando não há lateral
+  assert.match(css, /@media\(max-width:860px\)\{[\s\S]*\.bancos-layout\{display:block\}/);
+});
+
+/* O amarelo do Banco do Brasil com texto branco dá 1,1:1 e o número some.
+ * Crachá que não se lê não identifica banco nenhum. */
+test('bancos: o número no crachá lê em qualquer cor de marca', () => {
+  const {run} = setup();
+  const cores = [...run("BANCOS_BR.map(b=>b[2])")];
+  assert.ok(cores.length >= 20, 'a tabela encolheu');
+  for (const cor of cores) {
+    const txt = run(`corTextoSobre(${JSON.stringify(cor)})`);
+    const r = run(`contrasteEntre(${JSON.stringify(cor)},${JSON.stringify(txt === '#fff' ? '#ffffff' : txt)})`);
+    assert.ok(r >= 4.5, `${cor} com ${txt} dá ${r.toFixed(2)}:1`);
+  }
+});
