@@ -15,10 +15,13 @@ import {createHash} from 'node:crypto';
  * deploy (que depende dela) não sai. O conserto é trocar o número pelo hash
  * que a mensagem de erro já traz. */
 const html = readFileSync(new URL('../publico/index.html', import.meta.url), 'utf8');
-const refs = [...html.matchAll(/(?:href|src)="\.\/([^"?]+)\?v=([^"]*)"/g)];
+/* O "\./" era OPCIONAL no HTML, e a varredura só via quem o tinha:
+   empresas.css?v=8 passou meses fora da conferência por causa de dois
+   caracteres. Controle que não alcança tudo o que deveria não é controle. */
+const refs = [...html.matchAll(/(?:href|src)="(?:\.\/)?([^"?:]+\.(?:css|js|svg|json))\?v=([^"]*)"/g)];
 
 test('versão dos arquivos: existe pelo menos uma referência versionada', () => {
-  assert.ok(refs.length >= 5, 'a varredura não achou os arquivos — o teste estaria passando em branco');
+  assert.ok(refs.length >= 12, 'a varredura não achou os arquivos — o teste estaria passando em branco');
 });
 
 for (const [, caminho, v] of refs) {

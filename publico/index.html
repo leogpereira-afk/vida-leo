@@ -637,7 +637,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 }
 </style>
 <link rel="stylesheet" href="./refinamento.css?v=35e03ac04929">
-<link rel="stylesheet" href="empresas.css?v=8">
+<link rel="stylesheet" href="empresas.css?v=14cee7a15f49">
 <link rel="stylesheet" href="organograma.css?v=5075861ba133">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
@@ -9689,8 +9689,35 @@ async function vBancos(m){
     if(bancosFonte.erro)lista.appendChild(el('<p class="bancos-erro" role="alert">'+esc(bancosFonte.erro)+(bancosFonte.contas?' Exibindo a última consulta.':' As contas da gestão ainda não estão incluídas nesta lista.')+'</p>'));
     const novas=todas.filter(b=>b._gestao&&!b._local);if(novas.length)estado.appendChild(acao('Conferir '+novas.length+' contas',()=>bancosConferirImportacao(bancosFonte.contas),'ghost mini'));
     const grade=el('<div class="bancos-grade"></div>');lista.appendChild(grade);
-    for(const b of contas){const card=el('<article class="banco-card banco-linha"><header><span class="banco-icone">🏦</span><div><h2>'+esc(b.banco||'Banco não informado')+(b.codigoBanco?' · '+esc(b.codigoBanco):'')+'</h2><p>'+esc(b.titular||'Titular não informado')+'</p></div></header><dl class="banco-dados-rapidos"></dl><div class="banco-atalhos"></div></article>');
-      if(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(b.logo||'')){const img=el('<img alt="Logo do banco">');img.src=b.logo;img.style.cssText='width:100%;height:100%;object-fit:contain';card.querySelector('.banco-icone').replaceChildren(img)}
+    for(const b of contas){
+      /* O CARTÃO MOSTRA O QUE SE PROCURA NA HORA: logo, número do banco,
+         titular, gerente e telefone. Gerente e telefone moravam dentro de
+         "Detalhes", recolhido — quem precisa ligar para o gerente não vai
+         abrir um acordeão para achar o número. O resto continua lá dentro. */
+      const card=el('<article class="banco-card"><header><span class="banco-icone"></span><div>'
+        +'<h2>'+esc(b.banco||'Banco não informado')+'</h2>'
+        +'<p>'+esc(b.titular||'Titular não informado')+'</p></div></header>'
+        +'<dl class="banco-dados-rapidos"></dl><div class="banco-contato"></div><div class="banco-atalhos"></div></article>');
+      const icone=card.querySelector('.banco-icone');
+      if(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(b.logo||'')){
+        const img=el('<img alt="Logo do '+esc(b.banco||'banco')+'">');img.src=b.logo;icone.replaceChildren(img);
+      }else{
+        /* Sem logo cadastrada, o crachá é o NÚMERO do banco — que é o que
+           distingue um do outro. Emoji igual em todos não distingue nada.
+           (Logo de banco é marca de terceiro: não entra no repositório, o
+           dono anexa a dele em "Logo do banco".) */
+        icone.classList.add('banco-icone-texto');
+        icone.textContent=b.codigoBanco||iniciaisDe(b.banco||'')||'🏦';
+      }
+      if(b.codigoBanco)card.querySelector('header>div').insertBefore(
+        el('<span class="banco-codigo">Banco '+esc(b.codigoBanco)+'</span>'),card.querySelector('header h2').nextSibling);
+      const contato=card.querySelector('.banco-contato');
+      if(b.gerente)contato.appendChild(el('<span class="banco-gerente"><i aria-hidden="true">👤</i>'+esc(b.gerente)+'</span>'));
+      if(b.telefone){
+        const so=String(b.telefone).replace(/[^\d+]/g,'');
+        contato.appendChild(el('<a class="banco-fone" href="tel:'+esc(so)+'"><i aria-hidden="true">📞</i>'+esc(b.telefone)+'</a>'));
+      }
+      if(!b.gerente&&!b.telefone)contato.appendChild(el('<span class="banco-sem-contato">Sem gerente ou telefone cadastrado</span>'));
       const rapido=card.querySelector('dl');
       for(const [t,v]of [['Agência',b.agencia],['Conta',b.conta],['PIX',b.pix]]){const d=el('<div><dt>'+t+'</dt><dd></dd></div>');if(v){const c=acao(v,()=>bancoCopiar(v,c),'ghost mini');c.title='Copiar '+t;d.querySelector('dd').appendChild(c)}else d.querySelector('dd').textContent='—';rapido.appendChild(d)}
       const copiar=acao('Copiar',()=>bancoCopiar(bancoTexto(b),copiar),'ghost mini');copiar.title='Copiar dados bancários';card.querySelector('.banco-atalhos').appendChild(copiar);
@@ -9698,7 +9725,10 @@ async function vBancos(m){
       for(const [t,v]of [['Origem',b._fonte],['Código do banco',b.codigoBanco],['Tipo de conta',b.tipo],['CPF / CNPJ',b.doc],['Tipo do PIX',b.pixTipo],['Gerente',b.gerente],['Telefone',b.telefone],['Observações',b.obs]])if(v)detalhes.querySelector('dl').appendChild(el('<div><dt>'+esc(t)+'</dt><dd>'+esc(v)+'</dd></div>'));
       if(b._local&&b._gestao&&normaliza(b._local.titular||'')!==normaliza(b._gestao.titular||''))detalhes.querySelector('dl').appendChild(el('<div class="banco-nomes-cadastro"><dt>Nomes nos cadastros</dt><dd>Central: '+esc(b._local.titular||'não informado')+'<br>Gestão Impresilk: '+esc(b._gestao.titular||'não informado')+'</dd></div>'));
       const rodape=detalhes.querySelector('footer');const copiarTudo=acao('Copiar dados',()=>bancoCopiar(bancoTexto(b),copiarTudo),'ghost mini');rodape.appendChild(copiarTudo);
-      if(b._local){rodape.appendChild(acao('Editar',()=>bancoModal(b._local,b._gestao),'ghost mini'));rodape.appendChild(acao('Logo do banco',()=>bancoModalLogo(b._local),'ghost mini'));rodape.appendChild(acao('Excluir cadastro',()=>bancoExcluir(b._local),'ghost mini'));}
+      if(b._local){rodape.appendChild(acao('Editar',()=>bancoModal(b._local,b._gestao),'ghost mini'));rodape.appendChild(acao('Excluir cadastro',()=>bancoExcluir(b._local),'ghost mini'));
+        /* No cartão, não escondido: sem logo o crachá é o número, e o caminho
+           para trocar isso tem de estar onde se vê a falta. */
+        card.querySelector('.banco-atalhos').appendChild(acao(b.logo?'Trocar logo':'Pôr a logo',()=>bancoModalLogo(b._local),'ghost mini'));}
       else rodape.appendChild(acao('Guardar na Central',()=>bancosConferirImportacao([b._gestao]),'ghost mini'));
       grade.appendChild(card);
     }
