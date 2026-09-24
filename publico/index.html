@@ -10131,6 +10131,136 @@ function vEmpresas(m){
 }
 
 /* ===================== PATRIMÔNIO ===================== */
+/* A EVOLUÇÃO DO PATRIMÔNIO, ANO A ANO — calculada num lugar só, lida pela
+   tela e pelo PDF.
+
+   De onde vêm os anos: das avaliações que o dono cadastra por ano, mais o
+   valor atual do bem lançado no ano da SUA data de avaliação. Bem sem data de
+   avaliação não é chutado para o ano corrente: dizer que um valor é de 2026
+   sem saber quando foi avaliado inventaria uma valorização que não aconteceu.
+   Avaliação explícita do ano vence o valor atual.
+
+   A VALORIZAÇÃO DO TOTAL SÓ COMPARA O QUE EXISTE NOS DOIS ANOS. Somar tudo de
+   2025 contra tudo de 2026 e chamar a diferença de valorização é mentira
+   quando um bem novo entrou no meio: o patrimônio cresceu por compra, não por
+   preço. Por isso a conta do conjunto roda sobre os bens presentes nos dois
+   anos, e o que entrou ou saiu é DITO à parte. */
+function avaliacoesDoBem(x){
+  const por=new Map();
+  const ano=dataISOValida(x.avaliadoEm)?Number(String(x.avaliadoEm).slice(0,4)):null;
+  const atual=Number(x.valor);
+  if(ano&&Number.isFinite(atual)&&atual>0)por.set(ano,atual);
+  for(const a of (x.avaliacoes||[])){
+    const y=Number(a&&a.ano), v=Number(a&&a.valor);
+    if(Number.isInteger(y)&&y>=1900&&y<=2200&&Number.isFinite(v)&&v>0)por.set(y,v);
+  }
+  return por;
+}
+function evolucaoPatrimonio(bens){
+  const linhas=[],anos=new Set();
+  for(const x of (bens||[])){
+    const por=avaliacoesDoBem(x);
+    if(!por.size)continue;
+    por.forEach((_,a)=>anos.add(a));
+    linhas.push({bem:x,por});
+  }
+  const lista=[...anos].sort((a,b)=>a-b);
+  linhas.sort((a,b)=>(b.por.get(lista[lista.length-1])||0)-(a.por.get(lista[lista.length-1])||0)
+    ||String(a.bem.nome||'').localeCompare(String(b.bem.nome||'')));
+  const totais=lista.map(a=>linhas.reduce((s,l)=>s+(l.por.get(a)||0),0));
+  const variacao=lista.map((a,i)=>{
+    if(!i)return null;
+    const ant=lista[i-1];
+    const juntos=linhas.filter(l=>l.por.has(a)&&l.por.has(ant));
+    const de=juntos.reduce((s,l)=>s+l.por.get(ant),0);
+    const para=juntos.reduce((s,l)=>s+l.por.get(a),0);
+    return {
+      comparaveis:juntos.length,
+      entraram:linhas.filter(l=>l.por.has(a)&&!l.por.has(ant)).length,
+      sairam:linhas.filter(l=>!l.por.has(a)&&l.por.has(ant)).length,
+      de,para,dif:para-de,pct:de?(para-de)/de*100:null,
+    };
+  });
+  return {anos:lista,linhas,totais,variacao};
+}
+/* A valorização de UM bem, entre o ano pedido e o ano anterior em que ele tem
+   avaliação — que nem sempre é o ano imediatamente anterior. */
+function variacaoBem(por,ano){
+  const anteriores=[...por.keys()].filter(a=>a<ano).sort((a,b)=>b-a);
+  if(!anteriores.length)return null;
+  const de=por.get(anteriores[0]),para=por.get(ano);
+  if(!de)return null;
+  return {deAno:anteriores[0],de,para,dif:para-de,pct:(para-de)/de*100};
+}
+
+/* O PATRIMÔNIO EM PAPEL: a lista de bens e a evolução ano a ano, lidas do
+   MESMO cálculo da tela. A valorização vai em número e em palavra — cor some
+   na fotocópia. */
+function imprimirPatrimonio(){
+  const bens=(E.patrimonio||[]).filter(x=>x.situacao!=='Vendido');
+  if(!bens.length){alert('Nenhum bem em carteira para imprimir.');return}
+  const w=window.open('','_blank');
+  if(!w){alert('Libere o pop-up para gerar o PDF.');return}
+  const valor=x=>+x.valor||0,devo=x=>+x.falta||0;
+  const bruto=bens.reduce((s,x)=>s+valor(x),0),divida=bens.reduce((s,x)=>s+devo(x),0);
+  const ord=[...bens].sort((a,b)=>valor(b)-valor(a));
+  const ev=evolucaoPatrimonio(bens);
+  const linhaBem=x=>`<tr class="${devo(x)>0?'s-devo':'s-ok'}">
+    <td><b>${esc(x.nome||'(sem nome)')}</b>${x.documento?'<small>'+esc(x.documento)+'</small>':''}</td>
+    <td>${esc(x.tipo||'—')}</td><td>${esc(x.onde||'—')}</td>
+    <td class="n">${valor(x)?brl(valor(x)):'—'}</td>
+    <td class="n">${devo(x)?brl(devo(x)):'—'}</td>
+    <td class="n"><b>${valor(x)?brl(valor(x)-devo(x)):'—'}</b></td>
+    <td>${esc(x.situacao||'—')}</td></tr>`;
+  const tabelaEv=!ev.anos.length?'<p class="nota">Nenhuma avaliação com ano cadastrada.</p>':
+    `<table><thead><tr><th>Bem</th>${ev.anos.map(a=>`<th class="n">${a}</th>`).join('')}<th class="n">Valorização</th></tr></thead>
+     <tbody>${ev.linhas.map(l=>{
+       const ultimo=[...l.por.keys()].sort((a,b)=>b-a)[0];
+       const v=variacaoBem(l.por,ultimo);
+       return `<tr><td>${esc(l.bem.nome||'(sem nome)')}</td>${ev.anos.map(a=>{
+         const val=l.por.get(a);const dv=val!=null?variacaoBem(l.por,a):null;
+         return `<td class="n">${val!=null?brl(val)+(dv&&dv.pct!=null?'<small>'+(dv.pct>0?'+':'')+dv.pct.toFixed(1)+'%</small>':''):'—'}</td>`;
+       }).join('')}<td class="n"><b>${v?(v.pct>0?'valorizou ':v.pct<0?'desvalorizou ':'estável ')+Math.abs(v.pct).toFixed(1)+'% desde '+v.deAno:'1ª avaliação'}</b></td></tr>`;
+     }).join('')}</tbody>
+     <tfoot><tr><td><b>TOTAL</b></td>${ev.totais.map(v=>`<td class="n"><b>${brl(v)}</b></td>`).join('')}<td></td></tr>
+     <tr><td>Valorização do conjunto</td>${ev.variacao.map(v=>`<td class="n">${v&&v.pct!=null?(v.pct>0?'+':'')+v.pct.toFixed(1)+'%':'—'}</td>`).join('')}<td></td></tr></tfoot></table>
+     <p class="nota">A valorização do conjunto compara só os bens avaliados nos dois anos: bem que entrou no meio faria o total subir por compra, não por preço.</p>`;
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>Patrimônio</title>
+  <style>
+  body{font:13px/1.5 -apple-system,Segoe UI,sans-serif;padding:26px;color:#1a1a1a}
+  h1{font-size:21px;margin:0 0 2px}
+  .sub{color:#666;font-size:12px;margin-bottom:14px}
+  .resumo{display:flex;gap:18px;flex-wrap:wrap;margin:0 0 16px;font-size:12.5px}
+  .resumo b{font-size:17px;display:block}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px}
+  th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#666;
+     border-bottom:1.5px solid #333;padding:5px 6px}
+  td{padding:6px;border-bottom:1px solid #eee;vertical-align:top}
+  td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  td small{display:block;color:#777;font-size:10.5px;font-weight:400}
+  tr.s-devo td:first-child{box-shadow:inset 3px 0 0 #c98a4b}
+  tr.s-ok td:first-child{box-shadow:inset 3px 0 0 #1f6f5c}
+  tfoot td{border-top:1.5px solid #333;border-bottom:0}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#666;margin:24px 0 8px;
+     border-top:1px solid #ddd;padding-top:14px}
+  .nota{color:#666;font-size:11px;margin:4px 0 0}
+  .rodape{margin-top:22px;padding-top:10px;border-top:1px solid #ddd;color:#777;font-size:10.5px}
+  @media print{body{padding:0}thead{display:table-header-group}tr{break-inside:avoid}}
+  </style>
+  <h1>Patrimônio</h1>
+  <div class="sub">Leonardo Gonçalves · gerado em ${new Date().toLocaleDateString('pt-BR')} · ${bens.length} bem(ns) em carteira</div>
+  <div class="resumo"><div>Bruto<b>${brl(bruto)}</b></div><div>Ainda devo<b>${brl(divida)}</b></div>
+    <div>Líquido<b>${brl(bruto-divida)}</b></div></div>
+  <table><thead><tr><th>Bem</th><th>Tipo</th><th>Onde</th><th class="n">Valor</th><th class="n">Devo</th><th class="n">Meu</th><th>Situação</th></tr></thead>
+  <tbody>${ord.map(linhaBem).join('')}</tbody>
+  <tfoot><tr><td colspan="3"><b>TOTAL</b></td><td class="n"><b>${brl(bruto)}</b></td><td class="n"><b>${brl(divida)}</b></td><td class="n"><b>${brl(bruto-divida)}</b></td><td></td></tr></tfoot></table>
+  <h2>Evolução ano a ano</h2>
+  ${tabelaEv}
+  <div class="rodape">Valores de avaliação cadastrados pelo proprietário. Bens vendidos não entram nesta folha.</div>`);
+  w.document.close();
+  setTimeout(()=>w.print(),400);
+}
+
 function vPatrimonio(m){
   const r=rr('patrimonio');
   m.classList.add('ff-patrimonio');
@@ -10196,11 +10326,146 @@ function vPatrimonio(m){
   cx.appendChild(rol);
   const pe=el('<div style="padding:0 17px 15px"></div>');
   const bt=el('<button class="mais">+ Novo bem</button>');bt.onclick=novo;pe.appendChild(bt);cx.appendChild(pe);
-  m.appendChild(bloco('pt-lista','Meus bens','clique para abrir, anexar escritura e lançar o que falta pagar',cx));
+  m.appendChild(bloco('pt-lista','Meus bens','clique para abrir, anexar foto, escritura e lançar o que falta pagar',cx));
+
+  /* ---- a evolução, ano a ano ---- */
+  const ev=evolucaoPatrimonio(bens);
+  const cxEv=el('<div class="corpo"></div>');
+  if(ev.anos.length<1){
+    cxEv.appendChild(el('<div class="vazio">Nenhuma avaliação com ano ainda. Abra um bem e cadastre a avaliação de cada ano para ver a valorização.</div>'));
+  }else{
+    const rolEv=el('<div class="rolagem"></div>');
+    const t=document.createElement('table');
+    t.innerHTML='<thead><tr><th>Bem</th>'+ev.anos.map(a2=>`<th style="text-align:right">${a2}</th>`).join('')+
+      '<th style="text-align:right">Valorização</th></tr></thead>';
+    const tb=document.createElement('tbody');
+    ev.linhas.forEach(l=>{
+      const ultimo=[...l.por.keys()].sort((x2,y2)=>y2-x2)[0];
+      const v=variacaoBem(l.por,ultimo);
+      const tr=document.createElement('tr');tr.style.cursor='pointer';
+      tr.innerHTML='<td style="padding:10px"><b>'+esc(l.bem.nome||'(sem nome)')+'</b></td>'+
+        ev.anos.map(a2=>{
+          const val=l.por.get(a2);
+          const dv=val!=null?variacaoBem(l.por,a2):null;
+          return '<td style="padding:10px;text-align:right;font-variant-numeric:tabular-nums">'+
+            (val!=null?brl(val)+(dv&&dv.pct!=null?'<small style="display:block;font-size:11px;color:'+(dv.pct>0?'var(--verde)':dv.pct<0?'var(--vermelho)':'var(--suave)')+'">'+(dv.pct>0?'+':'')+dv.pct.toFixed(1)+'%</small>':'')
+              :'<span style="color:var(--suave)">—</span>')+'</td>';
+        }).join('')+
+        '<td style="padding:10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:'+
+        (v&&v.pct>0?'var(--verde)':v&&v.pct<0?'var(--vermelho)':'var(--suave)')+'">'+
+        (v?(v.pct>0?'+':'')+v.pct.toFixed(1)+'%<small style="display:block;font-size:11px;font-weight:400;color:var(--suave)">desde '+v.deAno+'</small>':'<span style="color:var(--suave)">1ª avaliação</span>')+'</td>';
+      tr.onclick=()=>modalBem(l.bem);
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    const tf=document.createElement('tfoot');
+    tf.innerHTML='<tr class="tfim"><td style="padding:10px">TOTAL</td>'+
+      ev.totais.map(v=>`<td style="text-align:right">${brl(v)}</td>`).join('')+'<td></td></tr>'+
+      '<tr><td style="padding:10px;color:var(--suave);font-size:12px">Valorização do conjunto</td>'+
+      ev.variacao.map(v=>'<td style="text-align:right;padding:10px;font-size:12px;font-variant-numeric:tabular-nums;color:'+
+        (v&&v.pct>0?'var(--verde)':v&&v.pct<0?'var(--vermelho)':'var(--suave)')+'">'+
+        (v&&v.pct!=null?(v.pct>0?'+':'')+v.pct.toFixed(1)+'%':'—')+'</td>').join('')+'<td></td></tr>';
+    t.appendChild(tf);
+    rolEv.appendChild(t);cxEv.appendChild(rolEv);
+    /* O QUE ENTROU E O QUE SAIU VAI DITO. Sem isso, o total subindo porque um
+       bem novo foi comprado se leria como valorização. */
+    const notas=ev.variacao.map((v,i)=>{
+      if(!v)return '';
+      const partes=[];
+      if(v.entraram)partes.push(v.entraram+' bem(ns) entrou(aram) neste ano');
+      if(v.sairam)partes.push(v.sairam+' saiu(íram)');
+      return partes.length?'<b>'+ev.anos[i]+'</b>: '+partes.join(' e ')+'.':'';
+    }).filter(Boolean).join(' ');
+    cxEv.appendChild(el('<p class="ff-note">A valorização do conjunto compara só os bens avaliados nos <b>dois</b> anos — bem que entrou no meio faria o total subir por compra, não por preço. '+
+      (notas||'Nenhum bem entrou ou saiu entre os anos listados.')+'</p>'));
+  }
+  const peEv=el('<div style="padding:0 17px 15px;display:flex;gap:9px;flex-wrap:wrap"></div>');
+  const bPdf=el('<button class="btn ghost mini">🖨 Salvar patrimônio em PDF</button>');
+  bPdf.onclick=()=>imprimirPatrimonio();
+  peEv.appendChild(bPdf);cxEv.appendChild(peEv);
+  m.appendChild(bloco('pt-evol','Evolução ano a ano','cadastre a avaliação de cada ano dentro do bem; a valorização é calculada daqui',cxEv));
 
   const porTipo={};bens.forEach(x=>porTipo[x.tipo||'Outro']=(porTipo[x.tipo||'Outro']||0)+valor(x));
   if(bruto>0) m.appendChild(bloco('pt-tipo','Onde está o patrimônio','',graficoEl(gRosca(
     Object.entries(porTipo).map(([r2,v])=>({r:r2,v})).filter(x=>x.v>0),{fmt:brl}))));
+}
+
+/* AS AVALIAÇÕES POR ANO. O bem tem UM valor atual, que é o que vale hoje; a
+   série por ano é o que permite dizer se valorizou. Guardar uma coisa no lugar
+   da outra perderia o histórico na primeira reavaliação. */
+function secaoAvaliacoesBem(x){
+  const sec=el('<details class="ff-attachments" open><summary>Avaliações por ano</summary></details>');
+  const corpo=el('<div></div>');sec.appendChild(corpo);
+  const pintar=()=>{
+    corpo.replaceChildren();
+    const por=avaliacoesDoBem(x);
+    const anos=[...por.keys()].sort((a,b)=>b-a);
+    if(!anos.length)corpo.appendChild(el('<p class="ff-note">Nenhuma avaliação com ano. Cadastre abaixo para acompanhar a valorização.</p>'));
+    else{
+      const ul=el('<div class="arqs" style="margin-bottom:9px"></div>');
+      anos.forEach(ano=>{
+        const v=variacaoBem(por,ano);
+        const daData=dataISOValida(x.avaliadoEm)&&Number(String(x.avaliadoEm).slice(0,4))===ano
+          &&!(x.avaliacoes||[]).some(a=>Number(a.ano)===ano);
+        const it=el('<div class="arq"><span>'+ano+'</span><span class="nome">'+brl(por.get(ano))+
+          (v&&v.pct!=null?' <small style="color:'+(v.pct>0?'var(--verde)':v.pct<0?'var(--vermelho)':'var(--suave)')+'">'+(v.pct>0?'+':'')+v.pct.toFixed(1)+'% desde '+v.deAno+'</small>':'')+
+          '</span><span class="tam">'+(daData?'valor atual do bem':'avaliação cadastrada')+'</span></div>');
+        if(!daData){
+          const bx=el('<button class="lixo" aria-label="Apagar a avaliação de '+ano+'">✕</button>');
+          bx.onclick=()=>{
+            if(!confirm('Apagar a avaliação de '+ano+'?'))return;
+            x.avaliacoes=(x.avaliacoes||[]).filter(a=>Number(a.ano)!==ano);salvar();pintar();
+          };
+          it.appendChild(bx);
+        }
+        ul.appendChild(it);
+      });
+      corpo.appendChild(ul);
+    }
+    const form=el('<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end"></div>');
+    const anoIn=el('<label class="campo" style="max-width:110px">Ano<input type="number" min="1900" max="2200" step="1" placeholder="2026"></label>');
+    const valIn=el('<label class="campo" style="max-width:190px">Valor (R$)<input type="text" inputmode="decimal" placeholder="1.200.000,00"></label>');
+    const add=el('<button type="button" class="btn ghost mini">Adicionar avaliação</button>');
+    add.onclick=()=>{
+      const ano=Number(anoIn.querySelector('input').value);
+      let valor;try{valor=financeiroNumero(valIn.querySelector('input').value||'')}catch{valor=NaN}
+      if(!Number.isInteger(ano)||ano<1900||ano>2200){alert('Informe o ano com quatro dígitos.');return}
+      if(!Number.isFinite(valor)||valor<=0){alert('Informe o valor da avaliação.');return}
+      x.avaliacoes=[...(x.avaliacoes||[]).filter(a=>Number(a.ano)!==ano),{ano,valor}];
+      salvar();anoIn.querySelector('input').value='';valIn.querySelector('input').value='';pintar();
+    };
+    form.appendChild(anoIn);form.appendChild(valIn);form.appendChild(add);
+    /* Atalho para o caso comum: o valor de hoje vira a avaliação deste ano,
+       sem digitar de novo. */
+    const atual=Number(x.valor),anoHoje=Number(hoje().slice(0,4));
+    if(Number.isFinite(atual)&&atual>0&&!avaliacoesDoBem(x).has(anoHoje)){
+      const usar=el('<button type="button" class="btn ghost mini">Usar o valor atual como avaliação de '+anoHoje+'</button>');
+      usar.onclick=()=>{x.avaliacoes=[...(x.avaliacoes||[]),{ano:anoHoje,valor:atual}];salvar();pintar()};
+      form.appendChild(usar);
+    }
+    corpo.appendChild(form);
+  };
+  pintar();
+  return sec;
+}
+/* A FOTO DO BEM é o anexo de imagem, mostrado como imagem. O arquivo já podia
+   ser anexado desde sempre; o que faltava era VER sem precisar abrir. */
+function fotosDoBem(ref){
+  const cx=el('<div class="bem-fotos" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:9px"></div>');
+  (async()=>{
+    let as=[];
+    try{as=await arqPor(ref)}catch{return}
+    const imgs=as.filter(a=>/^image\//i.test(a.tipo||''));
+    if(!imgs.length)return;
+    for(const a of imgs.slice(0,6)){
+      try{
+        const u=await arqUrlDe(a.id,false);
+        const fig=el('<a target="_blank" rel="noopener noreferrer" style="display:block;line-height:0"><img alt="'+esc(a.nome)+'" style="width:110px;height:82px;object-fit:cover;border-radius:10px;border:1px solid var(--linha)"></a>');
+        fig.href=u;fig.querySelector('img').src=u;cx.appendChild(fig);
+      }catch{ /* imagem que não abre não derruba o resto da janela */ }
+    }
+  })();
+  return cx;
 }
 
 function modalBem(x,novo=false){
@@ -10217,7 +10482,11 @@ function modalBem(x,novo=false){
       {k:'obs',t:'Observações',tipo:'textarea',full:true},
     ],x,(v,patch)=>financeiroSalvarRegistro(E.patrimonio,x,v,patch),fechar);
     const resumo=el('<output class="ff-equity-preview" aria-live="polite"></output>');editor.form.querySelector('.ff-actions').before(resumo);const atualizarResumo=()=>{try{const v=financeiroNumero(editor.controles.valor.value||'0'),d=financeiroNumero(editor.controles.falta.value||'0');resumo.textContent='Parcela líquida: '+brl(v-d)+' · avaliação menos saldo devedor.'}catch{resumo.textContent='Confira os valores para calcular a parcela líquida.'}};editor.controles.valor.oninput=atualizarResumo;editor.controles.falta.oninput=atualizarResumo;atualizarResumo();
-    if(!novo){const a=el('<details class="ff-attachments"><summary>Escritura, contrato e comprovantes</summary></details>');a.appendChild(areaArquivos('bem:'+x.id,'Escritura, matrícula, contrato, ITBI, boletos'));c.appendChild(a);
+    if(!novo){
+      c.appendChild(secaoAvaliacoesBem(x));
+      const a=el('<details class="ff-attachments"><summary>Foto, escritura, contrato e comprovantes</summary></details>');
+      a.appendChild(fotosDoBem('bem:'+x.id));
+      a.appendChild(areaArquivos('bem:'+x.id,'Foto do bem, escritura, matrícula, contrato, ITBI, boletos'));c.appendChild(a);
       const del=el('<button type="button" class="btn ghost">Apagar bem</button>');del.onclick=async()=>{if(!confirm('Apagar este bem e seus arquivos?'))return;if(!await apagarAnexosDe('bem:'+x.id))return;E.patrimonio=E.patrimonio.filter(y=>y.id!==x.id);salvar();fechar()};c.appendChild(del);
     }else c.appendChild(el('<p class="ff-note">Salve o bem para anexar os documentos. Bens vendidos ficam disponíveis no histórico.</p>'));
   });
