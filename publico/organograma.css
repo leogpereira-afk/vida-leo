@@ -17,3 +17,8 @@
 .empresas-layout:has(#empresas-organograma:not([hidden]))>:is(.empresa-contexto,.workspace-tabs,.workspace-pane){grid-column:1/-1}
 
 .org-modal-fundo{z-index:1200}.org-modal{box-sizing:border-box;background:var(--card,#fff);color:var(--tinta,#21332d)}.org-modal-cab{display:flex;align-items:center;justify-content:space-between;gap:16px;position:sticky;top:-20px;background:var(--card,#fff);z-index:2;padding:12px 0}.org-modal-cab h2{margin:0;font:600 21px Inter,system-ui,sans-serif}.org-modal .org-form{padding:20px 0}.org-form-acoes{position:sticky;bottom:0;background:var(--card,#fff);padding:14px 0;z-index:2}.org-form-acoes button{min-width:100px;min-height:42px}.org-visao-geral [data-no-id]:hover{filter:brightness(1.12)}
+
+/* Controles junto ao próprio card, no alto, com edição à direita. */
+.org-no-acoes{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 14px;padding:0 0 10px;border-top:0;border-bottom:1px solid var(--linha)}
+.org-no-acoes>button:first-child{order:10;margin-left:auto}
+.org-no-acoes .btn{font-size:11px;padding:7px 9px;min-height:34px}

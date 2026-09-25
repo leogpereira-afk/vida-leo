@@ -171,3 +171,19 @@ test('Contabilidade selecionada acompanha o cadastro por ID e preserva referênc
  a.e.contabilidades=[];assert.equal(a.api.identificar(n,a.e).contabilidade,'Escritório Central');
  clicar(a,'Editar','.org-no[data-no-id="a"]');enviar(a,{contabilidadeId:'',contabilidade:'Referência manual'});assert.equal(a.e.organogramas[0].nos[0].contabilidadeId,'');assert.equal(a.api.identificar(a.e.organogramas[0].nos[0],a.e).contabilidade,'Referência manual');
 });
+
+test('Raízes independentes ficam próximas no topo sem mudar vínculos ou sobrepor descendentes',()=>{
+ const {api,e}=app(),o=exemplo();o.nos.push({id:'livre1',nome:'Livre 1'},{id:'livre2',nome:'Livre 2'},{id:'d',nome:'Outra filha',parentId:'a'});
+ const antes=JSON.stringify(o);
+ for(const opts of [{resumo:true,horizontal:true},{}]){
+  const {document}=parseHTML(api.diagramaSVG(o,e,opts).svg);
+  const rect=id=>document.querySelector('[data-no-id="'+id+'"] rect');
+  assert.equal(+rect('livre1').getAttribute('x')-(+rect('a').getAttribute('x')),296);
+  assert.equal(+rect('livre2').getAttribute('x')-(+rect('livre1').getAttribute('x')),296);
+  assert.equal(rect('a').getAttribute('y'),rect('livre2').getAttribute('y'));
+  assert.equal(document.querySelectorAll('path').length,3);
+  const boxes=[...document.querySelectorAll('[data-no-id] rect:first-child')].map(r=>['x','y','width','height'].map(k=>+r.getAttribute(k)));
+  for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){const [x,y,w,h]=boxes[i],[a,b,c,d]=boxes[j];assert.ok(x+w<=a||a+c<=x||y+h<=b||b+d<=y);}
+ }
+ assert.equal(JSON.stringify(o),antes);
+});

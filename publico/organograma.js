@@ -196,6 +196,17 @@
       let x = inicio; for (const f of filhos(o,n.id)) { posicionar(f,x); x += dados.get(f.id).largura+gap; }
     }
     let inicio = 0; for (const n of raizes) { posicionar(n,inicio); inicio += dados.get(n.id).largura+gap; }
+    // O topo compartilha a largura dos ramos abaixo: empresas independentes
+    // não precisam reservar uma coluna vazia por toda a altura do desenho.
+    if(raizes.length>1 && (opts.horizontal || !opts.resumo)){
+      const comRamos=raizes.filter(n=>filhos(o,n.id).length);
+      const larguraRamos=comRamos.reduce((s,n)=>s+dados.get(n.id).largura,0)+Math.max(0,comRamos.length-1)*gap;
+      const larguraTopo=raizes.length*largura+(raizes.length-1)*gap;
+      totalX=Math.max(larguraTopo,larguraRamos);
+      let xRamo=(totalX-larguraRamos)/2;
+      for(const n of comRamos){posicionar(n,xRamo);xRamo+=dados.get(n.id).largura+gap;}
+      raizes.forEach((n,i)=>{dados.get(n.id).x=(totalX-larguraTopo)/2+i*(largura+gap)+18;});
+    }
     let altura = Math.max(120,niveis.reduce((s,h) => s+h+gapY,0)-gapY+36);
     if(opts.resumo && !opts.horizontal){
       // Os ramos principais ficam lado a lado; cada ramo profundo ocupa sua própria coluna.
@@ -424,7 +435,7 @@
             }
           }
           if(info.empresa&&ctx.openCompany)acoes.append(botao('Abrir empresa',()=>ctx.openCompany(info.empresa.id)));
-          cartao.append(acoes);li.append(cartao);const fs=filhos(o,n.id);if(fs.length){const ul=criar('ul','org-filhos');for(const f of fs)ul.append(ramo(f));li.append(ul)}return li;
+          cartao.prepend(acoes);li.append(cartao);const fs=filhos(o,n.id);if(fs.length){const ul=criar('ul','org-filhos');for(const f of fs)ul.append(ramo(f));li.append(ul)}return li;
         }
         if(modo!=='geral'){const navegacao=criar('div','org-visual-controles');navegacao.append(botao('← Ver à esquerda',()=>{viewport.scrollLeft-=Math.max(260,viewport.clientWidth*.7)}),botao('Ver à direita →',()=>{viewport.scrollLeft+=Math.max(260,viewport.clientWidth*.7)}));painel.append(navegacao)}
         const ul=criar('ul','org-arvore');for(const raiz of filhos(o))ul.append(ramo(raiz));viewport.append(ul);painel.append(viewport);if(modo==='detalhes'){const centralizar=()=>{const primeira=viewport.querySelector('.org-arvore>.org-ramo>.org-no');if(primeira)viewport.scrollLeft=Math.max(0,primeira.offsetLeft+primeira.offsetWidth/2-viewport.clientWidth/2)};if(global.requestAnimationFrame)global.requestAnimationFrame(centralizar);else centralizar()}
