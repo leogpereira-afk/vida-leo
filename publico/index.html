@@ -645,7 +645,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 <link rel="stylesheet" href="./central-fluida.css?v=df0c674c8278">
 <link rel="stylesheet" href="./documentos-revisao.css?v=90d5f0ab4afe">
 <link rel="stylesheet" href="./metodo-vof.css?v=c123348dc276">
-<link rel="stylesheet" href="./painel-compacto.css?v=70889622e0b6">
+<link rel="stylesheet" href="./painel-compacto.css?v=4baf1a7c4d03">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -1042,7 +1042,7 @@ const SEED={
      BOMBEIRO = Hidráulica" uma vez, os 21 pagamentos dele viram mão de obra
      hidráulica -- de uma vez, para trás e para a frente. É a diferença entre
      classificar 90 fornecedores e classificar 824 lançamentos. */
-  obras:[],obraAportes:[],obraFornecedores:{},
+  obras:[],obraAportes:[],obraFornecedores:{},fortemaisLinks:[],
   /* Caixa e VGV — o modelo patrimonial que morava na planilha "Patrimonial".
      São poucas dezenas de linhas em cada lista: cabem no estado, ao contrário
      do livro-caixa das obras. Quatro listas independentes, como na planilha:
@@ -1132,6 +1132,8 @@ function carregar(){
   let s=null; try{s=JSON.parse(localStorage.getItem(CHAVE))}catch(e){}
   const base=structuredClone(SEED);
   const d=(s&&s.viagens)?{...base,...s}:base;
+  if(!Array.isArray(d.fortemaisLinks))d.fortemaisLinks=[];
+  d.fortemaisLinks.forEach(x=>{if(!x.id)x.id=uid()});
   // migração: todo registro precisa de id estável (arquivos são ligados por ele)
   for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','queixas','consultas','fisio','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','contabilidades','empresasPJ','patrimonio','oportunidades','obras','obraAportes','contas','empreend','casas','reservas'])
     (d[k]||[]).forEach(x=>{if(!x.id)x.id=uid()});
@@ -5346,10 +5348,61 @@ function imprimirObra(o,rr2,custos){
   setTimeout(()=>w.print(),400);
 }
 
+/* Atalhos independentes das obras; seguem o mesmo backup e sincronização. */
+function fmLinkUrl(valor){
+  let texto=String(valor||'').trim();
+  if(/^(?:[\w-]+\.)+[\w-]+(?::\d+)?(?:[/?#]|$)/i.test(texto))texto='https://'+texto;
+  let u;try{u=new URL(texto)}catch{throw Error('Informe um endereço válido, como https://site.com.br.')}
+  if(!['https:','http:'].includes(u.protocol)||u.username||u.password)throw Error('Use um endereço de site HTTP ou HTTPS, sem senha no link.');
+  if(u.href.length>2048)throw Error('O endereço é muito longo. Use um link com até 2.048 caracteres.');
+  return u.href;
+}
+function fmGravarLinks(lista){
+  const anterior=E.fortemaisLinks,mt=E._mt,tinhaMt=Object.hasOwn(E,'_mt');
+  E.fortemaisLinks=lista;
+  try{salvar()}catch(e){E.fortemaisLinks=anterior;if(tinhaMt)E._mt=mt;else delete E._mt;throw Error('Não foi possível salvar o link. Seus dados anteriores foram mantidos. Tente novamente.');}
+}
+function fmSalvarLink(valores,anterior){
+  const titulo=String(valores.titulo||'').trim(),url=fmLinkUrl(valores.url),lista=E.fortemaisLinks||[];
+  if(!titulo)throw Error('Dê um nome ao destino.');
+  if(titulo.length>100)throw Error('Use um nome com até 100 caracteres.');
+  if(anterior&&!lista.includes(anterior))throw Error('Este link mudou. Feche e abra a edição novamente.');
+  const link={id:anterior?.id||uid(),titulo,url};
+  fmGravarLinks(anterior?lista.map(x=>x===anterior?link:x):[...lista,link]);return link;
+}
+function fmEditarLink(link){
+  abrirModal(link?'Editar link':'Adicionar link','Escolha o nome do destino. O link abrirá em uma nova aba.',(c,fechar)=>{
+    const corpo=el('<div class="secao fm-link-editor"></div>');
+    const form=devFormulario(corpo,[{k:'titulo',t:'Nome do destino',req:true,full:true,ph:'Ex.: Site da Fortemais'},{k:'url',t:'Endereço do site',req:true,full:true,ph:'https://…'}],link||{},'Salvar link',v=>{fmSalvarLink(v,link);fechar()});
+    form.querySelector('[name=titulo]').maxLength=100;const endereco=form.querySelector('[name=url]');endereco.maxLength=2048;endereco.inputMode='url';endereco.autocapitalize='none';endereco.spellcheck=false;
+    const acoes=el('<div class="fm-link-form-actions"></div>');
+    if(link){const remover=acao('Remover link',()=>{if(!confirm('Remover o atalho “'+link.titulo+'”? O site de destino não será alterado.'))return;try{fmGravarLinks((E.fortemaisLinks||[]).filter(x=>x.id!==link.id));fechar()}catch(e){const erro=form.querySelector('[role=alert]');erro.textContent=e.message;erro.hidden=false}},'ghost');remover.type='button';remover.classList.add('fm-link-remove');acoes.appendChild(remover)}
+    const cancelar=acao('Cancelar',fechar,'ghost');cancelar.type='button';acoes.append(cancelar,form.querySelector('button[type=submit]'));form.appendChild(acoes);c.appendChild(corpo);
+  });
+}
+function fmPainelLinks(){
+  const sec=el('<section class="fm-links" aria-label="Links da Fortemais"><header><div><h2>Links rápidos</h2><p>Seus destinos, em outra aba.</p></div></header><div class="fm-links-list"></div></section>');
+  sec.querySelector('header').appendChild(acao('+ Adicionar link',()=>fmEditarLink(),'ghost'));
+  const lista=sec.querySelector('.fm-links-list');
+  for(const link of E.fortemaisLinks||[]){
+    let url='';try{url=fmLinkUrl(link.url)}catch{}
+    const item=el('<div class="fm-link-item"></div>'),destino=el(url?'<a target="_blank" rel="noopener noreferrer"></a>':'<span class="fm-link-invalid"></span>');
+    if(url){destino.href=url;destino.title=link.titulo+' — '+url;destino.setAttribute('aria-label',link.titulo+' (abre em nova aba)')}
+    const nome=el('<strong></strong>');nome.textContent=link.titulo||'Link sem nome';
+    const host=el('<small></small>');host.textContent=url?new URL(url).hostname:'Edite o endereço para abrir';destino.append(nome,host);
+    if(url)destino.appendChild(el('<span class="fm-link-arrow" aria-hidden="true">↗</span>'));
+    const editar=acao('Editar',()=>fmEditarLink(link),'ghost');editar.setAttribute('aria-label','Editar link '+(link.titulo||'sem nome'));
+    item.append(destino,editar);lista.appendChild(item);
+  }
+  if(!lista.children.length)lista.appendChild(el('<p class="fm-links-empty">Adicione sites, sistemas ou pastas e escolha o nome de cada atalho.</p>'));
+  return sec;
+}
+
 /* ---------------- a tela ---------------- */
 async function vFortemais(m){
   m.classList.add('fortemais-fluida');const r=rr('fortemais');
   m.appendChild(cab('Fortemais','Cada obra: o que custou, quem aportou, por quanto saiu e o que sobrou.'));
+  m.appendChild(fmPainelLinks());
 
   const resumo=await fmResumo();
   if(resumo===null){
