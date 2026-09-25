@@ -7,6 +7,20 @@ const fonte=readFileSync(new URL('../publico/organograma.js',import.meta.url),'u
 const exemplo=()=>({id:'grupo',titulo:'Grupo de teste',nos:[{id:'a',nome:'Antigo',empresaId:'empresa-a',tipo:'Holding',parentId:''},{id:'b',nome:'Empresa B',tipo:'Empresa',parentId:'a',socios:'Pessoa exemplo — 100%',observacoes:'Registro original'},{id:'c',nome:'Equipe',tipo:'Área',parentId:'b'}]});
 function app(estado){const {document,HTMLElement,HTMLSelectElement}=parseHTML('<html><body><main></main><div id="modal"></div></body></html>');Object.defineProperty(HTMLSelectElement.prototype,'value',{configurable:true,get(){return [...this.options].find(o=>o.selected)?.value || this.options[0]?.value || ''},set(v){for(const o of this.options)o.selected=o.value===String(v)}});HTMLElement.prototype.scrollIntoView=function(){};const ctx=vm.createContext({document,console,URL,Date,Math,Set,Map});vm.runInContext(fonte,ctx);const api=ctx.LeoOrganograma,e=estado||{empresasPJ:[{id:'empresa-a',nome:'Atual'}],organogramas:[exemplo()]},calls=[];const contexto={getState:()=>e,save:()=>calls.push('save'),onSelect:id=>calls.push(id),openModal:(titulo,sub,montar)=>{const m=document.querySelector('#modal');m.replaceChildren();const c=document.createElement('div');m.append(c);montar(c,()=>m.replaceChildren())}};return{api,e,document,contexto,calls,render(){return api.render(document.querySelector('main'),contexto)}}}
 const plain=v=>JSON.parse(JSON.stringify(v));
+test('Setas reordenam irmãos preservando descendentes e original',()=>{
+  const {api}=app(),o=exemplo();o.nos.push({id:'d',nome:'Outra empresa',parentId:'a'});
+  const antes=JSON.stringify(o),novo=api.moverNo(o,'d',-1);
+  assert.equal(JSON.stringify(o),antes);assert.equal(novo.nos.find(n=>n.id==='d').ordem,0);assert.equal(novo.nos.find(n=>n.id==='b').ordem,1);
+  assert.equal(novo.nos.find(n=>n.id==='c').parentId,'b');api.validar([novo]);
+  assert.deepEqual(plain(api.moverNo(novo,'d',-1)),plain(novo));
+  assert.equal(api.moverNo(novo,'d',1).nos.find(n=>n.id==='d').ordem,1);
+});
+test('Editor de cards salva ordem e desabilita setas nos limites',()=>{
+  const a=app();a.e.organogramas[0].nos.push({id:'d',nome:'Outra empresa',parentId:'a'});a.render();clicar(a,'Editar cards');
+  const card=a.document.querySelector('.org-no[data-no-id="d"]');const subir=[...card.querySelectorAll('button')].find(b=>b.textContent==='↑ Subir');subir.click();
+  assert.equal(a.e.organogramas[0].nos.find(n=>n.id==='d').ordem,0);assert.ok(a.calls.includes('save'));
+  assert.equal([...a.document.querySelector('.org-no[data-no-id="d"]').querySelectorAll('button')].find(b=>b.textContent==='↑ Subir').disabled,true);
+});
 function clicar(a,nome,root='body'){const b=[...a.document.querySelectorAll(root+' button')].find(b=>b.textContent===nome);assert.ok(b,`Botão ${nome}`);b.click()}
 function enviar(a,dados){const f=a.document.querySelector('#modal form');for(const[k,v]of Object.entries(dados))f.querySelector(`[name=${k}]`).value=String(v);f.onsubmit({preventDefault(){}})}
 test('Validação aceita florestas e não converte ligação visual em participação',()=>{const {api}=app(),o=exemplo();o.nos.push({id:'livre',nome:'Outra raiz'});api.validar([o]);assert.equal(o.nos[1].percentual,undefined);assert.equal(o.nos[0].socios,undefined)});

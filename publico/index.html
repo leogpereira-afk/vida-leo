@@ -15,6 +15,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+html[data-fonte-interface] body,html[data-fonte-interface] body *{font-family:var(--fonte-interface)!important}
+
 :root{
   --bg:#f7f6f3; --card:#fff; --linha:#e8e5df; --tinta:#20211f; --suave:#6f7269;
   --marca:#3e45ee; --marca-cl:#eeefff; --marca-solida:#3e45ee;
@@ -635,7 +637,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 }
 </style>
 <link rel="stylesheet" href="./refinamento.css?v=a9b0b08ec1e1">
-<link rel="stylesheet" href="empresas.css?v=3d6acb9d81e6">
+<link rel="stylesheet" href="empresas.css?v=6c0e78d80262">
 <link rel="stylesheet" href="organograma.css?v=5075861ba133">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
@@ -677,7 +679,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 <script src="./vendor/ical-2.2.1.min.js"></script>
 <script src="./google-datas.js?v=85c5d36986f3"></script>
 <script src="./documentos-revisao.js?v=f54d2ba958f9"></script>
-<script src="./organograma.js?v=49273e1653d7"></script>
+<script src="./organograma.js?v=ddeef367b42a"></script>
 <script>
 /* ============================================================
    Central do Léo — painel pessoal, um arquivo só.
@@ -703,6 +705,30 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 // tira acento/caixa/espaço extra — usado pra casar nome de pessoa e de exame
 const normaliza=s=>String(s??'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim().replace(/\s+/g,' ');
 const mesmaPessoa=(a,b)=>normaliza(a)===normaliza(b);
+/* A MESMA UNIDADE ESCRITA DE DOIS JEITOS É A MESMA UNIDADE.
+
+   Dois laboratórios medem a mesma coisa e imprimem "g%" e "g/dL", "milh/mm3" e
+   "milhões/mm³", "mcg/dL" e "µg/dL". Comparar o texto cru faz a Central achar
+   que são grandezas diferentes: some a faixa de referência e, pior, a
+   comparação com o exame anterior vira "sem comparação numérica" — justamente
+   no segundo laudo, que é quando a evolução finalmente existiria. É a mesma
+   lição do "1K" e "1k" que apagou um recorde do Strava.
+
+   A lista é CURTA e explícita, e o que não está nela continua diferente:
+   mg/dL e mg/L não se equivalem, e chutar equivalência em exame de sangue é
+   pior do que não comparar. */
+const UNIDADES_IGUAIS = [
+  ['g/dl', 'g%'],
+  ['ug/dl', 'mcg/dl'],
+  ['milh/mm3', 'milhoes/mm3', 'mi/mm3'],
+  ['uui/ml', 'uu/ml'],
+];
+function unidadeCanonica(u){
+  let s = normaliza(u).replace(/[³]/g,'3').replace(/[²]/g,'2').replace(/µ/g,'u').replace(/\s+/g,'');
+  for(const grupo of UNIDADES_IGUAIS) if(grupo.includes(s)) return grupo[0];
+  return s;
+}
+const mesmaUnidade=(a,b)=>unidadeCanonica(a)===unidadeCanonica(b);
 const el=h=>{const d=document.createElement('div');d.innerHTML=h.trim();return d.firstElementChild};
 const moedaNum=t=>{
   if(typeof t==='number')return t;
@@ -1044,7 +1070,7 @@ const SEED={
   norte:{proposito:'',valores:'',legado:''},
   roda:{},desenvolvimento:{fontes:[],leituras:[],revisoes:[],reflexoes:[],validacoes:[]},rituais:[],instrucoes:[],protecao:[],planoAno:[],pdi:[],livros:[],bancos:[],liderancas:[],empresasPJ:[],patrimonio:[],
   oportunidades:[],
-  estrategia:{},planejamentoEmpresas:[],organogramas:[],
+  estrategia:{},planejamentoEmpresas:[],organogramas:[],contabilidades:[],
   comportamento:{temperamentos:{},disc:{},discAdaptado:{},big5:{},valores:{},lideranca:{},
     tipoJung:'',tracoPrincipal:'',motivadorPrincipal:'',motivadorSecundario:'',medos:'',
     positividade:'',estima:'',flexibilidade:'',fonteLaudo:'',eneagramaTipo:'',comoDecido:'',oQueMeMove:'',comoMeRecarrego:'',meusPontosCegos:'',comoMeAjudar:'',numerologia:'',perfilDisc:'',eneagrama:'',bigfive:''},
@@ -1106,7 +1132,7 @@ function carregar(){
   const base=structuredClone(SEED);
   const d=(s&&s.viagens)?{...base,...s}:base;
   // migração: todo registro precisa de id estável (arquivos são ligados por ele)
-  for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','queixas','consultas','fisio','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades','obras','obraAportes','contas','empreend','casas','reservas'])
+  for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','queixas','consultas','fisio','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','contabilidades','empresasPJ','patrimonio','oportunidades','obras','obraAportes','contas','empreend','casas','reservas'])
     (d[k]||[]).forEach(x=>{if(!x.id)x.id=uid()});
   d.viagens.forEach(v=>{if(!Array.isArray(v.custos))v.custos=[];
     if(!Array.isArray(v.passagens))v.passagens=[];
@@ -1144,7 +1170,7 @@ function carregar(){
   if(!Array.isArray(d.obraM2Fora))d.obraM2Fora=[];
   // objetos únicos: garante que existam mesmo em backup antigo
   for(const k of ['sos','norte','roda','perfil','comportamento']) d[k]={...structuredClone(SEED[k]),...(d[k]||{})};
-  for(const k of ['vitais','vacinas','histFamiliar','rastreios','queixas','consultas','fisio','rituais','instrucoes','seguros','planos','casa','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades']) if(!Array.isArray(d[k])) d[k]=[];
+  for(const k of ['vitais','vacinas','histFamiliar','rastreios','queixas','consultas','fisio','rituais','instrucoes','seguros','planos','casa','protecao','planoAno','pdi','livros','bancos','contabilidades','empresasPJ','patrimonio','oportunidades']) if(!Array.isArray(d[k])) d[k]=[];
   if(!Array.isArray(d.planejamentoEmpresas))d.planejamentoEmpresas=[];
   d.planejamentoEmpresas.forEach(p=>{if(!p.id)p.id=uid()});
   // toda oportunidade tem uma lista de links, mesmo que vazia
@@ -1514,14 +1540,30 @@ function abrirModal(titulo,sub,montar,aoFechar){
    {v,t} separa os dois, que é o que permite GUARDAR UM ID e MOSTRAR UM NOME.
    Guardar o nome faria o vínculo apodrecer no dia em que alguém corrigisse um
    acento na queixa — a chave é o id, o nome só exibe. */
-function opcoesSelect(opcoes,valor){
+/* A LISTA DE QUEIXAS MORA AQUI, NUM LUGAR SÓ. Ela existia em dois: a célula
+   da tabela rotulava "Dor no ombro · desde 12/03" e o formulário de "+
+   Adicionar" rotulava só "Dor no ombro" -- e duas queixas com o mesmo nome
+   (a dor que voltou, que é justamente o motivo de a queixa ter data) ficavam
+   indistinguíveis na hora de criar a consulta. Lista copiada não avisa quando
+   as duas divergem. */
+function opcoesDeQueixa(){
+  return [{v:'',t:'— nenhuma —'},...(E.queixas||[]).filter(q=>q&&q.id).map(q=>({
+    v:q.id,t:(q.oque||'queixa')+(dataISOValida(q.data)?' · desde '+fmtData(q.data):'')}))];
+}
+
+/* `preservarFora` decide o que fazer com um valor que não está na lista.
+   Em registro SALVO (célula da tabela, `campos`) preservar é o certo: a
+   queixa foi apagada, a opção saiu das Configurações, e sumir com o valor
+   calado apagaria escolha do dono. Em registro NOVO é o contrário -- ali o
+   valor é só o padrão embutido no código, e ressuscitá-lo devolve à tela uma
+   opção que o dono APAGOU das Configurações, já marcada. Foi o que aconteceu
+   com "Trabalho" em Nova viagem. */
+function opcoesSelect(opcoes,valor,preservarFora=true){
   const lista=(Array.isArray(opcoes)?opcoes:[]).map(o=>o&&typeof o==='object'
     ? {v:String(o.v??''),t:String(o.t??o.v??'')}
     : {v:String(o??''),t:String(o??'')});
   const v=valor==null?'':String(valor);
-  /* valor gravado que saiu da lista (queixa apagada, opção removida) não some
-     calado: aparece como está, para o dono ver e decidir */
-  if(v&&!lista.some(o=>o.v===v))lista.push({v,t:v});
+  if(preservarFora&&v&&!lista.some(o=>o.v===v))lista.push({v,t:v});
   const vistos=new Set();
   return lista.filter(o=>vistos.has(o.v)?false:(vistos.add(o.v),true))
     .map(o=>`<option value="${esc(o.v)}"${o.v===v?' selected':''}>${esc(o.t)}</option>`).join('');
@@ -1651,12 +1693,8 @@ function areaArquivos(ref,dica,somenteLeitura=false){
   return c;
 }
 
-/* ===================== MÉTODO V.O.F. =====================
-   A aba é uma síntese de apresentação do caderno completo. O PDF continua
-   sendo a fonte primária do conteúdo; esta camada transforma suas 179 páginas
-   em uma trilha navegável, com tese, evidência, prática e pergunta por módulo.
-   Os módulos não gravam dados pessoais: são um acervo editorial local ao app.
-   ============================================================ */
+/* ---------------- navegação ---------------- */
+// logos de verdade na lateral (o emoji não faz jus)
 const VOF_MODULOS=[
   {id:'arquitetura',nivel:1,ordem:'01',grupo:'Fundamento',ic:'△',titulo:'Arquitetura do método',tese:'Venda, Operação e Finanças são um único negócio. Pessoas e Gestores sustentam as três áreas.',resumo:'Comece pela sustentação: o resultado não fica de pé quando a base humana e a liderança não acompanham o crescimento.',entrega:'Mapa de interdependência da empresa',evidencias:['Uma promessa de venda que a operação consegue cumprir','Um padrão que a equipe consegue repetir','Um número financeiro que orienta uma decisão'],perguntas:['Onde o negócio depende de uma pessoa só?','Que área promete sem consultar a outra?'],ferramentas:['Pirâmide V.O.F.','Mapa de promessa–entrega–caixa'],fonte:'Caderno completo · Nível 1 · p. 2–5',frase:'O método começa antes da ferramenta: começa por enxergar o sistema.'},
   {id:'conscientizar',nivel:1,ordem:'02',grupo:'Fundamento',ic:'◉',titulo:'Conscientizar',tese:'Reconhecer o problema sem procurar culpados e assumir uma mudança que possa ser acompanhada.',resumo:'A consciência abre a jornada. Sintoma, evidência e escolha transformam uma conversa difusa em compromisso.',entrega:'Compromisso de mudança em 40 minutos',evidencias:['Sintoma observado','Registro ou ocorrência que possa ser examinado','Responsável, prazo e forma de verificação'],perguntas:['Se você se afastar por 30 dias, o que continuará funcionando?','Qual é o custo de continuar igual?'],ferramentas:['Conversa de 40 minutos','Custo do retrabalho','Caderno de aplicação'],fonte:'Caderno completo · Nível 1 · p. 10–16',frase:'Consciência não é culpa. É a disposição de olhar para o que está acontecendo.'},
@@ -1829,6 +1867,7 @@ const MODS=[
   {id:'agenda',ic:'📅',nome:'Agenda',grupo:'',render:vAgenda},
   {id:'rendimentos',ic:'📈',nome:'Rendimentos',grupo:'Dinheiro',render:vRendimentos},
   {id:'gastos',ic:'💸',nome:'Gastos',grupo:'',render:vGastos},
+  {id:'bancos',ic:'🏦',nome:'Bancos',grupo:'',render:vBancos},
   {id:'patrimonio',ic:'🏠',nome:'Patrimônio',grupo:'',render:vPatrimonio},
   {id:'caixavgv',ic:'💰',nome:'Caixa e VGV',grupo:'',render:vCaixaVGV},
   {id:'viagens',ic:'✈️',nome:'Viagens',grupo:'Vida',render:vViagens},
@@ -1836,8 +1875,11 @@ const MODS=[
   {id:'saude',ic:'🩺',nome:'Saúde',grupo:'',render:vSaude},
   {id:'strava',ic:LOGO_STRAVA,nome:'Strava',grupo:'',render:vStrava},
   {id:'empresas',ic:'🏢',nome:'Empresas',grupo:'Empresa',render:vEmpresas},
-  {id:'estrategia',ic:'♟️',nome:'Planejamento estratégico',grupo:'',render:vEstrategia},
+  {id:'estrategia',ic:'♟️',nome:'Planejamento estratégico',grupo:'',oculto:true,render:vEmpresas},
   {id:'fortemais',ic:'🏗️',nome:'Fortemais',grupo:'Projeto especial',render:vFortemais},
+  {id:'domo',ic:'🏗️',nome:'Domo Construtora',url:'https://leogpereira-afk.github.io/domo/'},
+  {id:'diamond',ic:'💎',nome:'Diamond Vendas',url:'https://leogpereira-afk.github.io/diamond/'},
+  {id:'minaslab',ic:'🔬',nome:'MinasLab',url:'https://leogpereira-afk.github.io/minaslab-painel/'},
   {id:'bosques',ic:'🌳',nome:'Portal dos Bosques',url:'https://leogpereira-afk.github.io/bosques/'},
   {id:'oportunidades',ic:'💡',nome:'Oportunidades',grupo:'Extra',render:vOportunidades},
   {id:'metodo-vof',ic:'◈',nome:'Método V.O.F.',grupo:'',render:vMetodoVOF},
@@ -1850,31 +1892,17 @@ let atual=MODS.some(m=>!m.url&&m.id===location.hash.slice(1))?location.hash.slic
 function alternarMenu(forcar){const aberto=typeof forcar==='boolean'?forcar:!document.querySelector('.side').classList.contains('menu-aberto');document.querySelector('.side').classList.toggle('menu-aberto',aberto);document.querySelector('.menu-mobile').setAttribute('aria-expanded',String(aberto))}
 function menu(){
   const nav=document.getElementById('nav');nav.innerHTML='';
-  MODS.forEach(m=>{
+  MODS.filter(m=>!m.oculto).forEach(m=>{
+    const selecionado=!m.url&&(m.id===atual||(atual==='estrategia'&&m.id==='empresas'));
     if(m.grupo)nav.appendChild(el(`<div class="sep">${m.grupo}</div>`));
     /* Entrada com `url` é ATALHO para outro sistema, não tela daqui: abre em
        outra aba, nunca fica marcada como ativa, e o ↗ avisa antes do clique.
        Sem isto o menu prometeria uma tela que não existe. */
-    const b=el(`<button class="${!m.url&&m.id===atual?'on':''}"><span class="ic">${m.ic}</span><span class="tx">${m.nome}</span>${m.url?'<span class="fora">↗</span>':''}</button>`);
+    const b=el(`<button class="${selecionado?'on':''}"><span class="ic">${m.ic}</span><span class="tx">${m.nome}</span>${m.url?'<span class="fora">↗</span>':''}</button>`);
     if(m.url){b.title='abre em outra aba — sistema com login próprio';
       b.onclick=()=>window.open(m.url,'_blank','noopener');}
-    else {b.onclick=()=>irTela(m.id);if(m.id===atual)b.setAttribute('aria-current','page')}
+    else {b.onclick=()=>irTela(m.id);if(selecionado)b.setAttribute('aria-current','page')}
     nav.appendChild(b);
-    if(m.id==='empresas'){
-      const empresasLaterais=(E.empresasPJ||[]).filter(e=>String(e.nome||'').trim()).sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
-      if(empresasLaterais.length){
-        const grupo=el('<div class="nav-empresas" aria-label="Empresas cadastradas"></div>');
-        for(const empresa of empresasLaterais){
-          const ativa=atual==='empresas'&&filtro.empresaId===empresa.id;
-          const item=el(`<button type="button" class="nav-empresa${ativa?' on':''}"${ativa?' aria-current="page"':''}><span class="tx">${esc(empresa.nome)}</span></button>`);
-          item.prepend(empresaImagem(empresa,'nav-empresa-logo'));
-          item.title='Abrir '+empresa.nome;
-          item.onclick=()=>{filtro.empresaId=empresa.id;filtro.empresaAba='cadastros';irTela('empresas')};
-          grupo.appendChild(item);
-        }
-        nav.appendChild(grupo);
-      }
-    }
   });
 }
 function indiceDaTela(pagina){
@@ -2015,6 +2043,7 @@ function prepararTabelas(pagina){
 }
 
 function tela(){
+  aplicarFonteInterface();
   const m=document.getElementById('main'),pagina=el('<div class="pagina"></div>');m.replaceChildren(pagina);
   const alvo=_alvoBloco;_alvoBloco=null;
   const mod=MODS.find(x=>x.id===atual&&!x.url);document.title=mod.nome+' · Central do Léo';
@@ -2026,9 +2055,9 @@ function tela(){
   try{if(typeof stravaMontarBotao==='function')stravaMontarBotao()}catch(e){console.error('strava/botao',e)}
   return !!alvo;
 }
-const rr=id=>()=>{if(atual===id)tela()};
+const rr=id=>()=>{if(atual===id||(id==='estrategia'&&atual==='empresas'&&filtro.empresaAba==='planejamento')||(id==='empresas'&&atual==='estrategia'))tela()};
 // trocar de tela: sobe ao topo, a não ser que alguém tenha pedido um bloco
-function irTela(id){if(id==='guia'&&_alvoBloco==='gu-empresas'){id='empresas';_alvoBloco=null}if(!MODS.some(m=>m.id===id&&!m.url))return;atual=id;if(location.hash!=='#'+id)history.pushState(null,'','#'+id);alternarMenu(false);menu();if(!tela())window.scrollTo(0,0);document.getElementById('main').focus({preventScroll:true})}
+function irTela(id){if(id==='guia'&&_alvoBloco==='gu-bancos'){id='bancos';_alvoBloco=null}if(id==='guia'&&_alvoBloco==='gu-empresas'){id='empresas';_alvoBloco=null}if(!MODS.some(m=>m.id===id&&!m.url))return;atual=id;if(location.hash!=='#'+id)history.pushState(null,'','#'+id);alternarMenu(false);menu();if(!tela())window.scrollTo(0,0);document.getElementById('main').focus({preventScroll:true})}
 window.addEventListener('popstate',()=>{const id=location.hash.slice(1)||'inicio';if(MODS.some(m=>m.id===id&&!m.url)){atual=id;menu();tela()}});
 const cab=(t,s)=>el(`<div class="topo"><div><h1>${t}</h1><p>${s||''}</p></div><span class="cresce"></span></div>`);
 const kpi=(rot,val,sub,cl,ir)=>`<div class="kpi ${cl||''}${ir?' clic':''}"${ir?` data-kpi="${ir}" role="button" tabindex="0" title="Abrir detalhes"`:''}><div class="rot">${rot}</div><div class="val">${val}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
@@ -2097,6 +2126,7 @@ function ordenarDemandas(lista){
   return [...lista].sort((a,b)=>(a.status==='Concluída')-(b.status==='Concluída')||(a.prazo||'9999').localeCompare(b.prazo||'9999')||(prioridade[a.prioridade]??1)-(prioridade[b.prioridade]??1)||(a.titulo||'').localeCompare(b.titulo||'','pt-BR'));
 }
 function abrirRegistro(secao,col,registro){
+  if(col==='bancos'&&registro){irTela('bancos');bancoModal(registro);return;}
   if(col==='empresasPJ'&&registro){empresaAbrir(registro.id);return;}
   if(['empresaDocumento','empresaObrigacao'].includes(col)&&registro){const emp=empresaPorId(registro.empresaId);if(!emp)return;empresaAbrir(emp.id,col==='empresaDocumento'?'documentos':'imoveis');const item=(col==='empresaDocumento'?empresaDocumentos(emp):empresaObrigacoes(emp)).find(x=>x.id===registro.id);if(item)(col==='empresaDocumento'?empresaModalDocumento:empresaModalObrigacao)(emp,item);return;}
 
@@ -2252,7 +2282,15 @@ function novoRegistroRotina(titulo,lista,base,defs,abrir){
     const grade=form.querySelector('.rotina-form-campos');
     defs.forEach(d=>{
       const label=el('<label></label>');label.appendChild(el('<span>'+esc(d.t)+(d.obrigatorio?' *':'')+'</span>'));
-      const inp=d.opcoes?el('<select>'+d.opcoes.map(o=>'<option value="'+esc(o)+'">'+esc(o)+'</option>').join('')+'</select>'):el('<input type="'+(d.tipo||'text')+'">');
+      /* AS OPÇÕES SAEM DE opcoesSelect, NÃO DE esc() DIRETO. Montar à mão aqui
+         só funcionava com opção de texto puro; quando a opção é {v,t} -- como
+         em "Por causa de qual queixa", cujo valor é o id da queixa e o texto é
+         o nome dela -- esc() de um objeto vira "[object Object]", e as opções
+         saíam todas iguais e sem id: o vínculo não tinha como ser gravado por
+         este caminho. opcoesSelect (linha ~1517) já trata as duas formas, já
+         marca o valor atual e já preserva valor gravado que saiu da lista, e é
+         a mesma função que a célula da tabela usa. */
+      const inp=d.opcoes?el('<select>'+opcoesSelect(d.opcoes,registro[d.k],false)+'</select>'):el('<input type="'+(d.tipo||'text')+'">');
       inp.name=d.k;inp.value=registro[d.k]??'';inp.required=!!d.obrigatorio;
       if(d.tipo==='number'){inp.step='any';inp.inputMode='decimal';inp.min=d.min??'0'}
       if(d.ph)inp.placeholder=d.ph;
@@ -3871,32 +3909,49 @@ const MARCADORES = [
   ['HDL', 'mg/dL', '> 40', '> 50', v => v < 40, v => v < 50],
   ['Triglicérides', 'mg/dL', '< 150', '< 100', v => v >= 150, v => v >= 100],
   ['Lp(a)', 'mg/dL', '< 50', '< 30 (1x na vida)', v => v >= 50, v => v >= 30],
-  ['Glicemia jejum', 'mg/dL', '70 a 99', '< 90', v => v < 70 || v >= 100, v => v >= 90],
+  ['Glicemia jejum', 'mg/dL', '70 a 99', '< 90', v => v >= 100 || v < 70, v => v >= 90],
   ['HbA1c', '%', '< 5,7', '< 5,4', v => v >= 5.7, v => v >= 5.4],
-  ['Insulina', 'µU/mL', '2 a 25', '< 8', v => v < 2 || v > 25, v => v >= 8],
+  ['Insulina', 'µU/mL', '2 a 25', '< 8', v => v > 10 || v < 2, v => v >= 8],
   ['PCR ultrassensível', 'mg/L', '< 3', '< 1', v => v >= 3, v => v >= 1],
-  ['Testosterona total', 'ng/dL', '250 a 950', '> 500', v => v < 250 || v > 950, v => v < 500],
-  ['Vitamina D', 'ng/mL', '30 a 100', '40 a 60', v => v < 30 || v > 100, v => v < 40 || v > 60],
+  /* O TETO ESTAVA FALTANDO: a régua diz "250 a 950" e a regra só olhava o piso,
+     então um resultado bem acima do topo impresso aqui saía em verde, "No
+     alvo". Tela que imprime uma faixa e pinta de verde o que está fora dela
+     mente na direção mais perigosa. (Nenhum valor de exame entra neste arquivo:
+     ele é público.) */
+  ['Testosterona total', 'ng/dL', '250 a 950', '> 500', v => v < 350 || v > 950, v => v < 500],
+  ['Vitamina D', 'ng/mL', '30 a 100', '40 a 60', v => v < 30, v => v < 40 || v > 60],
   ['TSH', 'µUI/mL', '0,4 a 4,0', '1,0 a 2,5', v => v > 4 || v < 0.4, v => v > 2.5 || v < 1],
   ['PSA', 'ng/mL', '< 4', '< 2,5', v => v >= 4, v => v >= 2.5],
-  ['Creatinina', 'mg/dL', '0,7 a 1,3', 'até 1,1', v => v < 0.7 || v > 1.3, v => v > 1.1],
-  ['Ácido úrico', 'mg/dL', '3,5 a 7,2', '< 6', v => v < 3.5 || v > 7.2, v => v >= 6],
+  ['Creatinina', 'mg/dL', '0,7 a 1,3', 'até 1,1', v => v > 1.3 || v < 0.7, v => v > 1.1],
+  ['Ácido úrico', 'mg/dL', '3,5 a 7,2', '< 6', v => v > 7.2 || v < 3.5, v => v >= 6],
   ['Ferritina', 'ng/mL', '30 a 400', '50 a 150', v => v > 400 || v < 30, v => v < 50 || v > 150],
 ];
-// Unidades equivalentes evitam que a mesma grandeza apareça como dois itens
-// quando o laboratório escreve a unidade de outra forma.
-const UNIDADES_IGUAIS = [
-  ['g/dl', 'g%'],
-  ['ug/dl', 'mcg/dl'],
-  ['milh/mm3', 'milhoes/mm3', 'mi/mm3'],
-  ['uui/ml', 'uu/ml'],
-];
-function unidadeCanonica(u){
-  let s = normaliza(u).replace(/[³]/g,'3').replace(/[²]/g,'2').replace(/µ/g,'u').replace(/\s+/g,'');
-  for(const grupo of UNIDADES_IGUAIS) if(grupo.includes(s)) return grupo[0];
-  return s;
+function faixaDoExameHTML(g){
+  if(g.ult.origemDocumental)return esc(g.ult.referenciaLaudo||'Consultar laudo original');
+  if(g.mk&&mesmaUnidade(unidadeSaude(g.ult),g.mk[1]))return esc(g.mk[3]);
+  const r=referenciaExtra(g.ult);
+  /* A ORIGEM DA RÉGUA VAI JUNTO. Saber que a faixa é do laudo, e não uma
+     média de internet, é metade da informação — e a única forma de o dono
+     perceber quando as duas discordam. */
+  if(r)return esc(r[2])+(r[5]==='geral'?' <span style="opacity:.7">· referência geral</span>':'');
+  return 'Consultar laudo';
 }
-const mesmaUnidade=(a,b)=>unidadeCanonica(a)===unidadeCanonica(b);
+
+/* FAIXAS DE REFERÊNCIA DOS DEMAIS EXAMES.
+
+   A régua aqui é a do LAUDO, não a de um site: intervalo de laboratório
+   depende do método que mediu a amostra, e faixa de internet diverge entre si
+   e às vezes mede outra coisa com o mesmo nome — nos EUA reporta-se "BUN"
+   (10 a 20 mg/dL) onde aqui se reporta "ureia" (15 a 40 mg/dL), escalas
+   diferentes que fariam um resultado normal parecer o dobro do limite. Onde o
+   laudo não deu régua utilizável, a faixa é geral e vem DITA como tal, e
+   quando nem isso existe o campo fica em texto, sem cor.
+
+   Formato: [nome, unidade, texto da faixa, fora(v) ou null, atenção(v) ou null,
+   origem]. `fora` null quer dizer: mostre a faixa, não pinte nada — é melhor
+   não afirmar do que afirmar errado sobre saúde.
+
+   Homem adulto, que é de quem são os registros desta Central. */
 const REFERENCIAS_EXTRA = [
   ['Colesterol total','mg/dL','< 200 ótimo · 200 a 239 limite · ≥ 240 alto', v=>v>=240, v=>v>=200,'laudo'],
   ['Hemoglobina','g%','14,0 a 18,0', v=>v<14||v>18, null,'laudo'],
@@ -3929,11 +3984,16 @@ const REFERENCIAS_EXTRA = [
   ['PTH (paratormônio)','pg/mL','12 a 88', v=>v<12||v>88, null,'laudo'],
   ['DHT (di-hidrotestosterona)','pg/mL','143 a 842 (homens)', v=>v<143||v>842, null,'laudo'],
   ['SHBG','nmol/L','10 a 50 (referência geral, não do laudo)', v=>v<10||v>50, null,'geral'],
+  /* Índices do hemograma e do coagulograma, das faixas que os laudos trazem.
+     Onde os dois laboratórios divergiram (HCM: 27–31 num, 27–32 no outro),
+     fica a MAIS LARGA: estreitar por conta própria inventaria alarme. */
   ['VCM','fL','80,0 a 100,0', v=>v<80||v>100, null,'laudo'],
   ['HCM','pg','27,0 a 32,0', v=>v<27||v>32, null,'laudo'],
   ['CHCM','%','31,0 a 36,0', v=>v<31||v>36, null,'laudo'],
   ['Atividade protrombínica','%','70 a 100', v=>v<70||v>100, null,'laudo'],
   ['Relação PTTA paciente/controle','','menor que 1,3', v=>v>=1.3, null,'laudo'],
+  /* Estes três o laudo se recusa a enquadrar, e com razão declarada nele
+     mesmo. Mostrar a explicação e NÃO pintar é a leitura honesta. */
   ['PSA livre','ng/mL','o laudo diz que não há referência estabelecida para o PSA livre isolado', null, null,'laudo'],
   ['PSA livre / total','%','só se interpreta quando o PSA total fica entre 4 e 10 ng/mL', null, null,'laudo'],
   ['Testosterona livre (calculada)','ng/dL','o laudo imprime a referência em nmol/L, unidade diferente do resultado', null, null,'laudo'],
@@ -3942,8 +4002,9 @@ function referenciaExtra(x){
   const r = REFERENCIAS_EXTRA.find(y => normaliza(y[0]) === normaliza(x.exame||''));
   if(!r) return null;
   const u = unidadeSaude(x);
-  return (u && !mesmaUnidade(u, r[1])) ? null : r;
+  return (u && !mesmaUnidade(u, r[1])) ? null : r;   // unidade diferente não compara
 }
+
 // Rastreios recomendados por idade (homem). [nome, idadeInicio, cadaXMeses, porquê]
 // [nome, idade que começa, a cada N meses, para quê, onde procurar se já foi feito]
 // o 5º item evita o rastreio ficar "nunca feito" para sempre: 'marcadores' olha os exames
@@ -3975,8 +4036,11 @@ const ultimoDe = (nome) => E.exames.filter(x => x.exame === nome && x.valor !== 
 function numeroResultadoSaude(valor){
   if(typeof valor==='number')return Number.isFinite(valor)?valor:NaN;
   let texto=String(valor??'').trim();
-  // Ponto entre grupos de três dígitos é milhar, não decimal: 5.820
-  // leucócitos precisa virar 5820, enquanto 5.82 continua sendo decimal.
+  /* PONTO DE MILHAR NÃO É VÍRGULA. "5.820" leucócitos virava 5,82 e "201.000"
+     plaquetas virava 201 — números que, comparados a qualquer faixa, gritariam
+     alarme falso. Só tira o ponto quando TODOS os grupos depois dele têm
+     exatamente três dígitos e não há vírgula na frente: aí é milhar e não
+     decimal. "1.48" e "94.0" continuam decimais. */
   if(/^[+-]?\d{1,3}(\.\d{3})+$/.test(texto))texto=texto.replace(/\./g,'');
   if(!/^[+-]?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:e[+-]?\d+)?$/i.test(texto))return NaN;
   const n=Number(texto.replace(',','.'));return Number.isFinite(n)?n:NaN;
@@ -3989,6 +4053,8 @@ function semaforo(x) {
   const v = numeroResultadoSaude(x.valor);
   if(x.resultado==='Aguardando')return '';
   if (!m || isNaN(v) || x.unidade&&!mesmaUnidade(x.unidade,m[1])) {
+    /* Sem marcador do painel, ainda pode haver a faixa do laudo. Só pinta quem
+       tem regra: as três que o laudo se recusa a enquadrar ficam sem cor. */
     const r = isNaN(v) ? null : referenciaExtra(x);
     if (r && r[3]) return r[3](v) ? 'ruim' : (r[4] && r[4](v)) ? 'atencao' : 'ok';
     return x.resultado === 'Alterado' ? 'ruim' : x.resultado === 'Atenção' ? 'atencao' : x.resultado === 'Normal' ? 'ok' : '';
@@ -4003,106 +4069,113 @@ const CHIP_SEM = { ok: ['var(--verde-cl)', 'var(--verde)', 'No alvo'], atencao: 
 function unidadeSaude(x){if(x.origemDocumental)return x.unidade||'';return x.unidade||MARCADORES.find(m=>m[0]===x.exame)?.[1]||''}
 function resultadoSaudeRegistrado(x){return dataISOValida(x.data)&&x.data<=hoje()&&x.resultado!=='Aguardando'&&(String(x.valor??'').trim()!==''||['Normal','Atenção','Alterado'].includes(x.resultado))}
 function registrosResultadoSaude(lista){return lista.filter(resultadoSaudeRegistrado).slice().sort((a,b)=>a.data.localeCompare(b.data))}
-function gruposExames(){
-  const porMarcador={};
-  (E.exames||[]).forEach(x=>{
-    const nome=(x.exame||'').trim();if(!nome)return;
-    (porMarcador[nome]=porMarcador[nome]||[]).push(x);
-  });
-  return Object.entries(porMarcador).map(([nome,itens])=>{
-    itens.sort((a,b)=>(a.data||'').localeCompare(b.data||''));
-    const resultados=registrosResultadoSaude(itens),ult=resultados.at(-1)||itens.at(-1),ant=resultados.at(-2);
-    const nUlt=numeroResultadoSaude(ult.valor),nAnt=ant?numeroResultadoSaude(ant.valor):NaN;
-    let tend=null;
-    if(!isNaN(nUlt)&&!isNaN(nAnt)&&nAnt!==0&&mesmaUnidade(unidadeSaude(ult),unidadeSaude(ant))){
-      const dif=nUlt-nAnt,pct=dif/Math.abs(nAnt)*100;
-      const semU=semaforo(ult),semA=semaforo(ant),ordem={ruim:0,atencao:1,ok:2,'':1};
-      tend={dif,pct,rumo:ordem[semU]-ordem[semA],seta:Math.abs(pct)<2?'→':dif>0?'↑':'↓'};
-    }
-    return {nome,itens,ult,resultados:resultados.length,pendentes:itens.length-resultados.length,sem:resultados.length?semaforo(ult):'',tend,mk:MARCADORES.find(y=>y[0]===nome)};
-  }).sort((a,b)=>{
-    const ordem={ruim:0,atencao:1,ok:2,'':3};
-    return (ordem[a.sem]??3)-(ordem[b.sem]??3)||a.nome.localeCompare(b.nome);
-  });
-}
-function textoEvolucaoExame(g){
-  if(!g.tend)return g.resultados>1?'sem comparação numérica':g.resultados?'1ª medição':'aguardando resultado';
-  const t=g.tend,pct=Math.abs(t.pct),quanto=pct<2?'praticamente igual':(t.dif>0?'subiu ':'caiu ')+pct.toFixed(0)+'%';
-  const rumo=t.rumo>0?' — aproximou do alvo':t.rumo<0?' — afastou do alvo':'';
-  return quanto+rumo;
-}
+/* IMPORTAR UM LAUDO INTEIRO.
+
+   Um laudo de check-up traz 40 e poucos marcadores. Digitar um por um não
+   acontece — e o que não acontece não vira histórico. Aqui entra uma lista
+   pronta (arquivo .json ou texto colado), a tela MOSTRA o que entendeu, e só
+   entra o que o dono marcar. Nada é gravado antes do clique.
+
+   O QUE JÁ EXISTE VEM DESMARCADO, não escondido: mesmo exame na mesma data já
+   registrado aparece com o aviso, para o dono decidir. Esconder viraria
+   "sumiu", e reimportar o mesmo laudo duplicaria o histórico calado.
+
+   O QUE NÃO FOI ENTENDIDO É DITO. Linha sem exame ou sem data entra na conta
+   dos descartados com o motivo — lista que descarta em silêncio faz o dono
+   acreditar que importou tudo. */
 function lerLaudoImportado(texto){
-  let lista;
-  try{lista=typeof texto==='string'?JSON.parse(texto):texto}catch(e){return {bons:[],descartados:[],erro:'Não consegui ler o JSON do laudo.'}}
-  if(!Array.isArray(lista))return {bons:[],descartados:[],erro:'O arquivo precisa conter uma lista de exames.'};
+  let bruto;
+  try{bruto=JSON.parse(texto)}catch{return{erro:'Não consegui ler o arquivo: ele precisa ser a lista de exames em JSON.'}}
+  const lista=Array.isArray(bruto)?bruto:Array.isArray(bruto&&bruto.exames)?bruto.exames:null;
+  if(!lista)return{erro:'O arquivo não tem uma lista de exames.'};
   const bons=[],descartados=[];
-  lista.forEach((item,i)=>{
-    const x=item&&typeof item==='object'?item:{};
-    const exame=String(x.exame??x.nome??'').trim();
-    const data=String(x.data??'').trim().slice(0,10);
-    const valor=x.valor==null?'':String(x.valor).trim();
-    const motivo=!exame?'exame sem nome':!dataISOValida(data)?'data inválida':!valor?'resultado vazio':'';
-    if(motivo){descartados.push((exame||'Exame '+(i+1))+': '+motivo);return}
-    const dataProxima=String(x.proximo??'').trim().slice(0,10);
-    bons.push({
-      id:uid(),data,exame,valor,
-      unidade:String(x.unidade??'').trim(),
-      medico:String(x.medico??x.laboratorio??'').trim(),
-      resultado:String(x.resultado??'').trim(),
-      proximo:dataISOValida(dataProxima)?dataProxima:'',
-      obs:String(x.obs??x.observacao??'').trim()
-    });
-  });
-  return {bons,descartados,erro:''};
+  for(const r of lista){
+    const nome=String((r&&r.exame)||'').trim();
+    const data=String((r&&r.data)||'').trim();
+    if(!nome){descartados.push('sem nome de exame');continue}
+    if(!dataISOValida(data)){descartados.push((nome||'registro')+': data inválida');continue}
+    bons.push({data,exame:nome,
+      valor:r.valor==null?'':String(r.valor).trim(),
+      unidade:String(r.unidade||'').trim(),
+      medico:String(r.medico||'').trim(),
+      resultado:['','Aguardando','Normal','Atenção','Alterado'].includes(r.resultado)?r.resultado:'',
+      proximo:dataISOValida(String(r.proximo||''))?String(r.proximo):'',
+      obs:String(r.obs||'').trim()});
+  }
+  return{bons,descartados};
 }
-function jaTemExame(x,lista=E.exames){
-  return (lista||[]).some(y=>dataISOValida(y.data)&&dataISOValida(x?.data)&&y.data===x.data&&normaliza(y.exame)===normaliza(x.exame));
-}
+function jaTemExame(r){return (E.exames||[]).some(x=>normaliza(x.exame||'')===normaliza(r.exame)&&String(x.data||'')===r.data)}
 function importarExamesRotina(){
-  abrirModal('Importar exames','Cole uma lista JSON para revisar antes de gravar qualquer resultado.',(c,fechar)=>{
-    const s1=el('<div class="secao"></div>');
-    s1.appendChild(el('<p style="margin-top:0;color:var(--suave);font-size:12.5px">Exemplo: <code>[{"data":"2026-09-02","exame":"LDL","valor":94,"unidade":"mg/dL"}]</code></p>'));
-    const area=el('<textarea rows="8" aria-label="Dados do laudo" placeholder="Cole aqui a lista de resultados em JSON"></textarea>');
-    s1.appendChild(area);c.appendChild(s1);
-    const preview=el('<div class="secao" aria-live="polite"></div>');c.appendChild(preview);
-    const footer=el('<div class="secao" style="display:flex;gap:9px;align-items:center"></div>');
-    const cancelar=el('<button class="btn ghost" type="button">Cancelar</button>');cancelar.onclick=fechar;
-    const conferir=el('<button class="btn" type="button">Conferir laudo</button>');
-    footer.append(cancelar,el('<span class="cresce"></span>'),conferir);c.appendChild(footer);
-    let dados={bons:[],descartados:[],erro:''};
-    conferir.onclick=()=>{
-      dados=lerLaudoImportado(area.value);
-      preview.innerHTML='';
-      if(dados.erro){preview.appendChild(el('<p class="form-erro" role="alert"></p>'));preview.querySelector('.form-erro').textContent=dados.erro;return}
-      const resumo=el('<p class="rotina-nota"></p>');
-      resumo.textContent=dados.bons.length+' exame(s) reconhecido(s)'+(dados.descartados.length?' · '+dados.descartados.length+' não entendido(s)':'')+'.';
-      preview.appendChild(resumo);
-      if(dados.descartados.length){const p=el('<p class="rotina-nota"></p>');p.textContent='Não importados: '+dados.descartados.join(' · ');preview.appendChild(p)}
-      const table=document.createElement('table');table.className='tabela';
-      const thead=document.createElement('thead'),hr=document.createElement('tr');
-      ['Adicionar','Exame','Data','Resultado','Situação'].forEach(t=>{const th=document.createElement('th');th.textContent=t;hr.appendChild(th)});
-      thead.appendChild(hr);table.appendChild(thead);
-      const tbody=document.createElement('tbody');
-      dados.bons.forEach((x,i)=>{
-        const tr=document.createElement('tr'),tdCheck=document.createElement('td'),check=document.createElement('input');
-        check.type='checkbox';check.checked=!jaTemExame(x);check.dataset.i=String(i);tdCheck.appendChild(check);tr.appendChild(tdCheck);
-        [x.exame,x.data,x.valor+(x.unidade?' '+x.unidade:'')].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});
-        const tdSit=document.createElement('td');tdSit.textContent=jaTemExame(x)?'já registrado nesta data':'novo';tr.appendChild(tdSit);tbody.appendChild(tr);
+  abrirModal('Importar resultados de laudo','Escolha o arquivo .json (ou cole o conteúdo). Nada entra sem você conferir.',(c,fechar)=>{
+    const topo=el('<div class="secao"></div>');
+    const arq=el('<input type="file" accept=".json,.txt,application/json,text/plain" aria-label="Arquivo do laudo">');
+    const cola=el('<textarea placeholder="…ou cole aqui o conteúdo do arquivo" style="width:100%;min-height:70px;margin-top:9px;border:1px solid var(--linha);background:var(--bg);color:inherit;padding:8px 10px;border-radius:9px;font:inherit"></textarea>');
+    const bLer=el('<button class="btn ghost" style="margin-top:9px">Conferir o que veio</button>');
+    topo.appendChild(arq);topo.appendChild(cola);topo.appendChild(bLer);c.appendChild(topo);
+    const previa=el('<div class="secao"></div>');c.appendChild(previa);
+    const rodape=el('<div class="secao" style="display:flex;gap:9px;align-items:center"></div>');c.appendChild(rodape);
+    arq.onchange=()=>{const f=arq.files&&arq.files[0];if(!f)return;const fr=new FileReader();
+      fr.onload=()=>{cola.value=String(fr.result||'');mostrar()};
+      fr.onerror=()=>{previa.replaceChildren(el('<div class="aviso">Não consegui abrir o arquivo.</div>'))};
+      fr.readAsText(f)};
+    bLer.onclick=mostrar;
+    function mostrar(){
+      previa.replaceChildren();rodape.replaceChildren();
+      const texto=cola.value.trim();
+      if(!texto){previa.appendChild(el('<div class="vazio">Escolha o arquivo ou cole o conteúdo.</div>'));return}
+      const r=lerLaudoImportado(texto);
+      if(r.erro){previa.appendChild(el('<div class="aviso">'+esc(r.erro)+'</div>'));return}
+      if(!r.bons.length){previa.appendChild(el('<div class="aviso">Nenhum exame utilizável no arquivo.</div>'));return}
+      const t=document.createElement('table');
+      t.innerHTML='<thead><tr><th></th><th>Data</th><th>Exame</th><th>Resultado</th><th>Situação</th></tr></thead>';
+      const tb=document.createElement('tbody');
+      const linhas=r.bons.map(x=>{
+        const repetido=jaTemExame(x);
+        /* A LINHA NASCE COMO <tr> DE VERDADE, não por `el()`.
+           `el()` monta o HTML dentro de uma <div>, e o navegador DESCARTA as
+           tags <tr> e <td> soltas fora de uma tabela — medido: de
+           '<tr><td><input></td><td>x</td></tr>' sobra literalmente
+           '<input>x'. Então `firstElementChild` não volta null: volta o
+           próprio <input>, procurar o <input> DENTRO dele dá nada, e a
+           montagem morre ali. A janela ficava em branco sem erro à vista.
+           O simulador de DOM dos testes é tolerante e aceita o <tr> — por
+           isso os sete testes passavam com a tela quebrada. */
+        const tr=document.createElement('tr');
+        tr.innerHTML='<td><input type="checkbox"></td><td>'+esc(fmtDataAno(x.data))+'</td>'+
+          '<td>'+esc(x.exame)+'</td><td>'+esc([x.valor,x.unidade].filter(Boolean).join(' ')||'—')+'</td>'+
+          '<td>'+(repetido?'<span class="badge" style="background:var(--areia-cl);color:var(--areia)">já registrado nesta data</span>':'novo')+'</td>';
+        const cx=tr.querySelector('input');
+        /* A marca vai por PROPRIEDADE, não pelo atributo `checked` do HTML: o
+           atributo só diz o estado INICIAL, e é ele que alguns ambientes não
+           refletem na propriedade — a caixa aparecia marcada e valia `undefined`
+           na hora de contar. */
+        cx.checked=!repetido;
+        tb.appendChild(tr);return{x,cx};
       });
-      table.appendChild(tbody);preview.appendChild(table);
-      const atualizarBotao=()=>{
-        const n=[...tbody.querySelectorAll('input[type="checkbox"]')].filter(x=>x.checked).length;
-        adicionar.textContent='Adicionar '+n+' exame'+(n===1?'':'s');adicionar.disabled=n===0;
+      t.appendChild(tb);
+      const rol=el('<div class="rolagem"></div>');rol.appendChild(t);previa.appendChild(rol);
+      const repetidos=linhas.filter(l=>jaTemExame(l.x)).length;
+      previa.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin-top:9px">'+
+        r.bons.length+' exame(s) no arquivo'+(repetidos?' · '+repetidos+' já registrado(s) nesta data, vêm desmarcados':'')+
+        (r.descartados.length?' · <b>'+r.descartados.length+' não entendi:</b> '+esc(r.descartados.slice(0,4).join('; '))+(r.descartados.length>4?'…':''):'')+'</p>'));
+      const bOk=el('<button class="btn"></button>');
+      const contar=()=>linhas.filter(l=>l.cx.checked).length;
+      const rotular=()=>{bOk.textContent='Adicionar '+contar()+' exame(s)';bOk.disabled=!contar()};
+      linhas.forEach(l=>l.cx.onchange=rotular);rotular();
+      bOk.onclick=()=>{
+        const escolhidos=linhas.filter(l=>l.cx.checked).map(l=>l.x);
+        if(!escolhidos.length)return;
+        escolhidos.forEach(x=>E.exames.push({id:uid(),...x}));
+        salvar();fechar();
+        alert(escolhidos.length+' exame(s) adicionados à Saúde.');
       };
-      tbody.addEventListener('change',atualizarBotao);
-      footer.innerHTML='';footer.append(cancelar,el('<span class="cresce"></span>'),adicionar);atualizarBotao();
-    };
-    const adicionar=el('<button class="btn" type="button"></button>');
-    adicionar.onclick=()=>{
-      const checks=[...preview.querySelectorAll('tbody input[type="checkbox"]')];
-      checks.filter(x=>x.checked).forEach(x=>{const item=dados.bons[+x.dataset.i];if(item&&!jaTemExame(item)){E.exames.push(item)}});
-      salvar();fechar();
-    };
+      const bTodos=el('<button class="btn ghost">Marcar todos</button>');
+      bTodos.onclick=()=>{const ligar=contar()<linhas.length;linhas.forEach(l=>l.cx.checked=ligar);rotular()};
+      rodape.appendChild(bOk);rodape.appendChild(bTodos);
+      rodape.appendChild(el('<span class="cresce"></span>'));
+      const bNao=el('<button class="btn ghost">Cancelar</button>');bNao.onclick=fechar;rodape.appendChild(bNao);
+    }
+    mostrar();
   });
 }
 function novoExameRotina(nome=''){novoRegistroRotina('Novo exame',E.exames,{data:hoje(),exame:nome,valor:'',medico:'',resultado:'',proximo:'',obs:''},[
@@ -4116,8 +4189,8 @@ function novoCuidadoRotina(tipo){
     tratamentos:['Novo tratamento',E.tratamentos,{inicio:hoje(),fim:'',frequencia:'',status:'Em andamento'},[{k:'oque',t:'Tratamento / remédio',obrigatorio:true},{k:'motivo',t:'Motivo informado'},{k:'inicio',t:'Início',tipo:'date'},{k:'frequencia',t:'Frequência / dose prescrita'},{k:'medico',t:'Profissional responsável'}],'sa-trat'],
     vacinas:['Nova vacina',E.vacinas,{data:hoje(),proxima:'',viagem:'Não',obs:''},[{k:'vacina',t:'Vacina',obrigatorio:true},{k:'data',t:'Data da dose',tipo:'date',obrigatorio:true},{k:'proxima',t:'Próxima data informada',tipo:'date'},{k:'obs',t:'Observação'}],'sa-vac'],
     queixas:['Nova queixa',E.queixas,{data:hoje(),onde:'',intensidade:'',situacao:'Ativa',obs:''},[{k:'oque',t:'O que estou sentindo',obrigatorio:true},{k:'data',t:'Sinto desde',tipo:'date',obrigatorio:true},{k:'onde',t:'Onde',opcoes:['','Cabeça','Pescoço','Ombro','Braço','Cotovelo','Punho / mão','Peito','Costas','Lombar','Quadril','Joelho','Perna','Tornozelo / pé','Abdômen','Geral','Outro']},{k:'intensidade',t:'Intensidade de 0 a 10',tipo:'number'},{k:'obs',t:'O que melhora ou piora'}],'sa-quei'],
-    consultas:['Nova consulta',E.consultas,{data:hoje(),retorno:'',obs:''},[{k:'especialidade',t:'Especialidade',obrigatorio:true},{k:'data',t:'Data da consulta',tipo:'date',obrigatorio:true},{k:'profissional',t:'Profissional'},{k:'queixaId',t:'Por causa de qual queixa',tipo:'select',opcoes:[{v:'',t:'— nenhuma —'},...(E.queixas||[]).filter(q=>q&&q.id).map(q=>({v:q.id,t:q.oque||'queixa'}))]},{k:'motivo',t:'Por que fui'},{k:'conduta',t:'O que ficou combinado'},{k:'retorno',t:'Retorno marcado para',tipo:'date'}],'sa-cons'],
-    fisio:['Nova sessão de fisioterapia',E.fisio,{data:hoje(),queixaId:'',sessao:'',total:'',dorAntes:'',dorDepois:'',obs:''},[{k:'oque',t:'Para quê',obrigatorio:true},{k:'queixaId',t:'Por causa de qual queixa',tipo:'select',opcoes:[{v:'',t:'— nenhuma —'},...(E.queixas||[]).filter(q=>q&&q.id).map(q=>({v:q.id,t:q.oque||'queixa'}))]},{k:'data',t:'Data da sessão',tipo:'date',obrigatorio:true},{k:'sessao',t:'Número da sessão',tipo:'number'},{k:'total',t:'De quantas sessões',tipo:'number'},{k:'dorAntes',t:'Dor antes, de 0 a 10',tipo:'number'},{k:'dorDepois',t:'Dor depois, de 0 a 10',tipo:'number'},{k:'profissional',t:'Profissional'}],'sa-fisio']
+    consultas:['Nova consulta',E.consultas,{data:hoje(),retorno:'',obs:''},[{k:'especialidade',t:'Especialidade',obrigatorio:true},{k:'data',t:'Data da consulta',tipo:'date',obrigatorio:true},{k:'profissional',t:'Profissional'},{k:'queixaId',t:'Por causa de qual queixa',tipo:'select',opcoes:opcoesDeQueixa()},{k:'motivo',t:'Por que fui'},{k:'conduta',t:'O que ficou combinado'},{k:'retorno',t:'Retorno marcado para',tipo:'date'}],'sa-cons'],
+    fisio:['Nova sessão de fisioterapia',E.fisio,{data:hoje(),queixaId:'',sessao:'',total:'',dorAntes:'',dorDepois:'',obs:''},[{k:'oque',t:'Para quê',obrigatorio:true},{k:'queixaId',t:'Por causa de qual queixa',tipo:'select',opcoes:opcoesDeQueixa()},{k:'data',t:'Data da sessão',tipo:'date',obrigatorio:true},{k:'sessao',t:'Número da sessão',tipo:'number'},{k:'total',t:'De quantas sessões',tipo:'number'},{k:'dorAntes',t:'Dor antes, de 0 a 10',tipo:'number'},{k:'dorDepois',t:'Dor depois, de 0 a 10',tipo:'number'},{k:'profissional',t:'Profissional'}],'sa-fisio']
   };
   const [titulo,lista,base,defs,blocoId]=opcoes[tipo];novoRegistroRotina(titulo,lista,base,defs,()=>{abreBloco(blocoId);rr('saude')()});
 }
@@ -4192,32 +4265,7 @@ function vSaude(m) {
   /* ---- 1. exames: um por marcador, com a evolução dentro ---- */
   const cx = el('<div></div>');
   const rol = el('<div class="rolagem"></div>');
-  // agrupa as medições por marcador; a linha mostra a última e para onde está indo
-  const porMarcador = {};
-  E.exames.forEach(x => {
-    const k = (x.exame || '').trim(); if (!k) return;
-    (porMarcador[k] = porMarcador[k] || []).push(x);
-  });
-  const grupos = Object.entries(porMarcador).map(([nome, itens]) => {
-    itens.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
-    const resultados=registrosResultadoSaude(itens);
-    const ult = resultados.at(-1)||itens.at(-1), ant = resultados.at(-2);
-    const nUlt = numeroResultadoSaude(ult.valor);
-    const nAnt = ant ? numeroResultadoSaude(ant.valor) : NaN;
-    let tend = null;
-    if (!isNaN(nUlt) && !isNaN(nAnt) && nAnt !== 0 && mesmaUnidade(unidadeSaude(ult),unidadeSaude(ant))) {
-      const dif = nUlt - nAnt, pct = dif / Math.abs(nAnt) * 100;
-      // "melhor" depende do marcador: sair do alvo é pior, entrar é melhor
-      const semU = semaforo(ult), semA = semaforo(ant);
-      const ordem = { ruim: 0, atencao: 1, ok: 2, '': 1 };
-      const rumo = ordem[semU] - ordem[semA];
-      tend = { dif, pct, rumo, seta: Math.abs(pct) < 2 ? '→' : dif > 0 ? '↑' : '↓' };
-    }
-    return { nome, itens, ult, resultados:resultados.length, pendentes:itens.length-resultados.length, sem: resultados.length?semaforo(ult):'', tend, mk: MARCADORES.find(y => y[0] === nome) };
-  }).sort((a, b) => {
-    const ord = { ruim: 0, atencao: 1, ok: 2, '': 3 };
-    return (ord[a.sem] ?? 3) - (ord[b.sem] ?? 3) || a.nome.localeCompare(b.nome);
-  });
+  const grupos = gruposExames();
 
   if (grupos.length) {
     const t = document.createElement('table');
@@ -4235,7 +4283,7 @@ function vSaude(m) {
       tr.innerHTML = `<td style="padding:10px"><b style="font-size:14px">${esc(g.nome)}</b>${g.pendentes?'<small class="rotina-nota">'+g.pendentes+' registro(s) a completar</small>':''}</td>
         <td style="padding:10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:14px">${
           g.ult.valor !== '' && g.ult.valor != null ? esc(g.ult.valor) + (unidadeSaude(g.ult) ? ' <span style="font-weight:400;font-size:11.5px;color:var(--suave)">' + esc(unidadeSaude(g.ult)) + '</span>' : '') : '—'}</td>
-        <td style="padding:10px;color:var(--suave);font-size:12.5px">${g.ult.origemDocumental ? esc(g.ult.referenciaLaudo||'Consultar laudo original') : g.mk&&normaliza(unidadeSaude(g.ult))===normaliza(g.mk[1]) ? esc(g.mk[3]) : 'Consultar laudo'}</td>
+        <td style="padding:10px;color:var(--suave);font-size:12.5px">${faixaDoExameHTML(g)}</td>
         <td style="padding:10px">${c ? `<span class="chip" style="background:${c[0]};color:${c[1]}">${c[2]}</span>` : '—'}</td>
         <td style="padding:10px;color:${corT};font-size:12.5px;font-variant-numeric:tabular-nums">${
           td ? td.seta + ' ' + (td.pct > 0 ? '+' : '') + td.pct.toFixed(0) + '%' : '<span style="color:var(--suave)">'+(g.resultados>1?'Sem comparação numérica':g.resultados?'1ª medição':'Aguardando resultado')+'</span>'}</td>
@@ -4253,7 +4301,13 @@ function vSaude(m) {
   const pe = el('<div style="padding:0 17px 15px"></div>');
   const bt = el('<button class="mais">+ Novo exame</button>');
   bt.onclick = () => novoExameRotina();
-  pe.appendChild(bt); cx.appendChild(pe);
+  pe.appendChild(bt);
+  const bImp = el('<button class="btn ghost mini" style="margin-left:9px">📄 Importar laudo</button>');
+  bImp.onclick = () => importarExamesRotina();
+  pe.appendChild(bImp);
+  const bPdf = el('<button class="btn ghost mini" style="margin-left:9px">🖨 Salvar em PDF</button>');
+  bPdf.onclick = () => imprimirExames();
+  pe.appendChild(bPdf); cx.appendChild(pe);
   m.appendChild(bloco('sa-ex', 'Exames e marcadores', 'um por marcador — clique para ver a evolução e anexar o laudo', cx));
 
   const incompletos=E.exames.filter(x=>!String(x.exame||'').trim()||!resultadoSaudeRegistrado(x));
@@ -4337,8 +4391,7 @@ function vSaude(m) {
      queixa amanhã, o vínculo continua de pé. Um vínculo salvo à mão precisa de
      tela que o mostre — por isso a queixa ganhou a coluna que conta o que está
      amarrado nela. */
-  const opcoesQueixa=[{v:'',t:'— nenhuma —'},...(E.queixas||[]).filter(q=>q&&q.id).map(q=>({
-    v:q.id,t:(q.oque||'queixa')+(dataISOValida(q.data)?' · desde '+fmtData(q.data):'')}))];
+  const opcoesQueixa=opcoesDeQueixa();
   const ligados=id=>({
     consultas:(E.consultas||[]).filter(x=>x&&x.queixaId===id).length,
     fisio:(E.fisio||[]).filter(x=>x&&x.queixaId===id).length});
@@ -4465,6 +4518,139 @@ function rastreiosPendentes(todos) {
 }
 
 // histórico de um marcador: gráfico, todas as medições e o caminho até o alvo
+/* OS GRUPOS DE EXAME, CALCULADOS NUM LUGAR SÓ — a tela e o PDF leem daqui.
+   Duas cópias desta conta divergiriam na primeira mudança, e aí o papel que o
+   médico tem na mão diria uma coisa e a tela do dono outra.
+
+   O RUMO NÃO É O SINAL DA DIFERENÇA. Subir é bom no HDL e ruim no LDL: o que
+   conta é ter se aproximado ou se afastado do alvo, por isso a comparação é
+   entre os SEMÁFOROS da medição de agora e da anterior. E só compara quando a
+   unidade é a mesma nas duas — µg/dL contra mg/dL daria uma variação inventada. */
+function gruposExames(){
+  const porMarcador = {};
+  (E.exames||[]).forEach(x => {
+    const k = (x.exame || '').trim(); if (!k) return;
+    (porMarcador[k] = porMarcador[k] || []).push(x);
+  });
+  return Object.entries(porMarcador).map(([nome, itens]) => {
+    itens.sort((a, b) => (a.data || '').localeCompare(b.data || ''));
+    const resultados=registrosResultadoSaude(itens);
+    const ult = resultados.at(-1)||itens.at(-1), ant = resultados.at(-2);
+    const nUlt = numeroResultadoSaude(ult.valor);
+    const nAnt = ant ? numeroResultadoSaude(ant.valor) : NaN;
+    let tend = null;
+    if (!isNaN(nUlt) && !isNaN(nAnt) && nAnt !== 0 && mesmaUnidade(unidadeSaude(ult),unidadeSaude(ant))) {
+      const dif = nUlt - nAnt, pct = dif / Math.abs(nAnt) * 100;
+      const semU = semaforo(ult), semA = semaforo(ant);
+      const ordem = { ruim: 0, atencao: 1, ok: 2, '': 1 };
+      const rumo = ordem[semU] - ordem[semA];
+      tend = { dif, pct, rumo, seta: Math.abs(pct) < 2 ? '→' : dif > 0 ? '↑' : '↓' };
+    }
+    return { nome, itens, ult, resultados:resultados.length, pendentes:itens.length-resultados.length, sem: resultados.length?semaforo(ult):'', tend, mk: MARCADORES.find(y => y[0] === nome) };
+  }).sort((a, b) => {
+    // urgência primeiro: alterado, fora do alvo, no alvo, sem régua
+    const ord = { ruim: 0, atencao: 1, ok: 2, '': 3 };
+    return (ord[a.sem] ?? 3) - (ord[b.sem] ?? 3) || a.nome.localeCompare(b.nome);
+  });
+}
+
+/* OS EXAMES EM PAPEL, com para onde cada um está indo.
+
+   É o que se leva para a consulta: o médico não quer rolar uma tela, quer ver
+   a folha. Por isso a ordem é a da urgência (alterado, fora do alvo, no alvo,
+   sem régua), a mesma da tela — e não a alfabética.
+
+   A EVOLUÇÃO VAI EM PALAVRA, não só em seta. "↑ +48%" numa folha impressa em
+   preto e branco não diz se melhorou ou piorou; "subiu 48% — aproximou do
+   alvo" diz. A cor some na fotocópia, a frase não.
+
+   De onde a régua veio também vai junto: faixa do laudo e referência geral não
+   são a mesma coisa, e quem lê o papel tem de saber qual está usando. */
+function textoEvolucaoExame(g){
+  if(!g.tend)return g.resultados>1?'sem comparação numérica':g.resultados?'1ª medição':'aguardando resultado';
+  const t=g.tend, pct=Math.abs(t.pct);
+  const quanto=pct<2?'praticamente igual':(t.dif>0?'subiu ':'caiu ')+pct.toFixed(0)+'%';
+  const rumo=t.rumo>0?' — aproximou do alvo':t.rumo<0?' — afastou do alvo':'';
+  return quanto+rumo;
+}
+function imprimirExames(){
+  const grupos=gruposExames();
+  if(!grupos.length){alert('Ainda não há exames registrados para imprimir.');return}
+  const w=window.open('','_blank');
+  if(!w){alert('Libere o pop-up para gerar o PDF.');return}
+  const rotulo={ruim:'Alterado',atencao:'Fora do alvo',ok:'No alvo','':'Sem régua cadastrada'};
+  const conta=s=>grupos.filter(g=>g.sem===s).length;
+  const faixa=g=>{
+    if(g.ult.origemDocumental)return esc(g.ult.referenciaLaudo||'consultar laudo original');
+    if(g.mk&&mesmaUnidade(unidadeSaude(g.ult),g.mk[1]))return esc(g.mk[3]);
+    const r=referenciaExtra(g.ult);
+    return r?esc(r[2])+(r[5]==='geral'?' (referência geral)':''):'—';
+  };
+  const linha=g=>`<tr class="s-${g.sem||'nada'}">
+    <td><b>${esc(g.nome)}</b></td>
+    <td class="n">${g.ult.valor!==''&&g.ult.valor!=null?esc(g.ult.valor):'—'} <span class="u">${esc(unidadeSaude(g.ult)||'')}</span></td>
+    <td class="ref">${faixa(g)}</td>
+    <td>${esc(rotulo[g.sem]||'—')}</td>
+    <td>${esc(textoEvolucaoExame(g))}</td>
+    <td class="n">${g.ult.data?esc(fmtDataAno(g.ult.data)):'—'}</td></tr>`;
+  /* O histórico só entra para quem tem mais de uma medição: repetir uma linha
+     de um valor só encheria a folha sem dizer nada novo. */
+  const comHistorico=grupos.filter(g=>g.resultados>1);
+  const historico=comHistorico.map(g=>{
+    const regs=registrosResultadoSaude(g.itens);
+    const pts=regs.map(x=>({v:numeroResultadoSaude(x.valor),r:fmtData(x.data)})).filter(x=>!isNaN(x.v));
+    const u=unidadeSaude(g.ult);
+    return `<section class="hist"><h3>${esc(g.nome)} <span class="u">${esc(u||'')}</span></h3>
+      <div class="linhas">${regs.map(x=>`<span><b>${esc(fmtDataAno(x.data))}</b> ${esc(x.valor!==''&&x.valor!=null?x.valor:'—')}</span>`).join('')}</div>
+      ${pts.length>1?gLinha(pts,{fmt:v=>String(v)}):''}
+    </section>`;
+  }).join('');
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>Exames e marcadores</title>
+  <style>
+  :root{--linha:#dcdcdc;--suave:#666;--verde:#1f6f5c}
+  body{font:13px/1.5 -apple-system,Segoe UI,sans-serif;padding:26px;color:#1a1a1a}
+  h1{font-size:21px;margin:0 0 2px}
+  .sub{color:#666;font-size:12px;margin-bottom:14px}
+  .resumo{display:flex;gap:16px;flex-wrap:wrap;margin:0 0 16px;font-size:12.5px}
+  .resumo b{font-size:17px;display:block}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#666;
+     border-bottom:1.5px solid #333;padding:5px 6px}
+  td{padding:6px;border-bottom:1px solid #eee;vertical-align:top}
+  td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .u{color:#777;font-size:10.5px}
+  .ref{color:#555}
+  /* a situação também vai em traço na lateral: numa cópia em preto e branco a
+     cor de fundo some, a barra não */
+  tr.s-ruim td:first-child{box-shadow:inset 3px 0 0 #b4443a}
+  tr.s-atencao td:first-child{box-shadow:inset 3px 0 0 #c98a4b}
+  tr.s-ok td:first-child{box-shadow:inset 3px 0 0 #1f6f5c}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#666;margin:24px 0 8px;
+     border-top:1px solid #ddd;padding-top:14px}
+  .hist{break-inside:avoid;page-break-inside:avoid;margin-bottom:16px}
+  .hist h3{font-size:13.5px;margin:0 0 4px}
+  .linhas{display:flex;flex-wrap:wrap;gap:10px;color:#444;font-size:11.5px;margin-bottom:4px}
+  .rodape{margin-top:22px;padding-top:10px;border-top:1px solid #ddd;color:#777;font-size:10.5px;line-height:1.5}
+  @media print{body{padding:0}thead{display:table-header-group}tr{break-inside:avoid}}
+  </style>
+  <h1>Exames e marcadores</h1>
+  <div class="sub">Leonardo Gonçalves${idadeLeo()?' · '+idadeLeo()+' anos':''} · gerado em ${new Date().toLocaleDateString('pt-BR')}</div>
+  <div class="resumo">
+    <div><b>${grupos.length}</b> marcadores</div>
+    <div><b>${conta('ruim')}</b> alterados</div>
+    <div><b>${conta('atencao')}</b> fora do alvo</div>
+    <div><b>${conta('ok')}</b> no alvo</div>
+    <div><b>${conta('')}</b> sem régua</div>
+  </div>
+  <table><thead><tr><th>Exame</th><th class="n">Último</th><th>Faixa de referência</th><th>Situação</th><th>Desde a medição anterior</th><th class="n">Data</th></tr></thead>
+  <tbody>${grupos.map(linha).join('')}</tbody></table>
+  ${historico?'<h2>Evolução dos que têm mais de uma medição</h2>'+historico:''}
+  <div class="rodape">A situação compara o resultado com a faixa de referência indicada ao lado — do laudo quando o laudo trouxe,
+  e referência geral quando não trouxe. Não é laudo nem parecer médico: quem interpreta é o profissional que acompanha o caso.</div>`);
+  w.document.close();
+  setTimeout(()=>w.print(),400);
+}
+
 function modalMarcador(nome) {
   const mk = MARCADORES.find(y => y[0] === nome);
   const itens = E.exames.filter(x => (x.exame || '').trim() === nome)
@@ -6617,7 +6803,7 @@ const FONTES_BUSCA=[
   {col:'pessoas',tela:'guia',ic:'👨‍👩‍👧',rot:'Minha gente',
    campos:['nome','relacao','gosta','obs'],
    tit:x=>x.nome||'pessoa',sub:x=>[x.relacao,x.nascimento?fmtDataAno(x.nascimento):''].filter(Boolean).join(' · ')},
-  {col:'bancos',tela:'guia',ic:'🏦',rot:'Banco',
+  {col:'bancos',tela:'bancos',ic:'🏦',rot:'Banco',
    campos:['banco','titular','tipo','pix','gerente','agencia','conta'],
    tit:x=>[x.banco,x.titular].filter(Boolean).join(' · ')||'conta',
    sub:x=>[x.tipo,x.agencia&&'ag. '+x.agencia,x.conta&&'cc. '+x.conta].filter(Boolean).join(' · ')},
@@ -7609,26 +7795,26 @@ function modalAnoEmpresa(emp){
   },rr('estrategia'));
 }
 
-function prepararEstrategia(m){
+function prepararEstrategia(m,empresaFixa){
   m.classList.add('workspace-layout','estrategia-workspace','strategy-desk');
   if(migrarPlanejamento(E))salvar();
   const empresas=empresasPlanejamento();
-  const topo=cab('Planejamento estratégico','Direção clara. Prioridades definidas. Execução acompanhada.');m.appendChild(topo);
+  const topo=empresaFixa?el('<div class="strategy-section-heading"><div><h2>Planejamento estratégico</h2><p>Direção, objetivos e resultados de '+esc(empresaFixa.nome)+'.</p></div></div>'):cab('Planejamento estratégico','Direção clara. Prioridades definidas. Execução acompanhada.');m.appendChild(topo);
   if(!empresas.length){
     const vazio=el('<div class="workspace-empty"><h2>Comece pela sua empresa</h2><p>Cadastre uma empresa para organizar o planejamento anual, de 2027 em diante.</p></div>');
     vazio.appendChild(acao('Cadastrar empresa',()=>{irTela('empresas');empresaModalFicha()}));m.appendChild(vazio);return null;
   }
-  const emp=empresas.find(e=>e.id===filtro.estrEmpresaId)||empresas[0];filtro.estrEmpresaId=emp.id;
+  const emp=empresaFixa||empresas.find(e=>e.id===filtro.estrEmpresaId)||empresas[0];filtro.estrEmpresaId=emp.id;
   const planos=(E.planejamentoEmpresas||[]).filter(p=>p.empresaId===emp.id).sort((a,b)=>b.ano-a.ano);
   const est=planos.find(p=>p.id===filtro.estrPlano)||planos.find(p=>p.ano===Math.max(2027,+hoje().slice(0,4)))||planos[0];
   filtro.estrPlano=est?.id||'';
   const contexto=el('<div class="strategy-context"></div>');
   const campo=(nome,select)=>{const label=el('<label>'+nome+'</label>');label.appendChild(select);contexto.appendChild(label)};
-  campo('Empresa',seletor(emp.id,empresas.map(e=>[e.id,e.nome+(['Baixada','Histórico'].includes(e.status)?' · '+e.status:'')]),v=>{filtro.estrEmpresaId=v;filtro.estrPlano='';filtro.estrObjetivo='';rr('estrategia')()},'Empresa do planejamento'));
+  if(!empresaFixa)campo('Empresa',seletor(emp.id,empresas.map(e=>[e.id,e.nome+(['Baixada','Histórico'].includes(e.status)?' · '+e.status:'')]),v=>{filtro.estrEmpresaId=v;filtro.estrPlano='';filtro.estrObjetivo='';rr('estrategia')()},'Empresa do planejamento'));
   if(est)campo('Planejamento anual',seletor(est.id,planos.map(p=>[p.id,p.ano+(p.encerrado?' · Encerrado':'')]),v=>{filtro.estrPlano=v;filtro.estrObjetivo='';rr('estrategia')()},'Ano do planejamento da empresa'));
   const fim=el('<div class="strategy-context-actions"></div>');
   if(est)fim.appendChild(el('<span class="strategy-badge">'+(est.encerrado?'Encerrado · consulta':'Em elaboração')+'</span>'));
-  fim.appendChild(acao('Novo ano',()=>modalAnoEmpresa(emp),'ghost'));contexto.appendChild(fim);m.appendChild(contexto);
+  fim.appendChild(acao('Novo ano',()=>modalAnoEmpresa(emp),'ghost'));contexto.appendChild(fim);contexto.querySelector('div').prepend(empresaImagem(emp,'empresa-logo-cabecalho'));m.appendChild(contexto);
   if(!est){
     const vazio=el(`<section class="strategy-start"><span class="strategy-kicker">SEU PRÓXIMO CICLO</span><h2>O próximo capítulo da<br>${esc(emp.nome)}.</h2><p>Transforme a direção da empresa em objetivos, ações e resultados. Cada ano terá seu próprio planejamento e histórico.</p><ol><li><b>01</b><span>Defina a direção<small>Missão, visão e valores</small></span></li><li><b>02</b><span>Escolha as prioridades<small>Objetivos e indicadores</small></span></li><li><b>03</b><span>Organize a execução<small>Equipe, ações e prazos</small></span></li></ol><div class="strategy-start-action"></div><small>Planejamentos a partir de 2027 · Apresentação em PDF</small></section>`);
     vazio.querySelector('.strategy-start-action').appendChild(acao('Criar primeiro planejamento',()=>modalAnoEmpresa(emp)));m.appendChild(vazio);return null;
@@ -7722,8 +7908,8 @@ function exportarPlanoPDF(emp,plano){
 
 let _pecaNaMao=null; // Compatibilidade com a navegação anterior da equipe.
 
-function vEstrategia(m){
-  const selecao=prepararEstrategia(m);if(!selecao)return;
+function vEstrategia(m,empresaFixa){
+  const selecao=prepararEstrategia(m,empresaFixa);if(!selecao)return;
   const {emp,est}=selecao,r=rr('estrategia'),s=resumoEstrategia(est);
   const ui=abasWorkspace(m,'estr',[['resumo','Visão geral'],['plano','Objetivos e ações'],['identidade','Direção'],['equipe','Equipe'],['balanco','Resultados e arquivos']],filtro.estrAba||'resumo',v=>filtro.estrAba=v);
   const ir=(aba,obj)=>{filtro.estrAba=aba;if(obj)filtro.estrObjetivo=obj.id;r()};
@@ -9562,6 +9748,626 @@ function financeiroSalvarRegistro(lista,obj,valores,patch){
   if(existe)Object.assign(existe,patch);else{const novo={...obj,...valores};delete novo._ffNovo;lista.push(novo)}salvar();
 }
 function financeiroBusca(lista,termo,campos){const q=normaliza(termo||'');return !q?lista:lista.filter(x=>normaliza(campos.map(k=>x[k]??'').join(' ')).includes(q))}
+/* Bancos: uma lista central, com consulta autenticada ao cadastro da gestão. */
+let bancosFonte={contas:null,erro:'',em:'',pendente:null};
+function bancosIguais(a,b){
+  const txt=v=>normaliza(String(v||'')).replace(/[^a-z0-9]/g,'');
+  const banco=v=>{const n=txt(v);return n==='bb'?'bancodobrasil':n};
+  if(!banco(a.banco)||!txt(a.conta)||!txt(b.conta))return false;
+  if(banco(a.banco)!==banco(b.banco)||['agencia','conta'].some(k=>txt(a[k])!==txt(b[k])))return false;
+  const da=txt(a.doc),db=txt(b.doc);if(da&&db)return da===db;
+  // Banco + agência + conta identificam a conta, mesmo com titular abreviado.
+  // Documentos conflitantes acima impedem a reunião; os nomes permanecem visíveis.
+  return (!!txt(a.titular)&&txt(a.titular)===txt(b.titular))||!!txt(a.agencia);
+}
+function bancosReunidos(locais,origem){
+  const saida=locais.map(b=>({...b,_local:b,_fonte:'Central'}));
+  for(const b of origem||[]){
+    const encontrado=saida.find(x=>(b.id&&x.origemGestao===b.id)||bancosIguais(x,b));
+    if(encontrado){for(const [k,v]of Object.entries(b))if(k!=='id'&&!encontrado[k]&&!(encontrado.camposEditadosCentral||[]).includes(k))encontrado[k]=v;encontrado._fonte=encontrado._local?'Central + Gestão':'Gestão Impresilk';encontrado._gestao=b;continue}
+    saida.push({...b,id:'gestao:'+b.id,_gestao:b,_fonte:'Gestão Impresilk'});
+  }
+  return saida;
+}
+async function bancosCarregar(forcar=false){
+  if(bancosFonte.pendente)return bancosFonte.pendente;
+  if(!forcar&&bancosFonte.contas&&Date.now()-Date.parse(bancosFonte.em)<300000)return;
+  bancosFonte.erro='';
+  bancosFonte.pendente=(async()=>{try{const d=await apiSync('POST',{acao:'bancosGestao'});if(!Array.isArray(d.contas))throw Error('Resposta inválida');bancosFonte.contas=d.contas;bancosFonte.em=d.lidoEm||new Date().toISOString()}catch{bancosFonte.erro='Não foi possível atualizar as contas da gestão. Tente novamente.'}finally{bancosFonte.pendente=null}})();
+  return bancosFonte.pendente;
+}
+function bancosGuardar(contas){
+  const novas=bancosReunidos(E.bancos,contas).filter(b=>b._gestao&&!b._local);
+  for(const b of novas)E.bancos.push({...b._gestao,id:uid(),origemGestao:b._gestao.id});
+  if(novas.length)salvar();return novas.length;
+}
+function bancosConferirImportacao(contas){
+  abrirModal('Guardar contas na Central','Confira os cadastros. Contas já existentes serão preservadas.',(c,fechar)=>{
+    const novas=bancosReunidos(E.bancos,contas).filter(b=>b._gestao&&!b._local);
+    c.appendChild(el('<p>'+novas.length+' conta(s) nova(s). Nenhum saldo ou movimentação será importado.</p>'));
+    for(const b of novas)c.appendChild(empresaLinha(b.banco,b.titular+' · conta '+(b.conta||'não informada')));
+    const a=el('<div class="empresa-acoes"></div>');a.append(acao('Cancelar',fechar,'ghost'),acao('Guardar '+novas.length+' contas',()=>{bancosGuardar(contas);fechar()}));c.appendChild(a);
+  },rr('bancos'));
+}
+function bancoModal(b,origem){
+  const novo=!b,registro=b||{id:uid(),_ffNovo:true};
+  const defs=[{k:'banco',t:'Banco',req:true,grupo:'Identificação'},{k:'titular',t:'Titular',req:true,sugestoes:(E.empresasPJ||[]).map(e=>e.nome)},
+    {k:'codigoBanco',t:'Código do banco',ph:'3 dígitos',ajuda:'Número do banco, diferente da agência e da conta.'},{k:'doc',t:'CPF / CNPJ do titular'},{k:'tipo',t:'Tipo de conta',opcoes:['',...CFG('tiposContaBanco')]},
+    {k:'agencia',t:'Agência',grupo:'Conta e PIX'},{k:'conta',t:'Conta com dígito'},{k:'pix',t:'Chave PIX'},{k:'pixTipo',t:'Tipo da chave',opcoes:['','CNPJ','CPF','E-mail','Telefone','Aleatória','Conta e agência']},
+    {k:'gerente',t:'Gerente / contato',grupo:'Contato e observações'},{k:'telefone',t:'Telefone'},
+    {k:'contabilidadeId',t:'Contabilidade',opcoes:['',...(E.contabilidades||[]).map(x=>x.id)],
+     ajuda:(E.contabilidades||[]).length?'Cadastre na aba Contabilidade para aparecer aqui.':'Nenhuma cadastrada ainda: use a aba Contabilidade.'},
+    {k:'obs',t:'Observações',tipo:'textarea',full:true}];
+  const aoAbrir=editor=>{
+    /* O select guarda o ID e mostra o NOME: id manda, nome só exibe. Vínculo
+       para uma contabilidade apagada aparece dito, nunca em branco. */
+    const sel=editor&&editor.controles&&editor.controles.contabilidadeId;
+    if(!sel)return;
+    for(const opt of sel.options)if(opt.value)
+      opt.textContent=contabilidadePorId(opt.value)?.nome||'Contabilidade não encontrada · confira o vínculo';
+  };
+  empresaFormulario(novo?'Nova conta':'Editar conta','Banco e titular são obrigatórios. Agência, conta e PIX são opcionais. Não registre senhas.',defs,registro,(v,patch)=>{
+    if(v.codigoBanco&&!/^\d{3}$/.test(v.codigoBanco))throw Error('Informe o código do banco com 3 dígitos.');
+    const emp=empresaPorId(registro.empresaId);if(emp&&normaliza(v.titular)!==normaliza(emp.nome))throw Error('O titular está vinculado à empresa '+emp.nome+'. Altere o nome na ficha da empresa.');
+    if(emp){v.titular=emp.nome;if(registro.titular!==emp.nome)patch.titular=emp.nome;else delete patch.titular;}
+    if(E.bancos.some(x=>x.id!==registro.id&&bancosIguais(x,v)))throw Error('Esta conta já está cadastrada. Abra a conta existente.');
+    patch.camposEditadosCentral=[...new Set([...(registro.camposEditadosCentral||[]),...Object.keys(patch)])];
+    if(origem?.id)patch.origemGestao=origem.id;
+    financeiroSalvarRegistro(E.bancos,registro,{...v,...patch},patch);rr('bancos')();
+  },aoAbrir);
+}
+function bancoSalvarLogo(b,logo){
+  if(!E.bancos.includes(b))throw Error('O cadastro mudou. Abra a conta novamente.');
+  if(logo&&!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(logo))throw Error('Escolha novamente a imagem.');
+  b.logo=logo;salvar();
+}
+function bancoModalLogo(b){
+  abrirModal('Logo do banco',esc(b.banco),(c,fechar)=>{
+    let logo=b.logo||'',versao=0;
+    const box=el('<div class="empresa-logo-editor"><div class="empresa-logo-previa"></div><p>PNG, JPG ou WebP · até 10 MB. A logo será usada nesta conta.</p><p role="alert"></p><div class="empresa-acoes"></div></div>');c.appendChild(box);
+    const previa=box.querySelector('.empresa-logo-previa'),erro=box.querySelector('[role=alert]'),acoes=box.querySelector('.empresa-acoes');
+    const pintar=()=>{previa.replaceChildren();if(logo){const img=el('<img alt="Prévia da logo" style="width:80px;height:80px;object-fit:contain">');img.src=logo;previa.appendChild(img)}else previa.textContent='🏦'};
+    const salvarLogo=acao('Salvar logo',()=>{try{bancoSalvarLogo(b,logo);fechar()}catch(e){erro.textContent=e.message}});
+    acoes.appendChild(acao('Escolher imagem',()=>pedirArquivo(file=>{const atual=++versao;salvarLogo.disabled=true;erro.textContent='';lerLogo(file,uri=>{if(atual!==versao||!box.isConnected)return;logo=uri;salvarLogo.disabled=false;pintar()},msg=>{if(atual!==versao)return;erro.textContent=msg;salvarLogo.disabled=false})},'image/png,image/jpeg,image/webp'),'ghost'));
+    acoes.appendChild(acao('Remover logo',()=>{versao++;logo='';salvarLogo.disabled=false;pintar()},'ghost'));
+    acoes.append(acao('Cancelar',fechar,'ghost'),salvarLogo);pintar();
+  });
+}
+function bancoExcluir(b){
+  if(!confirm('Excluir este cadastro da Central? A conta da gestão e o banco original não serão alterados.'))return;
+  const i=E.bancos.indexOf(b);if(i<0){alert('O cadastro mudou. Abra a lista novamente.');return}
+  E.bancos.splice(i,1);salvar();rr('bancos')();
+}
+function bancoTexto(b){return [b.banco,b.codigoBanco&&'Código do banco: '+b.codigoBanco,b.titular,b.doc&&'CPF/CNPJ: '+b.doc,b.agencia&&'Agência: '+b.agencia,b.conta&&'Conta: '+b.conta,b.pix&&'PIX: '+b.pix].filter(Boolean).join('\n')}
+async function bancoCopiar(texto,botao){try{await navigator.clipboard.writeText(texto);botao.textContent='Copiado ✓'}catch{botao.textContent='Não foi possível copiar'}}
+function bancoEmpresa(b){return empresaPorId(b.empresaId)?.nome||b.titular||'Sem titular'}
+/* O NÚMERO DO BANCO, PUXADO DO NOME quando não foi cadastrado.
+
+   O dono abriu a tela e não viu número nenhum: quase nenhuma conta tem o
+   campo preenchido, e o cartão só mostrava o que estava lá. A lista abaixo
+   cobre os bancos que a casa usa e os grandes do país, com o código da
+   compensação e a cor da marca — que é o que permite um crachá reconhecível
+   sem embutir logo de terceiro num repositório público.
+
+   UM CÓDIGO ERRADO É PIOR QUE NENHUM: ele vai para dentro de uma TED. Por isso
+   a busca casa por palavra inteira do nome, o código deduzido aparece MARCADO
+   como deduzido ("pelo nome"), e o cadastro sempre vence a dedução. */
+const BANCOS_BR=[
+  ['756','sicoob','#003641'],['748','sicredi','#3FA110'],['001','banco do brasil','#FCEF00','bb'],
+  ['237','bradesco','#CC092F'],['341','itau','#EC7000','itaú'],['033','santander','#EC0000'],
+  ['104','caixa','#0070AF','cef'],['077','inter','#FF7A00'],['260','nubank','#820AD1','nu pagamentos'],
+  ['336','c6','#242424','c6 bank'],['208','btg','#0D1B2A','btg pactual'],['422','safra','#00285E'],
+  ['041','banrisul','#0D6AB4'],['070','brb','#0A5EA8'],['389','mercantil','#006341'],
+  ['318','bmg','#F58220'],['212','original','#00A868'],['707','daycoval','#004B8D'],
+  ['246','abc brasil','#0B2A5B'],['623','pan','#00A9E0'],['655','votorantim','#004B8D','bv'],
+  ['290','pagbank','#00AA4F','pagseguro'],['323','mercado pago','#00AEEF'],['380','picpay','#21C25E'],
+  ['085','ailos','#00A5A8'],['136','unicred','#00539B'],['133','cresol','#00843D'],
+  ['021','banestes','#0067B1'],['003','banco da amazonia','#005C3C','basa'],['004','banco do nordeste','#004B8D','bnb'],
+  ['613','omni','#F47920'],['637','sofisa','#004990'],['643','pine','#0B3C5D'],['224','fibra','#0A3D62'],
+];
+/* Casa por PALAVRA INTEIRA: "interior" não pode virar Inter, nem "banestado"
+   virar Banestes. Nome sem correspondência devolve nada, e nada é resposta. */
+function bancoConhecido(nome){
+  const n=' '+normaliza(nome).replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim()+' ';
+  for(const [cod,chave,cor,...apelidos] of BANCOS_BR){
+    for(const alvo of [chave,...apelidos]){
+      const a=' '+normaliza(alvo)+' ';
+      if(n.includes(a))return {codigo:cod,cor,chave};
+    }
+  }
+  return null;
+}
+/* O código que o cartão mostra, e de onde ele veio. Cadastro manda. */
+function codigoDoBanco(b){
+  if(/^\d{3}$/.test(String(b.codigoBanco||'').trim()))return {codigo:String(b.codigoBanco).trim(),deduzido:false};
+  const k=bancoConhecido(b.banco||'');
+  return k?{codigo:k.codigo,deduzido:true}:null;
+}
+/* A MARCA DO BANCO, na ordem: logo que o dono anexou > logo registrada no
+   sistema para esse nome > cor da marca conhecida > cor automática do nome.
+   Nenhuma imagem de terceiro entra no repositório: o que existe aqui é cor. */
+function marcaDoBanco(b){
+  const nome=b.banco||'';
+  const daCentral=marcaDe(nome);
+  const conhecido=bancoConhecido(nome);
+  const logo=/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(b.logo||'')?b.logo:(daCentral.logo||'');
+  return {logo,cor:(E.marcas&&E.marcas[nome]&&E.marcas[nome].cor)||(conhecido&&conhecido.cor)||daCentral.cor};
+}
+
+/* O NÚMERO NO FORMATO DO WHATSAPP, ou nada.
+
+   wa.me exige o número internacional colado: 55 + DDD + assinante. Errar isso
+   não dá erro na tela — abre conversa com OUTRA pessoa. Por isso:
+   - 10 ou 11 dígitos (DDD + número) ganham o 55 do Brasil;
+   - 12 ou 13 dígitos que já comecem com 55 passam direto;
+   - número escrito com + é internacional e vai como está;
+   - 8 ou 9 dígitos são telefone SEM DDD: inventar o DDD mandaria a mensagem
+     para outra cidade, então devolve nada e o cartão fica no link de ligar. */
+function numeroWhatsapp(tel){
+  const bruto=String(tel||'').trim();
+  const so=bruto.replace(/\D/g,'');
+  if(!so)return '';
+  if(bruto.startsWith('+'))return so.length>=11?so:'';
+  if(so.length===10||so.length===11)return '55'+so;
+  if((so.length===12||so.length===13)&&so.startsWith('55'))return so;
+  return '';
+}
+
+/* ===================== CONTABILIDADE =====================
+   São poucas, e o que se precisa delas é sempre a mesma coisa: quem é, com
+   quem falar e como falar. Por isso o cartão é o mesmo do banco — logo, nome,
+   contato e WhatsApp — e o vínculo mora no BANCO, não aqui: a pergunta que
+   aparece na vida real é "quem cuida da contabilidade desta conta?". */
+function contabilidadePorId(id){return (E.contabilidades||[]).find(x=>x.id===id)||null}
+function contabilidadeModal(x,novo=false){
+  const registro=x||{id:uid(),_ffNovo:true};
+  const defs=[
+    {k:'nome',t:'Contabilidade',req:true,grupo:'Identificação',ph:'Nome do escritório'},
+    {k:'responsavel',t:'Responsável / contato'},
+    {k:'telefone',t:'Telefone'},{k:'email',t:'E-mail'},
+    {k:'doc',t:'CNPJ'},{k:'crc',t:'CRC'},
+    {k:'onde',t:'Onde fica',grupo:'Outros'},
+    {k:'obs',t:'Observações',tipo:'textarea',full:true},
+  ];
+  empresaFormulario(novo?'Nova contabilidade':'Editar contabilidade',
+    'Só o nome é obrigatório. Não registre senhas nem certificados.',defs,registro,(v,patch)=>{
+      if((E.contabilidades||[]).some(y=>y.id!==registro.id&&normaliza(y.nome)===normaliza(v.nome)))
+        throw Error('Já existe uma contabilidade com esse nome.');
+      financeiroSalvarRegistro(E.contabilidades,registro,{...v,...patch},patch);rr('bancos')();
+    });
+}
+function contabilidadeExcluir(x){
+  /* VÍNCULO NÃO SOME CALADO. Apagar a contabilidade deixaria bancos apontando
+     para um id que não existe mais, e o cartão diria "—" sem explicar. */
+  const presos=(E.bancos||[]).filter(b=>b.contabilidadeId===x.id);
+  if(!confirm('Apagar “'+(x.nome||'contabilidade')+'”?'+
+    (presos.length?'\n\n'+presos.length+' conta(s) estão vinculadas a ela e ficam sem contabilidade.':'')))return;
+  E.contabilidades=(E.contabilidades||[]).filter(y=>y.id!==x.id);
+  for(const b of presos)delete b.contabilidadeId;
+  salvar();rr('bancos')();
+}
+function contatoWhatsappHTML(tel,classe){
+  if(!tel)return null;
+  const zap=numeroWhatsapp(tel),so=String(tel).replace(/[^\d+]/g,'');
+  if(!zap)return el('<a class="'+classe+'" href="tel:'+esc(so)+'"><i aria-hidden="true">📞</i>'+esc(tel)+'</a>');
+  const a=el('<a class="'+classe+' banco-zap" target="_blank" rel="noopener noreferrer"><i aria-hidden="true">💬</i>'+esc(tel)+'</a>');
+  a.href='https://wa.me/'+zap;a.title='Abrir conversa no WhatsApp';
+  const lig=el('<a class="banco-ligar">ligar</a>');lig.href='tel:'+so;a.appendChild(lig);
+  return a;
+}
+function painelContabilidade(cx){
+  const lista=(E.contabilidades||[]).slice().sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'));
+  const topo=el('<div class="bancos-origem"></div>');
+  topo.appendChild(el('<p><b>'+lista.length+'</b> contabilidade(s) · vincule cada conta à sua dentro do cartão do banco</p>'));
+  topo.appendChild(acao('+ Nova contabilidade',()=>contabilidadeModal(null,true),'ghost mini'));
+  cx.appendChild(topo);
+  const grade=el('<div class="bancos-grade"></div>');cx.appendChild(grade);
+  if(!lista.length){grade.appendChild(el('<p class="empresa-nota">Nenhuma contabilidade cadastrada. Cadastre a primeira para poder vincular às contas.</p>'));return}
+  for(const x of lista){
+    const marca=marcaDe(x.nome||'');
+    const contas=(E.bancos||[]).filter(b=>b.contabilidadeId===x.id);
+    const card=el('<article class="banco-card"><header><span class="banco-icone"></span><div>'
+      +'<h2>'+esc(x.nome||'Sem nome')+'</h2>'
+      +(x.responsavel?'<p>'+esc(x.responsavel)+'</p>':'')
+      +'</div></header><dl class="banco-dados-rapidos"></dl><div class="banco-contato"></div></article>');
+    const icone=card.querySelector('.banco-icone');
+    if(marca.logo){const img=el('<img alt="Logo de '+esc(x.nome||'')+'">');img.src=marca.logo;icone.replaceChildren(img)}
+    else{icone.classList.add('banco-icone-texto');icone.style.background=marca.cor;
+      icone.style.color=/^#[0-9a-f]{6}$/i.test(marca.cor)?corTextoSobre(marca.cor):'#fff';
+      icone.textContent=iniciaisDe(x.nome||'?')}
+    const dl=card.querySelector('dl');
+    for(const [t,v] of [['CNPJ',x.doc],['CRC',x.crc],['Onde',x.onde]])
+      if(v)dl.appendChild(el('<div><dt>'+t+'</dt><dd>'+esc(v)+'</dd></div>'));
+    const contato=card.querySelector('.banco-contato');
+    const fone=contatoWhatsappHTML(x.telefone,'banco-fone');
+    if(fone)contato.appendChild(fone);
+    if(x.email){const a=el('<a class="banco-fone"><i aria-hidden="true">✉️</i>'+esc(x.email)+'</a>');a.href='mailto:'+x.email;contato.appendChild(a)}
+    /* Quantas contas ela cuida é o dado que diz se o cadastro está em uso. */
+    contato.appendChild(el('<span class="'+(contas.length?'banco-gerente':'banco-sem-contato')+'">'
+      +(contas.length?'<i aria-hidden="true">🏦</i>'+contas.length+' conta(s) vinculada(s)':'Nenhuma conta vinculada ainda')+'</span>'));
+    /* Mesmo padrão do cartão do banco: as ações moram em Detalhes, para o
+       cartão ficar de leitura e não de botões. */
+    const det=el('<details class="banco-detalhes"><summary>Detalhes</summary><div class="banco-detalhes-corpo"><dl></dl><footer></footer></div></details>');
+    card.appendChild(det);
+    if(x.obs)det.querySelector('dl').appendChild(el('<div><dt>Observações</dt><dd>'+esc(x.obs)+'</dd></div>'));
+    if(contas.length)det.querySelector('dl').appendChild(el('<div><dt>Contas vinculadas</dt><dd>'
+      +contas.map(b=>esc((b.banco||'banco')+' · '+(b.titular||''))).join('<br>')+'</dd></div>'));
+    const at=det.querySelector('footer');
+    at.appendChild(acao('Editar',()=>contabilidadeModal(x),'ghost mini'));
+    at.appendChild(acao(marca.logo?'Trocar logo':'Pôr a logo',()=>contabilidadeModalLogo(x),'ghost mini'));
+    at.appendChild(acao('Excluir',()=>contabilidadeExcluir(x),'ghost mini'));
+    grade.appendChild(card);
+  }
+}
+/* A logo usa o MESMO registro de marcas do resto do app (E.marcas por nome):
+   uma contabilidade que também é empresa cadastrada já vem com a marca certa. */
+function contabilidadeModalLogo(x){
+  abrirModal('Logomarca da contabilidade',esc(x.nome||''),(c,fechar)=>{
+    c.classList.add('empresa-modal');
+    const atual=marcaDe(x.nome||'').logo;
+    const sec=el('<div class="secao"></div>');
+    sec.appendChild(el('<p class="ff-note">PNG de até 300 KB. A marca fica guardada pelo NOME, e vale em toda a Central.</p>'));
+    if(atual){const p=el('<p><img alt="Logo atual" style="max-width:150px;max-height:80px;object-fit:contain"></p>');p.querySelector('img').src=atual;sec.appendChild(p)}
+    const inp=el('<input type="file" accept="image/png">');sec.appendChild(inp);
+    const acoes=el('<div class="secao" style="display:flex;gap:9px"></div>');
+    inp.onchange=()=>{
+      const f=inp.files&&inp.files[0];if(!f)return;
+      if(f.size>300*1024){alert('Escolha um PNG de até 300 KB.');return}
+      const fr=new FileReader();
+      fr.onload=()=>{try{empresaSalvarLogo({id:x.id,nome:x.nome},String(fr.result));fechar();rr('bancos')()}
+        catch(e){alert(e.message||'Não consegui salvar a logo.')}};
+      fr.onerror=()=>alert('Não consegui ler o arquivo.');
+      fr.readAsDataURL(f);
+    };
+    if(atual){const tirar=el('<button type="button" class="btn ghost">Tirar a logo</button>');
+      tirar.onclick=()=>{try{empresaSalvarLogo({id:x.id,nome:x.nome},'');fechar();rr('bancos')()}catch(e){alert(e.message)}};
+      acoes.appendChild(tirar)}
+    const ok=el('<button type="button" class="btn ghost">Fechar</button>');ok.onclick=fechar;acoes.appendChild(ok);
+    c.appendChild(sec);c.appendChild(acoes);
+  });
+}
+
+/* ===================== AS OUTRAS ABAS DA CENTRAL FINANCEIRA =====================
+   Seguros, Documentos PF, Documentos PJ e Drive. NENHUMA delas inventa uma
+   lista nova: seguros continuam em E.seguros (os mesmos de Gastos), documentos
+   de pessoa em E.documentos (os mesmos da tela Documentos), documentos de
+   empresa dentro da ficha de cada empresa, e o Drive é a tela que já existe.
+   Segunda lista para o mesmo fato diverge na primeira semana. */
+
+/* O TITULAR DO SEGURO — empresa ou pessoa. O cadastro de seguros nunca teve
+   esse campo (nasceu dentro de Gastos, onde só importava quanto custa). Ele é
+   editável aqui; em Gastos a tabela continua como era, e os dois escrevem no
+   MESMO registro. */
+function seguroTitular(s){return String(s&&s.titular||'').trim()||'Sem titular'}
+function seguroModal(x,novo=false){
+  const registro=x||{id:uid(),_ffNovo:true,status:'Ativo',ciclo:'Anual'};
+  const pessoas=['Léo',...(E.pessoas||[]).map(p=>p.nome).filter(Boolean)];
+  const empresas=(E.empresasPJ||[]).map(e=>e.nome).filter(Boolean);
+  const defs=[
+    {k:'titular',t:'De quem é',req:true,grupo:'Identificação',
+     sugestoes:[...new Set([...empresas,...pessoas])],ajuda:'Empresa ou pessoa: é por aqui que a lista se agrupa.'},
+    {k:'tipo',t:'Tipo',opcoes:['',...CFG('tiposSeguro')]},
+    {k:'item',t:'O que cobre',ph:'o carro, a casa, minha vida'},
+    {k:'seguradora',t:'Seguradora',grupo:'Apólice'},{k:'apolice',t:'Apólice'},
+    {k:'capital',t:'Capital segurado (R$)',tipo:'moeda',min:0},
+    {k:'beneficiarios',t:'Quem recebe'},{k:'telefone',t:'Telefone do sinistro'},
+    {k:'valor',t:'Custo (R$)',tipo:'moeda',min:0,grupo:'Custo e vigência'},
+    {k:'ciclo',t:'Cobrança',opcoes:['Mensal','Anual']},
+    {k:'renova',t:'Renova em',tipo:'date'},
+    {k:'status',t:'Status',opcoes:['Ativo','Cancelado']},
+    {k:'obs',t:'Observações',tipo:'textarea',full:true,grupo:'Outros'},
+  ];
+  empresaFormulario(novo?'Novo seguro':'Editar seguro',
+    'O mesmo cadastro que aparece em Gastos. Não registre senhas.',defs,registro,(v,patch)=>{
+      financeiroSalvarRegistro(E.seguros,registro,{...v,...patch},patch);rr('bancos')();
+    });
+}
+function painelSeguros(cx,grupo){
+  const todos=(E.seguros||[]).filter(s=>!grupo||seguroTitular(s)===grupo);
+  const topo=el('<div class="bancos-origem"></div>');
+  topo.appendChild(el('<p><b>'+todos.length+'</b> apólice(s)'+(grupo?' · '+esc(grupo):'')+' · o mesmo cadastro que aparece em Gastos</p>'));
+  topo.appendChild(acao('+ Novo seguro',()=>seguroModal(null,true),'ghost mini'));
+  cx.appendChild(topo);
+  const grade=el('<div class="bancos-grade"></div>');cx.appendChild(grade);
+  if(!todos.length){grade.appendChild(el('<p class="empresa-nota">Nenhuma apólice aqui. Cadastre para acompanhar vigência e cobertura.</p>'));return}
+  const h=hoje();
+  for(const s of todos.slice().sort((a,b)=>String(a.renova||'9').localeCompare(String(b.renova||'9')))){
+    const dias=dataISOValida(s.renova)?Math.round((new Date(s.renova+'T12:00')-new Date(h+'T12:00'))/864e5):null;
+    const sit=s.status==='Cancelado'?['Cancelado','var(--suave)']
+      :dias==null?['Sem data de renovação','var(--suave)']
+      :dias<0?['Venceu em '+fmtDataAno(s.renova),'var(--vermelho)']
+      :dias<=45?['Renova em '+fmtDataAno(s.renova),'var(--areia)']
+      :['Renova em '+fmtDataAno(s.renova),'var(--verde)'];
+    const card=el('<article class="banco-card"><header><span class="banco-icone banco-icone-texto">🛡️</span><div>'
+      +'<h2>'+esc((s.tipo||'Seguro')+(s.item?' · '+s.item:''))+'</h2>'
+      +'<p>'+esc(s.seguradora||'Seguradora não informada')+'</p></div></header>'
+      +'<dl class="banco-dados-rapidos"></dl><div class="banco-contato"></div></article>');
+    const dl=card.querySelector('dl');
+    for(const [t,v] of [['Apólice',s.apolice],['Capital',s.capital?brl(+s.capital):''],
+        ['Custo',s.valor?brl(+s.valor)+(s.ciclo?'/'+String(s.ciclo).toLowerCase().replace('mensal','mês').replace('anual','ano'):''):''],
+        ['Quem recebe',s.beneficiarios]])
+      if(v)dl.appendChild(el('<div><dt>'+t+'</dt><dd>'+esc(v)+'</dd></div>'));
+    const ct=card.querySelector('.banco-contato');
+    ct.appendChild(el('<span class="banco-gerente" style="color:'+sit[1]+'"><i aria-hidden="true">📅</i>'+esc(sit[0])+'</span>'));
+    const fone=contatoWhatsappHTML(s.telefone,'banco-fone');
+    if(fone){fone.title='Telefone do sinistro';ct.appendChild(fone)}
+    const det=el('<details class="banco-detalhes"><summary>Detalhes</summary><div class="banco-detalhes-corpo"><dl></dl><footer></footer></div></details>');
+    card.appendChild(det);
+    for(const [t,v] of [['De quem é',s.titular],['Vigência',s.renova?fmtDataAno(s.renova):''],['Status',s.status],['Observações',s.obs]])
+      if(v)det.querySelector('dl').appendChild(el('<div><dt>'+esc(t)+'</dt><dd>'+esc(v)+'</dd></div>'));
+    det.querySelector('footer').appendChild(acao('Editar',()=>seguroModal(s),'ghost mini'));
+    det.querySelector('footer').appendChild(acao('Apólice e comprovantes',
+      ()=>abrirModal(esc((s.tipo||'Seguro')+(s.item?' · '+s.item:'')),esc(s.seguradora||''),
+        c2=>c2.appendChild(areaArquivos('seguro:'+s.id,'Apólice, carteirinha, comprovante de pagamento'))),'ghost mini'));
+    grade.appendChild(card);
+  }
+}
+
+/* DOCUMENTOS DE PESSOA: os mesmos de E.documentos, agrupados por dono. */
+function painelDocsPF(cx,pessoa){
+  const lista=(E.documentos||[]).filter(d=>!pessoa||(d.dono||'Léo')===pessoa);
+  const topo=el('<div class="bancos-origem"></div>');
+  topo.appendChild(el('<p><b>'+lista.length+'</b> documento(s)'+(pessoa?' · '+esc(pessoa):'')+' · os mesmos da tela Documentos</p>'));
+  topo.appendChild(acao('+ Novo documento',()=>novoDocumento(),'ghost mini'));
+  topo.appendChild(acao('Abrir tela Documentos',()=>irTela('documentos'),'ghost mini'));
+  cx.appendChild(topo);
+  const grade=el('<div class="bancos-grade"></div>');cx.appendChild(grade);
+  if(!lista.length){grade.appendChild(el('<p class="empresa-nota">Nenhum documento desta pessoa.</p>'));return}
+  for(const d of lista.slice().sort((a,b)=>String(a.validade||'9').localeCompare(String(b.validade||'9')))){
+    const st=statusDocumento(d);
+    const cor=st==='Vencido'?'var(--vermelho)':st==='Vencendo'?'var(--areia)':st==='Em dia'?'var(--verde)':'var(--suave)';
+    const card=el('<article class="banco-card"><header><span class="banco-icone banco-icone-texto">🪪</span><div>'
+      +'<h2>'+esc(d.nome||'Documento')+'</h2><p>'+esc(d.dono||'Léo')+'</p></div></header>'
+      +'<dl class="banco-dados-rapidos"></dl><div class="banco-contato"></div></article>');
+    const dl=card.querySelector('dl');
+    for(const [t,v] of [['Número',d.numero],['Onde está',d.onde]])
+      if(v)dl.appendChild(el('<div><dt>'+t+'</dt><dd>'+esc(v)+'</dd></div>'));
+    card.querySelector('.banco-contato').appendChild(
+      el('<span class="banco-gerente" style="color:'+cor+'"><i aria-hidden="true">📅</i>'+esc(st)+(d.validade?' · '+fmtDataAno(d.validade):'')+'</span>'));
+    const det=el('<details class="banco-detalhes"><summary>Detalhes</summary><div class="banco-detalhes-corpo"><dl></dl><footer></footer></div></details>');
+    card.appendChild(det);
+    if(d.obs)det.querySelector('dl').appendChild(el('<div><dt>Observações</dt><dd>'+esc(d.obs)+'</dd></div>'));
+    det.querySelector('footer').appendChild(acao('Abrir',()=>modalDoc(d),'ghost mini'));
+    grade.appendChild(card);
+  }
+}
+
+/* DOCUMENTOS DE EMPRESA: moram dentro da ficha da empresa, e é lá que se
+   editam. Aqui eles são LIDOS e agrupados, com o caminho de volta. */
+function painelDocsPJ(cx,empresaNome){
+  const empresas=(E.empresasPJ||[]).filter(e=>!empresaNome||e.nome===empresaNome);
+  const topo=el('<div class="bancos-origem"></div>');
+  const total=empresas.reduce((s,e)=>s+empresaDocumentos(e).length,0);
+  topo.appendChild(el('<p><b>'+total+'</b> documento(s)'+(empresaNome?' · '+esc(empresaNome):'')+' · guardados na ficha de cada empresa</p>'));
+  cx.appendChild(topo);
+  const grade=el('<div class="bancos-grade"></div>');cx.appendChild(grade);
+  let n=0;
+  for(const emp of empresas)for(const d of empresaDocumentos(emp)){
+    n++;
+    const card=el('<article class="banco-card"><header><span class="banco-icone banco-icone-texto">📑</span><div>'
+      +'<h2>'+esc(d.nome||d.tipo||'Documento')+'</h2><p>'+esc(emp.nome||'')+'</p></div></header>'
+      +'<dl class="banco-dados-rapidos"></dl><div class="banco-contato"></div></article>');
+    const dl=card.querySelector('dl');
+    for(const [t,v] of [['Tipo',d.tipo],['Número',d.numero],['Validade',d.validade?fmtDataAno(d.validade):'']])
+      if(v)dl.appendChild(el('<div><dt>'+t+'</dt><dd>'+esc(v)+'</dd></div>'));
+    const at=card.querySelector('.banco-contato');
+    at.appendChild(acao('Abrir na ficha da empresa',()=>{empresaAbrir(emp.id,'documentos')},'ghost mini'));
+    grade.appendChild(card);
+  }
+  if(!n)grade.appendChild(el('<p class="empresa-nota">Nenhum documento cadastrado'+(empresaNome?' nesta empresa':' nas empresas')+'. Eles são cadastrados na ficha da empresa.</p>'));
+}
+
+async function vBancos(m){
+  m.classList.add('workspace-layout','bancos-layout');const topo=cab('Bancos','Contas, titulares e chaves PIX em um só lugar.');topo.appendChild(acao('+ Nova conta',()=>bancoModal()));m.appendChild(topo);
+  const busca=el('<div class="bancos-filtros"><label>Buscar conta<input type="search" aria-label="Buscar conta" placeholder="Banco, titular, agência, conta ou PIX"></label><div class="bancos-escopo"></div></div>');
+  busca.querySelector('label').firstChild.textContent='';busca.querySelector('label').classList.add('bancos-busca-topo');topo.insertBefore(busca.querySelector('label'),topo.lastElementChild);
+  const input=topo.querySelector('input');input.value=filtro.bancoBusca||'';
+  /* TRÊS ABAS (pedido do dono, 24/09/2026). Bancos, Contabilidade e
+     Organograma respondem à mesma pergunta — "quem cuida do dinheiro e de
+     quem é cada coisa" — e estavam em telas diferentes. O organograma
+     CONTINUA também dentro de Empresas: ele é o mesmo componente, lido do
+     mesmo E.organogramas, então tirar de lá tiraria de quem já usava. */
+  const ABAS_BANCOS=[['bancos','🏦 Bancos'],['contabilidade','🧾 Contabilidade'],['seguros','🛡️ Seguros'],
+    ['docpf','🪪 Documentos PF'],['docpj','📑 Documentos PJ'],['drive','📁 Google Drive'],['organograma','🗂 Organograma']];
+  const abaAtual=ABAS_BANCOS.some(([k])=>k===filtro.bancoAba)?filtro.bancoAba:'bancos';
+  const abas=abasWorkspace(m,'bancos',ABAS_BANCOS,abaAtual,id=>{filtro.bancoAba=id;rr('bancos')()});
+  /* UMA COLUNA SÓ À ESQUERDA: as três abas em cima, uma embaixo da outra, e a
+     lista de empresas logo abaixo delas. `abasWorkspace` pendura a barra como
+     irmã dos painéis; sem juntar as duas coisas num nó só, a grade punha a
+     barra sozinha na coluna e a lista de empresas atravessava a direita — que
+     foi exatamente o que quebrou na tela. */
+  const lateral=el('<aside class="bancos-lateral" aria-label="Áreas e empresas"></aside>');
+  lateral.appendChild(m.querySelector('.workspace-tabs'));
+  m.insertBefore(lateral,m.querySelector('.workspace-pane'));
+  /* A LATERAL AGRUPA PELO QUE FAZ SENTIDO EM CADA ABA: empresa nos bancos e
+     nos documentos de empresa, pessoa nos documentos de pessoa, titular nos
+     seguros. A lista sai sempre dos DADOS, nunca de uma constante: assunto
+     que não existe não vira item de menu vazio. */
+  const gruposDaAba=chave=>{
+    if(chave==='seguros')return [...new Set((E.seguros||[]).map(seguroTitular))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    if(chave==='docpf')return [...new Set((E.documentos||[]).map(d=>d.dono||'Léo'))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    if(chave==='docpj')return (E.empresasPJ||[]).map(e=>e.nome).filter(Boolean).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    return [];
+  };
+  const contaDoGrupo=(chave,g)=>
+    chave==='seguros'?(E.seguros||[]).filter(s=>seguroTitular(s)===g).length
+    :chave==='docpf'?(E.documentos||[]).filter(d=>(d.dono||'Léo')===g).length
+    :chave==='docpj'?empresaDocumentos((E.empresasPJ||[]).find(e=>e.nome===g)||{}).length:0;
+  const listaLateral=(chave,painel)=>{
+    const itens=gruposDaAba(chave);
+    if(!itens.length)return '';
+    filtro.bancoGrupo=filtro.bancoGrupo||{};
+    let atualG=filtro.bancoGrupo[chave];
+    if(!itens.includes(atualG))atualG=itens[0];
+    filtro.bancoGrupo[chave]=atualG;
+    const nav=el('<nav class="bancos-empresas" aria-label="Agrupamento"></nav>');
+    for(const g of itens){
+      const b2=acao('',()=>{filtro.bancoGrupo[chave]=g;rr('bancos')()},'ghost');
+      b2.className='banco-empresa-chip';b2.setAttribute('aria-pressed',String(g===atualG));
+      b2.innerHTML='<span>'+esc(g)+'</span><b>'+contaDoGrupo(chave,g)+'</b>';
+      nav.appendChild(b2);
+    }
+    lateral.appendChild(el('<div class="bancos-filtros"><div class="bancos-escopo"></div></div>'));
+    lateral.lastElementChild.querySelector('.bancos-escopo').appendChild(nav);
+    return atualG;
+  };
+  if(abaAtual==='contabilidade'){painelContabilidade(abas.paineis.contabilidade);return}
+  if(abaAtual==='seguros'){painelSeguros(abas.paineis.seguros,listaLateral('seguros'));return}
+  if(abaAtual==='docpf'){painelDocsPF(abas.paineis.docpf,listaLateral('docpf'));return}
+  if(abaAtual==='docpj'){painelDocsPJ(abas.paineis.docpj,listaLateral('docpj'));return}
+  if(abaAtual==='drive'){
+    /* O Drive é a tela que já existe, desenhada aqui dentro: uma segunda
+       implementação do mesmo navegador de pastas divergiria na primeira
+       mudança. Ela é assíncrona e cuida do próprio estado. */
+    try{vDrive(abas.paineis.drive)}
+    catch(e){abas.paineis.drive.appendChild(el('<p class="empresa-nota">Não consegui abrir o Drive aqui: '+esc(e.message||'')+'</p>'))}
+    return;
+  }
+  if(abaAtual==='organograma'){
+    if(typeof LeoOrganograma==='undefined'){abas.paineis.organograma.appendChild(el('<p class="empresa-nota">Não foi possível carregar o organograma. Atualize a página para tentar novamente.</p>'));return}
+    LeoOrganograma.render(abas.paineis.organograma,{getState:()=>E,save:salvar,
+      openModal:(titulo,sub,montar)=>abrirModal(esc(titulo),esc(sub),montar),openCompany:empresaAbrir,
+      logo:nome=>marcaDe(nome).logo,selectedId:filtro.empresaOrganogramaId||'',
+      onSelect:id=>{filtro.empresaOrganogramaId=id}});
+    return;
+  }
+  /* A lista de empresas mora na LATERAL, abaixo das abas; o painel fica só
+     com as contas, que é o que precisa da largura. */
+  lateral.appendChild(busca);
+  const alvo=abas.paineis.bancos;
+  const lista=el('<div class="bancos-conteudo" aria-live="polite"></div>');alvo.appendChild(lista);
+  input.oninput=()=>{filtro.bancoBusca=input.value;pintar()};
+  function pintar(){
+    if(!m.isConnected)return;lista.replaceChildren();
+    const todas=bancosReunidos(E.bancos,bancosFonte.contas),titulares=[...new Set(todas.map(bancoEmpresa))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    if(!titulares.includes(filtro.bancoTitular))filtro.bancoTitular=titulares[0]||'';
+    const filtros=busca.querySelector('.bancos-escopo');filtros.replaceChildren();
+    const chips=el('<nav class="bancos-empresas" aria-label="Bancos por empresa"></nav>');
+    for(const [valor,nome]of titulares.map(t=>[t,t])){
+      const quantidade=valor?todas.filter(b=>bancoEmpresa(b)===valor).length:todas.length;
+      const chip=acao('',()=>{const pos=chips.scrollLeft;filtro.bancoTitular=valor;pintar();const nav=busca.querySelector('.bancos-empresas');nav.scrollLeft=pos;nav.querySelector('[aria-pressed="true"]').focus({preventScroll:true})},'ghost');
+      chip.className='banco-empresa-chip';chip.setAttribute('aria-pressed',String((filtro.bancoTitular||'')===valor));
+      chip.innerHTML='<span>'+esc(nome)+'</span><b>'+quantidade+'</b>';chips.appendChild(chip);
+    }
+    filtros.appendChild(chips);
+    const contas=financeiroBusca(todas,filtro.bancoBusca,['banco','codigoBanco','titular','agencia','conta','pix','doc']).filter(b=>!filtro.bancoTitular||bancoEmpresa(b)===filtro.bancoTitular);
+    const estado=el('<div class="bancos-origem"></div>');
+    estado.appendChild(el('<p><b>'+contas.length+'</b> conta(s) · '+esc(filtro.bancoTitular||'Nenhuma empresa')+(bancosFonte.contas?' · '+bancosFonte.contas.length+' cadastros na gestão':bancosFonte.erro?' · origem indisponível':' · consultando cadastro da gestão…')+'</p>'));
+    estado.appendChild(acao('Atualizar gestão',async()=>{const p=bancosCarregar(true);pintar();await p;pintar()},'ghost mini'));lista.appendChild(estado);
+    if(bancosFonte.pendente)lista.appendChild(el('<p class="empresa-nota">Atualizando as contas da gestão…</p>'));
+    if(bancosFonte.erro)lista.appendChild(el('<p class="bancos-erro" role="alert">'+esc(bancosFonte.erro)+(bancosFonte.contas?' Exibindo a última consulta.':' As contas da gestão ainda não estão incluídas nesta lista.')+'</p>'));
+    const novas=todas.filter(b=>b._gestao&&!b._local);if(novas.length)estado.appendChild(acao('Conferir '+novas.length+' contas',()=>bancosConferirImportacao(bancosFonte.contas),'ghost mini'));
+    const grade=el('<div class="bancos-grade"></div>');lista.appendChild(grade);
+    for(const b of contas){
+      /* O CARTÃO MOSTRA O QUE SE PROCURA NA HORA: logo, número do banco,
+         titular, gerente e telefone. Gerente e telefone moravam dentro de
+         "Detalhes", recolhido — quem precisa ligar para o gerente não vai
+         abrir um acordeão para achar o número. O resto continua lá dentro. */
+      const card=el('<article class="banco-card"><header><span class="banco-icone"></span><div>'
+        +'<h2>'+esc(b.banco||'Banco não informado')+'</h2>'
+        +'<p>'+esc(b.titular||'Titular não informado')+'</p></div></header>'
+        +'<dl class="banco-dados-rapidos"></dl><div class="banco-contato"></div></article>');
+      const icone=card.querySelector('.banco-icone');
+      const marca=marcaDoBanco(b),cod=codigoDoBanco(b);
+      if(marca.logo){
+        const img=el('<img alt="Logo do '+esc(b.banco||'banco')+'">');img.src=marca.logo;icone.replaceChildren(img);
+      }else{
+        /* Sem logo, o crachá é o NÚMERO do banco na cor da marca — distingue
+           de longe, e emoji igual em todos não distinguia nada. Logo de banco
+           é marca de terceiro e não entra no repositório: o dono anexa a dele,
+           e a Central reaproveita a que já estiver registrada para esse nome. */
+        icone.classList.add('banco-icone-texto');
+        /* Branco nem sempre lê: o amarelo do Banco do Brasil (#FCEF00) com
+           texto branco dá 1,1:1 e o número some. A mesma função de contraste
+           dos exames escolhe entre claro e escuro pelo que realmente lê. */
+        icone.style.background=marca.cor;
+        icone.style.color=/^#[0-9a-f]{6}$/i.test(marca.cor)?corTextoSobre(marca.cor):'#fff';
+        icone.textContent=(cod&&cod.codigo)||iniciaisDe(b.banco||'')||'🏦';
+      }
+      if(cod){
+        const selo=el('<span class="banco-codigo'+(cod.deduzido?' banco-codigo-deduzido':'')+'">Banco '+esc(cod.codigo)+
+          (cod.deduzido?' <i>pelo nome</i>':'')+'</span>');
+        /* Deduzido não é cadastrado: o número vai para dentro de uma TED, e
+           quem lê tem de saber se alguém conferiu ou se o app adivinhou. */
+        if(cod.deduzido)selo.title='Código deduzido do nome do banco. Confira e salve no cadastro para confirmar.';
+        card.querySelector('header>div').insertBefore(selo,card.querySelector('header h2').nextSibling);
+      }
+      /* A logo da EMPRESA titular, quando a Central já tem: diz de quem é a
+         conta sem precisar ler. */
+      /* A LOGO DA EMPRESA TITULAR, do mesmo tamanho da do banco. Estava em
+         15px ao lado de uma de 42px: parecia um selo perdido, não a marca de
+         quem é a conta. As duas agora se equilibram nas pontas do cabeçalho —
+         banco à esquerda, empresa à direita. */
+      const marcaEmp=marcaDe(b.titular||'');
+      if(marcaEmp.logo){
+        const selo=el('<span class="banco-titular-logo" title="'+esc(b.titular||'')+'"><img alt="Logo de '+esc(b.titular||'')+'"></span>');
+        selo.querySelector('img').src=marcaEmp.logo;
+        card.querySelector('header').appendChild(selo);
+      }
+      const contato=card.querySelector('.banco-contato');
+      if(b.gerente)contato.appendChild(el('<span class="banco-gerente"><i aria-hidden="true">👤</i>'+esc(b.gerente)+'</span>'));
+      if(b.telefone){
+        const zap=numeroWhatsapp(b.telefone),so=String(b.telefone).replace(/[^\d+]/g,'');
+        if(zap){
+          const a2=el('<a class="banco-fone banco-zap" target="_blank" rel="noopener noreferrer"><i aria-hidden="true">💬</i>'+esc(b.telefone)+'</a>');
+          a2.href='https://wa.me/'+zap;a2.title='Abrir conversa no WhatsApp';
+          contato.appendChild(a2);
+          /* Ligar continua a um toque: trocar o telefone pelo WhatsApp não
+             pode tirar do dono a única forma de ligar para o gerente. */
+          const lig=el('<a class="banco-ligar">ligar</a>');lig.href='tel:'+so;a2.appendChild(lig);
+        }else{
+          /* Sem DDD não dá para montar link de WhatsApp: inventar um DDD
+             mandaria a mensagem para outra pessoa. Fica o telefone de sempre. */
+          contato.appendChild(el('<a class="banco-fone" href="tel:'+esc(so)+'"><i aria-hidden="true">📞</i>'+esc(b.telefone)+'</a>'));
+        }
+      }
+      if(!b.gerente&&!b.telefone)contato.appendChild(el('<span class="banco-sem-contato">Sem gerente ou telefone cadastrado</span>'));
+      /* A CONTABILIDADE DESTA CONTA, com logo, nome e contato — que é o que o
+         dono pediu: saber de quem é o telefone sem sair do cartão do banco.
+         Vínculo apontando para cadastro apagado é DITO, nunca mostrado em
+         branco: id órfão que vira traço esconde o problema. */
+      if(b.contabilidadeId){
+        const ct=contabilidadePorId(b.contabilidadeId);
+        const cx=el('<div class="banco-contabil"></div>');
+        if(!ct)cx.appendChild(el('<span class="banco-sem-contato">Contabilidade não encontrada · confira o vínculo</span>'));
+        else{
+          const mc=marcaDe(ct.nome||'');
+          const selo=el('<span class="banco-contabil-logo" aria-hidden="true"></span>');
+          if(mc.logo){const img=el('<img alt="">');img.src=mc.logo;selo.appendChild(img)}
+          else{selo.style.background=mc.cor;
+            selo.style.color=/^#[0-9a-f]{6}$/i.test(mc.cor)?corTextoSobre(mc.cor):'#fff';
+            selo.textContent=iniciaisDe(ct.nome||'?')}
+          cx.appendChild(selo);
+          const txt=el('<span class="banco-contabil-txt"><b></b></span>');
+          txt.querySelector('b').textContent=ct.nome||'Contabilidade';
+          if(ct.responsavel)txt.appendChild(el('<small>'+esc(ct.responsavel)+'</small>'));
+          cx.appendChild(txt);
+          const fone=contatoWhatsappHTML(ct.telefone,'banco-fone banco-contabil-fone');
+          if(fone)cx.appendChild(fone);
+        }
+        contato.appendChild(cx);
+      }
+      const rapido=card.querySelector('dl');
+      for(const [t,v]of [['Agência',b.agencia],['Conta',b.conta],['PIX',b.pix]]){const d=el('<div><dt>'+t+'</dt><dd></dd></div>');if(v){const c=acao(v,()=>bancoCopiar(v,c),'ghost mini');c.title='Copiar '+t;d.querySelector('dd').appendChild(c)}else d.querySelector('dd').textContent='—';rapido.appendChild(d)}
+      /* "Copiar" e "Pôr a logo" saíram do corpo do cartão (pedido do dono,
+         24/09/2026: ficavam agressivos). Moram no rodapé de Detalhes, junto
+         com Editar e Excluir — e o rodapé já tinha um "Copiar dados", então
+         eram dois botões para a mesma coisa. */
+      const detalhes=el('<details class="banco-detalhes"><summary>Detalhes</summary><div class="banco-detalhes-corpo"><dl></dl><footer></footer></div></details>');card.appendChild(detalhes);
+      for(const [t,v]of [['Origem',b._fonte],['Código do banco',b.codigoBanco],['Tipo de conta',b.tipo],['CPF / CNPJ',b.doc],['Tipo do PIX',b.pixTipo],['Gerente',b.gerente],['Telefone',b.telefone],['Observações',b.obs]])if(v)detalhes.querySelector('dl').appendChild(el('<div><dt>'+esc(t)+'</dt><dd>'+esc(v)+'</dd></div>'));
+      if(b._local&&b._gestao&&normaliza(b._local.titular||'')!==normaliza(b._gestao.titular||''))detalhes.querySelector('dl').appendChild(el('<div class="banco-nomes-cadastro"><dt>Nomes nos cadastros</dt><dd>Central: '+esc(b._local.titular||'não informado')+'<br>Gestão Impresilk: '+esc(b._gestao.titular||'não informado')+'</dd></div>'));
+      const rodape=detalhes.querySelector('footer');const copiarTudo=acao('Copiar dados',()=>bancoCopiar(bancoTexto(b),copiarTudo),'ghost mini');rodape.appendChild(copiarTudo);
+      if(b._local){rodape.appendChild(acao('Editar',()=>bancoModal(b._local,b._gestao),'ghost mini'));
+        rodape.appendChild(acao(marca.logo?'Trocar logo':'Pôr a logo',()=>bancoModalLogo(b._local),'ghost mini'));
+        rodape.appendChild(acao('Excluir cadastro',()=>bancoExcluir(b._local),'ghost mini'));}
+      else rodape.appendChild(acao('Guardar na Central',()=>bancosConferirImportacao([b._gestao]),'ghost mini'));
+      grade.appendChild(card);
+    }
+    if(!contas.length&&!bancosFonte.pendente)grade.appendChild(el('<p class="empresa-nota">Nenhuma conta neste filtro.</p>'));
+  }
+  const p=bancosCarregar();pintar();await p;pintar();
+}
+
 /* ===================== EMPRESAS =====================
    E.empresasPJ é a ficha canônica. Bancos e bens continuam em suas listas;
    somente documentos e obrigações exclusivos da empresa ficam aninhados. */
@@ -9693,8 +10499,10 @@ function empresaSalvarFicha(emp,novo,v,patch=v){
   if(nome!==emp.nome&&!renomeiaEmpresa(emp.nome,nome,emp))throw Error('Não foi possível renomear. Confira os vínculos dessa empresa.');
   Object.assign(emp,patch,{nome});salvar();return emp;
 }
-function empresaFormulario(titulo,sub,defs,obj,gravar){
-  abrirModal(titulo,sub,(c,fechar)=>{c.classList.add('empresa-modal');const editor=financeiroFormulario(c,defs,obj,gravar,fechar);if(defs.some(d=>d.grupo)){const campos=editor.form.querySelector('.ff-fields');let grupo;for(const d of defs){const campo=editor.controles[d.k].closest('.ff-field');if(d.grupo){grupo=el('<fieldset class="empresa-form-grupo"><legend></legend></fieldset>');grupo.querySelector('legend').textContent=d.grupo;campos.appendChild(grupo)}grupo.appendChild(campo)}}});
+/* `aoMontar` é opcional e recebe o editor pronto: serve para o select que
+   guarda ID e precisa mostrar NOME. Quem não passa nada não muda em nada. */
+function empresaFormulario(titulo,sub,defs,obj,gravar,aoMontar){
+  abrirModal(titulo,sub,(c,fechar)=>{c.classList.add('empresa-modal');const editor=financeiroFormulario(c,defs,obj,gravar,fechar);if(defs.some(d=>d.grupo)){const campos=editor.form.querySelector('.ff-fields');let grupo;for(const d of defs){const campo=editor.controles[d.k].closest('.ff-field');if(d.grupo){grupo=el('<fieldset class="empresa-form-grupo"><legend></legend></fieldset>');grupo.querySelector('legend').textContent=d.grupo;campos.appendChild(grupo)}grupo.appendChild(campo)}}if(aoMontar)aoMontar(editor)});
 }
 function empresaModalFicha(emp){
   const novo=!emp;emp=emp||{id:uid(),nome:'',status:'Ativa'};
@@ -9809,7 +10617,7 @@ function empresaModalObrigacao(emp,o){
   });
 }
 function empresaAbrir(id,secao=''){
-  filtro.empresaId=id;filtro.empresaBusca='';filtro.empresaAba='cadastros';irTela('empresas');
+  filtro.empresaId=id;filtro.empresaBusca='';filtro.empresaAba=secao?(['liderancas','acompanhamento'].includes(secao)?'liderancas':'referencias'):'cadastros';irTela('empresas');
   if(secao)document.getElementById('empresa-'+secao)?.scrollIntoView({block:'start'});
 }
 function empresaAbrirAnexos(emp,doc){abrirModal(doc?esc(doc.nome):'Arquivos da empresa',esc(emp.nome),(c)=>{c.appendChild(areaArquivos(empresaRefArquivo(emp,doc),'Contrato, comprovante ou documento em PDF'))})}
@@ -9826,7 +10634,7 @@ function empresaBloco(titulo,id,sub,acaoTexto,fn){
   if(fn)b.querySelector('header').appendChild(acao(acaoTexto,fn,'ghost mini'));return b;
 }
 function empresaLinha(titulo,sub,botao,fn){const b=el('<div class="empresa-linha"><div><b>'+esc(titulo)+'</b><small>'+esc(sub||'')+'</small></div></div>');if(fn)b.appendChild(acao(botao,fn,'ghost mini'));return b}
-function empresaAbrirPlano(emp,p){filtro.estrEmpresaId=emp.id;filtro.estrPlano=p?.id||'';filtro.estrAba='resumo';irTela('estrategia')}
+function empresaAbrirPlano(emp,p){filtro.empresaId=emp.id;filtro.empresaBusca='';filtro.empresaAba='planejamento';filtro.estrEmpresaId=emp.id;filtro.estrPlano=p?.id||'';filtro.estrAba='resumo';irTela('empresas')}
 /* Central de controle: identidades permanentes; planos anuais continuam na origem. */
 function centralLideres(emp){return (E.liderancas||[]).filter(p=>(p.vinculos||[]).some(v=>v.empresaId===emp.id))}
 function centralSalvarLider(emp,id,dados){
@@ -9837,19 +10645,35 @@ function centralSalvarLider(emp,id,dados){
   const p=existente||{id:uid(),vinculos:[],registros:[]};
   for(const k of ['nome','telefone','email','foto','pontosFortes','desenvolvimento','comunicacao'])p[k]=String(dados[k]||'').trim();
   let v=p.vinculos.find(x=>x.empresaId===emp.id);if(!v){v={empresaId:emp.id};p.vinculos.push(v)}
-  for(const k of ['responsabilidade','entregas','autonomia'])v[k]=String(dados[k]||'').trim();
+  const camposVinculo=['responsabilidade','entregas','autonomia','contribuicao','evidencia','apoio','proximoPasso','responsavelAcompanhamento','revisarEm','situacaoAcordo'];
+  if(existente){const anterior={em:new Date().toISOString()};for(const k of camposVinculo)anterior[k]=v[k]||'';(v.avaliacoes||(v.avaliacoes=[])).push(anterior)}
+  for(const k of camposVinculo)if(Object.hasOwn(dados,k))v[k]=String(dados[k]||'').trim();
   p.atualizadoEm=hoje();if(!existente)(E.liderancas||(E.liderancas=[])).push(p);salvar();return p;
 }
 function centralModalLider(emp,p){
-  abrirModal(p?'Perfil da liderança':'Adicionar liderança',esc(emp.nome)+' · cadastro permanente, independente do ano.',(c,fechar)=>{
+  abrirModal(p?'Perfil da liderança':'Adicionar liderança',esc(emp.nome)+' · Obrigatórios: nome e papel. Contatos e perfil são opcionais.',(c,fechar)=>{
     if(!p){const disponiveis=(E.liderancas||[]).filter(x=>!centralLideres(emp).some(y=>y.id===x.id));if(disponiveis.length){c.appendChild(el('<p class="empresa-nota">Esta pessoa já está em outra empresa? Selecione para manter um único perfil.</p>'));c.appendChild(seletor('',[['','Escolher liderança existente'],...disponiveis.map(x=>[x.id,x.nome])],id=>{if(id){fechar();centralModalLider(emp,(E.liderancas||[]).find(x=>x.id===id))}},'Liderança já cadastrada'))}}
     const v=p?.vinculos?.find(x=>x.empresaId===emp.id)||{};
     formularioEstrategia(c,{...p,...v},[
       {k:'nome',t:'Nome',req:true},{k:'foto',t:'Link da foto (opcional)'},{k:'telefone',t:'Telefone'},{k:'email',t:'E-mail'},
       {k:'responsabilidade',t:'Papel nesta empresa',req:true,full:true},{k:'entregas',t:'Entregas e resultados esperados',tipo:'textarea',full:true},
       {k:'autonomia',t:'O que decide e o que precisa de você',tipo:'textarea',full:true},
+      {k:'contribuicao',t:'Como está contribuindo nesta empresa?',tipo:'select',opcoes:[['','Ainda não avaliado'],['Ajuda','Ajuda'],['Parcialmente','Parcialmente'],['Precisa melhorar','Precisa melhorar']]},
+      {k:'evidencia',t:'Evidência observada e impacto',tipo:'textarea',full:true},
+      {k:'apoio',t:'Apoio que preciso oferecer',tipo:'textarea',full:true},
+      {k:'proximoPasso',t:'Próximo passo combinado',tipo:'textarea',full:true},
+      {k:'responsavelAcompanhamento',t:'Responsável pelo acompanhamento'},
+      {k:'revisarEm',t:'Data da próxima revisão',tipo:'date'},
+      {k:'situacaoAcordo',t:'Situação do acordo',tipo:'select',opcoes:['A combinar','Combinado','Em andamento','Concluído','Bloqueado'].map(x=>[x,x])},
       {k:'pontosFortes',t:'Pontos fortes observados',tipo:'textarea',full:true},{k:'desenvolvimento',t:'Pontos a desenvolver',tipo:'textarea',full:true},{k:'comunicacao',t:'Como conduzir nossas conversas',tipo:'textarea',full:true}
     ],'Salvar liderança',d=>{centralSalvarLider(emp,p?.id,d);fechar()});
+    c.querySelectorAll('textarea').forEach(t=>t.rows=2);
+    const form=c.querySelector('form'),rodape=form.querySelector('.strategy-form-footer');
+    for(const [titulo,campos,aberto]of [['Entregas e autonomia',['entregas','autonomia'],true],['Contribuição e acordo de desenvolvimento',['contribuicao','evidencia','apoio','proximoPasso','responsavelAcompanhamento','revisarEm','situacaoAcordo'],true],['Contato e foto (opcional)',['foto','telefone','email'],false],['Perfil e desenvolvimento (opcional)',['pontosFortes','desenvolvimento','comunicacao'],false]]){
+      const grupo=el('<details class="lider-form-grupo"'+(aberto?' open':'')+'><summary>'+titulo+'</summary><div></div></details>');
+      for(const k of campos)grupo.lastElementChild.appendChild(form.querySelector('[name="'+k+'"]').closest('label'));
+      form.insertBefore(grupo,rodape);
+    }
     c.appendChild(el('<p class="empresa-nota">Nome, contato e perfil acompanham a pessoa nas empresas vinculadas. Papel, entregas e autonomia são específicos desta empresa. Registre suas observações, sem deduzir avaliações.</p>'));
   },rr('empresas'));
 }
@@ -9868,24 +10692,41 @@ function centralModalItem(emp,tipo,item){
     if(item)Object.assign(item,d);else(emp[tipo]||(emp[tipo]=[])).push({id:uid(),...d});salvar();fechar();
   }),rr('empresas'));
 }
+function centralAbrirAcoes(emp,plano,estado){empresaAbrirPlano(emp,plano);filtro.estrAba='plano';filtro.estrFiltro=estado;filtro.estrBusca='';rr('estrategia')()}
 function centralEmpresa(emp,ficha,planos){
-  const lideres=centralLideres(emp),plano=planos.find(p=>!p.encerrado)||planos[0],s=plano?resumoEstrategia(plano):null;
-  const resumo=empresaBloco('🧭 Visão de direção','direcao','Prioridades e decisões desta empresa. Cada informação continua na sua origem.');
+  const lideres=centralLideres(emp),plano=planos.find(p=>p.id===filtro.estrPlano)||planos.find(p=>!p.encerrado)||planos[0],s=plano?resumoEstrategia(plano):null;
+  const resumo=empresaBloco('🧭 Visão de gestão','direcao',plano?'Planejamento '+plano.ano+(plano.encerrado?' · Encerrado':' · Ciclo atual'):'Defina o próximo ciclo desta empresa.');
   const metricas=el('<div class="central-metricas"></div>');
-  for(const [t,n,sub,fn] of [['♟️ Objetivos',s?.objetivos.length??'—',plano?'Plano '+plano.ano:'Planejamento não cadastrado',()=>plano?empresaAbrirPlano(emp,plano):modalAnoEmpresa(emp)],['👥 Lideranças',lideres.length,'Selecionadas por você',()=>document.getElementById('empresa-liderancas')?.scrollIntoView({block:'start'})],['⏳ Prazos vencidos',s?.atrasadas.length??'—','Ações do planejamento',()=>plano?empresaAbrirPlano(emp,plano):modalAnoEmpresa(emp)],['🚧 Bloqueios',s?.travadas.length??'—','Precisam de uma decisão',()=>plano?empresaAbrirPlano(emp,plano):modalAnoEmpresa(emp)]]){const b=acao('',fn,'ghost');b.className='central-metrica';b.innerHTML='<span>'+esc(t)+'</span><strong>'+esc(n)+'</strong><small>'+esc(sub)+'</small>';metricas.appendChild(b)}
-  resumo.lastElementChild.appendChild(metricas);
-  if(s){if(s.semQuem.length)resumo.lastElementChild.appendChild(el('<p class="empresa-nota">⚠️ '+s.semQuem.length+' ação(ões) sem responsável. Defina quem conduz cada entrega no planejamento.</p>'));for(const o of s.objetivos.slice(0,4))resumo.lastElementChild.appendChild(empresaLinha(o.titulo||'Objetivo sem título',o.meta||o.indicador||'Definir como medir','Acompanhar',()=>{empresaAbrirPlano(emp,plano);filtro.estrAba='plano';filtro.estrObjetivo=o.id;rr('estrategia')()}));}
-  resumo.lastElementChild.appendChild(acao(plano?'Abrir estratégia · '+plano.ano:'Definir estratégia',()=>plano?empresaAbrirPlano(emp,plano):modalAnoEmpresa(emp),'ghost'));ficha.appendChild(resumo);
-  const pessoas=empresaBloco('👥 Minhas lideranças','liderancas','Pessoas escolhidas por você, com responsabilidades e acompanhamento.','+ Liderança',()=>centralModalLider(emp));
-  if(!lideres.length)pessoas.lastElementChild.appendChild(el('<p class="empresa-nota">Quem responde pelas áreas desta empresa? Adicione apenas suas lideranças. Nenhuma pessoa do RH ou dos planos é importada automaticamente.</p>'));
+  for(const [t,n,sub,fn] of [['♟️ Objetivos',s?.objetivos.length??'—',plano?'Plano '+plano.ano:'Planejamento não cadastrado',()=>empresaAbrirPlano(emp,plano)],['👥 Lideranças',lideres.length,'Selecionadas por você',()=>{filtro.empresaAba='liderancas';rr('empresas')()}],['⏳ Prazos vencidos',s?.atrasadas.length??'—','Ações do planejamento',()=>centralAbrirAcoes(emp,plano,'atrasadas')],['🚧 Bloqueios',s?.travadas.length??'—','Precisam de uma decisão',()=>centralAbrirAcoes(emp,plano,'travadas')]]){const b=acao('',fn,'ghost');b.className='central-metrica';if(n>0&&(t.includes('vencidos')||t.includes('Bloqueios')))b.classList.add('central-metrica-alerta');b.innerHTML='<span>'+esc(t)+'</span><strong>'+esc(n)+'</strong><small>'+esc(sub)+'</small>';metricas.appendChild(b)}
+  const corpo=resumo.lastElementChild;corpo.appendChild(metricas);
+  const gradeResumo=el('<div class="central-resumo-grid"><div class="central-prioridades"><h3>Prioridades do ciclo</h3></div><aside class="central-decisoes"><h3>Próxima decisão</h3></aside></div>');corpo.appendChild(gradeResumo);
+  const prioridades=gradeResumo.firstElementChild,decisoes=gradeResumo.lastElementChild;
+  if(plano?.visao)prioridades.appendChild(el('<p class="central-visao">'+esc(plano.visao)+'</p>'));
+  if(s?.objetivos.length){for(const o of s.objetivos.slice(0,4))prioridades.appendChild(empresaLinha(o.titulo||'Objetivo sem título',o.meta||o.indicador||'Indicador a definir','Acompanhar',()=>{empresaAbrirPlano(emp,plano);filtro.estrAba='plano';filtro.estrObjetivo=o.id;rr('estrategia')()}))}
+  else prioridades.appendChild(el('<p class="empresa-nota">O que esta empresa precisa alcançar? Registre objetivos, responsáveis e como medir o resultado.</p>'));
+  prioridades.appendChild(acao(plano?'Abrir planejamento':'Criar planejamento',()=>empresaAbrirPlano(emp,plano),'ghost mini'));
+  const pendentes=plano?.encerrado?[]:[...(s?.travadas||[]),...(s?.atrasadas||[]).filter(x=>x.a.status!=='Travada')].sort((x,y)=>(y.a.status==='Travada')-(x.a.status==='Travada')||(x.a.ate||'9999').localeCompare(y.a.ate||'9999'));
+  for(const {a,o}of pendentes.slice(0,3))decisoes.appendChild(empresaLinha(a.oque||'Ação sem título',a.travaPor||a.quem||'Responsável a definir','Ver',()=>{empresaAbrirPlano(emp,plano);filtro.estrAba='plano';filtro.estrObjetivo=o.id;rr('estrategia')()}));
+  if(!pendentes.length)decisoes.appendChild(el('<p class="empresa-nota">'+(plano?.encerrado?'Ciclo encerrado. Consulte o histórico no planejamento.':s?'Nenhuma ação vencida ou bloqueada neste plano.':'Comece pela direção: objetivo, indicador e responsável.')+'</p>'));
+  const preencher=el('<div class="central-completar"><h4>Construir a direção</h4></div>');
+  if(!lideres.length)preencher.appendChild(acao('+ Definir lideranças',()=>{filtro.empresaAba='liderancas';rr('empresas')()},'ghost mini'));
+  if(!plano?.visao)preencher.appendChild(acao('Definir visão',()=>{empresaAbrirPlano(emp,plano);filtro.estrAba='identidade';rr('estrategia')()},'ghost mini'));
+  if(s?.semQuem.length)preencher.appendChild(acao(s.semQuem.length+' ações sem responsável',()=>centralAbrirAcoes(emp,plano,'todas'),'ghost mini'));
+  if(preencher.children.length>1)decisoes.appendChild(preencher);
+  ficha.appendChild(resumo);
+  const pessoas=empresaBloco('👥 Minhas lideranças','liderancas','Quem conduz a empresa, o que entrega e o que pode decidir.','+ Liderança',()=>centralModalLider(emp));
+  if(!lideres.length)pessoas.lastElementChild.appendChild(el('<p class="empresa-nota">Cadastre suas lideranças e combine papel, entregas e autonomia.</p>'));
   const grade=el('<div class="central-lideres"></div>');for(const p of lideres){const v=p.vinculos.find(v=>v.empresaId===emp.id),card=el('<article class="central-lider"><h3>'+esc(p.nome)+'</h3><p>'+esc(v.responsabilidade||'Papel a definir')+'</p></article>');
     card.prepend(empresaImagem({nome:p.nome},'central-avatar',p.foto||''));
     const entregas=s?.abertas.filter(x=>x.a.liderId===p.id)||[];if(entregas.length)card.appendChild(empresaLinha(entregas.length+' ação(ões) em aberto no plano','Responsabilidade vinculada à liderança','Ver ações',()=>{empresaAbrirPlano(emp,plano);filtro.estrAba='plano';rr('estrategia')()}));
     for(const [rotulo,valor] of [['Entregas',v.entregas],['Autonomia',v.autonomia],['Pontos fortes',p.pontosFortes],['Desenvolvimento',p.desenvolvimento],['Comunicação',p.comunicacao]])if(valor)card.appendChild(el('<p><b>'+rotulo+'</b><br>'+esc(valor)+'</p>'));
+    for(const [rotulo,valor] of [['Contribuição',v.contribuicao],['Evidência e impacto',v.evidencia],['Apoio necessário',v.apoio],['Próximo passo',v.proximoPasso],['Acompanhamento',[v.responsavelAcompanhamento,v.situacaoAcordo].filter(Boolean).join(' · ')]])if(valor)card.appendChild(el('<p><b>'+rotulo+'</b><br>'+esc(valor)+'</p>'));
+    if(v.revisarEm)card.appendChild(el('<p class="'+(v.revisarEm<hoje()&&v.situacaoAcordo!=='Concluído'?'empresa-atencao':'empresa-nota')+'">Revisão: '+esc(fmtDataAno(v.revisarEm))+'</p>'));
+    if(v.avaliacoes?.length){const h=el('<details class="central-lider-historico"><summary>Histórico de avaliações</summary><ol></ol></details>');for(const registro of [...v.avaliacoes].reverse())h.lastElementChild.appendChild(el('<li>'+esc([registro.em?.slice(0,10),registro.contribuicao,registro.evidencia,registro.entregas,registro.proximoPasso,registro.situacaoAcordo].filter(Boolean).join(' · '))+'</li>'));card.appendChild(h)}
     if(p.telefone||p.email)card.appendChild(el('<p>'+esc([p.telefone,p.email].filter(Boolean).join(' · '))+'</p>'));
     const a=el('<div class="empresa-acoes"></div>');a.append(acao('Editar perfil',()=>centralModalLider(emp,p),'ghost mini'),acao('Registrar conversa',()=>centralModalConversa(emp,p),'ghost mini'));card.appendChild(a);grade.appendChild(card);
   }pessoas.lastElementChild.appendChild(grade);ficha.appendChild(pessoas);
-  const conversas=empresaBloco('💬 Acompanhamento e decisões','acompanhamento','Combinados por liderança, com histórico e próximo passo.');
+  const conversas=empresaBloco('💬 Acompanhamento e decisões','acompanhamento','Combinados, próximos passos e histórico.');conversas.hidden=!lideres.length;
   const registros=lideres.flatMap(p=>(p.registros||[]).filter(r=>r.empresaId===emp.id).map(r=>({p,r}))).sort((a,b)=>(b.r.data||'').localeCompare(a.r.data||''));
   for(const {p,r} of registros){const linha=empresaLinha(p.nome+' · '+r.assunto,[r.data&&fmtDataAno(r.data),r.combinado,r.prazo?'Prazo '+fmtDataAno(r.prazo):'',r.concluido?'Concluído':'Em acompanhamento'].filter(Boolean).join(' · '),r.concluido?'Reabrir':'Concluir',()=>{r.concluido=!r.concluido;salvar();rr('empresas')()});if(!r.concluido&&r.prazo&&r.prazo<hoje())linha.classList.add('empresa-atencao');conversas.lastElementChild.appendChild(linha)}
   if(!registros.length)conversas.lastElementChild.appendChild(el('<p class="empresa-nota">Use “Registrar conversa” no perfil de uma liderança para guardar decisões e combinados.</p>'));ficha.appendChild(conversas);
@@ -9896,28 +10737,37 @@ function centralEmpresa(emp,ficha,planos){
   }
 }
 
+function empresaSelecionar(id){
+  filtro.empresaId=id;filtro.estrEmpresaId=id;filtro.estrPlano='';filtro.estrObjetivo='';filtro.estrBusca='';filtro.estrFiltro='todas';rr('empresas')();
+}
 function vEmpresas(m){
-  m.classList.add('workspace-layout','empresas-layout');const topo=cab('Empresas','Sua central de direção: estratégia, lideranças, bancos, contatos e sistemas.');if(filtro.empresaAba!=='organograma')topo.appendChild(acao('+ Nova empresa',()=>empresaModalFicha()));m.appendChild(topo);
-  const abas=abasWorkspace(m,'empresas',[['cadastros','Central de controle'],['organograma','Organograma']],filtro.empresaAba||'cadastros',id=>{filtro.empresaAba=id;rr('empresas')()});
+  m.classList.add('workspace-layout','empresas-layout');
+  const topo=cab('Empresas','Estratégia, lideranças e decisões de alta gestão.');topo.appendChild(acao('+ Nova empresa',()=>empresaModalFicha()));m.appendChild(topo);
+  // A rota antiga permanece válida para favoritos, busca e eventos da agenda.
+  if(atual==='estrategia'){filtro.empresaAba='planejamento';if(filtro.estrEmpresaId)filtro.empresaId=filtro.estrEmpresaId;if(migrarPlanejamento(E))salvar()}
+  const todas=empresaLista(''),lista=empresaLista(filtro.empresaBusca||''),emp=todas.find(e=>e.id===filtro.empresaId)||todas[0];
+  const escolha=el('<section class="empresas-seletor" aria-label="Selecionar empresa"><div class="empresas-seletor-topo"><span>SUAS EMPRESAS <b>'+todas.length+'</b></span><label><input type="search" placeholder="Encontrar empresa…" aria-label="Buscar empresa"></label></div><div class="empresas-trilho"><button type="button" class="empresas-seta" aria-label="Empresas anteriores">‹</button><nav class="empresas-chips" aria-label="Empresas"></nav><button type="button" class="empresas-seta" aria-label="Próximas empresas">›</button></div><label class="empresa-select-mobile">Empresa</label></section>');m.appendChild(escolha);
+  const busca=escolha.querySelector('input');busca.value=filtro.empresaBusca||'';busca.oninput=()=>{const pos=busca.selectionStart;filtro.empresaBusca=busca.value;rr('empresas')();const novo=document.querySelector('.empresas-seletor input');novo?.focus();try{novo?.setSelectionRange(pos,pos)}catch{}};
+  const opcoes=escolha.querySelector('.empresas-chips');
+  for(const e of lista){const b=el('<button type="button" class="empresa-opcao'+(e===emp?' selecionada':'')+'" aria-pressed="'+(e===emp)+'" title="'+esc(e.nome||'Empresa sem nome')+'"><span>'+esc(e.nome||'Empresa sem nome')+'</span></button>');b.prepend(empresaImagem(e));b.onclick=()=>empresaSelecionar(e.id);opcoes.appendChild(b)}
+  if(!lista.length)opcoes.appendChild(el('<p class="empresa-nota">Nenhuma empresa encontrada.</p>'));
+  const mobile=seletor(emp?.id||'',todas.map(e=>[e.id,e.nome]),empresaSelecionar,'Selecionar empresa');escolha.querySelector('.empresa-select-mobile').appendChild(mobile);
+  const setas=escolha.querySelectorAll('.empresas-seta');setas[0].onclick=()=>opcoes.scrollBy({left:-Math.max(240,opcoes.clientWidth*.7),behavior:'smooth'});setas[1].onclick=()=>opcoes.scrollBy({left:Math.max(240,opcoes.clientWidth*.7),behavior:'smooth'});
+  const indicar=()=>{const max=opcoes.scrollWidth-opcoes.clientWidth;setas[0].disabled=(opcoes.scrollLeft||0)<=1;setas[1].disabled=max<1||(opcoes.scrollLeft||0)>=max-1};opcoes.onscroll=()=>{filtro.empresaTrilho=opcoes.scrollLeft;indicar()};
+  const posicionar=()=>{opcoes.scrollLeft=filtro.empresaTrilho||0;indicar()};if(window.requestAnimationFrame)window.requestAnimationFrame(posicionar);else posicionar();
+  if(window.ResizeObserver){const observar=new window.ResizeObserver(()=>{if(!opcoes.isConnected){observar.disconnect();return}indicar()});observar.observe(opcoes)}
+  if(!emp){const empty=el('<section class="workspace-empty"><h2>Sua direção começa pela empresa</h2><p>Cadastre a empresa para reunir estratégia, lideranças e referências.</p></section>');empty.appendChild(acao('Cadastrar empresa',()=>empresaModalFicha()));m.appendChild(empty);return;}
+  filtro.empresaId=emp.id;filtro.estrEmpresaId=emp.id;
+  const contexto=el('<div class="empresa-contexto"><div><h2>'+esc(emp.nome||'Empresa sem nome')+'</h2><span>'+esc(emp.status||'Situação não informada')+'</span></div><small>'+esc(emp.cnpj||'')+'</small></div>');contexto.querySelector('div').prepend(empresaImagem(emp,'empresa-logo-cabecalho'));m.appendChild(contexto);
+  const abas=abasWorkspace(m,'empresas',[['cadastros','🧭 Visão de gestão'],['planejamento','♟️ Planejamento estratégico'],['liderancas','👥 Lideranças'],['organograma','Organograma'],['referencias','🏛️ Referências']],filtro.empresaAba||'cadastros',id=>{filtro.empresaAba=id;if(atual==='estrategia')irTela('empresas');else rr('empresas')()});
+  if(filtro.empresaAba==='planejamento'){vEstrategia(abas.paineis.planejamento,emp);return;}
   if(filtro.empresaAba==='organograma'){
     if(typeof LeoOrganograma==='undefined'){abas.paineis.organograma.appendChild(el('<p class="empresa-nota">Não foi possível carregar o organograma. Atualize a página para tentar novamente.</p>'));return;}
     LeoOrganograma.render(abas.paineis.organograma,{getState:()=>E,save:salvar,openModal:(titulo,sub,montar)=>abrirModal(esc(titulo),esc(sub),montar),openCompany:empresaAbrir,logo:nome=>marcaDe(nome).logo,selectedId:filtro.empresaOrganogramaId||'',onSelect:id=>{filtro.empresaOrganogramaId=id}});return;
   }
-  m=abas.paineis.cadastros;
-  const lista=empresaLista(filtro.empresaBusca||''),emp=lista.find(e=>e.id===filtro.empresaId)||lista[0];
-  const estrutura=el('<div class="empresas-estrutura"><aside class="empresas-lista" aria-label="Lista de empresas"><label>Encontrar empresa<input type="search" placeholder="Nome, CNPJ ou cidade" aria-label="Buscar empresa"></label><div class="empresas-opcoes"></div></aside><div class="empresa-ficha"></div></div>');m.appendChild(estrutura);
-  const busca=estrutura.querySelector('input');busca.value=filtro.empresaBusca||'';busca.oninput=()=>{const pos=busca.selectionStart;filtro.empresaBusca=busca.value;rr('empresas')();const novo=m.parentElement?.querySelector('input[type=search]')||document.querySelector('.empresas-lista input');novo?.focus();novo?.setSelectionRange?.(pos,pos)};
-  const opcoes=estrutura.querySelector('.empresas-opcoes');
-  for(const e of lista){const b=el('<button class="empresa-opcao'+(e===emp?' selecionada':'')+'" aria-pressed="'+(e===emp)+'"><span><b>'+esc(e.nome||'Empresa sem nome')+'</b><small>'+esc(e.cnpj||e.status||'Completar cadastro')+'</small></span></button>');b.prepend(empresaImagem(e));b.onclick=()=>{filtro.empresaId=e.id;rr('empresas')()};opcoes.appendChild(b)}
-  if(!lista.length)opcoes.appendChild(el('<p class="empresa-nota">Nenhuma empresa encontrada.</p>'));
-  const ficha=estrutura.querySelector('.empresa-ficha');
-  if(!emp){const empty=el('<section class="workspace-empty"><h2>'+((E.empresasPJ||[]).length?'Nenhuma empresa neste filtro':'Sua base empresarial começa aqui')+'</h2><p>Reúna contatos, contas e documentos. Os planejamentos anuais continuarão ligados à mesma empresa.</p></section>');empty.appendChild(acao((E.empresasPJ||[]).length?'Limpar busca':'Cadastrar empresa',(E.empresasPJ||[]).length?()=>{filtro.empresaBusca='';rr('empresas')()}:()=>empresaModalFicha()));ficha.appendChild(empty);return;}
-  filtro.empresaId=emp.id;
-  const docs=empresaDocumentos(emp),obs=empresaObrigacoes(emp),pend=obs.filter(o=>!['Pago','Cancelado'].includes(o.status)),contas=empresaContas(emp),bens=empresaRegistros(emp,'patrimonio'),planos=(E.planejamentoEmpresas||[]).filter(p=>p.empresaId===emp.id).sort((a,b)=>b.ano-a.ano);
-  const hero=el('<section class="empresa-cabecalho"><div><span class="workspace-eyebrow">CENTRAL DE CONTROLE · '+esc(emp.status||'Situação não informada')+'</span><h2>'+esc(emp.nome||'Empresa sem nome')+'</h2><p>'+esc([emp.razaoSocial,emp.cnpj].filter(Boolean).join(' · ')||'Complete o CNPJ e os dados gerais.')+'</p></div><div class="empresa-resumo"><span><b>'+contas.length+'</b> contas</span><span><b>'+docs.length+'</b> documentos</span><span><b>'+pend.length+'</b> obrigações em aberto</span></div></section>');ficha.appendChild(hero);
-  const identidade=el('<div class="empresa-identidade"></div>');identidade.append(empresaImagem(emp,'empresa-logo-cabecalho'),hero.firstElementChild);hero.prepend(identidade);
-  const acoesFicha=el('<div class="empresa-acoes empresa-acoes-ficha"></div>');acoesFicha.append(acao(marcaDe(emp.nome).logo?'Trocar logo':'Adicionar logo',()=>empresaModalLogo(emp),'ghost mini'),acao('Excluir empresa',()=>empresaModalExcluir(emp),'ghost mini empresa-btn-excluir'));hero.appendChild(acoesFicha);
-  const nav=el('<nav class="empresa-indice" aria-label="Seções da empresa"></nav>');for(const [id,t] of [['direcao','🧭 Visão geral'],['liderancas','👥 Lideranças'],['acompanhamento','💬 Acompanhamento'],['bancos','🏦 Bancos'],['contatos','☎️ Contatos'],['sistemas','🔗 Sistemas'],['gerais','Dados cadastrais'],['documentos','Documentos'],['imoveis','Obrigações'],['conexoes','Conexões']])nav.appendChild(acao(t,()=>document.getElementById('empresa-'+id)?.scrollIntoView({block:'start'}),'ghost mini'));ficha.appendChild(nav);
+  const ficha=el('<div class="empresa-ficha"></div>');abas.paineis.cadastros.appendChild(ficha);
+  const docs=empresaDocumentos(emp),obs=empresaObrigacoes(emp),contas=empresaContas(emp),bens=empresaRegistros(emp,'patrimonio'),planos=(E.planejamentoEmpresas||[]).filter(p=>p.empresaId===emp.id).sort((a,b)=>b.ano-a.ano);
+  const acoesFicha=el('<div class="empresa-acoes empresa-acoes-ficha"></div>');acoesFicha.append(acao(marcaDe(emp.nome).logo?'Trocar logo':'Adicionar logo',()=>empresaModalLogo(emp),'ghost mini'),acao('Excluir empresa',()=>empresaModalExcluir(emp),'ghost mini empresa-btn-excluir'));
   centralEmpresa(emp,ficha,planos);
   const geral=empresaBloco('🏢 Dados e contatos','gerais','Informações cadastrais e quem procurar.','Editar dados',()=>empresaModalFicha(emp));
   const dl=el('<dl class="empresa-dados"></dl>');for(const [t,v] of [['CNPJ',emp.cnpj],['Abertura',emp.abertura?fmtDataAno(emp.abertura):''],['Atividade / CNAE',emp.atividade],['Inscrição estadual',emp.inscricaoEstadual],['Inscrição municipal',emp.inscricaoMunicipal],['Regime',emp.regime],['Sócios',emp.socios],['Endereço',[emp.endereco,emp.cidade,emp.uf,emp.cep].filter(Boolean).join(' · ')],['Contato',[emp.contato,emp.telefone,emp.email].filter(Boolean).join(' · ')],['Contabilidade',[emp.contador,emp.contadorContato].filter(Boolean).join(' · ')],['Referência bancária anterior',emp.banco],['Observações',emp.obs]])if(v)dl.appendChild(el('<div><dt>'+t+'</dt><dd>'+esc(v)+'</dd></div>'));
@@ -9947,9 +10797,145 @@ function vEmpresas(m){
   conexoes.lastElementChild.appendChild(empresaLinha('Caixa e VGV','Fonte: planilha patrimonial. Uma nova importação substitui os registros dessa área.','Abrir',()=>irTela('caixavgv')));
   const proximos=empresaEventos().filter(e=>e.ref.empresaId===emp.id).sort((a,b)=>a.data.localeCompare(b.data));
   conexoes.lastElementChild.appendChild(empresaLinha('Agenda da empresa',proximos.length+' vencimento(s) em aberto · documentos e obrigações','Ver Agenda',()=>{filtro.agEmpresaId=emp.id;filtro.agSo='empresas';filtro.agMes=(proximos[0]?.data||hoje()).slice(0,7);irTela('agenda')}));ficha.appendChild(conexoes);
+  const refs=abas.paineis.referencias;
+  refs.appendChild(el('<p class="empresa-nota">Base de consulta da direção: bancos, contatos, documentos e vínculos. As rotinas operacionais continuam nos sistemas de cada empresa.</p>'));
+  refs.appendChild(acoesFicha);
+  for(const id of ['contatos','sistemas','gerais','bancos','documentos','imoveis','conexoes']){const secao=ficha.querySelector('#empresa-'+id);if(secao)refs.appendChild(secao)}
+  for(const id of ['liderancas','acompanhamento']){const secao=ficha.querySelector('#empresa-'+id);if(secao)abas.paineis.liderancas.appendChild(secao)}
+
 }
 
 /* ===================== PATRIMÔNIO ===================== */
+/* A EVOLUÇÃO DO PATRIMÔNIO, ANO A ANO — calculada num lugar só, lida pela
+   tela e pelo PDF.
+
+   De onde vêm os anos: das avaliações que o dono cadastra por ano, mais o
+   valor atual do bem lançado no ano da SUA data de avaliação. Bem sem data de
+   avaliação não é chutado para o ano corrente: dizer que um valor é de 2026
+   sem saber quando foi avaliado inventaria uma valorização que não aconteceu.
+   Avaliação explícita do ano vence o valor atual.
+
+   A VALORIZAÇÃO DO TOTAL SÓ COMPARA O QUE EXISTE NOS DOIS ANOS. Somar tudo de
+   2025 contra tudo de 2026 e chamar a diferença de valorização é mentira
+   quando um bem novo entrou no meio: o patrimônio cresceu por compra, não por
+   preço. Por isso a conta do conjunto roda sobre os bens presentes nos dois
+   anos, e o que entrou ou saiu é DITO à parte. */
+function avaliacoesDoBem(x){
+  const por=new Map();
+  const ano=dataISOValida(x.avaliadoEm)?Number(String(x.avaliadoEm).slice(0,4)):null;
+  const atual=Number(x.valor);
+  if(ano&&Number.isFinite(atual)&&atual>0)por.set(ano,atual);
+  for(const a of (x.avaliacoes||[])){
+    const y=Number(a&&a.ano), v=Number(a&&a.valor);
+    if(Number.isInteger(y)&&y>=1900&&y<=2200&&Number.isFinite(v)&&v>0)por.set(y,v);
+  }
+  return por;
+}
+function evolucaoPatrimonio(bens){
+  const linhas=[],anos=new Set();
+  for(const x of (bens||[])){
+    const por=avaliacoesDoBem(x);
+    if(!por.size)continue;
+    por.forEach((_,a)=>anos.add(a));
+    linhas.push({bem:x,por});
+  }
+  const lista=[...anos].sort((a,b)=>a-b);
+  linhas.sort((a,b)=>(b.por.get(lista[lista.length-1])||0)-(a.por.get(lista[lista.length-1])||0)
+    ||String(a.bem.nome||'').localeCompare(String(b.bem.nome||'')));
+  const totais=lista.map(a=>linhas.reduce((s,l)=>s+(l.por.get(a)||0),0));
+  const variacao=lista.map((a,i)=>{
+    if(!i)return null;
+    const ant=lista[i-1];
+    const juntos=linhas.filter(l=>l.por.has(a)&&l.por.has(ant));
+    const de=juntos.reduce((s,l)=>s+l.por.get(ant),0);
+    const para=juntos.reduce((s,l)=>s+l.por.get(a),0);
+    return {
+      comparaveis:juntos.length,
+      entraram:linhas.filter(l=>l.por.has(a)&&!l.por.has(ant)).length,
+      sairam:linhas.filter(l=>!l.por.has(a)&&l.por.has(ant)).length,
+      de,para,dif:para-de,pct:de?(para-de)/de*100:null,
+    };
+  });
+  return {anos:lista,linhas,totais,variacao};
+}
+/* A valorização de UM bem, entre o ano pedido e o ano anterior em que ele tem
+   avaliação — que nem sempre é o ano imediatamente anterior. */
+function variacaoBem(por,ano){
+  const anteriores=[...por.keys()].filter(a=>a<ano).sort((a,b)=>b-a);
+  if(!anteriores.length)return null;
+  const de=por.get(anteriores[0]),para=por.get(ano);
+  if(!de)return null;
+  return {deAno:anteriores[0],de,para,dif:para-de,pct:(para-de)/de*100};
+}
+
+/* O PATRIMÔNIO EM PAPEL: a lista de bens e a evolução ano a ano, lidas do
+   MESMO cálculo da tela. A valorização vai em número e em palavra — cor some
+   na fotocópia. */
+function imprimirPatrimonio(){
+  const bens=(E.patrimonio||[]).filter(x=>x.situacao!=='Vendido');
+  if(!bens.length){alert('Nenhum bem em carteira para imprimir.');return}
+  const w=window.open('','_blank');
+  if(!w){alert('Libere o pop-up para gerar o PDF.');return}
+  const valor=x=>+x.valor||0,devo=x=>+x.falta||0;
+  const bruto=bens.reduce((s,x)=>s+valor(x),0),divida=bens.reduce((s,x)=>s+devo(x),0);
+  const ord=[...bens].sort((a,b)=>valor(b)-valor(a));
+  const ev=evolucaoPatrimonio(bens);
+  const linhaBem=x=>`<tr class="${devo(x)>0?'s-devo':'s-ok'}">
+    <td><b>${esc(x.nome||'(sem nome)')}</b>${x.documento?'<small>'+esc(x.documento)+'</small>':''}</td>
+    <td>${esc(x.tipo||'—')}</td><td>${esc(x.onde||'—')}</td>
+    <td class="n">${valor(x)?brl(valor(x)):'—'}</td>
+    <td class="n">${devo(x)?brl(devo(x)):'—'}</td>
+    <td class="n"><b>${valor(x)?brl(valor(x)-devo(x)):'—'}</b></td>
+    <td>${esc(x.situacao||'—')}</td></tr>`;
+  const tabelaEv=!ev.anos.length?'<p class="nota">Nenhuma avaliação com ano cadastrada.</p>':
+    `<table><thead><tr><th>Bem</th>${ev.anos.map(a=>`<th class="n">${a}</th>`).join('')}<th class="n">Valorização</th></tr></thead>
+     <tbody>${ev.linhas.map(l=>{
+       const ultimo=[...l.por.keys()].sort((a,b)=>b-a)[0];
+       const v=variacaoBem(l.por,ultimo);
+       return `<tr><td>${esc(l.bem.nome||'(sem nome)')}</td>${ev.anos.map(a=>{
+         const val=l.por.get(a);const dv=val!=null?variacaoBem(l.por,a):null;
+         return `<td class="n">${val!=null?brl(val)+(dv&&dv.pct!=null?'<small>'+(dv.pct>0?'+':'')+dv.pct.toFixed(1)+'%</small>':''):'—'}</td>`;
+       }).join('')}<td class="n"><b>${v?(v.pct>0?'valorizou ':v.pct<0?'desvalorizou ':'estável ')+Math.abs(v.pct).toFixed(1)+'% desde '+v.deAno:'1ª avaliação'}</b></td></tr>`;
+     }).join('')}</tbody>
+     <tfoot><tr><td><b>TOTAL</b></td>${ev.totais.map(v=>`<td class="n"><b>${brl(v)}</b></td>`).join('')}<td></td></tr>
+     <tr><td>Valorização do conjunto</td>${ev.variacao.map(v=>`<td class="n">${v&&v.pct!=null?(v.pct>0?'+':'')+v.pct.toFixed(1)+'%':'—'}</td>`).join('')}<td></td></tr></tfoot></table>
+     <p class="nota">A valorização do conjunto compara só os bens avaliados nos dois anos: bem que entrou no meio faria o total subir por compra, não por preço.</p>`;
+  w.document.write(`<!doctype html><meta charset="utf-8"><title>Patrimônio</title>
+  <style>
+  body{font:13px/1.5 -apple-system,Segoe UI,sans-serif;padding:26px;color:#1a1a1a}
+  h1{font-size:21px;margin:0 0 2px}
+  .sub{color:#666;font-size:12px;margin-bottom:14px}
+  .resumo{display:flex;gap:18px;flex-wrap:wrap;margin:0 0 16px;font-size:12.5px}
+  .resumo b{font-size:17px;display:block}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:6px}
+  th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:#666;
+     border-bottom:1.5px solid #333;padding:5px 6px}
+  td{padding:6px;border-bottom:1px solid #eee;vertical-align:top}
+  td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  td small{display:block;color:#777;font-size:10.5px;font-weight:400}
+  tr.s-devo td:first-child{box-shadow:inset 3px 0 0 #c98a4b}
+  tr.s-ok td:first-child{box-shadow:inset 3px 0 0 #1f6f5c}
+  tfoot td{border-top:1.5px solid #333;border-bottom:0}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:#666;margin:24px 0 8px;
+     border-top:1px solid #ddd;padding-top:14px}
+  .nota{color:#666;font-size:11px;margin:4px 0 0}
+  .rodape{margin-top:22px;padding-top:10px;border-top:1px solid #ddd;color:#777;font-size:10.5px}
+  @media print{body{padding:0}thead{display:table-header-group}tr{break-inside:avoid}}
+  </style>
+  <h1>Patrimônio</h1>
+  <div class="sub">Leonardo Gonçalves · gerado em ${new Date().toLocaleDateString('pt-BR')} · ${bens.length} bem(ns) em carteira</div>
+  <div class="resumo"><div>Bruto<b>${brl(bruto)}</b></div><div>Ainda devo<b>${brl(divida)}</b></div>
+    <div>Líquido<b>${brl(bruto-divida)}</b></div></div>
+  <table><thead><tr><th>Bem</th><th>Tipo</th><th>Onde</th><th class="n">Valor</th><th class="n">Devo</th><th class="n">Meu</th><th>Situação</th></tr></thead>
+  <tbody>${ord.map(linhaBem).join('')}</tbody>
+  <tfoot><tr><td colspan="3"><b>TOTAL</b></td><td class="n"><b>${brl(bruto)}</b></td><td class="n"><b>${brl(divida)}</b></td><td class="n"><b>${brl(bruto-divida)}</b></td><td></td></tr></tfoot></table>
+  <h2>Evolução ano a ano</h2>
+  ${tabelaEv}
+  <div class="rodape">Valores de avaliação cadastrados pelo proprietário. Bens vendidos não entram nesta folha.</div>`);
+  w.document.close();
+  setTimeout(()=>w.print(),400);
+}
+
 function vPatrimonio(m){
   const r=rr('patrimonio');
   m.classList.add('ff-patrimonio');
@@ -10015,11 +11001,146 @@ function vPatrimonio(m){
   cx.appendChild(rol);
   const pe=el('<div style="padding:0 17px 15px"></div>');
   const bt=el('<button class="mais">+ Novo bem</button>');bt.onclick=novo;pe.appendChild(bt);cx.appendChild(pe);
-  m.appendChild(bloco('pt-lista','Meus bens','clique para abrir, anexar escritura e lançar o que falta pagar',cx));
+  m.appendChild(bloco('pt-lista','Meus bens','clique para abrir, anexar foto, escritura e lançar o que falta pagar',cx));
+
+  /* ---- a evolução, ano a ano ---- */
+  const ev=evolucaoPatrimonio(bens);
+  const cxEv=el('<div class="corpo"></div>');
+  if(ev.anos.length<1){
+    cxEv.appendChild(el('<div class="vazio">Nenhuma avaliação com ano ainda. Abra um bem e cadastre a avaliação de cada ano para ver a valorização.</div>'));
+  }else{
+    const rolEv=el('<div class="rolagem"></div>');
+    const t=document.createElement('table');
+    t.innerHTML='<thead><tr><th>Bem</th>'+ev.anos.map(a2=>`<th style="text-align:right">${a2}</th>`).join('')+
+      '<th style="text-align:right">Valorização</th></tr></thead>';
+    const tb=document.createElement('tbody');
+    ev.linhas.forEach(l=>{
+      const ultimo=[...l.por.keys()].sort((x2,y2)=>y2-x2)[0];
+      const v=variacaoBem(l.por,ultimo);
+      const tr=document.createElement('tr');tr.style.cursor='pointer';
+      tr.innerHTML='<td style="padding:10px"><b>'+esc(l.bem.nome||'(sem nome)')+'</b></td>'+
+        ev.anos.map(a2=>{
+          const val=l.por.get(a2);
+          const dv=val!=null?variacaoBem(l.por,a2):null;
+          return '<td style="padding:10px;text-align:right;font-variant-numeric:tabular-nums">'+
+            (val!=null?brl(val)+(dv&&dv.pct!=null?'<small style="display:block;font-size:11px;color:'+(dv.pct>0?'var(--verde)':dv.pct<0?'var(--vermelho)':'var(--suave)')+'">'+(dv.pct>0?'+':'')+dv.pct.toFixed(1)+'%</small>':'')
+              :'<span style="color:var(--suave)">—</span>')+'</td>';
+        }).join('')+
+        '<td style="padding:10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:'+
+        (v&&v.pct>0?'var(--verde)':v&&v.pct<0?'var(--vermelho)':'var(--suave)')+'">'+
+        (v?(v.pct>0?'+':'')+v.pct.toFixed(1)+'%<small style="display:block;font-size:11px;font-weight:400;color:var(--suave)">desde '+v.deAno+'</small>':'<span style="color:var(--suave)">1ª avaliação</span>')+'</td>';
+      tr.onclick=()=>modalBem(l.bem);
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    const tf=document.createElement('tfoot');
+    tf.innerHTML='<tr class="tfim"><td style="padding:10px">TOTAL</td>'+
+      ev.totais.map(v=>`<td style="text-align:right">${brl(v)}</td>`).join('')+'<td></td></tr>'+
+      '<tr><td style="padding:10px;color:var(--suave);font-size:12px">Valorização do conjunto</td>'+
+      ev.variacao.map(v=>'<td style="text-align:right;padding:10px;font-size:12px;font-variant-numeric:tabular-nums;color:'+
+        (v&&v.pct>0?'var(--verde)':v&&v.pct<0?'var(--vermelho)':'var(--suave)')+'">'+
+        (v&&v.pct!=null?(v.pct>0?'+':'')+v.pct.toFixed(1)+'%':'—')+'</td>').join('')+'<td></td></tr>';
+    t.appendChild(tf);
+    rolEv.appendChild(t);cxEv.appendChild(rolEv);
+    /* O QUE ENTROU E O QUE SAIU VAI DITO. Sem isso, o total subindo porque um
+       bem novo foi comprado se leria como valorização. */
+    const notas=ev.variacao.map((v,i)=>{
+      if(!v)return '';
+      const partes=[];
+      if(v.entraram)partes.push(v.entraram+' bem(ns) entrou(aram) neste ano');
+      if(v.sairam)partes.push(v.sairam+' saiu(íram)');
+      return partes.length?'<b>'+ev.anos[i]+'</b>: '+partes.join(' e ')+'.':'';
+    }).filter(Boolean).join(' ');
+    cxEv.appendChild(el('<p class="ff-note">A valorização do conjunto compara só os bens avaliados nos <b>dois</b> anos — bem que entrou no meio faria o total subir por compra, não por preço. '+
+      (notas||'Nenhum bem entrou ou saiu entre os anos listados.')+'</p>'));
+  }
+  const peEv=el('<div style="padding:0 17px 15px;display:flex;gap:9px;flex-wrap:wrap"></div>');
+  const bPdf=el('<button class="btn ghost mini">🖨 Salvar patrimônio em PDF</button>');
+  bPdf.onclick=()=>imprimirPatrimonio();
+  peEv.appendChild(bPdf);cxEv.appendChild(peEv);
+  m.appendChild(bloco('pt-evol','Evolução ano a ano','cadastre a avaliação de cada ano dentro do bem; a valorização é calculada daqui',cxEv));
 
   const porTipo={};bens.forEach(x=>porTipo[x.tipo||'Outro']=(porTipo[x.tipo||'Outro']||0)+valor(x));
   if(bruto>0) m.appendChild(bloco('pt-tipo','Onde está o patrimônio','',graficoEl(gRosca(
     Object.entries(porTipo).map(([r2,v])=>({r:r2,v})).filter(x=>x.v>0),{fmt:brl}))));
+}
+
+/* AS AVALIAÇÕES POR ANO. O bem tem UM valor atual, que é o que vale hoje; a
+   série por ano é o que permite dizer se valorizou. Guardar uma coisa no lugar
+   da outra perderia o histórico na primeira reavaliação. */
+function secaoAvaliacoesBem(x){
+  const sec=el('<details class="ff-attachments" open><summary>Avaliações por ano</summary></details>');
+  const corpo=el('<div></div>');sec.appendChild(corpo);
+  const pintar=()=>{
+    corpo.replaceChildren();
+    const por=avaliacoesDoBem(x);
+    const anos=[...por.keys()].sort((a,b)=>b-a);
+    if(!anos.length)corpo.appendChild(el('<p class="ff-note">Nenhuma avaliação com ano. Cadastre abaixo para acompanhar a valorização.</p>'));
+    else{
+      const ul=el('<div class="arqs" style="margin-bottom:9px"></div>');
+      anos.forEach(ano=>{
+        const v=variacaoBem(por,ano);
+        const daData=dataISOValida(x.avaliadoEm)&&Number(String(x.avaliadoEm).slice(0,4))===ano
+          &&!(x.avaliacoes||[]).some(a=>Number(a.ano)===ano);
+        const it=el('<div class="arq"><span>'+ano+'</span><span class="nome">'+brl(por.get(ano))+
+          (v&&v.pct!=null?' <small style="color:'+(v.pct>0?'var(--verde)':v.pct<0?'var(--vermelho)':'var(--suave)')+'">'+(v.pct>0?'+':'')+v.pct.toFixed(1)+'% desde '+v.deAno+'</small>':'')+
+          '</span><span class="tam">'+(daData?'valor atual do bem':'avaliação cadastrada')+'</span></div>');
+        if(!daData){
+          const bx=el('<button class="lixo" aria-label="Apagar a avaliação de '+ano+'">✕</button>');
+          bx.onclick=()=>{
+            if(!confirm('Apagar a avaliação de '+ano+'?'))return;
+            x.avaliacoes=(x.avaliacoes||[]).filter(a=>Number(a.ano)!==ano);salvar();pintar();
+          };
+          it.appendChild(bx);
+        }
+        ul.appendChild(it);
+      });
+      corpo.appendChild(ul);
+    }
+    const form=el('<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end"></div>');
+    const anoIn=el('<label class="campo" style="max-width:110px">Ano<input type="number" min="1900" max="2200" step="1" placeholder="2026"></label>');
+    const valIn=el('<label class="campo" style="max-width:190px">Valor (R$)<input type="text" inputmode="decimal" placeholder="1.200.000,00"></label>');
+    const add=el('<button type="button" class="btn ghost mini">Adicionar avaliação</button>');
+    add.onclick=()=>{
+      const ano=Number(anoIn.querySelector('input').value);
+      let valor;try{valor=financeiroNumero(valIn.querySelector('input').value||'')}catch{valor=NaN}
+      if(!Number.isInteger(ano)||ano<1900||ano>2200){alert('Informe o ano com quatro dígitos.');return}
+      if(!Number.isFinite(valor)||valor<=0){alert('Informe o valor da avaliação.');return}
+      x.avaliacoes=[...(x.avaliacoes||[]).filter(a=>Number(a.ano)!==ano),{ano,valor}];
+      salvar();anoIn.querySelector('input').value='';valIn.querySelector('input').value='';pintar();
+    };
+    form.appendChild(anoIn);form.appendChild(valIn);form.appendChild(add);
+    /* Atalho para o caso comum: o valor de hoje vira a avaliação deste ano,
+       sem digitar de novo. */
+    const atual=Number(x.valor),anoHoje=Number(hoje().slice(0,4));
+    if(Number.isFinite(atual)&&atual>0&&!avaliacoesDoBem(x).has(anoHoje)){
+      const usar=el('<button type="button" class="btn ghost mini">Usar o valor atual como avaliação de '+anoHoje+'</button>');
+      usar.onclick=()=>{x.avaliacoes=[...(x.avaliacoes||[]),{ano:anoHoje,valor:atual}];salvar();pintar()};
+      form.appendChild(usar);
+    }
+    corpo.appendChild(form);
+  };
+  pintar();
+  return sec;
+}
+/* A FOTO DO BEM é o anexo de imagem, mostrado como imagem. O arquivo já podia
+   ser anexado desde sempre; o que faltava era VER sem precisar abrir. */
+function fotosDoBem(ref){
+  const cx=el('<div class="bem-fotos" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:9px"></div>');
+  (async()=>{
+    let as=[];
+    try{as=await arqPor(ref)}catch{return}
+    const imgs=as.filter(a=>/^image\//i.test(a.tipo||''));
+    if(!imgs.length)return;
+    for(const a of imgs.slice(0,6)){
+      try{
+        const u=await arqUrlDe(a.id,false);
+        const fig=el('<a target="_blank" rel="noopener noreferrer" style="display:block;line-height:0"><img alt="'+esc(a.nome)+'" style="width:110px;height:82px;object-fit:cover;border-radius:10px;border:1px solid var(--linha)"></a>');
+        fig.href=u;fig.querySelector('img').src=u;cx.appendChild(fig);
+      }catch{ /* imagem que não abre não derruba o resto da janela */ }
+    }
+  })();
+  return cx;
 }
 
 function modalBem(x,novo=false){
@@ -10036,7 +11157,11 @@ function modalBem(x,novo=false){
       {k:'obs',t:'Observações',tipo:'textarea',full:true},
     ],x,(v,patch)=>financeiroSalvarRegistro(E.patrimonio,x,v,patch),fechar);
     const resumo=el('<output class="ff-equity-preview" aria-live="polite"></output>');editor.form.querySelector('.ff-actions').before(resumo);const atualizarResumo=()=>{try{const v=financeiroNumero(editor.controles.valor.value||'0'),d=financeiroNumero(editor.controles.falta.value||'0');resumo.textContent='Parcela líquida: '+brl(v-d)+' · avaliação menos saldo devedor.'}catch{resumo.textContent='Confira os valores para calcular a parcela líquida.'}};editor.controles.valor.oninput=atualizarResumo;editor.controles.falta.oninput=atualizarResumo;atualizarResumo();
-    if(!novo){const a=el('<details class="ff-attachments"><summary>Escritura, contrato e comprovantes</summary></details>');a.appendChild(areaArquivos('bem:'+x.id,'Escritura, matrícula, contrato, ITBI, boletos'));c.appendChild(a);
+    if(!novo){
+      c.appendChild(secaoAvaliacoesBem(x));
+      const a=el('<details class="ff-attachments"><summary>Foto, escritura, contrato e comprovantes</summary></details>');
+      a.appendChild(fotosDoBem('bem:'+x.id));
+      a.appendChild(areaArquivos('bem:'+x.id,'Foto do bem, escritura, matrícula, contrato, ITBI, boletos'));c.appendChild(a);
       const del=el('<button type="button" class="btn ghost">Apagar bem</button>');del.onclick=async()=>{if(!confirm('Apagar este bem e seus arquivos?'))return;if(!await apagarAnexosDe('bem:'+x.id))return;E.patrimonio=E.patrimonio.filter(y=>y.id!==x.id);salvar();fechar()};c.appendChild(del);
     }else c.appendChild(el('<p class="ff-note">Salve o bem para anexar os documentos. Bens vendidos ficam disponíveis no histórico.</p>'));
   });
@@ -13158,23 +14283,10 @@ function vGuia(m) {
   ponteEmpresas.appendChild(acao('Abrir Empresas',()=>irTela('empresas'),'ghost'));
   m.appendChild(bloco('gu-empresas','🏢 Minhas empresas','Os mesmos cadastros, organizados em fichas.',ponteEmpresas));
 
-  /* ---- 7b. BANCOS E PIX ---- */
-  const bc = el('<div class="guia-aviso-bancos"></div>');
-  bc.appendChild(el(`<div class="aviso" style="margin:0 0 4px">🔐 <b>Aqui não vai senha.</b>
-    Chave PIX, agência e conta ajudam a família a achar o dinheiro. Senha fica no gerenciador de senhas —
-    escreva só <i>onde</i> encontrar, nunca a senha em si.</div>`));
-  m.appendChild(bc);
-  m.appendChild(tabelaBloco('gu-bancos', '🏦 Bancos e PIX',
-    'onde está o dinheiro, de quem é a conta e como transferir', E.bancos, [
-      { k: 'banco', t: 'Banco', ph: 'nome do banco' },
-      { k: 'titular', t: 'Titular', ph: 'você ou a empresa', aoGravar:(valor,b)=>{const emp=empresaPorId(b.empresaId);if(emp&&valor!==emp.nome){alert('Esta conta está vinculada à empresa '+emp.nome+'. Atualize o nome na ficha Empresas.');return false}} },
-      { k: 'tipo', t: 'Tipo', tipo: 'select', opcoes: CFG('tiposContaBanco'), w: 175 },
-      { k: 'agencia', t: 'Agência', ph: '0000', w: 110 },
-      { k: 'conta', t: 'Conta', ph: '00000-0', w: 130 },
-      { k: 'pix', t: 'Chave PIX', ph: 'CNPJ, e-mail, telefone…' },
-      { k: 'gerente', t: 'Gerente / telefone', ph: 'quem atende' },
-    ], () => ({ banco: '', titular: '', tipo: CFG('tiposContaBanco')[0], agencia: '', conta: '', pix: '', gerente: '' }), r,
-    '', E.bancos));
+  /* Cadastro canônico em Dinheiro → Bancos; mantém a âncora dos atalhos antigos. */
+  const ponteBancos=el('<div class="corpo"><p>Contas pessoais e empresariais, PIX e contatos agora estão em Dinheiro → Bancos.</p></div>');
+  ponteBancos.appendChild(acao('Abrir Bancos',()=>irTela('bancos'),'ghost'));
+  m.appendChild(bloco('gu-bancos','🏦 Bancos e PIX','Um único cadastro para suas contas.',ponteBancos));
 
   /* ---- 7. PROTEÇÃO DA FAMÍLIA ---- */
   const menores = E.pessoas.filter(p => /filh/i.test(p.relacao || '') && p.nascimento && idadeDe(p.nascimento) < 18);
@@ -13640,10 +14752,25 @@ function renomeiaEmpresa(de,para,registro){
   salvar();return true;
 }
 
+const FONTES_INTERFACE={padrao:'',inter:'Inter, system-ui, sans-serif',sistema:'system-ui, sans-serif',arial:'Arial, sans-serif',georgia:'Georgia, serif'};
+function aplicarFonteInterface(){
+  const fonte=FONTES_INTERFACE[E.config?.fonteInterface]||'',raiz=document.documentElement;if(!raiz)return;
+  if(fonte){raiz.setAttribute('data-fonte-interface','');raiz.style.setProperty('--fonte-interface',fonte)}else{raiz.removeAttribute('data-fonte-interface');raiz.style.removeProperty('--fonte-interface')}
+}
+function escolherFonteInterface(valor){
+  if(!Object.hasOwn(FONTES_INTERFACE,valor))throw Error('Escolha uma fonte da lista.');
+  E.config=E.config||{};E.config.fonteInterface=valor;salvar();aplicarFonteInterface();
+}
 async function vConfig(m){
   const r=rr('config');
   m.classList.add('config-fluida');m.appendChild(cab('Configurações','Gerencie conexões, preferências, listas e cópias de segurança.'));
+  const bancosAtalho=el('<section class="bancos-config"><div class="corpo"><h2>🏦 Bancos cadastrados</h2><p>Edite banco, titular, agência, conta e PIX na lista organizada por empresa.</p></div></section>');
+  bancosAtalho.querySelector('.corpo').appendChild(acao('Gerenciar contas bancárias',()=>irTela('bancos'),'ghost'));m.appendChild(bancosAtalho);
   m.appendChild(painel('Seções', 'Abra o assunto que deseja ajustar'));
+  const aparencia=el('<div class="corpo"><p>Escolha a fonte das letras em todo o sistema. A mudança é aplicada imediatamente.</p></div>');
+  aparencia.appendChild(seletor(E.config?.fonteInterface||'padrao',[['padrao','Padrão do sistema'],['inter','Inter'],['sistema','Fonte do aparelho'],['arial','Arial'],['georgia','Georgia']],escolherFonteInterface,'Fonte das letras'));
+  m.appendChild(bloco('cf-aparencia','🎨 Aparência','fonte das letras, títulos e campos',aparencia));
+
   m.appendChild(blocoConferenciaCadastros());m.appendChild(blocoGoogle('gmail'));m.appendChild(blocoGoogle('agenda'));
   const t=await arqTotal();
   if(atual!=='config')return;
@@ -14014,9 +15141,7 @@ async function restaurarBackup(f){
 }
 
 /* ---------- login, nuvem, sair e PDF ---------- */
-// Prévia local por arquivo também é um ambiente de desenvolvimento: não há
-// servidor para autenticar, mas a tela precisa abrir para revisão visual.
-const DEV=['localhost','127.0.0.1'].includes(location.hostname)||location.protocol==='file:';
+const DEV=['localhost','127.0.0.1'].includes(location.hostname);
 const T_CHAVE='cl_token';
 const pegaToken=()=>localStorage.getItem(T_CHAVE)||sessionStorage.getItem(T_CHAVE)||'';
 const temSessao=()=>DEV||!!pegaToken();
