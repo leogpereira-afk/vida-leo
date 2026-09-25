@@ -10596,20 +10596,23 @@ async function empresaAnexos(emp){
   });return [...arquivos.values()];
 }
 function empresaAssinatura(emp){return JSON.stringify([emp,E.marcas?.[emp.nome]])}
-async function empresaExcluir(emp,assinatura,continuar=()=>true){
-  const conferir=()=>{if(!continuar())throw Error('Exclusão cancelada.');if(empresaPorId(emp.id)!==emp||empresaAssinatura(emp)!==assinatura)throw Error('A ficha mudou durante a conferência. Abra novamente antes de excluir.');if(empresaDependencias(emp).length)throw Error('A empresa possui dados relacionados. Confira os vínculos antes de excluir.');};
-  conferir();const anexos=await empresaAnexos(emp);conferir();if(anexos.length)throw Error('A empresa possui arquivos anexados. Confira os documentos antes de excluir.');
-  E.empresasPJ=E.empresasPJ.filter(e=>e.id!==emp.id);E.config=E.config||{};E.config.empresas=CFG('empresas').filter(n=>normaliza(n)!==normaliza(emp.nome));
-  if(E.marcas)delete E.marcas[emp.nome];if(filtro.empresaId===emp.id)filtro.empresaId='';salvar();
+async function empresaExcluir(emp,assinatura,continuar=()=>true,{removerConteudo=false}={}){
+  const conferir=()=>{if(!continuar())throw Error('Exclusão cancelada.');if(empresaPorId(emp.id)!==emp||empresaAssinatura(emp)!==assinatura)throw Error('A ficha mudou durante a conferência. Abra novamente antes de excluir.');if(!removerConteudo&&empresaDependencias(emp).length)throw Error('A empresa possui dados relacionados. Confira os vínculos antes de excluir.');};
+  conferir();const anexos=await empresaAnexos(emp);conferir();if(anexos.length&&!removerConteudo)throw Error('A empresa possui arquivos anexados. Confira os documentos antes de excluir.');
+  if(removerConteudo)for(const anexo of anexos){conferir();try{await arqDel(anexo.id)}catch(e){throw Error('Não foi possível remover todos os anexos. A ficha foi mantida; alguns arquivos podem já ter sido removidos. Tente novamente. '+e.message)}}
+  conferir();
+  E.empresasPJ=E.empresasPJ.filter(e=>e.id!==emp.id);E.config=E.config||{};const mesmoNome=E.empresasPJ.some(e=>normaliza(e.nome)===normaliza(emp.nome));
+  if(!mesmoNome){E.config.empresas=CFG('empresas').filter(n=>normaliza(n)!==normaliza(emp.nome));if(E.marcas)delete E.marcas[emp.nome];}
+  if(filtro.empresaId===emp.id)filtro.empresaId='';salvar();
 }
 function empresaModalExcluir(emp){
   abrirModal('Excluir empresa',esc(emp.nome),(c,fechar)=>{
-    c.classList.add('empresa-modal');const assinatura=empresaAssinatura(emp),box=el('<div class="empresa-exclusao"><p>Excluir remove esta ficha e sua logomarca da lista de empresas.</p><div class="empresa-excluir-vinculos"></div><p role="status">Conferindo vínculos e arquivos…</p><p role="alert" class="empresa-erro"></p><div class="empresa-acoes empresa-acoes-final"></div></div>');c.appendChild(box);
+    c.classList.add('empresa-modal');const assinatura=empresaAssinatura(emp),box=el('<div class="empresa-exclusao"><p>Excluir remove definitivamente esta ficha, seus documentos, obrigações, contatos, sistemas e arquivos anexados. Movimentações financeiras, bens, planejamentos e históricos compartilhados permanecem registrados.</p><div class="empresa-excluir-vinculos"></div><p role="status">Conferindo vínculos e arquivos…</p><p role="alert" class="empresa-erro"></p><div class="empresa-acoes empresa-acoes-final"></div></div>');c.appendChild(box);
     const lista=box.querySelector('.empresa-excluir-vinculos'),estado=box.querySelector('[role=status]'),erro=box.querySelector('[role=alert]'),acoes=box.querySelector('.empresa-acoes');
-    const confirmar=acao('Excluir empresa',async()=>{confirmar.disabled=true;erro.textContent='';try{await empresaExcluir(emp,assinatura,()=>box.isConnected);fechar()}catch(e){if(box.isConnected){erro.textContent=e.message;confirmar.disabled=false}}},'empresa-btn-excluir');confirmar.disabled=true;
+    const confirmar=acao('Excluir empresa',async()=>{confirmar.disabled=true;erro.textContent='';try{await empresaExcluir(emp,assinatura,()=>box.isConnected,{removerConteudo:true});fechar()}catch(e){if(box.isConnected){erro.textContent=e.message;confirmar.disabled=false}}},'empresa-btn-excluir');confirmar.disabled=true;
     acoes.append(acao('Cancelar',fechar,'ghost'),confirmar);
     const mostrar=(refs,arquivos)=>{lista.replaceChildren();for(const r of refs)lista.appendChild(empresaLinha(r.titulo,r.n+' registro(s)'));if(arquivos.length)lista.appendChild(empresaLinha('Arquivos anexados',arquivos.length+' arquivo(s)'));
-      const usado=refs.length||arquivos.length;estado.textContent=usado?'A exclusão está bloqueada porque existem informações relacionadas. Confira os dados na ficha antes de removê-la.':'Nenhum vínculo ou arquivo encontrado. Confirme abaixo para excluir esta ficha.';confirmar.disabled=!!usado;
+      const usado=refs.length||arquivos.length;estado.textContent=usado?'Existem informações relacionadas. A ficha e os anexos próprios serão excluídos. Registros compartilhados serão preservados. Esta ação não pode ser desfeita por esta tela.':'Nenhum vínculo ou arquivo encontrado. Confirme abaixo para excluir esta ficha.';confirmar.disabled=false;
       if(usado)acoes.prepend(acao('Conferir na ficha',()=>{fechar();empresaAbrir(emp.id)},'ghost'));
     };
     empresaAnexos(emp).then(arquivos=>{if(box.isConnected)mostrar(empresaDependencias(emp),arquivos)}).catch(e=>{if(box.isConnected){mostrar(empresaDependencias(emp),[]);estado.textContent='Não foi possível concluir a conferência.';erro.textContent=e.message;confirmar.disabled=true}});

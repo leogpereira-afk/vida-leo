@@ -232,3 +232,24 @@ test('Cancelar seletor de arquivo remove input conectado sem executar callback',
   input.dispatchEvent(new a.document.defaultView.Event('cancel'));
   assert.equal(calls,0);assert.equal(input.isConnected,false);
 });
+
+test('Exclusão explícita remove ficha e anexos próprios mesmo com vínculos, preservando finanças',async()=>{
+ const a=app();storage(a,{local:[{id:'proprio',ref:'empresa:pj-1'},{id:'outro',ref:'empresa:outra'}]});
+ a.run("emp.documentosEmpresa=[{id:'doc'}];E.bancos=[{id:'b',empresaId:emp.id,titular:emp.nome}];E.rendimentos=[{id:'r',empresa:emp.nome,valor:50}];globalThis.removidos=[];arqDel=async id=>removidos.push(id)");
+ const financeiro=a.run('JSON.stringify([E.bancos,E.rendimentos])');
+ await a.run('empresaExcluir(emp,empresaAssinatura(emp),()=>true,{removerConteudo:true})');
+ assert.equal(a.run('E.empresasPJ.length'),0);
+ assert.equal(a.run('removidos.join()'),'proprio');
+ assert.equal(a.run('JSON.stringify([E.bancos,E.rendimentos])'),financeiro);
+});
+test('Falha ao remover anexo mantém ficha e informa possível remoção parcial',async()=>{
+ const a=app();storage(a,{local:[{id:'a',ref:'empresa:pj-1'},{id:'b',ref:'empresa:pj-1'}]});
+ a.run("arqDel=async id=>{if(id==='b')throw Error('Falha de rede')}");
+ await assert.rejects(a.run('empresaExcluir(emp,empresaAssinatura(emp),()=>true,{removerConteudo:true})'),/alguns arquivos podem já ter sido removidos/);
+ assert.equal(a.run('E.empresasPJ.length'),1);
+});
+test('Modal permite confirmar exclusão com documento após conferir anexos',async()=>{
+ const a=app();storage(a);a.run("emp.documentosEmpresa=[{id:'d'}];empresaModalExcluir(emp)");await settle();
+ assert.equal(button(a,'Excluir empresa').disabled,false);
+ assert.match(a.document.querySelector('.empresa-exclusao').textContent,/históricos compartilhados permanecem/);
+});
