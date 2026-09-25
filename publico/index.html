@@ -3871,16 +3871,16 @@ const MARCADORES = [
   ['HDL', 'mg/dL', '> 40', '> 50', v => v < 40, v => v < 50],
   ['Triglicérides', 'mg/dL', '< 150', '< 100', v => v >= 150, v => v >= 100],
   ['Lp(a)', 'mg/dL', '< 50', '< 30 (1x na vida)', v => v >= 50, v => v >= 30],
-  ['Glicemia jejum', 'mg/dL', '70 a 99', '< 90', v => v >= 100, v => v >= 90],
+  ['Glicemia jejum', 'mg/dL', '70 a 99', '< 90', v => v < 70 || v >= 100, v => v >= 90],
   ['HbA1c', '%', '< 5,7', '< 5,4', v => v >= 5.7, v => v >= 5.4],
-  ['Insulina', 'µU/mL', '2 a 25', '< 8', v => v > 10, v => v >= 8],
+  ['Insulina', 'µU/mL', '2 a 25', '< 8', v => v < 2 || v > 25, v => v >= 8],
   ['PCR ultrassensível', 'mg/L', '< 3', '< 1', v => v >= 3, v => v >= 1],
-  ['Testosterona total', 'ng/dL', '250 a 950', '> 500', v => v < 350, v => v < 500],
-  ['Vitamina D', 'ng/mL', '30 a 100', '40 a 60', v => v < 30, v => v < 40 || v > 60],
+  ['Testosterona total', 'ng/dL', '250 a 950', '> 500', v => v < 250 || v > 950, v => v < 500],
+  ['Vitamina D', 'ng/mL', '30 a 100', '40 a 60', v => v < 30 || v > 100, v => v < 40 || v > 60],
   ['TSH', 'µUI/mL', '0,4 a 4,0', '1,0 a 2,5', v => v > 4 || v < 0.4, v => v > 2.5 || v < 1],
   ['PSA', 'ng/mL', '< 4', '< 2,5', v => v >= 4, v => v >= 2.5],
-  ['Creatinina', 'mg/dL', '0,7 a 1,3', 'até 1,1', v => v > 1.3, v => v > 1.1],
-  ['Ácido úrico', 'mg/dL', '3,5 a 7,2', '< 6', v => v > 7.2, v => v >= 6],
+  ['Creatinina', 'mg/dL', '0,7 a 1,3', 'até 1,1', v => v < 0.7 || v > 1.3, v => v > 1.1],
+  ['Ácido úrico', 'mg/dL', '3,5 a 7,2', '< 6', v => v < 3.5 || v > 7.2, v => v >= 6],
   ['Ferritina', 'ng/mL', '30 a 400', '50 a 150', v => v > 400 || v < 30, v => v < 50 || v > 150],
 ];
 // Unidades equivalentes evitam que a mesma grandeza apareça como dois itens
@@ -4030,6 +4030,80 @@ function textoEvolucaoExame(g){
   const t=g.tend,pct=Math.abs(t.pct),quanto=pct<2?'praticamente igual':(t.dif>0?'subiu ':'caiu ')+pct.toFixed(0)+'%';
   const rumo=t.rumo>0?' — aproximou do alvo':t.rumo<0?' — afastou do alvo':'';
   return quanto+rumo;
+}
+function lerLaudoImportado(texto){
+  let lista;
+  try{lista=typeof texto==='string'?JSON.parse(texto):texto}catch(e){return {bons:[],descartados:[],erro:'Não consegui ler o JSON do laudo.'}}
+  if(!Array.isArray(lista))return {bons:[],descartados:[],erro:'O arquivo precisa conter uma lista de exames.'};
+  const bons=[],descartados=[];
+  lista.forEach((item,i)=>{
+    const x=item&&typeof item==='object'?item:{};
+    const exame=String(x.exame??x.nome??'').trim();
+    const data=String(x.data??'').trim().slice(0,10);
+    const valor=x.valor==null?'':String(x.valor).trim();
+    const motivo=!exame?'exame sem nome':!dataISOValida(data)?'data inválida':!valor?'resultado vazio':'';
+    if(motivo){descartados.push((exame||'Exame '+(i+1))+': '+motivo);return}
+    const dataProxima=String(x.proximo??'').trim().slice(0,10);
+    bons.push({
+      id:uid(),data,exame,valor,
+      unidade:String(x.unidade??'').trim(),
+      medico:String(x.medico??x.laboratorio??'').trim(),
+      resultado:String(x.resultado??'').trim(),
+      proximo:dataISOValida(dataProxima)?dataProxima:'',
+      obs:String(x.obs??x.observacao??'').trim()
+    });
+  });
+  return {bons,descartados,erro:''};
+}
+function jaTemExame(x,lista=E.exames){
+  return (lista||[]).some(y=>dataISOValida(y.data)&&dataISOValida(x?.data)&&y.data===x.data&&normaliza(y.exame)===normaliza(x.exame));
+}
+function importarExamesRotina(){
+  abrirModal('Importar exames','Cole uma lista JSON para revisar antes de gravar qualquer resultado.',(c,fechar)=>{
+    const s1=el('<div class="secao"></div>');
+    s1.appendChild(el('<p style="margin-top:0;color:var(--suave);font-size:12.5px">Exemplo: <code>[{"data":"2026-09-02","exame":"LDL","valor":94,"unidade":"mg/dL"}]</code></p>'));
+    const area=el('<textarea rows="8" aria-label="Dados do laudo" placeholder="Cole aqui a lista de resultados em JSON"></textarea>');
+    s1.appendChild(area);c.appendChild(s1);
+    const preview=el('<div class="secao" aria-live="polite"></div>');c.appendChild(preview);
+    const footer=el('<div class="secao" style="display:flex;gap:9px;align-items:center"></div>');
+    const cancelar=el('<button class="btn ghost" type="button">Cancelar</button>');cancelar.onclick=fechar;
+    const conferir=el('<button class="btn" type="button">Conferir laudo</button>');
+    footer.append(cancelar,el('<span class="cresce"></span>'),conferir);c.appendChild(footer);
+    let dados={bons:[],descartados:[],erro:''};
+    conferir.onclick=()=>{
+      dados=lerLaudoImportado(area.value);
+      preview.innerHTML='';
+      if(dados.erro){preview.appendChild(el('<p class="form-erro" role="alert"></p>'));preview.querySelector('.form-erro').textContent=dados.erro;return}
+      const resumo=el('<p class="rotina-nota"></p>');
+      resumo.textContent=dados.bons.length+' exame(s) reconhecido(s)'+(dados.descartados.length?' · '+dados.descartados.length+' não entendido(s)':'')+'.';
+      preview.appendChild(resumo);
+      if(dados.descartados.length){const p=el('<p class="rotina-nota"></p>');p.textContent='Não importados: '+dados.descartados.join(' · ');preview.appendChild(p)}
+      const table=document.createElement('table');table.className='tabela';
+      const thead=document.createElement('thead'),hr=document.createElement('tr');
+      ['Adicionar','Exame','Data','Resultado','Situação'].forEach(t=>{const th=document.createElement('th');th.textContent=t;hr.appendChild(th)});
+      thead.appendChild(hr);table.appendChild(thead);
+      const tbody=document.createElement('tbody');
+      dados.bons.forEach((x,i)=>{
+        const tr=document.createElement('tr'),tdCheck=document.createElement('td'),check=document.createElement('input');
+        check.type='checkbox';check.checked=!jaTemExame(x);check.dataset.i=String(i);tdCheck.appendChild(check);tr.appendChild(tdCheck);
+        [x.exame,x.data,x.valor+(x.unidade?' '+x.unidade:'')].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td)});
+        const tdSit=document.createElement('td');tdSit.textContent=jaTemExame(x)?'já registrado nesta data':'novo';tr.appendChild(tdSit);tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);preview.appendChild(table);
+      const atualizarBotao=()=>{
+        const n=[...tbody.querySelectorAll('input[type="checkbox"]')].filter(x=>x.checked).length;
+        adicionar.textContent='Adicionar '+n+' exame'+(n===1?'':'s');adicionar.disabled=n===0;
+      };
+      tbody.addEventListener('change',atualizarBotao);
+      footer.innerHTML='';footer.append(cancelar,el('<span class="cresce"></span>'),adicionar);atualizarBotao();
+    };
+    const adicionar=el('<button class="btn" type="button"></button>');
+    adicionar.onclick=()=>{
+      const checks=[...preview.querySelectorAll('tbody input[type="checkbox"]')];
+      checks.filter(x=>x.checked).forEach(x=>{const item=dados.bons[+x.dataset.i];if(item&&!jaTemExame(item)){E.exames.push(item)}});
+      salvar();fechar();
+    };
+  });
 }
 function novoExameRotina(nome=''){novoRegistroRotina('Novo exame',E.exames,{data:hoje(),exame:nome,valor:'',medico:'',resultado:'',proximo:'',obs:''},[
   {k:'exame',t:'Exame / marcador',obrigatorio:true,ph:'Ex.: Hemograma, LDL ou consulta'},
