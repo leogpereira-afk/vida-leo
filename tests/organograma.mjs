@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import {parseHTML} from 'linkedom';
 const fonte=readFileSync(new URL('../publico/organograma.js',import.meta.url),'utf8');
 const exemplo=()=>({id:'grupo',titulo:'Grupo de teste',nos:[{id:'a',nome:'Antigo',empresaId:'empresa-a',tipo:'Holding',parentId:''},{id:'b',nome:'Empresa B',tipo:'Empresa',parentId:'a',socios:'Pessoa exemplo — 100%',observacoes:'Registro original'},{id:'c',nome:'Equipe',tipo:'Área',parentId:'b'}]});
-function app(estado){const {document,HTMLElement,HTMLSelectElement}=parseHTML('<html><body><main></main><div id="modal"></div></body></html>');Object.defineProperty(HTMLSelectElement.prototype,'value',{configurable:true,get(){return [...this.options].find(o=>o.selected)?.value || this.options[0]?.value || ''},set(v){for(const o of this.options)o.selected=o.value===String(v)}});HTMLElement.prototype.scrollIntoView=function(){};const ctx=vm.createContext({document,console,URL,Date,Math,Set,Map});vm.runInContext(fonte,ctx);const api=ctx.LeoOrganograma,e=estado||{empresasPJ:[{id:'empresa-a',nome:'Atual'}],organogramas:[exemplo()]},calls=[];const contexto={getState:()=>e,save:()=>calls.push('save'),onSelect:id=>calls.push(id),openModal:(titulo,sub,montar)=>{const m=document.querySelector('#modal');m.replaceChildren();const c=document.createElement('div');m.append(c);montar(c,()=>m.replaceChildren())}};return{api,e,document,contexto,calls,render(){return api.render(document.querySelector('main'),contexto)}}}
+function app(estado){const {document,HTMLElement,HTMLSelectElement}=parseHTML('<html><body><main></main><div id="modal"></div></body></html>');Object.defineProperty(HTMLSelectElement.prototype,'value',{configurable:true,get(){return [...this.options].find(o=>o.selected)?.value || this.options[0]?.value || ''},set(v){for(const o of this.options)o.selected=o.value===String(v)}});HTMLElement.prototype.scrollIntoView=function(){};const ctx=vm.createContext({document,console,URL,Date,Math,Set,Map});vm.runInContext(fonte,ctx);const api=ctx.LeoOrganograma,e=estado||{empresasPJ:[{id:'empresa-a',nome:'Atual'}],organogramas:[exemplo()]},calls=[];const contexto={getState:()=>e,save:()=>calls.push('save'),onSelect:id=>calls.push(id),openModal:(titulo,sub,montar)=>{const m=document.querySelector('#modal');m.replaceChildren();const c=document.createElement('div');m.append(c);montar(c,()=>m.replaceChildren())}};return{api,e,document,contexto,calls,ctx,render(){return api.render(document.querySelector('main'),contexto)}}}
 const plain=v=>JSON.parse(JSON.stringify(v));
 test('Setas reordenam irmãos preservando descendentes e original',()=>{
   const {api}=app(),o=exemplo();o.nos.push({id:'d',nome:'Outra empresa',parentId:'a'});
@@ -86,4 +86,23 @@ test('Separar retira ligação e mantém descendentes; raízes podem ser reorden
  assert.equal(a.document.querySelectorAll('.org-arvore>.org-ramo').length,2);
  clicar(a,'+ Empresa separada');enviar(a,{nome:'Independente'});
  assert.equal(a.e.organogramas[0].nos.at(-1).parentId,'');
+});
+
+test('Logo personalizada prevalece no desenho e PDF sem alterar empresa; restaurar só salva ao confirmar',()=>{
+ const a=app(),logo='data:image/png;base64,YWJj';a.e.empresasPJ[0].logo='https://example.com/original.png';a.e.organogramas[0].nos[0].logoPersonalizada=logo;
+ assert.equal(a.api.identificar(a.e.organogramas[0].nos[0],a.e).logo,logo);
+ assert.ok(a.api.htmlExportacao(a.e.organogramas[0],a.e).includes(logo));
+ a.render();clicar(a,'Detalhar');clicar(a,'Editar','.org-no[data-no-id="a"]');clicar(a,'Usar logo do cadastro','#modal');clicar(a,'Cancelar','#modal');assert.equal(a.e.organogramas[0].nos[0].logoPersonalizada,logo);
+ clicar(a,'Editar','.org-no[data-no-id="a"]');clicar(a,'Usar logo do cadastro','#modal');enviar(a,{});
+ assert.equal(a.api.identificar(a.e.organogramas[0].nos[0],a.e).logo,'https://example.com/original.png');assert.equal(a.e.empresasPJ[0].logo,'https://example.com/original.png');
+ a.e.organogramas[0].nos[0].logoPersonalizada='javascript:alert(1)';assert.throws(()=>a.api.validar(a.e.organogramas));
+});
+
+test('Upload aguarda leitura, rejeita arquivo grande e só grava a imagem ao salvar',()=>{
+ const a=app();let reader;a.ctx.FileReader=class{constructor(){reader=this}readAsDataURL(){}};
+ a.render();clicar(a,'Detalhar');clicar(a,'Editar','.org-no[data-no-id="a"]');
+ const input=a.document.querySelector('#modal input[type=file]');input.files=[{type:'image/png',size:1024*1024+1}];input.onchange();assert.match(a.document.querySelector('#modal .org-erro').textContent,/1 MB/);
+ input.files=[{type:'image/png',size:100}];input.onchange();enviar(a,{});assert.match(a.document.querySelector('#modal .org-erro').textContent,/Aguarde/);
+ reader.result='data:image/png;base64,YWJj';reader.onload();assert.equal(a.e.organogramas[0].nos[0].logoPersonalizada,undefined);
+ enviar(a,{});assert.equal(a.e.organogramas[0].nos[0].logoPersonalizada,reader.result);
 });

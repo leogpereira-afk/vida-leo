@@ -22,8 +22,9 @@
       const mapa = new Map();
       for (const n of o.nos) {
         if (!registro(n) || !texto(n.id) || mapa.has(n.id)) throw Error('Cada item precisa de um identificador único.');
-        for (const chave of ['id','tipo','empresaId','nome','nomePersonalizado','parentId','atividade','socios','relacao','observacoes','cnpj','regime','banco','contabilidade','logo','logoFundo']) if (n[chave] != null && typeof n[chave] !== 'string') throw Error('Texto inválido no item: ' + chave + '.');
+        for (const chave of ['id','tipo','empresaId','nome','nomePersonalizado','parentId','atividade','socios','relacao','observacoes','cnpj','regime','banco','contabilidade','logo','logoPersonalizada','logoFundo']) if (n[chave] != null && typeof n[chave] !== 'string') throw Error('Texto inválido no item: ' + chave + '.');
         if (n.logoFundo && !/^#[a-f\d]{6}$/i.test(n.logoFundo)) throw Error('A cor de fundo da logo precisa ser hexadecimal.');
+        if (n.logoPersonalizada && !logoSegura(n.logoPersonalizada)) throw Error('Escolha uma imagem PNG, JPEG ou WebP válida.');
         if (n.logo && !logoSegura(n.logo)) throw Error('A logo precisa ser PNG, JPEG, WebP ou um link HTTPS válido.');
         if (!texto(n.nome) && !texto(n.empresaId)) throw Error('Informe o nome do item ou vincule uma empresa.');
         if (n.tipo && !tipos.includes(n.tipo)) throw Error('Escolha um tipo válido para o item.');
@@ -82,7 +83,7 @@
   function identificar(n, estado, ctx = {}) {
     const empresa = (estado.empresasPJ || []).find(e => e.id === n.empresaId);
     const nome = texto(n.nomePersonalizado) || empresa?.nome || n.nome || 'Empresa não encontrada';
-    const original = empresa?.logo || (empresa && ctx.logo?.(empresa.nome)) || n.logo || '';
+    const original = n.logoPersonalizada || empresa?.logo || (empresa && ctx.logo?.(empresa.nome)) || n.logo || '';
     const logo = logoSegura(original);
     return {nome,logo,logoFundo:original===n.logo && /^#[a-f\d]{6}$/i.test(n.logoFundo||'') ? n.logoFundo : '',empresa,ausente:!!n.empresaId && !empresa};
   }
@@ -254,15 +255,26 @@
       const opcoes=[['','Item livre, sem cadastro vinculado'],...empresas.map(e=>[e.id,e.nome])];
       if(n?.empresaId&&!empresas.some(e=>e.id===n.empresaId))opcoes.push([n.empresaId,(n.nome||'Empresa')+' · cadastro não encontrado']);
       abrir(n?'Editar item':'Adicionar item','A ligação organiza o desenho. Ela não define participação societária.',(c,fechar)=>{
-        const campos=[{nome:'empresaId',rotulo:'Empresa do cadastro',valor:n?.empresaId,opcoes,full:true,dica:'A logo acompanha o cadastro. Você pode personalizar o nome neste card.'},{nome:'nome',rotulo:'Nome do card',valor:n?identificar(n,state(),ctx).nome:'',full:true,placeholder:'Empresa, pessoa, área ou escritório',dica:'Edite livremente. Deixe vazio para usar o nome do cadastro vinculado.'},{nome:'tipo',rotulo:'Tipo',valor:n?.tipo||'Empresa',opcoes:tipos.map(t=>[t,t])},{nome:'parentId',rotulo:'Card superior',dica:'Escolha a quem este card se liga. Os cards abaixo acompanham a mudança. Selecione o topo para remover a ligação superior.',valor:n?.parentId||paiId,opcoes:[['','Separado, sem ligação superior'],...o.nos.filter(x=>!descendentes.has(x.id)).map(x=>[x.id,identificar(x,state(),ctx).nome])]},...['cnpj','regime','banco','contabilidade'].map((chave,i)=>({nome:chave,rotulo:['CNPJ de referência','Regime tributário informado','Banco informado','Contabilidade'][i],valor:n?.[chave],dica:chave==='cnpj'?'Referência do desenho; não altera o cadastro empresarial.':undefined})),{nome:'atividade',rotulo:'Atividade / função',valor:n?.atividade,tipo:'textarea',full:true,rows:2},{nome:'socios',rotulo:'Sócios e composição informada',valor:n?.socios,tipo:'textarea',full:true,dica:'Preencha conforme seus documentos. Não é calculado a partir das linhas do desenho.'},{nome:'relacao',rotulo:'Descrição da ligação (opcional)',valor:n?.relacao,placeholder:'Ex.: contabilidade, gestão, participação informada'},{nome:'percentual',rotulo:'Percentual informado (opcional)',valor:n?.percentual,tipo:'number',dica:'Somente quando essa informação estiver confirmada.'},{nome:'observacoes',rotulo:'Observações',valor:n?.observacoes,tipo:'textarea',full:true}];
-        const {controles}=form(c,fechar,campos,v=>{
+        const campos=[{nome:'empresaId',rotulo:'Empresa do cadastro',valor:n?.empresaId,opcoes,full:true,dica:'Você pode personalizar o nome e a logomarca somente neste card.'},{nome:'nome',rotulo:'Nome do card',valor:n?identificar(n,state(),ctx).nome:'',full:true,placeholder:'Empresa, pessoa, área ou escritório',dica:'Edite livremente. Deixe vazio para usar o nome do cadastro vinculado.'},{nome:'tipo',rotulo:'Tipo',valor:n?.tipo||'Empresa',opcoes:tipos.map(t=>[t,t])},{nome:'parentId',rotulo:'Card superior',dica:'Escolha a quem este card se liga. Os cards abaixo acompanham a mudança. Selecione o topo para remover a ligação superior.',valor:n?.parentId||paiId,opcoes:[['','Separado, sem ligação superior'],...o.nos.filter(x=>!descendentes.has(x.id)).map(x=>[x.id,identificar(x,state(),ctx).nome])]},...['cnpj','regime','banco','contabilidade'].map((chave,i)=>({nome:chave,rotulo:['CNPJ de referência','Regime tributário informado','Banco informado','Contabilidade'][i],valor:n?.[chave],dica:chave==='cnpj'?'Referência do desenho; não altera o cadastro empresarial.':undefined})),{nome:'atividade',rotulo:'Atividade / função',valor:n?.atividade,tipo:'textarea',full:true,rows:2},{nome:'socios',rotulo:'Sócios e composição informada',valor:n?.socios,tipo:'textarea',full:true,dica:'Preencha conforme seus documentos. Não é calculado a partir das linhas do desenho.'},{nome:'relacao',rotulo:'Descrição da ligação (opcional)',valor:n?.relacao,placeholder:'Ex.: contabilidade, gestão, participação informada'},{nome:'percentual',rotulo:'Percentual informado (opcional)',valor:n?.percentual,tipo:'number',dica:'Somente quando essa informação estiver confirmada.'},{nome:'observacoes',rotulo:'Observações',valor:n?.observacoes,tipo:'textarea',full:true}];
+        let logoPersonalizada=n?.logoPersonalizada||'',carregando=false,leitura=0;
+        const {f,controles,erro}=form(c,fechar,campos,v=>{
+          if(carregando)throw Error('Aguarde a imagem terminar de carregar.');
           const emp=(state().empresasPJ||[]).find(e=>e.id===v.empresaId);
           if(v.empresaId&&!emp&&v.empresaId!==n?.empresaId)throw Error('Escolha uma empresa cadastrada.');
-          const valor={...clone(n||{id:id(),ordem:o.nos.length}),...v,nome:emp?.nome||texto(v.nome),nomePersonalizado:emp&&texto(v.nome)!==emp.nome?texto(v.nome):'',percentual:v.percentual===''?'':Number(v.percentual)};
+          const valor={...clone(n||{id:id(),ordem:o.nos.length}),...v,logoPersonalizada,nome:emp?.nome||texto(v.nome),nomePersonalizado:emp&&texto(v.nome)!==emp.nome?texto(v.nome):'',percentual:v.percentual===''?'':Number(v.percentual)};
           mudar(salvarNo(o,valor),o,assinatura);fechar();
         });
+        const bloco=criar('section','org-campo org-campo-full'),rotulo=criar('label','org-campo');rotulo.append(criar('span','','Logomarca do card'));
+        const arquivo=criar('input');arquivo.type='file';arquivo.accept='image/png,image/jpeg,image/webp';rotulo.append(arquivo);
+        const previa=criar('img');previa.alt='Prévia da logomarca';previa.style.cssText='width:80px;height:80px;object-fit:contain;background:#fff;border-radius:10px';
+        const atualizarLogo=()=>{const info=identificar({...n,empresaId:controles.empresaId.value,logoPersonalizada},state(),ctx);previa.hidden=!info.logo;if(info.logo)previa.src=info.logo;else previa.removeAttribute('src')};
+        arquivo.onchange=()=>{const atual=++leitura,file=arquivo.files?.[0];carregando=false;erro.textContent='';if(!file)return;
+          if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>1024*1024){erro.textContent='Escolha PNG, JPEG ou WebP de até 1 MB.';arquivo.value='';return}
+          carregando=true;const reader=new global.FileReader();reader.onload=()=>{if(atual!==leitura||!f.isConnected)return;carregando=false;const valor=String(reader.result||'');if(!logoSegura(valor)){erro.textContent='Não foi possível ler esta imagem.';return}logoPersonalizada=valor;atualizarLogo()};reader.onerror=()=>{if(atual!==leitura)return;carregando=false;erro.textContent='Não foi possível ler esta imagem. Tente novamente.'};reader.readAsDataURL(file);
+        };
+        bloco.append(rotulo,criar('small','','PNG, JPEG ou WebP, até 1 MB. A alteração será aplicada somente ao salvar este card.'),previa,botao('Usar logo do cadastro',()=>{leitura++;carregando=false;logoPersonalizada='';arquivo.value='';erro.textContent='';atualizarLogo()}));f.insertBefore(bloco,f.children[2]);atualizarLogo();
         let empresaAnterior=empresas.find(e=>e.id===n?.empresaId);
-        controles.empresaId.onchange=()=>{const e=empresas.find(e=>e.id===controles.empresaId.value);if(e&&(!texto(controles.nome.value)||controles.nome.value===empresaAnterior?.nome))controles.nome.value=e.nome;empresaAnterior=e;};
+        controles.empresaId.onchange=()=>{const e=empresas.find(e=>e.id===controles.empresaId.value);if(e&&(!texto(controles.nome.value)||controles.nome.value===empresaAnterior?.nome))controles.nome.value=e.nome;empresaAnterior=e;atualizarLogo();};
       });
     }
     function excluirNo(o,n) {
