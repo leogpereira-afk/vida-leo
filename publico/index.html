@@ -637,7 +637,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 }
 </style>
 <link rel="stylesheet" href="./refinamento.css?v=35e03ac04929">
-<link rel="stylesheet" href="empresas.css?v=0ea7409f14e0">
+<link rel="stylesheet" href="empresas.css?v=bcdeafb48bba">
 <link rel="stylesheet" href="organograma.css?v=5075861ba133">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
@@ -1069,7 +1069,7 @@ const SEED={
   norte:{proposito:'',valores:'',legado:''},
   roda:{},desenvolvimento:{fontes:[],leituras:[],revisoes:[],reflexoes:[],validacoes:[]},rituais:[],instrucoes:[],protecao:[],planoAno:[],pdi:[],livros:[],bancos:[],liderancas:[],empresasPJ:[],patrimonio:[],
   oportunidades:[],
-  estrategia:{},planejamentoEmpresas:[],organogramas:[],
+  estrategia:{},planejamentoEmpresas:[],organogramas:[],contabilidades:[],
   comportamento:{temperamentos:{},disc:{},discAdaptado:{},big5:{},valores:{},lideranca:{},
     tipoJung:'',tracoPrincipal:'',motivadorPrincipal:'',motivadorSecundario:'',medos:'',
     positividade:'',estima:'',flexibilidade:'',fonteLaudo:'',eneagramaTipo:'',comoDecido:'',oQueMeMove:'',comoMeRecarrego:'',meusPontosCegos:'',comoMeAjudar:'',numerologia:'',perfilDisc:'',eneagrama:'',bigfive:''},
@@ -1131,7 +1131,7 @@ function carregar(){
   const base=structuredClone(SEED);
   const d=(s&&s.viagens)?{...base,...s}:base;
   // migração: todo registro precisa de id estável (arquivos são ligados por ele)
-  for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','queixas','consultas','fisio','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades','obras','obraAportes','contas','empreend','casas','reservas'])
+  for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','queixas','consultas','fisio','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','contabilidades','empresasPJ','patrimonio','oportunidades','obras','obraAportes','contas','empreend','casas','reservas'])
     (d[k]||[]).forEach(x=>{if(!x.id)x.id=uid()});
   d.viagens.forEach(v=>{if(!Array.isArray(v.custos))v.custos=[];
     if(!Array.isArray(v.passagens))v.passagens=[];
@@ -1169,7 +1169,7 @@ function carregar(){
   if(!Array.isArray(d.obraM2Fora))d.obraM2Fora=[];
   // objetos únicos: garante que existam mesmo em backup antigo
   for(const k of ['sos','norte','roda','perfil','comportamento']) d[k]={...structuredClone(SEED[k]),...(d[k]||{})};
-  for(const k of ['vitais','vacinas','histFamiliar','rastreios','queixas','consultas','fisio','rituais','instrucoes','seguros','planos','casa','protecao','planoAno','pdi','livros','bancos','empresasPJ','patrimonio','oportunidades']) if(!Array.isArray(d[k])) d[k]=[];
+  for(const k of ['vitais','vacinas','histFamiliar','rastreios','queixas','consultas','fisio','rituais','instrucoes','seguros','planos','casa','protecao','planoAno','pdi','livros','bancos','contabilidades','empresasPJ','patrimonio','oportunidades']) if(!Array.isArray(d[k])) d[k]=[];
   if(!Array.isArray(d.planejamentoEmpresas))d.planejamentoEmpresas=[];
   d.planejamentoEmpresas.forEach(p=>{if(!p.id)p.id=uid()});
   // toda oportunidade tem uma lista de links, mesmo que vazia
@@ -9626,7 +9626,18 @@ function bancoModal(b,origem){
   const defs=[{k:'banco',t:'Banco',req:true,grupo:'Identificação'},{k:'titular',t:'Titular',req:true,sugestoes:(E.empresasPJ||[]).map(e=>e.nome)},
     {k:'codigoBanco',t:'Código do banco',ph:'3 dígitos',ajuda:'Número do banco, diferente da agência e da conta.'},{k:'doc',t:'CPF / CNPJ do titular'},{k:'tipo',t:'Tipo de conta',opcoes:['',...CFG('tiposContaBanco')]},
     {k:'agencia',t:'Agência',grupo:'Conta e PIX'},{k:'conta',t:'Conta com dígito'},{k:'pix',t:'Chave PIX'},{k:'pixTipo',t:'Tipo da chave',opcoes:['','CNPJ','CPF','E-mail','Telefone','Aleatória','Conta e agência']},
-    {k:'gerente',t:'Gerente / contato',grupo:'Contato e observações'},{k:'telefone',t:'Telefone'},{k:'obs',t:'Observações',tipo:'textarea',full:true}];
+    {k:'gerente',t:'Gerente / contato',grupo:'Contato e observações'},{k:'telefone',t:'Telefone'},
+    {k:'contabilidadeId',t:'Contabilidade',opcoes:['',...(E.contabilidades||[]).map(x=>x.id)],
+     ajuda:(E.contabilidades||[]).length?'Cadastre na aba Contabilidade para aparecer aqui.':'Nenhuma cadastrada ainda: use a aba Contabilidade.'},
+    {k:'obs',t:'Observações',tipo:'textarea',full:true}];
+  const aoAbrir=editor=>{
+    /* O select guarda o ID e mostra o NOME: id manda, nome só exibe. Vínculo
+       para uma contabilidade apagada aparece dito, nunca em branco. */
+    const sel=editor&&editor.controles&&editor.controles.contabilidadeId;
+    if(!sel)return;
+    for(const opt of sel.options)if(opt.value)
+      opt.textContent=contabilidadePorId(opt.value)?.nome||'Contabilidade não encontrada · confira o vínculo';
+  };
   empresaFormulario(novo?'Nova conta':'Editar conta','Banco e titular são obrigatórios. Agência, conta e PIX são opcionais. Não registre senhas.',defs,registro,(v,patch)=>{
     if(v.codigoBanco&&!/^\d{3}$/.test(v.codigoBanco))throw Error('Informe o código do banco com 3 dígitos.');
     const emp=empresaPorId(registro.empresaId);if(emp&&normaliza(v.titular)!==normaliza(emp.nome))throw Error('O titular está vinculado à empresa '+emp.nome+'. Altere o nome na ficha da empresa.');
@@ -9635,7 +9646,7 @@ function bancoModal(b,origem){
     patch.camposEditadosCentral=[...new Set([...(registro.camposEditadosCentral||[]),...Object.keys(patch)])];
     if(origem?.id)patch.origemGestao=origem.id;
     financeiroSalvarRegistro(E.bancos,registro,{...v,...patch},patch);rr('bancos')();
-  });
+  },aoAbrir);
 }
 function bancoSalvarLogo(b,logo){
   if(!E.bancos.includes(b))throw Error('O cadastro mudou. Abra a conta novamente.');
@@ -9734,11 +9745,144 @@ function numeroWhatsapp(tel){
   return '';
 }
 
+/* ===================== CONTABILIDADE =====================
+   São poucas, e o que se precisa delas é sempre a mesma coisa: quem é, com
+   quem falar e como falar. Por isso o cartão é o mesmo do banco — logo, nome,
+   contato e WhatsApp — e o vínculo mora no BANCO, não aqui: a pergunta que
+   aparece na vida real é "quem cuida da contabilidade desta conta?". */
+function contabilidadePorId(id){return (E.contabilidades||[]).find(x=>x.id===id)||null}
+function contabilidadeModal(x,novo=false){
+  const registro=x||{id:uid(),_ffNovo:true};
+  const defs=[
+    {k:'nome',t:'Contabilidade',req:true,grupo:'Identificação',ph:'Nome do escritório'},
+    {k:'responsavel',t:'Responsável / contato'},
+    {k:'telefone',t:'Telefone'},{k:'email',t:'E-mail'},
+    {k:'doc',t:'CNPJ'},{k:'crc',t:'CRC'},
+    {k:'onde',t:'Onde fica',grupo:'Outros'},
+    {k:'obs',t:'Observações',tipo:'textarea',full:true},
+  ];
+  empresaFormulario(novo?'Nova contabilidade':'Editar contabilidade',
+    'Só o nome é obrigatório. Não registre senhas nem certificados.',defs,registro,(v,patch)=>{
+      if((E.contabilidades||[]).some(y=>y.id!==registro.id&&normaliza(y.nome)===normaliza(v.nome)))
+        throw Error('Já existe uma contabilidade com esse nome.');
+      financeiroSalvarRegistro(E.contabilidades,registro,{...v,...patch},patch);rr('bancos')();
+    });
+}
+function contabilidadeExcluir(x){
+  /* VÍNCULO NÃO SOME CALADO. Apagar a contabilidade deixaria bancos apontando
+     para um id que não existe mais, e o cartão diria "—" sem explicar. */
+  const presos=(E.bancos||[]).filter(b=>b.contabilidadeId===x.id);
+  if(!confirm('Apagar “'+(x.nome||'contabilidade')+'”?'+
+    (presos.length?'\n\n'+presos.length+' conta(s) estão vinculadas a ela e ficam sem contabilidade.':'')))return;
+  E.contabilidades=(E.contabilidades||[]).filter(y=>y.id!==x.id);
+  for(const b of presos)delete b.contabilidadeId;
+  salvar();rr('bancos')();
+}
+function contatoWhatsappHTML(tel,classe){
+  if(!tel)return null;
+  const zap=numeroWhatsapp(tel),so=String(tel).replace(/[^\d+]/g,'');
+  if(!zap)return el('<a class="'+classe+'" href="tel:'+esc(so)+'"><i aria-hidden="true">📞</i>'+esc(tel)+'</a>');
+  const a=el('<a class="'+classe+' banco-zap" target="_blank" rel="noopener noreferrer"><i aria-hidden="true">💬</i>'+esc(tel)+'</a>');
+  a.href='https://wa.me/'+zap;a.title='Abrir conversa no WhatsApp';
+  const lig=el('<a class="banco-ligar">ligar</a>');lig.href='tel:'+so;a.appendChild(lig);
+  return a;
+}
+function painelContabilidade(cx){
+  const lista=(E.contabilidades||[]).slice().sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'));
+  const topo=el('<div class="bancos-origem"></div>');
+  topo.appendChild(el('<p><b>'+lista.length+'</b> contabilidade(s) · vincule cada conta à sua dentro do cartão do banco</p>'));
+  topo.appendChild(acao('+ Nova contabilidade',()=>contabilidadeModal(null,true),'ghost mini'));
+  cx.appendChild(topo);
+  const grade=el('<div class="bancos-grade"></div>');cx.appendChild(grade);
+  if(!lista.length){grade.appendChild(el('<p class="empresa-nota">Nenhuma contabilidade cadastrada. Cadastre a primeira para poder vincular às contas.</p>'));return}
+  for(const x of lista){
+    const marca=marcaDe(x.nome||'');
+    const contas=(E.bancos||[]).filter(b=>b.contabilidadeId===x.id);
+    const card=el('<article class="banco-card"><header><span class="banco-icone"></span><div>'
+      +'<h2>'+esc(x.nome||'Sem nome')+'</h2>'
+      +(x.responsavel?'<p>'+esc(x.responsavel)+'</p>':'')
+      +'</div></header><dl class="banco-dados-rapidos"></dl><div class="banco-contato"></div></article>');
+    const icone=card.querySelector('.banco-icone');
+    if(marca.logo){const img=el('<img alt="Logo de '+esc(x.nome||'')+'">');img.src=marca.logo;icone.replaceChildren(img)}
+    else{icone.classList.add('banco-icone-texto');icone.style.background=marca.cor;
+      icone.style.color=/^#[0-9a-f]{6}$/i.test(marca.cor)?corTextoSobre(marca.cor):'#fff';
+      icone.textContent=iniciaisDe(x.nome||'?')}
+    const dl=card.querySelector('dl');
+    for(const [t,v] of [['CNPJ',x.doc],['CRC',x.crc],['Onde',x.onde]])
+      if(v)dl.appendChild(el('<div><dt>'+t+'</dt><dd>'+esc(v)+'</dd></div>'));
+    const contato=card.querySelector('.banco-contato');
+    const fone=contatoWhatsappHTML(x.telefone,'banco-fone');
+    if(fone)contato.appendChild(fone);
+    if(x.email){const a=el('<a class="banco-fone"><i aria-hidden="true">✉️</i>'+esc(x.email)+'</a>');a.href='mailto:'+x.email;contato.appendChild(a)}
+    /* Quantas contas ela cuida é o dado que diz se o cadastro está em uso. */
+    contato.appendChild(el('<span class="'+(contas.length?'banco-gerente':'banco-sem-contato')+'">'
+      +(contas.length?'<i aria-hidden="true">🏦</i>'+contas.length+' conta(s) vinculada(s)':'Nenhuma conta vinculada ainda')+'</span>'));
+    /* Mesmo padrão do cartão do banco: as ações moram em Detalhes, para o
+       cartão ficar de leitura e não de botões. */
+    const det=el('<details class="banco-detalhes"><summary>Detalhes</summary><div class="banco-detalhes-corpo"><dl></dl><footer></footer></div></details>');
+    card.appendChild(det);
+    if(x.obs)det.querySelector('dl').appendChild(el('<div><dt>Observações</dt><dd>'+esc(x.obs)+'</dd></div>'));
+    if(contas.length)det.querySelector('dl').appendChild(el('<div><dt>Contas vinculadas</dt><dd>'
+      +contas.map(b=>esc((b.banco||'banco')+' · '+(b.titular||''))).join('<br>')+'</dd></div>'));
+    const at=det.querySelector('footer');
+    at.appendChild(acao('Editar',()=>contabilidadeModal(x),'ghost mini'));
+    at.appendChild(acao(marca.logo?'Trocar logo':'Pôr a logo',()=>contabilidadeModalLogo(x),'ghost mini'));
+    at.appendChild(acao('Excluir',()=>contabilidadeExcluir(x),'ghost mini'));
+    grade.appendChild(card);
+  }
+}
+/* A logo usa o MESMO registro de marcas do resto do app (E.marcas por nome):
+   uma contabilidade que também é empresa cadastrada já vem com a marca certa. */
+function contabilidadeModalLogo(x){
+  abrirModal('Logomarca da contabilidade',esc(x.nome||''),(c,fechar)=>{
+    c.classList.add('empresa-modal');
+    const atual=marcaDe(x.nome||'').logo;
+    const sec=el('<div class="secao"></div>');
+    sec.appendChild(el('<p class="ff-note">PNG de até 300 KB. A marca fica guardada pelo NOME, e vale em toda a Central.</p>'));
+    if(atual){const p=el('<p><img alt="Logo atual" style="max-width:150px;max-height:80px;object-fit:contain"></p>');p.querySelector('img').src=atual;sec.appendChild(p)}
+    const inp=el('<input type="file" accept="image/png">');sec.appendChild(inp);
+    const acoes=el('<div class="secao" style="display:flex;gap:9px"></div>');
+    inp.onchange=()=>{
+      const f=inp.files&&inp.files[0];if(!f)return;
+      if(f.size>300*1024){alert('Escolha um PNG de até 300 KB.');return}
+      const fr=new FileReader();
+      fr.onload=()=>{try{empresaSalvarLogo({id:x.id,nome:x.nome},String(fr.result));fechar();rr('bancos')()}
+        catch(e){alert(e.message||'Não consegui salvar a logo.')}};
+      fr.onerror=()=>alert('Não consegui ler o arquivo.');
+      fr.readAsDataURL(f);
+    };
+    if(atual){const tirar=el('<button type="button" class="btn ghost">Tirar a logo</button>');
+      tirar.onclick=()=>{try{empresaSalvarLogo({id:x.id,nome:x.nome},'');fechar();rr('bancos')()}catch(e){alert(e.message)}};
+      acoes.appendChild(tirar)}
+    const ok=el('<button type="button" class="btn ghost">Fechar</button>');ok.onclick=fechar;acoes.appendChild(ok);
+    c.appendChild(sec);c.appendChild(acoes);
+  });
+}
+
 async function vBancos(m){
   m.classList.add('workspace-layout','bancos-layout');const topo=cab('Bancos','Contas, titulares e chaves PIX em um só lugar.');topo.appendChild(acao('+ Nova conta',()=>bancoModal()));m.appendChild(topo);
   const busca=el('<div class="bancos-filtros"><label>Buscar conta<input type="search" aria-label="Buscar conta" placeholder="Banco, titular, agência, conta ou PIX"></label><div class="bancos-escopo"></div></div>');
   busca.querySelector('label').firstChild.textContent='';busca.querySelector('label').classList.add('bancos-busca-topo');topo.insertBefore(busca.querySelector('label'),topo.lastElementChild);
-  const input=topo.querySelector('input');input.value=filtro.bancoBusca||'';m.appendChild(busca);const lista=el('<div class="bancos-conteudo" aria-live="polite"></div>');m.appendChild(lista);
+  const input=topo.querySelector('input');input.value=filtro.bancoBusca||'';
+  /* TRÊS ABAS (pedido do dono, 24/09/2026). Bancos, Contabilidade e
+     Organograma respondem à mesma pergunta — "quem cuida do dinheiro e de
+     quem é cada coisa" — e estavam em telas diferentes. O organograma
+     CONTINUA também dentro de Empresas: ele é o mesmo componente, lido do
+     mesmo E.organogramas, então tirar de lá tiraria de quem já usava. */
+  const abaAtual=['bancos','contabilidade','organograma'].includes(filtro.bancoAba)?filtro.bancoAba:'bancos';
+  const abas=abasWorkspace(m,'bancos',[['bancos','🏦 Bancos'],['contabilidade','🧾 Contabilidade'],['organograma','🗂 Organograma']],
+    abaAtual,id=>{filtro.bancoAba=id;rr('bancos')()});
+  if(abaAtual==='contabilidade'){painelContabilidade(abas.paineis.contabilidade);return}
+  if(abaAtual==='organograma'){
+    if(typeof LeoOrganograma==='undefined'){abas.paineis.organograma.appendChild(el('<p class="empresa-nota">Não foi possível carregar o organograma. Atualize a página para tentar novamente.</p>'));return}
+    LeoOrganograma.render(abas.paineis.organograma,{getState:()=>E,save:salvar,
+      openModal:(titulo,sub,montar)=>abrirModal(esc(titulo),esc(sub),montar),openCompany:empresaAbrir,
+      logo:nome=>marcaDe(nome).logo,selectedId:filtro.empresaOrganogramaId||'',
+      onSelect:id=>{filtro.empresaOrganogramaId=id}});
+    return;
+  }
+  const alvo=abas.paineis.bancos;
+  alvo.appendChild(busca);const lista=el('<div class="bancos-conteudo" aria-live="polite"></div>');alvo.appendChild(lista);
   input.oninput=()=>{filtro.bancoBusca=input.value;pintar()};
   function pintar(){
     if(!m.isConnected)return;lista.replaceChildren();
@@ -9769,7 +9913,7 @@ async function vBancos(m){
       const card=el('<article class="banco-card"><header><span class="banco-icone"></span><div>'
         +'<h2>'+esc(b.banco||'Banco não informado')+'</h2>'
         +'<p>'+esc(b.titular||'Titular não informado')+'</p></div></header>'
-        +'<dl class="banco-dados-rapidos"></dl><div class="banco-contato"></div><div class="banco-atalhos"></div></article>');
+        +'<dl class="banco-dados-rapidos"></dl><div class="banco-contato"></div></article>');
       const icone=card.querySelector('.banco-icone');
       const marca=marcaDoBanco(b),cod=codigoDoBanco(b);
       if(marca.logo){
@@ -9825,17 +9969,44 @@ async function vBancos(m){
         }
       }
       if(!b.gerente&&!b.telefone)contato.appendChild(el('<span class="banco-sem-contato">Sem gerente ou telefone cadastrado</span>'));
+      /* A CONTABILIDADE DESTA CONTA, com logo, nome e contato — que é o que o
+         dono pediu: saber de quem é o telefone sem sair do cartão do banco.
+         Vínculo apontando para cadastro apagado é DITO, nunca mostrado em
+         branco: id órfão que vira traço esconde o problema. */
+      if(b.contabilidadeId){
+        const ct=contabilidadePorId(b.contabilidadeId);
+        const cx=el('<div class="banco-contabil"></div>');
+        if(!ct)cx.appendChild(el('<span class="banco-sem-contato">Contabilidade não encontrada · confira o vínculo</span>'));
+        else{
+          const mc=marcaDe(ct.nome||'');
+          const selo=el('<span class="banco-contabil-logo" aria-hidden="true"></span>');
+          if(mc.logo){const img=el('<img alt="">');img.src=mc.logo;selo.appendChild(img)}
+          else{selo.style.background=mc.cor;
+            selo.style.color=/^#[0-9a-f]{6}$/i.test(mc.cor)?corTextoSobre(mc.cor):'#fff';
+            selo.textContent=iniciaisDe(ct.nome||'?')}
+          cx.appendChild(selo);
+          const txt=el('<span class="banco-contabil-txt"><b></b></span>');
+          txt.querySelector('b').textContent=ct.nome||'Contabilidade';
+          if(ct.responsavel)txt.appendChild(el('<small>'+esc(ct.responsavel)+'</small>'));
+          cx.appendChild(txt);
+          const fone=contatoWhatsappHTML(ct.telefone,'banco-fone banco-contabil-fone');
+          if(fone)cx.appendChild(fone);
+        }
+        contato.appendChild(cx);
+      }
       const rapido=card.querySelector('dl');
       for(const [t,v]of [['Agência',b.agencia],['Conta',b.conta],['PIX',b.pix]]){const d=el('<div><dt>'+t+'</dt><dd></dd></div>');if(v){const c=acao(v,()=>bancoCopiar(v,c),'ghost mini');c.title='Copiar '+t;d.querySelector('dd').appendChild(c)}else d.querySelector('dd').textContent='—';rapido.appendChild(d)}
-      const copiar=acao('Copiar',()=>bancoCopiar(bancoTexto(b),copiar),'ghost mini');copiar.title='Copiar dados bancários';card.querySelector('.banco-atalhos').appendChild(copiar);
+      /* "Copiar" e "Pôr a logo" saíram do corpo do cartão (pedido do dono,
+         24/09/2026: ficavam agressivos). Moram no rodapé de Detalhes, junto
+         com Editar e Excluir — e o rodapé já tinha um "Copiar dados", então
+         eram dois botões para a mesma coisa. */
       const detalhes=el('<details class="banco-detalhes"><summary>Detalhes</summary><div class="banco-detalhes-corpo"><dl></dl><footer></footer></div></details>');card.appendChild(detalhes);
       for(const [t,v]of [['Origem',b._fonte],['Código do banco',b.codigoBanco],['Tipo de conta',b.tipo],['CPF / CNPJ',b.doc],['Tipo do PIX',b.pixTipo],['Gerente',b.gerente],['Telefone',b.telefone],['Observações',b.obs]])if(v)detalhes.querySelector('dl').appendChild(el('<div><dt>'+esc(t)+'</dt><dd>'+esc(v)+'</dd></div>'));
       if(b._local&&b._gestao&&normaliza(b._local.titular||'')!==normaliza(b._gestao.titular||''))detalhes.querySelector('dl').appendChild(el('<div class="banco-nomes-cadastro"><dt>Nomes nos cadastros</dt><dd>Central: '+esc(b._local.titular||'não informado')+'<br>Gestão Impresilk: '+esc(b._gestao.titular||'não informado')+'</dd></div>'));
       const rodape=detalhes.querySelector('footer');const copiarTudo=acao('Copiar dados',()=>bancoCopiar(bancoTexto(b),copiarTudo),'ghost mini');rodape.appendChild(copiarTudo);
-      if(b._local){rodape.appendChild(acao('Editar',()=>bancoModal(b._local,b._gestao),'ghost mini'));rodape.appendChild(acao('Excluir cadastro',()=>bancoExcluir(b._local),'ghost mini'));
-        /* No cartão, não escondido: sem logo o crachá é o número, e o caminho
-           para trocar isso tem de estar onde se vê a falta. */
-        card.querySelector('.banco-atalhos').appendChild(acao(b.logo?'Trocar logo':'Pôr a logo',()=>bancoModalLogo(b._local),'ghost mini'));}
+      if(b._local){rodape.appendChild(acao('Editar',()=>bancoModal(b._local,b._gestao),'ghost mini'));
+        rodape.appendChild(acao(marca.logo?'Trocar logo':'Pôr a logo',()=>bancoModalLogo(b._local),'ghost mini'));
+        rodape.appendChild(acao('Excluir cadastro',()=>bancoExcluir(b._local),'ghost mini'));}
       else rodape.appendChild(acao('Guardar na Central',()=>bancosConferirImportacao([b._gestao]),'ghost mini'));
       grade.appendChild(card);
     }
@@ -9975,8 +10146,10 @@ function empresaSalvarFicha(emp,novo,v,patch=v){
   if(nome!==emp.nome&&!renomeiaEmpresa(emp.nome,nome,emp))throw Error('Não foi possível renomear. Confira os vínculos dessa empresa.');
   Object.assign(emp,patch,{nome});salvar();return emp;
 }
-function empresaFormulario(titulo,sub,defs,obj,gravar){
-  abrirModal(titulo,sub,(c,fechar)=>{c.classList.add('empresa-modal');const editor=financeiroFormulario(c,defs,obj,gravar,fechar);if(defs.some(d=>d.grupo)){const campos=editor.form.querySelector('.ff-fields');let grupo;for(const d of defs){const campo=editor.controles[d.k].closest('.ff-field');if(d.grupo){grupo=el('<fieldset class="empresa-form-grupo"><legend></legend></fieldset>');grupo.querySelector('legend').textContent=d.grupo;campos.appendChild(grupo)}grupo.appendChild(campo)}}});
+/* `aoMontar` é opcional e recebe o editor pronto: serve para o select que
+   guarda ID e precisa mostrar NOME. Quem não passa nada não muda em nada. */
+function empresaFormulario(titulo,sub,defs,obj,gravar,aoMontar){
+  abrirModal(titulo,sub,(c,fechar)=>{c.classList.add('empresa-modal');const editor=financeiroFormulario(c,defs,obj,gravar,fechar);if(defs.some(d=>d.grupo)){const campos=editor.form.querySelector('.ff-fields');let grupo;for(const d of defs){const campo=editor.controles[d.k].closest('.ff-field');if(d.grupo){grupo=el('<fieldset class="empresa-form-grupo"><legend></legend></fieldset>');grupo.querySelector('legend').textContent=d.grupo;campos.appendChild(grupo)}grupo.appendChild(campo)}}if(aoMontar)aoMontar(editor)});
 }
 function empresaModalFicha(emp){
   const novo=!emp;emp=emp||{id:uid(),nome:'',status:'Ativa'};
