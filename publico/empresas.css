@@ -7,7 +7,7 @@
 .empresas-opcoes{display:grid;gap:5px;margin-top:12px}
 .empresa-opcao{display:flex;align-items:center;gap:10px;padding:12px 9px;border:1px solid transparent;border-radius:10px;background:transparent;text-align:left;font:inherit;cursor:pointer;color:var(--tinta);min-width:0;width:100%}
 .empresa-opcao>span:last-child{min-width:0;overflow-wrap:anywhere}.empresa-opcao b{display:block;font-size:14px}.empresa-opcao small{display:block;color:var(--suave);font-size:11px;margin-top:4px}
-.empresa-opcao.selecionada{background:var(--verde-cl);border-color:var(--verde);color:var(--verde)}
+.empresa-opcao.selecionada{background:var(--verde-claro,#e6f2ee);border-color:var(--verde);color:var(--verde)}
 .empresa-inicial{display:grid;place-items:center;width:32px;height:32px;flex:none;background:var(--bg);border-radius:9px;font-weight:700}
 .empresa-inicial{overflow:hidden}.empresa-inicial img{display:block;width:100%;height:100%;object-fit:contain;background:#fff}
 .empresa-identidade{display:flex;align-items:center;gap:16px}.empresa-identidade>div{min-width:0}.empresa-logo-cabecalho{width:76px;height:76px;font-size:25px;border:1px solid var(--linha);border-radius:16px}
@@ -34,132 +34,11 @@
 .empresas-layout .btn,.empresa-modal .btn{font-family:inherit}
 
 .empresa-form-grupo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-column:1/-1;gap:14px 18px;border:0;border-top:1px solid var(--linha);padding:18px 0 6px;margin:8px 0 0;min-width:0}.empresa-form-grupo legend{font-size:14px;font-weight:700;color:var(--verde);padding-right:12px}.empresa-form-grupo>.ff-field{min-width:0}@media(max-width:600px){.empresa-form-grupo{grid-template-columns:minmax(0,1fr)}}
-/* Navegação de direção: um contexto, uma linha de empresas e conteúdo útil. */
-.empresas-layout .topo{margin-bottom:16px}.empresas-layout .topo h1{font-size:30px}.empresas-layout .topo p{font-size:14px;margin-top:6px}
-.empresas-seletor{margin-bottom:16px;min-width:0}
-.empresas-seletor-topo{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:8px}
-.empresas-seletor-topo>span{font-size:11px;font-weight:700;letter-spacing:.09em;color:var(--suave)}.empresas-seletor-topo b{letter-spacing:0;margin-left:5px;color:var(--verde)}
-.empresas-seletor-topo label{width:220px}.empresas-seletor input{width:100%;box-sizing:border-box;padding:8px 11px;border:1px solid var(--linha);border-radius:8px;background:var(--card);color:var(--tinta);font:inherit;font-size:13px}
-.empresas-trilho{display:flex;align-items:center;gap:6px;min-width:0}.empresas-chips{display:flex;gap:6px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:thin;padding:4px 2px 8px;scroll-snap-type:x proximity}
-.empresas-chips .empresa-opcao{flex:none;width:auto;min-height:44px;max-width:280px;padding:8px 11px;gap:8px;border:1px solid var(--linha);border-radius:8px;background:var(--card);font-size:13px;font-weight:600;scroll-snap-align:start}
-.empresas-chips .empresa-opcao>span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.empresas-chips .empresa-inicial{width:26px;height:26px;border-radius:6px;font-size:12px}
-.empresas-chips .empresa-opcao:hover{border-color:var(--verde)}.empresas-chips .empresa-opcao.selecionada{color:var(--verde);background:var(--verde-cl);border-color:var(--verde);box-shadow:inset 0 -2px var(--verde)}
-.empresas-seta{border:1px solid var(--linha);border-radius:8px;background:var(--card);color:var(--verde);font:inherit;font-size:24px;flex:none;width:32px;height:44px;cursor:pointer}.empresas-seta:disabled{opacity:.3;cursor:default}
-.empresas-seletor .empresa-select-mobile{display:none}
-.empresa-contexto{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:4px 0 12px}.empresa-contexto>div{display:flex;align-items:center;gap:12px;min-width:0}.empresa-contexto h2{font-size:22px;line-height:1.3;margin:0;overflow-wrap:anywhere}.empresa-contexto span{font-size:11px;padding:4px 8px;border-radius:6px;background:var(--verde-cl);color:var(--verde)}.empresa-contexto small{font-size:12px;color:var(--suave);flex:none}
-.empresas-layout>.workspace-tabs{border:0;border-bottom:1px solid var(--linha);border-radius:0;background:transparent;padding:0 0 5px;margin-bottom:16px;gap:4px}.empresas-layout>.workspace-tabs button{min-height:44px;padding:10px 13px;font-size:13px;border-radius:8px}
-.empresas-layout .empresa-secao>header{padding:14px 18px}.empresas-layout .empresa-secao>header h2{font-size:16px}.empresas-layout .empresa-secao-corpo{padding:0 18px 18px}.empresas-layout .empresa-secao{border-radius:12px;margin-bottom:14px}.empresas-layout .empresa-acoes-ficha{margin:0 0 16px}
-.central-metricas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;padding:14px 0;border-bottom:1px solid var(--linha)}
-.central-metrica{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:6px;padding:10px 16px;border:0;border-right:1px solid var(--linha);border-radius:0;background:transparent;color:var(--tinta);font:inherit;cursor:pointer;min-width:0}.central-metrica:first-child{padding-left:0}.central-metrica:last-child{border-right:0}.central-metrica strong{font-size:29px;line-height:1.15}.central-metrica span{font-size:13px;font-weight:600}.central-metrica small{color:var(--suave);font-size:12px;line-height:1.5}.central-metrica:hover{background:var(--verde-cl)}
-.central-resumo-grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:24px;padding-top:20px}.central-resumo-grid h3{font-size:14px;margin:0 0 10px}.central-resumo-grid .empresa-linha{gap:12px;padding:12px 0}.central-resumo-grid .empresa-linha>div{flex-basis:auto}.central-resumo-grid .empresa-nota{margin:8px 0 14px;font-size:13px;line-height:1.6}.central-prioridades>.btn{margin-top:12px}.central-decisoes{border-left:1px solid var(--linha);padding-left:24px}.central-visao{font-size:14px;line-height:1.6;margin:6px 0;color:var(--verde);overflow-wrap:anywhere}.central-completar{display:flex;flex-wrap:wrap;gap:8px;padding-top:8px}.central-completar h4{font-size:12px;color:var(--suave);font-weight:500;margin:0 0 2px;flex-basis:100%}.central-completar .btn{font-size:12px;min-height:38px}
-.central-lideres{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding-top:16px}.central-lider{border:1px solid var(--linha);border-radius:12px;padding:18px;min-width:0;background:var(--bg)}.central-lider h3{margin:10px 0 5px;font-size:18px}.central-lider p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.6;color:var(--suave)}.central-lider p b{color:var(--tinta)}.central-avatar{width:44px;height:44px;font-size:18px;border-radius:12px}.central-avatar img{object-fit:cover}.central-lider .empresa-acoes{margin-top:14px}
-/* Bancos pessoais e empresariais: origem legível e dados fáceis de copiar. */
-.bancos-layout .topo{margin-bottom:20px}.bancos-layout .btn{font-family:inherit}.bancos-filtros label{display:grid;gap:6px;font-size:12px;font-weight:600;max-width:520px}.bancos-filtros input{padding:12px;border:1px solid var(--linha);border-radius:9px;background:var(--card);color:var(--tinta);font:inherit;font-size:14px;min-width:0}.bancos-escopo{display:flex;margin:14px 0 4px}.bancos-escopo select{font:inherit;font-size:13px;max-width:100%;padding:10px;border:1px solid var(--linha);border-radius:8px;background:var(--card);color:var(--tinta)}
-.bancos-origem{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.bancos-origem p{font-size:13px;color:var(--suave)}.bancos-origem b{color:var(--tinta)}.bancos-importar{display:flex;align-items:center;justify-content:space-between;gap:16px;border:1px solid var(--linha);border-radius:10px;background:var(--verde-cl);padding:12px 16px;font-size:13px;line-height:1.5;margin-bottom:18px}.bancos-importar .btn{flex:none}.bancos-erro{font-size:14px;line-height:1.6;color:var(--vermelho);border-left:3px solid currentColor;padding:8px 14px}
-.banco-card{display:flex;flex-direction:column;min-width:0;border:1px solid var(--linha);border-radius:14px;background:var(--card);padding:18px}.banco-card header{display:flex;gap:10px;align-items:flex-start}.banco-card header>div{flex:1;min-width:0}.banco-card h2{font-family:inherit;font-size:18px;font-weight:700;line-height:1.3;margin:0;overflow-wrap:anywhere}.banco-card header p{font-size:13px;color:var(--suave);line-height:1.5;margin:5px 0;overflow-wrap:anywhere}.banco-card header>small{font-size:10px;padding:4px 6px;background:var(--bg);border-radius:5px;color:var(--suave);max-width:95px}.banco-icone{display:grid;place-items:center;width:36px;height:36px;border-radius:9px;background:var(--verde-cl);flex:none}
-.banco-card dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:18px 0}.banco-card dl>div{min-width:0}.banco-card dt{font-size:11px;color:var(--suave);margin-bottom:4px}.banco-card dd{margin:0}.banco-card dd .btn{font-size:13px;font-weight:500;padding:7px 8px;min-height:36px;max-width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere}.banco-card footer{display:flex;justify-content:space-between;gap:8px;margin-top:auto;padding-top:12px;border-top:1px solid var(--linha)}.banco-card details{font-size:13px;margin:12px 0;line-height:1.6;overflow-wrap:anywhere}.banco-card details summary{cursor:pointer;color:var(--suave)}
-.empresas-layout select:focus-visible,.bancos-layout button:focus-visible,.bancos-layout input:focus-visible,.bancos-layout select:focus-visible{outline:3px solid var(--verde);outline-offset:3px}
-@media(max-width:900px){.central-resumo-grid{grid-template-columns:minmax(0,1fr)}.central-decisoes{border-left:0;border-top:1px solid var(--linha);padding:16px 0 0}.central-lideres{grid-template-columns:minmax(0,1fr)}.bancos-grade{grid-template-columns:minmax(0,1fr)}.empresa-contexto{align-items:flex-start}.empresa-contexto>div{flex-wrap:wrap;gap:6px 10px}}
-@media(max-width:600px){.empresas-layout .topo{margin-bottom:12px;gap:12px}.empresas-layout .topo h1{font-size:26px}.empresas-layout .topo p{font-size:13px}.empresas-trilho,.empresas-seletor-topo{display:none}.empresas-seletor .empresa-select-mobile{display:grid;gap:6px;font-size:12px;font-weight:600;color:var(--suave)}.empresa-select-mobile select{width:100%;min-width:0;box-sizing:border-box;min-height:48px;padding:10px 12px;background:var(--card);color:var(--tinta);font:inherit;font-size:14px;border:1px solid var(--verde);border-radius:9px}.empresa-contexto h2{font-size:19px}.empresa-contexto{flex-wrap:wrap;gap:6px}.empresas-layout>.workspace-tabs button{font-size:12px;padding:10px}.empresas-layout .empresa-secao>header{padding:12px 14px}.empresas-layout .empresa-secao-corpo{padding:0 14px 14px}.central-metricas{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px 0;gap:8px 0}.central-metrica{padding:8px 10px!important}.central-metrica:nth-child(2){border-right:0}.central-metrica strong{font-size:25px}.central-metrica span{font-size:12px}.central-metrica small{font-size:11px}.central-resumo-grid{padding-top:16px;gap:18px}.central-resumo-grid .empresa-linha{flex-wrap:nowrap}.bancos-importar{align-items:flex-start;flex-direction:column;gap:10px}.bancos-origem{align-items:flex-start}.banco-card{padding:14px}.banco-card header>small{max-width:60px}.banco-card h2{font-size:17px}.banco-card dl{gap:12px 8px}.banco-card footer .btn{min-height:42px}}
-@media print{.empresas-seletor,.empresas-layout>.workspace-tabs,.central-completar{display:none!important}.central-resumo-grid{grid-template-columns:1fr}.central-decisoes{border-left:0;padding-left:0}.banco-card{break-inside:avoid}.bancos-filtros,.bancos-importar,.bancos-origem button,.banco-card footer{display:none!important}}
 
-.empresa-contexto .empresa-logo-cabecalho{width:32px;height:32px;font-size:12px;border-radius:8px}
-
-.lider-form-grupo{grid-column:1/-1;border-top:1px solid var(--linha);padding-top:12px}.lider-form-grupo summary{font-size:14px;font-weight:600;cursor:pointer;padding:6px 0}.lider-form-grupo>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;padding-top:12px}.lider-form-grupo label{min-width:0}@media(max-width:600px){.lider-form-grupo>div{grid-template-columns:1fr}}
-
-@media(max-width:600px){.empresas-layout>.topo{flex-direction:row;align-items:center;flex-wrap:nowrap}.empresas-layout>.topo>div{min-width:0;flex:1}.empresas-layout>.topo>.btn{flex:none;width:auto;min-height:44px;font-size:12px;padding:10px}.empresas-layout>.workspace-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;max-width:100%;padding-bottom:9px}.empresas-layout>.workspace-tabs button{flex:none;white-space:nowrap}.banco-card footer{flex-wrap:wrap}}
-
-.banco-card .banco-campo-amplo{grid-column:1/-1}@media(max-width:600px){.banco-card dd .btn{min-height:44px}}
-
-.bancos-filtros{display:grid;grid-template-columns:minmax(0,2fr) minmax(190px,1fr);gap:16px;align-items:end}.bancos-filtros label{max-width:none}.bancos-filtros .bancos-escopo{display:block;margin:0}.bancos-filtros select{width:100%;min-height:48px}.central-metrica-alerta strong{color:var(--vermelho)}@media(max-width:600px){.bancos-filtros{grid-template-columns:1fr;gap:12px}}
-
-.banco-titular-origem{font-size:12px;line-height:1.6;padding:10px 12px;border-left:3px solid var(--areia);background:var(--areia-cl);margin:0 0 12px;overflow-wrap:anywhere}
-
-/* Empresas e titulares selecionados diretamente, sem abrir uma lista. */
-.bancos-filtros{display:block}.bancos-filtros>label{max-width:600px}.bancos-filtros .bancos-escopo{margin:16px 0 6px}
-.bancos-empresas{display:flex;flex-wrap:wrap;gap:8px;padding:3px;min-width:0}.banco-empresa-chip{display:flex;align-items:center;gap:9px;min-height:44px;max-width:100%;padding:9px 12px;border:1px solid var(--linha);border-radius:9px;background:var(--card);color:var(--tinta);font:500 13px/1.4 Inter,system-ui,sans-serif;cursor:pointer}.banco-empresa-chip span{overflow-wrap:anywhere}.banco-empresa-chip b{font-size:11px;min-width:23px;padding:2px 6px;border-radius:6px;background:var(--bg);color:var(--suave)}.banco-empresa-chip:hover{border-color:var(--verde)}.banco-empresa-chip[aria-pressed=true]{border-color:var(--verde);background:var(--verde-cl);color:var(--verde);box-shadow:inset 0 -2px var(--verde)}.banco-empresa-chip[aria-pressed=true] b{background:var(--verde);color:var(--card)}
-@media(max-width:600px){.bancos-empresas{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;padding-bottom:9px}.banco-empresa-chip{flex:none;max-width:280px}.banco-empresa-chip span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
-
-/* Consulta enxuta: uma conta por linha; dados complementares sob demanda. */
-.bancos-layout>.topo{gap:18px;margin-bottom:12px;flex-wrap:wrap}.bancos-layout>.topo h1{font-size:27px}.bancos-layout>.topo p{display:none}.bancos-layout .bancos-busca-topo{flex:1;max-width:500px;margin-left:auto}.bancos-busca-topo input{width:100%;padding:10px 12px;font:inherit;font-size:13px;background:var(--card);color:var(--tinta);border:1px solid var(--linha);border-radius:8px}.bancos-filtros .bancos-escopo{margin:0 0 6px}.bancos-empresas{gap:5px;padding:2px}.banco-empresa-chip{min-height:34px;padding:6px 9px;font-size:12px;border-radius:7px;gap:6px}.banco-empresa-chip b{padding:0 4px;min-width:18px;font-size:10px}.bancos-origem{margin:4px 0 10px;justify-content:flex-end;gap:8px}.bancos-origem p{margin-right:auto;font-size:12px}.bancos-origem .btn{font-size:12px;padding:7px 10px}/* CARTOES LADO A LADO (pedido do dono, 24/09/2026: "os bancos ficarem laterais"). Eram uma lista vertical de faixas largas: um banco por linha, e para ver o gerente era preciso abrir o acordeao de cada um. Agora cabem varios na largura, e o que se procura na hora (numero, gerente, telefone) esta no proprio cartao. */
-.bancos-grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;background:transparent;border:0;border-radius:0;overflow:visible}
-/* SELETOR DE EMPRESA NA LATERAL ESQUERDA (pedido do dono, 24/09/2026: "os
-   seletores ainda nao estao a esquerda"). Em cima, a fileira de 11 empresas
-   ocupava duas linhas e empurrava os cartoes para baixo da dobra. Na coluna da
-   esquerda ela vira um indice: fica parada enquanto as contas rolam. */
-.bancos-layout{display:grid;grid-template-columns:236px minmax(0,1fr);gap:20px;align-items:start}
-.bancos-layout>.topo{grid-column:1/-1}
-/* Tudo da lateral num no so: abas em cima, empresas embaixo. */
-.bancos-layout>.bancos-lateral{grid-column:1;grid-row:2;position:sticky;top:12px;display:flex;flex-direction:column;gap:12px;min-width:0}
-.bancos-layout>.workspace-pane{grid-column:2;grid-row:2;min-width:0}
-.bancos-lateral .workspace-tabs{flex-direction:column;flex-wrap:nowrap;gap:2px;margin:0;width:100%}
-.bancos-lateral .workspace-tabs button{width:100%;justify-content:flex-start;text-align:left;padding:10px 12px;font-size:13px}
-.bancos-lateral .bancos-filtros{display:block}
-.bancos-lateral .bancos-escopo{margin:0}
-.bancos-layout .bancos-empresas{flex-direction:column;flex-wrap:nowrap;gap:2px;padding:0;max-height:calc(100vh - 120px);overflow-y:auto}
-.bancos-layout .banco-empresa-chip{width:100%;justify-content:space-between;text-align:left;border:0;background:transparent;border-radius:8px;min-height:38px;padding:8px 10px;font-size:12.5px}
-.bancos-layout .banco-empresa-chip:hover{background:var(--bg)}
-.bancos-layout .banco-empresa-chip[aria-pressed="true"]{background:var(--verde-cl);color:var(--verde);font-weight:600}
-.bancos-layout .banco-empresa-chip span{white-space:normal;overflow-wrap:anywhere}
-/* A lateral so vale quando ha lateral: abaixo disso volta a ser uma fileira. */
-@media(max-width:860px){
-  .bancos-layout{display:block}
-  .bancos-layout>.bancos-lateral{position:static;display:block;margin-bottom:14px}
-  .bancos-lateral .workspace-tabs{flex-direction:row;flex-wrap:wrap;gap:6px;margin-bottom:12px}
-  .bancos-lateral .workspace-tabs button{width:auto}
-  .bancos-layout .bancos-empresas{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:8px;padding-bottom:8px;max-height:none}
-  .bancos-layout .banco-empresa-chip{width:auto;flex:none;border:1px solid var(--linha);background:var(--card);min-height:40px}
-}
-.bancos-grade .banco-card{padding:14px;gap:0}
-.banco-card header{align-items:center;gap:10px}
-.banco-card h2{font-size:15px;line-height:1.25}
-.banco-card header p{font-size:12px;margin:2px 0 0}
-.banco-codigo{display:inline-block;margin:3px 0 0;padding:1px 6px;border-radius:5px;background:var(--bg);color:var(--suave);font-size:10.5px;font-variant-numeric:tabular-nums}
-.banco-codigo i{font-style:normal;opacity:.75}
-/* Deduzido do nome tem cara de deduzido: o numero vai para dentro de uma TED. */
-.banco-codigo-deduzido{background:var(--areia-cl);color:var(--areia)}
-/* As duas marcas se equilibram nas pontas do cabecalho: o banco a esquerda,
-   a empresa a direita, do mesmo tamanho. A empresa vinha em 15px ao lado de
-   uma de 42px e parecia um selo perdido. */
-.banco-titular-logo{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;flex:none;margin-left:auto;border:1px solid var(--linha);border-radius:9px;overflow:hidden;background:#fff}
-.banco-titular-logo img{width:100%;height:100%;object-fit:contain;padding:3px}
-.banco-titular-logo img{width:100%;height:100%;object-fit:contain}
-.banco-icone{width:42px;height:42px;border-radius:10px;overflow:hidden}
-.banco-icone img{width:100%;height:100%;object-fit:contain}
-/* Sem logo cadastrada, o numero do banco vira o cracha: distingue, o emoji nao. */
-.banco-icone-texto{font:700 13px/1 Inter;color:var(--verde);font-variant-numeric:tabular-nums;letter-spacing:.02em}
-.banco-card .banco-dados-rapidos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;margin:12px 0 0}
-.banco-card .banco-dados-rapidos>div:last-child{grid-column:1/-1}
-.banco-card dt{font-size:10px;margin-bottom:1px}
-.banco-card dd{font-size:12.5px;overflow-wrap:anywhere}
-.banco-card dd .btn{border:0;background:transparent;padding:2px 0;font-size:12.5px;min-height:26px;box-shadow:none}
-.banco-card dd .btn:hover{color:var(--verde);text-decoration:underline}
-/* Gerente e telefone a vista: quem precisa ligar nao vai abrir um acordeao. */
-.banco-contato{display:flex;flex-direction:column;gap:4px;margin:12px 0 0;padding-top:10px;border-top:1px solid var(--linha);font-size:12.5px}
-.banco-contato i{font-style:normal;margin-right:6px;opacity:.8}
-.banco-gerente{color:var(--tinta);overflow-wrap:anywhere}
-.banco-fone{color:var(--verde);text-decoration:none;display:inline-flex;align-items:center;gap:0;flex-wrap:wrap}
-/* "ligar" fica discreto ao lado: trocar o telefone pelo WhatsApp nao pode
-   tirar do dono a unica forma de ligar para o gerente. */
-.banco-ligar{margin-left:10px;color:var(--suave);font-size:11.5px;text-decoration:underline}
-.banco-ligar:hover{color:var(--verde)}
-.banco-fone:hover{text-decoration:underline}
-.banco-sem-contato{color:var(--suave);font-size:11.5px}
-/* A contabilidade da conta, dentro do cartao do banco: logo, nome e contato. */
-.banco-contabil{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--linha)}
-.banco-contabil-logo{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;flex:none;border-radius:7px;overflow:hidden;background:#fff;border:1px solid var(--linha);font:700 10px/1 Inter}
-.banco-contabil-logo img{width:100%;height:100%;object-fit:contain;padding:2px}
-.banco-contabil-txt{display:flex;flex-direction:column;min-width:0;font-size:12px;line-height:1.3}
-.banco-contabil-txt small{color:var(--suave);font-size:11px}
-.banco-contabil-fone{margin-left:auto;font-size:12px}
-/* (.banco-atalhos saiu em 24/09/2026: os botoes foram para o rodape de
-   Detalhes, para o cartao ficar de leitura) */
-.banco-detalhes-corpo footer .btn{font-size:12px;padding:7px 9px}
-.banco-detalhes>summary{font-size:12px;padding:6px 0;white-space:nowrap}
-.banco-detalhes-corpo{border-top:1px dashed var(--linha);padding-top:10px}
-.banco-detalhes:not([open])>.banco-detalhes-corpo{display:none}
-.banco-detalhes-corpo dl{grid-template-columns:repeat(2,minmax(0,1fr));margin:0 0 10px}
-.banco-detalhes-corpo footer{justify-content:flex-start;padding-top:10px;flex-wrap:wrap}
-.banco-card .banco-titular-origem{margin:8px 0 0;padding:5px 9px;font-size:11px}
-@media(max-width:1100px){.banco-detalhes-corpo dl{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:600px){.bancos-layout>.topo{display:grid;grid-template-columns:1fr auto;gap:10px}.bancos-layout>.topo>.btn{width:auto;margin:0;font-size:12px}.bancos-layout .bancos-busca-topo{grid-column:1/-1;grid-row:2;width:100%;max-width:none}.bancos-empresas{flex-wrap:nowrap;padding-bottom:7px}.banco-empresa-chip{min-height:40px}.bancos-origem{flex-wrap:wrap;justify-content:flex-start}.bancos-origem p{flex-basis:100%;margin:0}.bancos-grade{grid-template-columns:minmax(0,1fr)}.bancos-grade .banco-card{padding:12px}.banco-detalhes>summary{min-height:40px}.banco-card dd .btn{min-height:36px}.banco-fone{min-height:40px;line-height:40px}.banco-detalhes-corpo dl{grid-template-columns:1fr 1fr}}
+/* Central de direção: resumo legível e contexto de empresa sempre visível. */
+.central-metricas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:18px 0}
+.central-metrica{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:10px;padding:18px;border:1px solid var(--linha);border-radius:14px;background:var(--verde-claro,#edf5f1);color:var(--tinta);font:inherit;cursor:pointer;min-width:0}
+.central-metrica strong{font-size:32px;line-height:1}.central-metrica span{font-size:13px;font-weight:700}.central-metrica small{color:var(--suave);font-size:11px;line-height:1.5}.central-metrica:hover{border-color:var(--verde);transform:translateY(-2px)}
+.central-lideres{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;padding-top:16px}.central-lider{border:1px solid var(--linha);border-radius:16px;padding:20px;min-width:0;background:var(--bg)}.central-lider h3{margin:12px 0 5px;font-size:19px}.central-lider p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.65;color:var(--suave)}.central-lider p b{color:var(--tinta)}.central-avatar{width:54px;height:54px;font-size:20px;border-radius:16px}.central-avatar img{object-fit:cover}.central-lider .empresa-acoes{margin-top:16px}
+@media(max-width:1100px){.central-metricas{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.central-lideres{grid-template-columns:minmax(0,1fr)}.central-metrica{padding:12px}.central-metrica strong{font-size:27px}.central-lider{padding:16px}.empresa-indice .btn{min-height:42px}}
