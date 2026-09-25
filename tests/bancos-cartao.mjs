@@ -45,7 +45,12 @@ test('bancos: número, gerente e telefone ficam no cartão, fora do acordeão', 
   assert.match(card.querySelector('.banco-gerente').textContent, /Fulano de Tal/);
   const fone = card.querySelector('.banco-fone');
   assert.ok(foraDoAcordeao(fone), 'o telefone à vista');
-  assert.equal(fone.getAttribute('href'), 'tel:38999991234', 'e clicável para ligar');
+  /* O toque no número passou a abrir o WHATSAPP (pedido do dono, 24/09/2026).
+     Isto é escolha, não regressão: este teste guardava `tel:` e foi virado de
+     propósito. O link de ligar não sumiu, ficou ao lado — e é isso que as duas
+     asserções abaixo protegem. */
+  assert.equal(fone.getAttribute('href'), 'https://wa.me/5538999991234', 'o número abre o WhatsApp');
+  assert.equal(card.querySelector('.banco-ligar').getAttribute('href'), 'tel:38999991234', 'e ligar continua a um toque');
 });
 
 test('bancos: sem logo, o crachá é o número do banco — emoji igual não distingue', async () => {
@@ -121,4 +126,58 @@ test('bancos: o número no crachá lê em qualquer cor de marca', () => {
     const r = run(`contrasteEntre(${JSON.stringify(cor)},${JSON.stringify(txt === '#fff' ? '#ffffff' : txt)})`);
     assert.ok(r >= 4.5, `${cor} com ${txt} dá ${r.toFixed(2)}:1`);
   }
+});
+
+/* wa.me exige 55 + DDD + número colados. Errar não dá erro na tela: abre
+ * conversa com OUTRA pessoa. O caso ruim vem primeiro. */
+test('whatsapp: número sem DDD não vira link — inventar DDD manda para outra cidade', () => {
+  const {run} = setup();
+  const z = t => run(`numeroWhatsapp(${JSON.stringify(t)})`);
+  assert.equal(z('99918-8350'), '', 'nove dígitos são telefone sem DDD');
+  assert.equal(z('3218-4600'), '', 'oito dígitos idem');
+  assert.equal(z(''), '');
+  assert.equal(z('não tenho'), '');
+  assert.equal(z('1234'), '', 'ramal não é celular');
+});
+
+test('whatsapp: com DDD ganha o 55, e quem já tem não ganha de novo', () => {
+  const {run} = setup();
+  const z = t => run(`numeroWhatsapp(${JSON.stringify(t)})`);
+  assert.equal(z('(38) 99918-8350'), '5538999188350');
+  assert.equal(z('38999188350'), '5538999188350');
+  assert.equal(z('(38) 3218-4600'), '553832184600', 'fixo com DDD também');
+  assert.equal(z('5538999188350'), '5538999188350', 'não duplica o 55');
+  assert.equal(z('+1 415 555 2671'), '14155552671', 'internacional vai como está');
+});
+
+test('bancos: o telefone abre o WhatsApp, e ligar continua a um toque', () => {
+  const s = setup();
+  s.run('E.bancos=[{id:"x",banco:"Sicoob Credinor",titular:"Empresa",gerente:"Rodney",telefone:"38999188350"}];bancosFonte={contas:[],erro:"",em:"",pendente:null}');
+  s.run("atual='bancos';const m=document.getElementById('main');m.replaceChildren();vBancos(m)");
+  const zap = s.document.querySelector('.banco-zap');
+  assert.ok(zap, 'o número tem de virar link de WhatsApp');
+  assert.equal(zap.getAttribute('href'), 'https://wa.me/5538999188350');
+  assert.equal(zap.getAttribute('target'), '_blank');
+  assert.match(zap.getAttribute('rel') || '', /noopener/, 'link externo sem dar acesso à janela');
+  const ligar = s.document.querySelector('.banco-ligar');
+  assert.ok(ligar, 'o telefone de ligar não pode sumir');
+  assert.equal(ligar.getAttribute('href'), 'tel:38999188350');
+});
+
+test('bancos: sem DDD, o cartão mantém o link de ligar e não monta WhatsApp', () => {
+  const s = setup();
+  s.run('E.bancos=[{id:"y",banco:"Banco X",titular:"Empresa",telefone:"3218-4600"}];bancosFonte={contas:[],erro:"",em:"",pendente:null}');
+  s.run("atual='bancos';const m=document.getElementById('main');m.replaceChildren();vBancos(m)");
+  assert.equal(s.document.querySelector('.banco-zap'), null);
+  // o href de telefone leva só os dígitos; o traço é do texto, não do link
+  assert.equal(s.document.querySelector('.banco-fone').getAttribute('href'), 'tel:32184600');
+  assert.match(s.document.querySelector('.banco-fone').textContent, /3218-4600/, 'na tela, o número como foi escrito');
+});
+
+test('bancos: a logo da empresa fica do tamanho da do banco', () => {
+  const tam = r => Number((css.match(new RegExp(r))||[])[1]);
+  const banco = tam(/\.banco-icone\{width:(\d+)px/);
+  const empresa = tam(/\.banco-titular-logo\{[^}]*width:(\d+)px/);
+  assert.ok(banco >= 38 && empresa >= 34, `banco ${banco}px, empresa ${empresa}px`);
+  assert.ok(Math.abs(banco - empresa) <= 6, `desequilibradas: ${banco}px contra ${empresa}px`);
 });

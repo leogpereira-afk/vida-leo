@@ -112,7 +112,11 @@
 .banco-codigo i{font-style:normal;opacity:.75}
 /* Deduzido do nome tem cara de deduzido: o numero vai para dentro de uma TED. */
 .banco-codigo-deduzido{background:var(--areia-cl);color:var(--areia)}
-.banco-titular-logo{display:inline-flex;width:15px;height:15px;margin-right:5px;vertical-align:-3px;border-radius:3px;overflow:hidden;background:#fff}
+/* As duas marcas se equilibram nas pontas do cabecalho: o banco a esquerda,
+   a empresa a direita, do mesmo tamanho. A empresa vinha em 15px ao lado de
+   uma de 42px e parecia um selo perdido. */
+.banco-titular-logo{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;flex:none;margin-left:auto;border:1px solid var(--linha);border-radius:9px;overflow:hidden;background:#fff}
+.banco-titular-logo img{width:100%;height:100%;object-fit:contain;padding:3px}
 .banco-titular-logo img{width:100%;height:100%;object-fit:contain}
 .banco-icone{width:42px;height:42px;border-radius:10px;overflow:hidden}
 .banco-icone img{width:100%;height:100%;object-fit:contain}
@@ -128,7 +132,11 @@
 .banco-contato{display:flex;flex-direction:column;gap:4px;margin:12px 0 0;padding-top:10px;border-top:1px solid var(--linha);font-size:12.5px}
 .banco-contato i{font-style:normal;margin-right:6px;opacity:.8}
 .banco-gerente{color:var(--tinta);overflow-wrap:anywhere}
-.banco-fone{color:var(--verde);text-decoration:none;display:inline-block}
+.banco-fone{color:var(--verde);text-decoration:none;display:inline-flex;align-items:center;gap:0;flex-wrap:wrap}
+/* "ligar" fica discreto ao lado: trocar o telefone pelo WhatsApp nao pode
+   tirar do dono a unica forma de ligar para o gerente. */
+.banco-ligar{margin-left:10px;color:var(--suave);font-size:11.5px;text-decoration:underline}
+.banco-ligar:hover{color:var(--verde)}
 .banco-fone:hover{text-decoration:underline}
 .banco-sem-contato{color:var(--suave);font-size:11.5px}
 .banco-atalhos{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}

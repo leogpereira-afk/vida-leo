@@ -637,7 +637,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 }
 </style>
 <link rel="stylesheet" href="./refinamento.css?v=35e03ac04929">
-<link rel="stylesheet" href="empresas.css?v=64f97d79ee6f">
+<link rel="stylesheet" href="empresas.css?v=0ea7409f14e0">
 <link rel="stylesheet" href="organograma.css?v=5075861ba133">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
@@ -9715,6 +9715,25 @@ function marcaDoBanco(b){
   return {logo,cor:(E.marcas&&E.marcas[nome]&&E.marcas[nome].cor)||(conhecido&&conhecido.cor)||daCentral.cor};
 }
 
+/* O NÚMERO NO FORMATO DO WHATSAPP, ou nada.
+
+   wa.me exige o número internacional colado: 55 + DDD + assinante. Errar isso
+   não dá erro na tela — abre conversa com OUTRA pessoa. Por isso:
+   - 10 ou 11 dígitos (DDD + número) ganham o 55 do Brasil;
+   - 12 ou 13 dígitos que já comecem com 55 passam direto;
+   - número escrito com + é internacional e vai como está;
+   - 8 ou 9 dígitos são telefone SEM DDD: inventar o DDD mandaria a mensagem
+     para outra cidade, então devolve nada e o cartão fica no link de ligar. */
+function numeroWhatsapp(tel){
+  const bruto=String(tel||'').trim();
+  const so=bruto.replace(/\D/g,'');
+  if(!so)return '';
+  if(bruto.startsWith('+'))return so.length>=11?so:'';
+  if(so.length===10||so.length===11)return '55'+so;
+  if((so.length===12||so.length===13)&&so.startsWith('55'))return so;
+  return '';
+}
+
 async function vBancos(m){
   m.classList.add('workspace-layout','bancos-layout');const topo=cab('Bancos','Contas, titulares e chaves PIX em um só lugar.');topo.appendChild(acao('+ Nova conta',()=>bancoModal()));m.appendChild(topo);
   const busca=el('<div class="bancos-filtros"><label>Buscar conta<input type="search" aria-label="Buscar conta" placeholder="Banco, titular, agência, conta ou PIX"></label><div class="bancos-escopo"></div></div>');
@@ -9778,17 +9797,32 @@ async function vBancos(m){
       }
       /* A logo da EMPRESA titular, quando a Central já tem: diz de quem é a
          conta sem precisar ler. */
+      /* A LOGO DA EMPRESA TITULAR, do mesmo tamanho da do banco. Estava em
+         15px ao lado de uma de 42px: parecia um selo perdido, não a marca de
+         quem é a conta. As duas agora se equilibram nas pontas do cabeçalho —
+         banco à esquerda, empresa à direita. */
       const marcaEmp=marcaDe(b.titular||'');
       if(marcaEmp.logo){
-        const selo=el('<span class="banco-titular-logo"><img alt=""></span>');
+        const selo=el('<span class="banco-titular-logo" title="'+esc(b.titular||'')+'"><img alt="Logo de '+esc(b.titular||'')+'"></span>');
         selo.querySelector('img').src=marcaEmp.logo;
-        card.querySelector('header p').prepend(selo);
+        card.querySelector('header').appendChild(selo);
       }
       const contato=card.querySelector('.banco-contato');
       if(b.gerente)contato.appendChild(el('<span class="banco-gerente"><i aria-hidden="true">👤</i>'+esc(b.gerente)+'</span>'));
       if(b.telefone){
-        const so=String(b.telefone).replace(/[^\d+]/g,'');
-        contato.appendChild(el('<a class="banco-fone" href="tel:'+esc(so)+'"><i aria-hidden="true">📞</i>'+esc(b.telefone)+'</a>'));
+        const zap=numeroWhatsapp(b.telefone),so=String(b.telefone).replace(/[^\d+]/g,'');
+        if(zap){
+          const a2=el('<a class="banco-fone banco-zap" target="_blank" rel="noopener noreferrer"><i aria-hidden="true">💬</i>'+esc(b.telefone)+'</a>');
+          a2.href='https://wa.me/'+zap;a2.title='Abrir conversa no WhatsApp';
+          contato.appendChild(a2);
+          /* Ligar continua a um toque: trocar o telefone pelo WhatsApp não
+             pode tirar do dono a única forma de ligar para o gerente. */
+          const lig=el('<a class="banco-ligar">ligar</a>');lig.href='tel:'+so;a2.appendChild(lig);
+        }else{
+          /* Sem DDD não dá para montar link de WhatsApp: inventar um DDD
+             mandaria a mensagem para outra pessoa. Fica o telefone de sempre. */
+          contato.appendChild(el('<a class="banco-fone" href="tel:'+esc(so)+'"><i aria-hidden="true">📞</i>'+esc(b.telefone)+'</a>'));
+        }
       }
       if(!b.gerente&&!b.telefone)contato.appendChild(el('<span class="banco-sem-contato">Sem gerente ou telefone cadastrado</span>'));
       const rapido=card.querySelector('dl');
