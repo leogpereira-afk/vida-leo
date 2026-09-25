@@ -10053,12 +10053,29 @@ function painelContabilidade(cx){
 }
 /* A logo usa o MESMO registro de marcas do resto do app (E.marcas por nome):
    uma contabilidade que também é empresa cadastrada já vem com a marca certa. */
-function contabilidadeSalvarLogo(x,logo){
+async function compactarLogosCentral(estado){
+  if(typeof LeoOrganograma==='undefined')throw Error('Atualize a página para preparar as imagens.');
+  const novo=structuredClone(estado),cache=new Map();
+  const registros=[...Object.values(novo.marcas||{}),...(novo.empresasPJ||[]),...(novo.bancos||[]),...(novo.organogramas||[]).flatMap(o=>o.nos||[])];
+  for(const r of registros)for(const k of ['logo','logoPersonalizada'])if(typeof r[k]==='string'&&r[k].startsWith('data:image/')){const original=r[k];if(!cache.has(original))cache.set(original,await LeoOrganograma.otimizarLogo(original));r[k]=cache.get(original)}
+  return novo;
+}
+function contabilidadeSalvarLogo(x,logo,ativo=()=>true){
   if(contabilidadePorId(x.id)!==x)throw Error('A contabilidade mudou. Abra novamente antes de salvar.');
   if(logo&&!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(logo))throw Error('Escolha novamente a imagem.');
-  const antes=structuredClone(E.marcas||{}),mt=E._mt;E.marcas=E.marcas||{};const marca={...(E.marcas[x.nome]||{})};if(logo)marca.logo=logo;else delete marca.logo;
+  const antes=E.marcas,mt=E._mt,tinhaMt=Object.hasOwn(E,'_mt');E.marcas=structuredClone(E.marcas||{});const marca={...(E.marcas[x.nome]||{})};if(logo)marca.logo=logo;else delete marca.logo;
   if(Object.keys(marca).length)E.marcas[x.nome]=marca;else delete E.marcas[x.nome];
-  try{salvar()}catch(e){E.marcas=antes;E._mt=mt;throw e}
+  try{salvar()}catch(e){
+    const proposta=structuredClone(E);E.marcas=antes;if(tinhaMt)E._mt=mt;else delete E._mt;
+    if(e.name!=='QuotaExceededError'&&!/quota/i.test(e.message))throw e;
+    const assinatura=JSON.stringify(E);
+    return compactarLogosCentral(proposta).then(novo=>{
+      if(!ativo())return;
+      if(JSON.stringify(E)!==assinatura)throw Error('Os dados mudaram enquanto as imagens eram preparadas. Tente salvar novamente.');
+      const original=E;E=novo;
+      try{salvar()}catch(erro){E=original;if(erro.name==='QuotaExceededError'||/quota/i.test(erro.message))throw Error('O armazenamento continua cheio mesmo após reduzir as logos. Seus dados anteriores foram preservados. Não limpe o navegador; exporte um backup da Central.');throw erro}
+    });
+  }
 }
 function contabilidadeModalLogo(x){
   abrirModal('Logomarca da contabilidade',esc(x.nome||''),(c,fechar)=>{
@@ -10067,15 +10084,15 @@ function contabilidadeModalLogo(x){
     const sec=el('<div class="secao"></div>');
     sec.appendChild(el('<p class="ff-note">PNG, JPG/JPEG ou WebP de até 10 MB. A imagem será reduzida automaticamente. A marca fica guardada pelo NOME, e vale em toda a Central.</p>'));
     if(atual){const p=el('<p><img alt="Logo atual" style="max-width:150px;max-height:80px;object-fit:contain"></p>');p.querySelector('img').src=atual;sec.appendChild(p)}
-    const inp=el('<input type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp">');sec.appendChild(inp);
+    const inp=el('<input type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp">');sec.appendChild(inp);const status=el('<p role="status" aria-live="polite"></p>');sec.appendChild(status);
     const acoes=el('<div class="secao" style="display:flex;gap:9px"></div>');
     inp.onchange=()=>{
       const f=inp.files&&inp.files[0];if(!f)return;
       inp.disabled=true;
-      lerLogo(f,logo=>{if(!sec.isConnected)return;try{contabilidadeSalvarLogo(x,logo);fechar();rr('bancos')()}catch(e){inp.disabled=false;alert(e.message||'Não consegui salvar a logo.')}},msg=>{inp.disabled=false;alert(msg)});
+      lerLogo(f,async logo=>{if(!sec.isConnected)return;try{status.textContent='Salvando e preparando as imagens…';await contabilidadeSalvarLogo(x,logo,()=>sec.isConnected);if(!sec.isConnected)return;fechar();rr('bancos')()}catch(e){inp.disabled=false;status.textContent=e.message||'Não consegui salvar a logo.'}},msg=>{inp.disabled=false;status.textContent=msg});
     };
     if(atual){const tirar=el('<button type="button" class="btn ghost">Tirar a logo</button>');
-      tirar.onclick=()=>{try{contabilidadeSalvarLogo(x,'');fechar();rr('bancos')()}catch(e){alert(e.message)}};
+      tirar.onclick=async()=>{try{await contabilidadeSalvarLogo(x,'',()=>sec.isConnected);if(sec.isConnected){fechar();rr('bancos')()}}catch(e){status.textContent=e.message}};
       acoes.appendChild(tirar)}
     const ok=el('<button type="button" class="btn ghost">Fechar</button>');ok.onclick=fechar;acoes.appendChild(ok);
     c.appendChild(sec);c.appendChild(acoes);

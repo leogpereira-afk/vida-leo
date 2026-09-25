@@ -17,3 +17,13 @@ test('Logo da contabilidade salva no próprio cadastro de marcas sem exigir fich
  a.run('contabilidadeModalLogo(E.contabilidades[0])');assert.match(a.document.querySelector('#modais input[type=file]').getAttribute('accept'),/image\/jpeg/);
  a.run("contabilidadeSalvarLogo(E.contabilidades[0],'')");assert.equal(a.run('E.marcas.Britt?.logo'),undefined);
 });
+
+test('Quota ao salvar logo de contabilidade reduz logos antigas da Central e tenta novamente',async()=>{
+ const a=app();a.run("E.contabilidades=[{id:'ct',nome:'Olis'}];E.marcas={Grande:{logo:'data:image/png;base64,'+'A'.repeat(100000),cor:'#123456'}};LeoOrganograma.otimizarLogo=async v=>v.length>60000?'data:image/webp;base64,YWJj':v;localStorage.setItem=(k,v)=>{if(v.length>80000){const e=Error('quota');e.name='QuotaExceededError';throw e}};");
+ await a.run("contabilidadeSalvarLogo(E.contabilidades[0],'data:image/png;base64,YWJj')");
+ assert.equal(a.run('E.marcas.Olis.logo'),'data:image/png;base64,YWJj');assert.equal(a.run('E.marcas.Grande.logo'),'data:image/webp;base64,YWJj');assert.equal(a.run('E.marcas.Grande.cor'),'#123456');assert.equal(a.run('E.organogramas[0].nos[1].observacoes'),'Informação preservada');
+});
+test('Quota persistente restaura estado integral e retorna mensagem clara',async()=>{
+ const a=app();a.run("E.contabilidades=[{id:'ct',nome:'Olis'}];LeoOrganograma.otimizarLogo=async v=>v;localStorage.setItem=()=>{const e=Error('quota');e.name='QuotaExceededError';throw e}");const antes=a.run('JSON.stringify(E)');
+ await assert.rejects(a.run("contabilidadeSalvarLogo(E.contabilidades[0],'data:image/png;base64,YWJj')"),/armazenamento continua cheio/);assert.equal(a.run('JSON.stringify(E)'),antes);
+});
