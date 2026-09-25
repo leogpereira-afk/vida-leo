@@ -17,9 +17,9 @@ test('Setas reordenam irmãos preservando descendentes e original',()=>{
 });
 test('Editor de cards salva ordem e desabilita setas nos limites',()=>{
   const a=app();a.e.organogramas[0].nos.push({id:'d',nome:'Outra empresa',parentId:'a'});a.render();clicar(a,'Editar cards');
-  const card=a.document.querySelector('.org-no[data-no-id="d"]');const subir=[...card.querySelectorAll('button')].find(b=>b.textContent==='↑ Subir');subir.click();
+  const card=a.document.querySelector('.org-no[data-no-id="d"]');const subir=[...card.querySelectorAll('button')].find(b=>b.textContent==='← Esquerda');subir.click();
   assert.equal(a.e.organogramas[0].nos.find(n=>n.id==='d').ordem,0);assert.ok(a.calls.includes('save'));
-  assert.equal([...a.document.querySelector('.org-no[data-no-id="d"]').querySelectorAll('button')].find(b=>b.textContent==='↑ Subir').disabled,true);
+  assert.equal([...a.document.querySelector('.org-no[data-no-id="d"]').querySelectorAll('button')].find(b=>b.textContent==='← Esquerda').disabled,true);
 });
 function clicar(a,nome,root='body'){const b=[...a.document.querySelectorAll(root+' button')].find(b=>b.textContent===nome);assert.ok(b,`Botão ${nome}`);b.click()}
 function enviar(a,dados){const f=a.document.querySelector('#modal form');for(const[k,v]of Object.entries(dados))f.querySelector(`[name=${k}]`).value=String(v);f.onsubmit({preventDefault(){}})}
@@ -75,4 +75,15 @@ test('Editar conteúdo e ligação preserva cadastro, descendentes e personaliza
  assert.ok(a.api.htmlExportacao(a.e.organogramas[0],a.e).includes('Nome exclusivo'));
  clicar(a,'Editar','.org-no[data-no-id="a"]');assert.equal(a.document.querySelector('[name=nome]').value,'Nome exclusivo');
  enviar(a,{nome:''});assert.equal(a.api.identificar(a.e.organogramas[0].nos[0],a.e).nome,'Atual');
+});
+
+test('Separar retira ligação e mantém descendentes; raízes podem ser reordenadas',()=>{
+ const a=app();a.render();clicar(a,'Editar cards');clicar(a,'Separar','.org-no[data-no-id="b"]');
+ assert.equal(a.e.organogramas[0].nos.find(n=>n.id==='b').parentId,'');
+ assert.equal(a.e.organogramas[0].nos.find(n=>n.id==='c').parentId,'b');
+ clicar(a,'← Esquerda','.org-no[data-no-id="b"]');
+ assert.equal(a.document.querySelector('.org-arvore>.org-ramo>.org-no').dataset.noId,'b');
+ assert.equal(a.document.querySelectorAll('.org-arvore>.org-ramo').length,2);
+ clicar(a,'+ Empresa separada');enviar(a,{nome:'Independente'});
+ assert.equal(a.e.organogramas[0].nos.at(-1).parentId,'');
 });
