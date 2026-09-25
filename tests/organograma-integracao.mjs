@@ -10,3 +10,10 @@ test('Organograma vinculado bloqueia exclusão de empresa sem apagar estrutura',
 test('Backup guarda organogramas, vínculos e observações e rejeita ciclo',()=>{const a=app();assert.equal(a.run('validarBackup(structuredClone(E)).organogramas[0].nos[1].observacoes'),'Informação preservada');a.run("const copia=structuredClone(E);copia.organogramas[0].nos[0].parentId='filho'");assert.throws(()=>a.run('validarBackup(copia)'),/ciclo/);});
 test('Restaurar estado conserva organograma e backup antigo ganha lista vazia',()=>{const a=app();a.run('globalThis.saved=JSON.stringify(E);localStorage.getItem=()=>saved;E=carregar()');assert.equal(a.run('E.organogramas[0].nos[0].empresaId'),'empresa-a');assert.equal(a.run('E.organogramas[0].nos[1].observacoes'),'Informação preservada');a.run('const velho=structuredClone(E);delete velho.organogramas;saved=JSON.stringify(velho);E=carregar()');assert.equal(a.run('E.organogramas.length'),0);});
 test('Renomear empresa atualiza a identificação do organograma sem trocar IDs ou notas',()=>{const a=app();a.run("renomeiaEmpresa('Empresa Exemplo','Novo nome');filtro.empresaAba='organograma';tela()");assert.ok(a.document.querySelector('#empresas-organograma').textContent.includes('Novo nome'));assert.equal(a.run('E.organogramas[0].nos[0].empresaId'),'empresa-a');assert.equal(a.run('E.organogramas[0].nos[1].observacoes'),'Informação preservada');});
+
+test('Logo da contabilidade salva no próprio cadastro de marcas sem exigir ficha empresarial',()=>{
+ const a=app();a.run("E.contabilidades=[{id:'ct',nome:'Britt'}];contabilidadeSalvarLogo(E.contabilidades[0],'data:image/png;base64,YWJj')");
+ assert.equal(a.run("E.marcas.Britt.logo"),'data:image/png;base64,YWJj');
+ a.run('contabilidadeModalLogo(E.contabilidades[0])');assert.match(a.document.querySelector('#modais input[type=file]').getAttribute('accept'),/image\/jpeg/);
+ a.run("contabilidadeSalvarLogo(E.contabilidades[0],'')");assert.equal(a.run('E.marcas.Britt?.logo'),undefined);
+});

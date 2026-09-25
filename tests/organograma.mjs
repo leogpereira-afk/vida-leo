@@ -163,3 +163,11 @@ test('Editar em tela cheia abre diálogo visível no próprio organograma e canc
  assert.ok(a.document.querySelector('.org-tela-cheia .org-modal-fundo [role=dialog]'));
  assert.equal(a.document.querySelector('#modal form'),null);clicar(a,'Cancelar','.org-modal');assert.equal(a.document.querySelector('.org-modal'),null);assert.ok(a.document.querySelector('.org-tela-cheia'));
 });
+
+test('Contabilidade selecionada acompanha o cadastro por ID e preserva referência se removida',()=>{
+ const a=app();a.e.contabilidades=[{id:'ct',nome:'Escritório Central'}];a.render();clicar(a,'Detalhar');clicar(a,'Editar','.org-no[data-no-id="a"]');
+ enviar(a,{contabilidadeId:'ct'});const n=a.e.organogramas[0].nos[0];assert.equal(n.contabilidadeId,'ct');assert.equal(a.api.identificar(n,a.e).contabilidade,'Escritório Central');
+ a.e.contabilidades[0].nome='Novo escritório';assert.equal(a.api.identificar(n,a.e).contabilidade,'Novo escritório');assert.ok(a.api.htmlExportacao(a.e.organogramas[0],a.e,{formato:'visual'}).includes('Novo escritório'));
+ a.e.contabilidades=[];assert.equal(a.api.identificar(n,a.e).contabilidade,'Escritório Central');
+ clicar(a,'Editar','.org-no[data-no-id="a"]');enviar(a,{contabilidadeId:'',contabilidade:'Referência manual'});assert.equal(a.e.organogramas[0].nos[0].contabilidadeId,'');assert.equal(a.api.identificar(a.e.organogramas[0].nos[0],a.e).contabilidade,'Referência manual');
+});

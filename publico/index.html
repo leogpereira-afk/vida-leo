@@ -679,7 +679,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 <script src="./vendor/ical-2.2.1.min.js"></script>
 <script src="./google-datas.js?v=85c5d36986f3"></script>
 <script src="./documentos-revisao.js?v=f54d2ba958f9"></script>
-<script src="./organograma.js?v=e35b56ec3e4e"></script>
+<script src="./organograma.js?v=05cf526b0a48"></script>
 <script>
 /* ============================================================
    Central do Léo — painel pessoal, um arquivo só.
@@ -10053,26 +10053,29 @@ function painelContabilidade(cx){
 }
 /* A logo usa o MESMO registro de marcas do resto do app (E.marcas por nome):
    uma contabilidade que também é empresa cadastrada já vem com a marca certa. */
+function contabilidadeSalvarLogo(x,logo){
+  if(contabilidadePorId(x.id)!==x)throw Error('A contabilidade mudou. Abra novamente antes de salvar.');
+  if(logo&&!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(logo))throw Error('Escolha novamente a imagem.');
+  const antes=structuredClone(E.marcas||{}),mt=E._mt;E.marcas=E.marcas||{};const marca={...(E.marcas[x.nome]||{})};if(logo)marca.logo=logo;else delete marca.logo;
+  if(Object.keys(marca).length)E.marcas[x.nome]=marca;else delete E.marcas[x.nome];
+  try{salvar()}catch(e){E.marcas=antes;E._mt=mt;throw e}
+}
 function contabilidadeModalLogo(x){
   abrirModal('Logomarca da contabilidade',esc(x.nome||''),(c,fechar)=>{
     c.classList.add('empresa-modal');
     const atual=marcaDe(x.nome||'').logo;
     const sec=el('<div class="secao"></div>');
-    sec.appendChild(el('<p class="ff-note">PNG de até 300 KB. A marca fica guardada pelo NOME, e vale em toda a Central.</p>'));
+    sec.appendChild(el('<p class="ff-note">PNG, JPG/JPEG ou WebP de até 10 MB. A imagem será reduzida automaticamente. A marca fica guardada pelo NOME, e vale em toda a Central.</p>'));
     if(atual){const p=el('<p><img alt="Logo atual" style="max-width:150px;max-height:80px;object-fit:contain"></p>');p.querySelector('img').src=atual;sec.appendChild(p)}
-    const inp=el('<input type="file" accept="image/png">');sec.appendChild(inp);
+    const inp=el('<input type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp">');sec.appendChild(inp);
     const acoes=el('<div class="secao" style="display:flex;gap:9px"></div>');
     inp.onchange=()=>{
       const f=inp.files&&inp.files[0];if(!f)return;
-      if(f.size>300*1024){alert('Escolha um PNG de até 300 KB.');return}
-      const fr=new FileReader();
-      fr.onload=()=>{try{empresaSalvarLogo({id:x.id,nome:x.nome},String(fr.result));fechar();rr('bancos')()}
-        catch(e){alert(e.message||'Não consegui salvar a logo.')}};
-      fr.onerror=()=>alert('Não consegui ler o arquivo.');
-      fr.readAsDataURL(f);
+      inp.disabled=true;
+      lerLogo(f,logo=>{if(!sec.isConnected)return;try{contabilidadeSalvarLogo(x,logo);fechar();rr('bancos')()}catch(e){inp.disabled=false;alert(e.message||'Não consegui salvar a logo.')}},msg=>{inp.disabled=false;alert(msg)});
     };
     if(atual){const tirar=el('<button type="button" class="btn ghost">Tirar a logo</button>');
-      tirar.onclick=()=>{try{empresaSalvarLogo({id:x.id,nome:x.nome},'');fechar();rr('bancos')()}catch(e){alert(e.message)}};
+      tirar.onclick=()=>{try{contabilidadeSalvarLogo(x,'');fechar();rr('bancos')()}catch(e){alert(e.message)}};
       acoes.appendChild(tirar)}
     const ok=el('<button type="button" class="btn ghost">Fechar</button>');ok.onclick=fechar;acoes.appendChild(ok);
     c.appendChild(sec);c.appendChild(acoes);
