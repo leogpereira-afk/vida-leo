@@ -38,7 +38,7 @@ test('Exportação de parte exclui nós externos e pode omitir observações',()
 test('Estrutura grande preserva todos os textos com páginas de leitura',()=>{const {api,e}=app(),o={id:'g',titulo:'Estrutura extensa',nos:[{id:'r',nome:'Raiz'}]};for(let i=0;i<15;i++)o.nos.push({id:'n'+i,nome:'Empresa número '+i,parentId:'r',observacoes:'Observação completa '+i});const html=api.htmlExportacao(o,e);assert.ok(html.includes('Leitura dos itens'));for(let i=0;i<15;i++)assert.ok(html.includes('Observação completa '+i));assert.ok(!html.includes('overflow:hidden'))});
 test('Tema escuro usa cores legíveis e fundo importado da logo',()=>{const {api,e}=app(),o=exemplo();o.tema='escuro';Object.assign(o.nos[1],{logo:'data:image/png;base64,YWJj',logoFundo:'#12141f'});const html=api.htmlExportacao(o,e);assert.ok(html.includes('class="escuro"'));assert.ok(html.includes('fill="#12141f"'));assert.ok(html.includes('fill="#f5f7fa"'))});
 test('Formulário cancelar item deixa estado e salvamento intocados',()=>{const a=app(),antes=JSON.stringify(a.e);a.render();clicar(a,'+ Adicionar item');a.document.querySelector('[name=nome]').value='Rascunho';clicar(a,'Cancelar','#modal');assert.equal(JSON.stringify(a.e),antes);assert.ok(!a.calls.includes('save'))});
-test('Formulário novo item vinculado usa nome canônico e grava apenas ao salvar',()=>{const a=app();a.render();clicar(a,'+ Adicionar item');enviar(a,{empresaId:'empresa-a',nome:'Nome ignorado',tipo:'Empresa',parentId:'b',percentual:''});assert.equal(a.document.querySelector('.org-erro')?.textContent||'','');assert.equal(a.e.organogramas[0].nos.length,4);assert.equal(a.e.organogramas[0].nos[3].nome,'Atual');assert.equal(a.e.organogramas[0].nos[3].empresaId,'empresa-a');assert.ok(a.calls.includes('save'))});
+test('Formulário vinculado mantém cadastro e salva nome personalizado no card',()=>{const a=app();a.render();clicar(a,'+ Adicionar item');enviar(a,{empresaId:'empresa-a',nome:'Nome ignorado',tipo:'Empresa',parentId:'b',percentual:''});assert.equal(a.document.querySelector('.org-erro')?.textContent||'','');assert.equal(a.e.organogramas[0].nos.length,4);assert.equal(a.e.organogramas[0].nos[3].nome,'Atual');assert.equal(a.e.organogramas[0].nos[3].nomePersonalizado,'Nome ignorado');assert.equal(a.api.identificar(a.e.organogramas[0].nos[3],a.e).nome,'Nome ignorado');assert.equal(a.e.organogramas[0].nos[3].empresaId,'empresa-a');assert.ok(a.calls.includes('save'))});
 test('Falha ao persistir mantém estado anterior e modal aberto com erro',()=>{const a=app();a.contexto.save=()=>{a.e._mt=123;throw Error('Armazenamento cheio')};a.render();const antes=JSON.stringify(a.e);clicar(a,'+ Adicionar item');enviar(a,{nome:'Novo',tipo:'Área'});assert.equal(JSON.stringify(a.e),antes);assert.match(a.document.querySelector('#modal .org-erro').textContent,/Armazenamento cheio/);assert.ok(a.document.querySelector('#modal form'))});
 test('Seleção de outro organograma notifica contexto e pode sobreviver à reabertura',()=>{const a=app();a.e.organogramas.push({id:'segundo',titulo:'Segundo grupo',nos:[]});a.render();const select=a.document.querySelector('.org-barra select');select.value='segundo';select.onchange();assert.equal(a.calls.at(-1),'segundo');a.contexto.selectedId='segundo';a.render();assert.equal(a.document.querySelector('.org-painel-cab h3').textContent,'Segundo grupo')});
 test('Importação aguarda aprovação e cancelamento preserva dados',async()=>{const a=app(),controle=a.render(),antes=JSON.stringify(a.e);controle.importarArquivo({size:123,text:async()=>JSON.stringify({id:'nova',titulo:'Importado',nos:[]})});await Promise.resolve();assert.match(a.document.querySelector('#modal').textContent,/Nada foi salvo/);clicar(a,'Cancelar','#modal');assert.equal(JSON.stringify(a.e),antes)});
@@ -62,4 +62,17 @@ test('PDF distribui irmãos horizontalmente também nos níveis internos e no re
     assert.ok(+rect('b').getAttribute('y')<+rect('c').getAttribute('y'));
   }
   assert.equal(JSON.stringify(o),antes);
+});
+
+test('Editar conteúdo e ligação preserva cadastro, descendentes e personalização ao reabrir',()=>{
+ const a=app();a.render();clicar(a,'Detalhar');clicar(a,'Editar','.org-no[data-no-id="b"]');
+ const superior=a.document.querySelector('[name=parentId]');assert.deepEqual([...superior.options].map(x=>x.value),['','a']);
+ enviar(a,{nome:'Novo card',parentId:'',atividade:'Nova função',observacoes:'Nova nota'});
+ assert.equal(a.e.organogramas[0].nos[1].parentId,'');assert.equal(a.e.organogramas[0].nos[2].parentId,'b');
+ clicar(a,'Editar','.org-no[data-no-id="a"]');assert.ok(!a.document.querySelector('[name=nome]').readOnly);
+ enviar(a,{nome:'Nome exclusivo'});assert.equal(a.e.empresasPJ[0].nome,'Atual');
+ assert.equal(a.api.identificar(a.e.organogramas[0].nos[0],a.e).nome,'Nome exclusivo');
+ assert.ok(a.api.htmlExportacao(a.e.organogramas[0],a.e).includes('Nome exclusivo'));
+ clicar(a,'Editar','.org-no[data-no-id="a"]');assert.equal(a.document.querySelector('[name=nome]').value,'Nome exclusivo');
+ enviar(a,{nome:''});assert.equal(a.api.identificar(a.e.organogramas[0].nos[0],a.e).nome,'Atual');
 });
