@@ -202,9 +202,16 @@
   }
   function render(container, ctx) {
     const doc = container.ownerDocument || global.document;
-    let selecionado = ctx.selectedId || '', modo='geral';
+    let selecionado = ctx.selectedId || '', modo='geral',telaCheia=false,marcador=null,overflowAnterior='';
     const selecionar = valor => { selecionado=valor; ctx.onSelect?.(valor); };
     const state = () => ctx.getState();
+    function alternarTelaCheia() {
+      telaCheia=!telaCheia;
+      if(telaCheia){marcador=doc.createComment('organograma');container.before(marcador);doc.body.append(container);overflowAnterior=doc.body.style.overflow;doc.body.style.overflow='hidden';doc.addEventListener('keydown',sairPeloTeclado)}
+      else{marcador?.replaceWith(container);marcador=null;doc.body.style.overflow=overflowAnterior;doc.removeEventListener('keydown',sairPeloTeclado)}
+      container.classList.toggle('org-tela-cheia',telaCheia);pintar();container.querySelector('[data-org-fullscreen]')?.focus();
+    }
+    function sairPeloTeclado(ev){if(ev.key==='Escape'&&telaCheia&&!doc.querySelector('[role="dialog"]')){ev.preventDefault();alternarTelaCheia()}}
     const criar = (tag,classe,conteudo) => { const x=doc.createElement(tag); if(classe)x.className=classe; if(conteudo!=null)x.textContent=conteudo; return x; };
     const botao = (rotulo,fn,classe='ghost') => {const b=criar('button','btn '+classe,rotulo);b.type='button';b.onclick=fn;return b;};
     function persistir(lista, proximoId) {
@@ -327,14 +334,14 @@
       if(!lista.length){const vazio=criar('section','org-vazio');vazio.append(criar('div','org-simbolo','⌘'),criar('h3','','Seu grupo, visto por inteiro'),criar('p','','Crie a estrutura, vincule suas empresas e registre as observações de cada ligação.'),botao('Criar primeiro organograma',()=>editarDiagrama(),''));container.append(vazio);return}
       const o=lista.find(x=>x.id===selecionado)||lista[0];selecionar(o.id);
       const barra=criar('div','org-barra');const escolha=criar('select');escolha.setAttribute('aria-label','Escolher organograma');for(const item of lista){const op=criar('option','',item.titulo);op.value=item.id;escolha.append(op)}escolha.value=o.id;escolha.onchange=()=>{selecionar(escolha.value);pintar()};barra.append(escolha);
-      const comandos=criar('div','org-acoes');comandos.append(botao('+ Adicionar item',()=>editarNo(o),''),botao(modo==='editar'?'Concluir edição':'Editar cards',()=>{modo=modo==='editar'?'geral':'editar';pintar()}),botao('+ Empresa separada',()=>editarNo(o)),botao('Exportar PDF',()=>exportar(o)));
+      const comandos=criar('div','org-acoes');const expandir=botao(telaCheia?'Sair da tela cheia':'Tela cheia',alternarTelaCheia);expandir.dataset.orgFullscreen='';expandir.setAttribute('aria-pressed',String(telaCheia));comandos.append(expandir);comandos.append(botao('+ Adicionar item',()=>editarNo(o),''),botao(modo==='editar'?'Concluir edição':'Editar cards',()=>{modo=modo==='editar'?'geral':'editar';pintar()}),botao('+ Empresa separada',()=>editarNo(o)),botao('Exportar PDF',()=>exportar(o)));
       const organizar=criar('details','org-organizar'),sumario=criar('summary','','Organizar');organizar.append(sumario,acoes);acoes.prepend(botao('Editar título e notas',()=>editarDiagrama(o)));comandos.append(organizar);barra.append(comandos);container.append(barra);
       const painel=criar('section','org-painel'+(o.tema==='escuro'?' org-tema-escuro':'')),cab=criar('header','org-painel-cab'),txt=criar('div');txt.append(criar('h3','',o.titulo));if(o.subtitulo)txt.append(criar('p','',o.subtitulo));cab.append(txt,criar('span','org-contagem',o.nos.length+' itens'));painel.append(cab);
       if(!o.nos.length){const vazio=criar('div','org-vazio');vazio.append(criar('p','','Adicione o primeiro item no topo da estrutura.'),botao('Adicionar primeiro item',()=>editarNo(o),''));painel.append(vazio)}
       else {
         painel.append(criar('p','org-orientacao','As linhas mostram as ligações que você informar. Sócios e participações são descritos separadamente.'));
         const visual=criar('div','org-visual-controles');visual.append(botao('Visão geral',()=>{modo='geral';pintar()},modo==='geral'?'':'ghost'),botao('Detalhar',()=>{modo='detalhes';pintar()},modo==='detalhes'?'':'ghost'),criar('span','org-ajuda',modo==='geral'?'Clique em um card para editar conteúdo e ligações.':'Role o desenho para ver todos os itens e suas informações.'));painel.append(visual);
-        if(modo==='geral'){const geral=criar('div','org-visao-geral');geral.innerHTML=diagramaSVG(o,state(),{notas:false,resumo:true},ctx).svg;const editarPeloDesenho=ev=>{const alvo=ev.target.closest?.('[data-no-id]');if(!alvo)return;const no=o.nos.find(n=>n.id===alvo.getAttribute('data-no-id'));if(no)editarNo(o,no)};geral.onclick=editarPeloDesenho;geral.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();editarPeloDesenho(ev)}};painel.append(geral)}
+        if(modo==='geral'){const geral=criar('div','org-visao-geral');geral.innerHTML=diagramaSVG(o,state(),{notas:false,resumo:true,horizontal:true},ctx).svg;const editarPeloDesenho=ev=>{const alvo=ev.target.closest?.('[data-no-id]');if(!alvo)return;const no=o.nos.find(n=>n.id===alvo.getAttribute('data-no-id'));if(no)editarNo(o,no)};geral.onclick=editarPeloDesenho;geral.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();editarPeloDesenho(ev)}};painel.append(geral)}
         const viewport=criar('div','org-viewport');viewport.hidden=modo!=='detalhes'&&modo!=='editar';viewport.tabIndex=0;viewport.setAttribute('aria-label','Desenho do organograma. Use a rolagem horizontal para ver todos os itens.');
         if(modo==='editar')painel.append(criar('p','org-ajuda','← e → movem os cards para a esquerda e a direita, mantendo os cards abaixo. Use Separar para retirar um card da linha ou Editar → Card superior para ligá-lo novamente.'));
         function ramo(n){

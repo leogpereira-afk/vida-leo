@@ -106,3 +106,12 @@ test('Upload aguarda leitura, rejeita arquivo grande e só grava a imagem ao sal
  reader.result='data:image/png;base64,YWJj';reader.onload();assert.equal(a.e.organogramas[0].nos[0].logoPersonalizada,undefined);
  enviar(a,{});assert.equal(a.e.organogramas[0].nos[0].logoPersonalizada,reader.result);
 });
+
+test('Tela cheia abre e fecha sem alterar os dados e mantém irmãos na horizontal',()=>{
+ const a=app();a.e.organogramas[0].nos.push({id:'d',nome:'Outra equipe',parentId:'b'});const antes=JSON.stringify(a.e);a.render();
+ const rect=id=>a.document.querySelector(`.org-visao-geral [data-no-id="${id}"] rect`);
+ assert.equal(rect('c').getAttribute('y'),rect('d').getAttribute('y'));
+ assert.notEqual(rect('c').getAttribute('x'),rect('d').getAttribute('x'));
+ clicar(a,'Tela cheia');assert.ok(a.document.querySelector('main.org-tela-cheia'));assert.equal(a.document.body.style.overflow,'hidden');
+ clicar(a,'Sair da tela cheia');assert.ok(!a.document.querySelector('.org-tela-cheia'));assert.equal(JSON.stringify(a.e),antes);
+});
