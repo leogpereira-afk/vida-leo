@@ -123,3 +123,12 @@ test('PDF somente desenho exclui rodapé, observações e páginas de dados, man
  assert.ok(!html.includes('Nota que não deve sair'));assert.ok(html.includes('size:A3 landscape'));
  const a=app();a.render();clicar(a,'Exportar PDF');assert.equal(a.document.querySelector('[name=formato]').value,'visual');
 });
+
+test('CNPJ do cadastro aparece no resumo, detalhes e PDF visual; referência do card tem prioridade',()=>{
+ const a=app();a.e.empresasPJ[0].cnpj='12.345.678/0001-90';a.render();
+ assert.ok(a.document.querySelector('.org-visao-geral').textContent.includes('12.345.678/0001-90'));
+ clicar(a,'Detalhar');assert.ok(a.document.querySelector('.org-no[data-no-id="a"]').textContent.includes('12.345.678/0001-90'));
+ assert.ok(a.api.htmlExportacao(a.e.organogramas[0],a.e,{formato:'visual'}).includes('12.345.678/0001-90'));
+ a.e.organogramas[0].nos[0].cnpj='98.765.432/0001-10';assert.equal(a.api.identificar(a.e.organogramas[0].nos[0],a.e).cnpj,'98.765.432/0001-10');
+ assert.equal(a.e.empresasPJ[0].cnpj,'12.345.678/0001-90');assert.equal(a.api.identificar({nome:'Livre'},a.e).cnpj,'');
+});
