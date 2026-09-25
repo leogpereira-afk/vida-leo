@@ -115,3 +115,11 @@ test('Tela cheia abre e fecha sem alterar os dados e mantém irmãos na horizont
  clicar(a,'Tela cheia');assert.ok(a.document.querySelector('main.org-tela-cheia'));assert.equal(a.document.body.style.overflow,'hidden');
  clicar(a,'Sair da tela cheia');assert.ok(!a.document.querySelector('.org-tela-cheia'));assert.equal(JSON.stringify(a.e),antes);
 });
+
+test('PDF somente desenho exclui rodapé, observações e páginas de dados, mantendo todos os cards',()=>{
+ const {api,e}=app(),o=exemplo();o.observacoes='Nota que não deve sair';const html=api.htmlExportacao(o,e,{formato:'visual',notas:true});const {document}=parseHTML(html);
+ assert.equal(document.querySelectorAll('.grafico [data-no-id]').length,3);
+ assert.equal(document.querySelector('.detalhes'),null);assert.equal(document.querySelector('.notas'),null);assert.equal(document.querySelector('footer'),null);
+ assert.ok(!html.includes('Nota que não deve sair'));assert.ok(html.includes('size:A3 landscape'));
+ const a=app();a.render();clicar(a,'Exportar PDF');assert.equal(a.document.querySelector('[name=formato]').value,'visual');
+});
