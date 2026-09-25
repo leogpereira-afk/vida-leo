@@ -98,12 +98,20 @@
   }
   function precisaOtimizar(lista){return lista.some(o=>o.nos.some(n=>['logo','logoPersonalizada'].some(k=>String(n[k]||'').startsWith('data:image/')&&n[k].length>60000)))}
   async function otimizarOrganogramas(lista){const nova=clone(lista),cache=new Map();for(const o of nova)for(const n of o.nos)for(const chave of ['logo','logoPersonalizada'])if(n[chave]){const original=n[chave];if(!cache.has(original))cache.set(original,await otimizarLogo(original));n[chave]=cache.get(original)}return nova}
+  function sociosResumidos(valor){
+    return texto(valor).split(/[;\n]+|\s*\/\s*|(?<=%)\s*,?\s*(?=[A-Za-zÀ-ÿ])/u).map(texto).filter(Boolean).map(parte=>{
+      const percentual=parte.match(/(\d+(?:[.,]\d+)?)\s*%/g)||[];
+      const nome=parte.replace(/\d+(?:[.,]\d+)?\s*%/g,'').replace(/^[\s:–—()\-]+|[\s:–—()\-]+$/g,'').trim();
+      if(percentual.length>1||/\s(?:e|&)\s/i.test(nome)||!nome)return 'Conferir composição no cadastro';
+      return nome.split(/\s+/)[0]+' · '+(percentual[0]||'% não informado');
+    }).join('\n');
+  }
   function identificar(n, estado, ctx = {}) {
     const empresa = (estado.empresasPJ || []).find(e => e.id === n.empresaId);
     const nome = texto(n.nomePersonalizado) || empresa?.nome || n.nome || 'Empresa não encontrada';
     const original = n.logoPersonalizada || empresa?.logo || (empresa && ctx.logo?.(empresa.nome)) || n.logo || '';
     const logo = logoSegura(original);
-    return {nome,logo,cnpj:texto(n.cnpj)||texto(empresa?.cnpj),logoFundo:original===n.logo && /^#[a-f\d]{6}$/i.test(n.logoFundo||'') ? n.logoFundo : '',empresa,ausente:!!n.empresaId && !empresa};
+    return {nome,logo,regime:texto(n.regime)||texto(empresa?.regime),contabilidade:texto(n.contabilidade)||texto(empresa?.contador),socios:sociosResumidos(texto(n.socios)||texto(empresa?.socios)),cnpj:texto(n.cnpj)||texto(empresa?.cnpj),logoFundo:original===n.logo && /^#[a-f\d]{6}$/i.test(n.logoFundo||'') ? n.logoFundo : '',empresa,ausente:!!n.empresaId && !empresa};
   }
   function recorte(o, raizId) {
     if (!raizId) return clone(o);
@@ -140,9 +148,9 @@
   }
   function cartaoExportacao(n, estado, notas, ctx) {
     const info = identificar(n,estado,ctx), blocos = [];
-    for (const [chave,rotulo] of [['cnpj','CNPJ'],['regime','Regime'],['banco','Banco'],['contabilidade','Contabilidade']]) {const valor=chave==='cnpj'?info.cnpj:n[chave];if(valor)blocos.push({rotulo,texto:valor,linhas:linhas(valor)});}
+    for (const [chave,rotulo] of [['cnpj','CNPJ'],['regime','Regime'],['banco','Banco'],['contabilidade','Contabilidade']]) {const valor=['cnpj','regime','contabilidade'].includes(chave)?info[chave]:n[chave];if(valor)blocos.push({rotulo,texto:valor,linhas:linhas(valor)});}
     if (n.atividade) blocos.push({rotulo:'Atividade',texto:n.atividade,linhas:linhas(n.atividade)});
-    if (n.socios) blocos.push({rotulo:'Composição informada',texto:n.socios,linhas:linhas(n.socios)});
+    if (info.socios) blocos.push({rotulo:'Sócios e participação',texto:info.socios,linhas:linhas(info.socios)});
     if (n.relacao || n.percentual !== '' && n.percentual != null) blocos.push({rotulo:'Ligação informada',linhas:linhas([n.relacao,n.percentual !== '' && n.percentual != null ? n.percentual.toLocaleString('pt-BR') + '%' : ''].filter(Boolean).join(' · '))});
     if (notas && n.observacoes) blocos.push({rotulo:'Observações',texto:n.observacoes,linhas:linhas(n.observacoes)});
     if (info.ausente) blocos.push({rotulo:'Cadastro',linhas:['Empresa não encontrada. Nome preservado.']});
@@ -157,13 +165,23 @@
     const largura = 272, gap = 24, gapY = 62, dados = new Map(), niveis = [];
     function medir(n, nivel) {
       const cartao = cartaoExportacao(n,estado,opts.notas !== false,ctx), fs = filhos(o,n.id);
-      if(opts.resumo){cartao.blocos=cartao.blocos.filter(b=>b.rotulo==='Atividade'||b.rotulo==='CNPJ').map(b=>({...b,linhas:b.linhas.length>2?[b.linhas[0],b.linhas[1]+'…']:b.linhas}));cartao.altura=Math.max(cartao.info.logo?100:0,60+cartao.nome.length*19+cartao.blocos.reduce((v,b)=>v+28+b.linhas.length*16,0));}
+      if(opts.resumo){cartao.blocos=cartao.blocos.filter(b=>['Atividade','CNPJ','Regime','Contabilidade','Sócios e participação'].includes(b.rotulo)).map(b=>({...b,linhas:b.rotulo==='Atividade'&&b.linhas.length>2?[b.linhas[0],b.linhas[1]+'…']:b.linhas}));cartao.altura=Math.max(cartao.info.logo?100:0,60+cartao.nome.length*19+cartao.blocos.reduce((v,b)=>v+28+b.linhas.length*16,0));}
       const total = Math.max(largura,fs.reduce((s,f) => s + medir(f,nivel+1),0) + Math.max(0,fs.length-1)*gap);
       dados.set(n.id,{n,cartao,largura:total,nivel}); niveis[nivel] = Math.max(niveis[nivel] || 0,cartao.altura);
       return total;
     }
     const raizes = filhos(o); let totalX = Math.max(largura,raizes.reduce((s,n) => s + medir(n,0),0) + Math.max(0,raizes.length-1)*gap);
-    if(opts.resumo&&opts.horizontal){const h=Math.max(100,...niveis);for(const d of dados.values())d.cartao.altura=h;niveis.fill(h)}
+    if(opts.resumo&&opts.horizontal){
+      const rotulos=['CNPJ','Regime','Contabilidade','Sócios e participação'];
+      const nomes=Math.max(2,...[...dados.values()].map(d=>d.cartao.nome.length));
+      for(const d of dados.values()){
+        while(d.cartao.nome.length<nomes)d.cartao.nome.push('');
+        const blocos=d.cartao.blocos;d.cartao.blocos=rotulos.map(rotulo=>blocos.find(b=>b.rotulo===rotulo)||{rotulo,linhas:['Não informado']}).concat(blocos.filter(b=>!rotulos.includes(b.rotulo)));
+      }
+      for(const rotulo of rotulos){const quantidade=Math.max(...[...dados.values()].map(d=>d.cartao.blocos.find(b=>b.rotulo===rotulo).linhas.length));for(const d of dados.values()){const b=d.cartao.blocos.find(b=>b.rotulo===rotulo);while(b.linhas.length<quantidade)b.linhas.push('')}}
+      const h=Math.max(100,...[...dados.values()].map(d=>60+d.cartao.nome.length*19+d.cartao.blocos.reduce((v,b)=>v+28+b.linhas.length*16,0)));
+      for(const d of dados.values())d.cartao.altura=h;niveis.fill(h);
+    }
     const yNiveis = niveis.map((_,i) => niveis.slice(0,i).reduce((s,h) => s+h+gapY,0) + 18);
     function posicionar(n, inicio) {
       const d = dados.get(n.id); d.x = inicio + (d.largura-largura)/2 + 18; d.y = yNiveis[d.nivel];
@@ -222,7 +240,7 @@
   }
   function render(container, ctx) {
     const doc = container.ownerDocument || global.document;
-    let selecionado = ctx.selectedId || '', modo='geral',telaCheia=false,marcador=null,overflowAnterior='';
+    let selecionado = ctx.selectedId || '', modo='geral',escala=1,telaCheia=false,marcador=null,overflowAnterior='';
     const selecionar = valor => { selecionado=valor; ctx.onSelect?.(valor); };
     const state = () => ctx.getState();
     function alternarTelaCheia() {
@@ -283,7 +301,7 @@
       const opcoes=[['','Item livre, sem cadastro vinculado'],...empresas.map(e=>[e.id,e.nome])];
       if(n?.empresaId&&!empresas.some(e=>e.id===n.empresaId))opcoes.push([n.empresaId,(n.nome||'Empresa')+' · cadastro não encontrado']);
       abrir(n?'Editar item':'Adicionar item','A ligação organiza o desenho. Ela não define participação societária.',(c,fechar)=>{
-        const campos=[{nome:'empresaId',rotulo:'Empresa do cadastro',valor:n?.empresaId,opcoes,full:true,dica:'Você pode personalizar o nome e a logomarca somente neste card.'},{nome:'nome',rotulo:'Nome do card',valor:n?identificar(n,state(),ctx).nome:'',full:true,placeholder:'Empresa, pessoa, área ou escritório',dica:'Edite livremente. Deixe vazio para usar o nome do cadastro vinculado.'},{nome:'tipo',rotulo:'Tipo',valor:n?.tipo||'Empresa',opcoes:tipos.map(t=>[t,t])},{nome:'parentId',rotulo:'Card superior',dica:'Escolha a quem este card se liga. Os cards abaixo acompanham a mudança. Selecione o topo para remover a ligação superior.',valor:n?.parentId||paiId,opcoes:[['','Separado, sem ligação superior'],...o.nos.filter(x=>!descendentes.has(x.id)).map(x=>[x.id,identificar(x,state(),ctx).nome])]},...['cnpj','regime','banco','contabilidade'].map((chave,i)=>({nome:chave,rotulo:['CNPJ de referência','Regime tributário informado','Banco informado','Contabilidade'][i],valor:n?.[chave],dica:chave==='cnpj'?'Deixe vazio para usar o CNPJ da empresa vinculada. Não altera o cadastro empresarial.':undefined})),{nome:'atividade',rotulo:'Atividade / função',valor:n?.atividade,tipo:'textarea',full:true,rows:2},{nome:'socios',rotulo:'Sócios e composição informada',valor:n?.socios,tipo:'textarea',full:true,dica:'Preencha conforme seus documentos. Não é calculado a partir das linhas do desenho.'},{nome:'relacao',rotulo:'Descrição da ligação (opcional)',valor:n?.relacao,placeholder:'Ex.: contabilidade, gestão, participação informada'},{nome:'percentual',rotulo:'Percentual informado (opcional)',valor:n?.percentual,tipo:'number',dica:'Somente quando essa informação estiver confirmada.'},{nome:'observacoes',rotulo:'Observações',valor:n?.observacoes,tipo:'textarea',full:true}];
+        const campos=[{nome:'empresaId',rotulo:'Empresa do cadastro',valor:n?.empresaId,opcoes,full:true,dica:'Você pode personalizar o nome e a logomarca somente neste card.'},{nome:'nome',rotulo:'Nome do card',valor:n?identificar(n,state(),ctx).nome:'',full:true,placeholder:'Empresa, pessoa, área ou escritório',dica:'Edite livremente. Deixe vazio para usar o nome do cadastro vinculado.'},{nome:'tipo',rotulo:'Tipo',valor:n?.tipo||'Empresa',opcoes:tipos.map(t=>[t,t])},{nome:'parentId',rotulo:'Card superior',dica:'Escolha a quem este card se liga. Os cards abaixo acompanham a mudança. Selecione o topo para remover a ligação superior.',valor:n?.parentId||paiId,opcoes:[['','Separado, sem ligação superior'],...o.nos.filter(x=>!descendentes.has(x.id)).map(x=>[x.id,identificar(x,state(),ctx).nome])]},...['cnpj','regime','banco','contabilidade'].map((chave,i)=>({nome:chave,rotulo:['CNPJ de referência','Regime tributário informado','Banco informado','Contabilidade'][i],valor:n?.[chave],dica:chave==='cnpj'?'Deixe vazio para usar o CNPJ da empresa vinculada. Não altera o cadastro empresarial.':undefined})),{nome:'atividade',rotulo:'Atividade / função',valor:n?.atividade,tipo:'textarea',full:true,rows:2},{nome:'socios',rotulo:'Sócios e composição informada',valor:n?.socios,tipo:'textarea',full:true,dica:'Um sócio por linha: Nome completo — 50%. O card mostra somente o primeiro nome. Vazio usa o cadastro da empresa.'},{nome:'relacao',rotulo:'Descrição da ligação (opcional)',valor:n?.relacao,placeholder:'Ex.: contabilidade, gestão, participação informada'},{nome:'percentual',rotulo:'Percentual informado (opcional)',valor:n?.percentual,tipo:'number',dica:'Somente quando essa informação estiver confirmada.'},{nome:'observacoes',rotulo:'Observações',valor:n?.observacoes,tipo:'textarea',full:true}];
         let logoPersonalizada=n?.logoPersonalizada||'',carregando=false,leitura=0;
         const {f,controles,erro}=form(c,fechar,campos,v=>{
           if(carregando)throw Error('Aguarde a imagem terminar de carregar.');
@@ -362,16 +380,16 @@
       else {
         painel.append(criar('p','org-orientacao','As linhas mostram as ligações que você informar. Sócios e participações são descritos separadamente.'));
         const visual=criar('div','org-visual-controles');visual.append(botao('Visão geral',()=>{modo='geral';pintar()},modo==='geral'?'':'ghost'),botao('Detalhar',()=>{modo='detalhes';pintar()},modo==='detalhes'?'':'ghost'),criar('span','org-ajuda',modo==='geral'?'Clique em um card para editar conteúdo e ligações.':'Role o desenho para ver todos os itens e suas informações.'));painel.append(visual);
-        if(modo==='geral'){const geral=criar('div','org-visao-geral');const desenho=diagramaSVG(o,state(),{notas:false,resumo:true,horizontal:true},ctx);geral.innerHTML=desenho.svg;geral.firstElementChild.style.maxWidth=desenho.largura+'px';geral.firstElementChild.style.margin='0 auto';const editarPeloDesenho=ev=>{const alvo=ev.target.closest?.('[data-no-id]');if(!alvo)return;const no=o.nos.find(n=>n.id===alvo.getAttribute('data-no-id'));if(no)editarNo(o,no)};geral.onclick=editarPeloDesenho;geral.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();editarPeloDesenho(ev)}};painel.append(geral)}
+        if(modo==='geral'){const zoom=criar('div','org-visual-controles');zoom.append(botao('− Reduzir',()=>{escala=Math.max(.5,(escala||1)-.25);pintar()}),botao('+ Ampliar',()=>{escala=Math.min(2,(escala||1)+.25);pintar()}),botao('Ajustar à tela',()=>{escala=0;pintar()}),botao('Tamanho de leitura',()=>{escala=1;pintar()}));painel.append(zoom);const geral=criar('div','org-visao-geral');const desenho=diagramaSVG(o,state(),{notas:false,resumo:true,horizontal:true},ctx);geral.innerHTML=desenho.svg;geral.firstElementChild.style.width=escala===0?'100%':Math.round(desenho.largura*escala)+'px';geral.firstElementChild.style.maxWidth=escala===0?'100%':'none';geral.firstElementChild.style.margin='0 auto';const editarPeloDesenho=ev=>{const alvo=ev.target.closest?.('[data-no-id]');if(!alvo)return;const no=o.nos.find(n=>n.id===alvo.getAttribute('data-no-id'));if(no)editarNo(o,no)};geral.onclick=editarPeloDesenho;geral.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();editarPeloDesenho(ev)}};painel.append(geral)}
         const viewport=criar('div','org-viewport');viewport.hidden=modo!=='detalhes'&&modo!=='editar';viewport.tabIndex=0;viewport.setAttribute('aria-label','Desenho do organograma. Use a rolagem horizontal para ver todos os itens.');
         if(modo==='editar')painel.append(criar('p','org-ajuda','← e → movem os cards para a esquerda e a direita, mantendo os cards abaixo. Use Separar para retirar um card da linha ou Editar → Card superior para ligá-lo novamente.'));
         function ramo(n){
           const info=identificar(n,state(),ctx),li=criar('li','org-ramo'),cartao=criar('article','org-no');cartao.dataset.noId=n.id;
           const titulo=criar('div','org-no-titulo'),icone=criar('span','org-no-logo');if(info.logoFundo)icone.style.background=info.logoFundo;if(info.logo){const img=criar('img');img.src=info.logo;img.alt='';if(info.logoFundo)img.style.background=info.logoFundo;img.onerror=()=>{icone.replaceChildren();icone.textContent=info.nome.slice(0,1)};icone.append(img)}else icone.textContent=info.nome.slice(0,1);
           const nome=criar('div');nome.append(criar('small','',n.tipo||'Empresa'),criar('h4','',info.nome));titulo.append(icone,nome);cartao.append(titulo);if(!n.parentId&&filhos(o).length>1)cartao.append(criar('p','org-no-atividade','Sem ligação superior'));
-          for(const [chave,rotulo]of [['cnpj','CNPJ'],['regime','Regime'],['banco','Banco'],['contabilidade','Contabilidade']]){const valor=chave==='cnpj'?info.cnpj:n[chave];if(valor){const dado=criar('p','org-no-referencia');dado.append(criar('b','',rotulo+': '),doc.createTextNode(valor));cartao.append(dado)}}
+          for(const [chave,rotulo]of [['cnpj','CNPJ'],['regime','Regime'],['banco','Banco'],['contabilidade','Contabilidade']]){const valor=['cnpj','regime','contabilidade'].includes(chave)?info[chave]:n[chave];if(valor){const dado=criar('p','org-no-referencia');dado.append(criar('b','',rotulo+': '),doc.createTextNode(valor));cartao.append(dado)}}
           if(n.atividade)cartao.append(criar('p','org-no-atividade',n.atividade));
-          if(n.socios){const d=criar('div','org-no-dado');d.append(criar('small','','Composição informada'),criar('p','',n.socios));cartao.append(d)}
+          if(info.socios){const d=criar('div','org-no-dado');d.append(criar('small','','Sócios e participação'),criar('p','',info.socios));cartao.append(d)}
           if(n.relacao||n.percentual!==''&&n.percentual!=null)cartao.append(criar('p','org-no-relacao',[n.relacao,n.percentual!==''&&n.percentual!=null?n.percentual.toLocaleString('pt-BR')+'%':''].filter(Boolean).join(' · ')));
           if(n.observacoes){const nota=criar('div','org-no-nota');nota.append(criar('small','','Observações'),criar('p','',n.observacoes));cartao.append(nota)}
           if(info.ausente)cartao.append(criar('p','org-aviso','Cadastro não encontrado. O nome foi preservado.'));
@@ -396,5 +414,5 @@
     pintar();
     return {render:pintar,importarArquivo};
   }
-  global.LeoOrganograma={render,validar,salvarNo,removerNo,moverNo,listaImportacao,importarNoEstado,identificar,recorte,diagramaSVG,htmlExportacao,otimizarLogo,otimizarOrganogramas};
+  global.LeoOrganograma={render,validar,salvarNo,removerNo,moverNo,listaImportacao,importarNoEstado,identificar,recorte,diagramaSVG,htmlExportacao,sociosResumidos,otimizarLogo,otimizarOrganogramas};
 })(globalThis);
