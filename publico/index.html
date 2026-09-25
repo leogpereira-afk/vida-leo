@@ -635,7 +635,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 }
 </style>
 <link rel="stylesheet" href="./refinamento.css?v=a9b0b08ec1e1">
-<link rel="stylesheet" href="empresas.css?v=3">
+<link rel="stylesheet" href="empresas.css?v=3d6acb9d81e6">
 <link rel="stylesheet" href="organograma.css?v=5075861ba133">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
@@ -3883,6 +3883,67 @@ const MARCADORES = [
   ['Ácido úrico', 'mg/dL', '3,5 a 7,2', '< 6', v => v > 7.2, v => v >= 6],
   ['Ferritina', 'ng/mL', '30 a 400', '50 a 150', v => v > 400 || v < 30, v => v < 50 || v > 150],
 ];
+// Unidades equivalentes evitam que a mesma grandeza apareça como dois itens
+// quando o laboratório escreve a unidade de outra forma.
+const UNIDADES_IGUAIS = [
+  ['g/dl', 'g%'],
+  ['ug/dl', 'mcg/dl'],
+  ['milh/mm3', 'milhoes/mm3', 'mi/mm3'],
+  ['uui/ml', 'uu/ml'],
+];
+function unidadeCanonica(u){
+  let s = normaliza(u).replace(/[³]/g,'3').replace(/[²]/g,'2').replace(/µ/g,'u').replace(/\s+/g,'');
+  for(const grupo of UNIDADES_IGUAIS) if(grupo.includes(s)) return grupo[0];
+  return s;
+}
+const mesmaUnidade=(a,b)=>unidadeCanonica(a)===unidadeCanonica(b);
+const REFERENCIAS_EXTRA = [
+  ['Colesterol total','mg/dL','< 200 ótimo · 200 a 239 limite · ≥ 240 alto', v=>v>=240, v=>v>=200,'laudo'],
+  ['Hemoglobina','g%','14,0 a 18,0', v=>v<14||v>18, null,'laudo'],
+  ['Hematócrito','%','40,0 a 52,0', v=>v<40||v>52, null,'laudo'],
+  ['Hemácias','milh/mm3','4,2 a 5,80', v=>v<4.2||v>5.8, null,'laudo'],
+  ['Leucócitos','/mm3','4.000 a 10.000', v=>v<4000||v>10000, null,'laudo'],
+  ['Plaquetas','/mm3','150.000 a 450.000', v=>v<150000||v>450000, null,'laudo'],
+  ['RDW','%','12,8 a 15,0', v=>v<12.8||v>15, null,'laudo'],
+  ['VHS (hemossedimentação)','mm/1h','até 18 (homens)', v=>v>18, null,'laudo'],
+  ['Fibrinogênio','mg/dL','200 a 400', v=>v<200||v>400, null,'laudo'],
+  ['Homocisteína','µmol/L','5,5 a 16,2 (homens)', v=>v<5.5||v>16.2, null,'laudo'],
+  ['TGO (AST)','U/L','11 a 39 (homens)', v=>v<11||v>39, null,'laudo'],
+  ['TGP (ALT)','U/L','5 a 38', v=>v<5||v>38, null,'laudo'],
+  ['Gama GT','U/L','< 55 (homens)', v=>v>=55, null,'laudo'],
+  ['Ureia','mg/dL','15 a 40', v=>v<15||v>40, null,'laudo'],
+  ['T4 livre','ng/dL','0,61 a 1,12', v=>v<0.61||v>1.12, null,'laudo'],
+  ['Vitamina B12','pg/mL','180 a 914', v=>v<180||v>914, null,'laudo'],
+  ['Ácido fólico','ng/mL','acima de 5,9', v=>v<=5.9, null,'laudo'],
+  ['Vitamina C','mg/dL','0,2 a 2,1 (homens)', v=>v<0.2||v>2.1, null,'laudo'],
+  ['Cálcio','mg/dL','8,8 a 11,0', v=>v<8.8||v>11, null,'laudo'],
+  ['Magnésio','mg/dL','1,6 a 2,6', v=>v<1.6||v>2.6, null,'laudo'],
+  ['Zinco','µg/dL','70,0 a 120,0', v=>v<70||v>120, null,'laudo'],
+  ['Cromo','µg/L','até 5,0', v=>v>5, null,'laudo'],
+  ['Ferro sérico','µg/dL','65 a 170 (homens)', v=>v<65||v>170, null,'laudo'],
+  ['Alumínio','µg/L','< 10,0', v=>v>=10, null,'laudo'],
+  ['Potássio','mg/dL','3,6 a 5,6', v=>v<3.6||v>5.6, null,'laudo'],
+  ['Sódio','mg/dL','135 a 145', v=>v<135||v>145, null,'laudo'],
+  ['Estradiol','pg/mL','abaixo de 31,5 (homens acima de 18 anos)', v=>v>=31.5, null,'laudo'],
+  ['Prolactina','ng/mL','2,64 a 13,13 (homens)', v=>v<2.64||v>13.13, null,'laudo'],
+  ['PTH (paratormônio)','pg/mL','12 a 88', v=>v<12||v>88, null,'laudo'],
+  ['DHT (di-hidrotestosterona)','pg/mL','143 a 842 (homens)', v=>v<143||v>842, null,'laudo'],
+  ['SHBG','nmol/L','10 a 50 (referência geral, não do laudo)', v=>v<10||v>50, null,'geral'],
+  ['VCM','fL','80,0 a 100,0', v=>v<80||v>100, null,'laudo'],
+  ['HCM','pg','27,0 a 32,0', v=>v<27||v>32, null,'laudo'],
+  ['CHCM','%','31,0 a 36,0', v=>v<31||v>36, null,'laudo'],
+  ['Atividade protrombínica','%','70 a 100', v=>v<70||v>100, null,'laudo'],
+  ['Relação PTTA paciente/controle','','menor que 1,3', v=>v>=1.3, null,'laudo'],
+  ['PSA livre','ng/mL','o laudo diz que não há referência estabelecida para o PSA livre isolado', null, null,'laudo'],
+  ['PSA livre / total','%','só se interpreta quando o PSA total fica entre 4 e 10 ng/mL', null, null,'laudo'],
+  ['Testosterona livre (calculada)','ng/dL','o laudo imprime a referência em nmol/L, unidade diferente do resultado', null, null,'laudo'],
+];
+function referenciaExtra(x){
+  const r = REFERENCIAS_EXTRA.find(y => normaliza(y[0]) === normaliza(x.exame||''));
+  if(!r) return null;
+  const u = unidadeSaude(x);
+  return (u && !mesmaUnidade(u, r[1])) ? null : r;
+}
 // Rastreios recomendados por idade (homem). [nome, idadeInicio, cadaXMeses, porquê]
 // [nome, idade que começa, a cada N meses, para quê, onde procurar se já foi feito]
 // o 5º item evita o rastreio ficar "nunca feito" para sempre: 'marcadores' olha os exames
@@ -3924,7 +3985,11 @@ function semaforo(x) {
   const m = MARCADORES.find(y => y[0] === x.exame);
   const v = numeroResultadoSaude(x.valor);
   if(x.resultado==='Aguardando')return '';
-  if (!m || isNaN(v) || x.unidade&&normaliza(x.unidade)!==normaliza(m[1])) return x.resultado === 'Alterado' ? 'ruim' : x.resultado === 'Atenção' ? 'atencao' : x.resultado === 'Normal' ? 'ok' : '';
+  if (!m || isNaN(v) || x.unidade&&!mesmaUnidade(x.unidade,m[1])) {
+    const r = isNaN(v) ? null : referenciaExtra(x);
+    if (r && r[3]) return r[3](v) ? 'ruim' : (r[4] && r[4](v)) ? 'atencao' : 'ok';
+    return x.resultado === 'Alterado' ? 'ruim' : x.resultado === 'Atenção' ? 'atencao' : x.resultado === 'Normal' ? 'ok' : '';
+  }
   if (m[4](v)) return 'ruim';          // fora da referência cadastrada no painel
   if (m[5] && m[5](v)) return 'atencao'; // dentro da referência cadastrada, fora do alvo do painel
   return 'ok';
@@ -4035,7 +4100,7 @@ function vSaude(m) {
     const nUlt = numeroResultadoSaude(ult.valor);
     const nAnt = ant ? numeroResultadoSaude(ant.valor) : NaN;
     let tend = null;
-    if (!isNaN(nUlt) && !isNaN(nAnt) && nAnt !== 0 && normaliza(unidadeSaude(ult))===normaliza(unidadeSaude(ant))) {
+    if (!isNaN(nUlt) && !isNaN(nAnt) && nAnt !== 0 && mesmaUnidade(unidadeSaude(ult),unidadeSaude(ant))) {
       const dif = nUlt - nAnt, pct = dif / Math.abs(nAnt) * 100;
       // "melhor" depende do marcador: sair do alvo é pior, entrar é melhor
       const semU = semaforo(ult), semA = semaforo(ant);
@@ -4300,8 +4365,8 @@ function modalMarcador(nome) {
   const itens = E.exames.filter(x => (x.exame || '').trim() === nome)
     .sort((a, b) => (a.data || '').localeCompare(b.data || ''));
   const ult = registrosResultadoSaude(itens).at(-1);
-  abrirModal(esc(nome), ult?.origemDocumental ? 'Referência do laudo: ' + esc(ult.referenciaLaudo||'Consultar documento original') : mk && (!ult||normaliza(unidadeSaude(ult))===normaliza(mk[1])) ? 'Alvo cadastrado: ' + esc(mk[3]) + ' · referência: ' + esc(mk[2]) : itens.length + ' medição(ões)', (c, fechar) => {
-    const pts = registrosResultadoSaude(itens).filter(x => !isNaN(numeroResultadoSaude(x.valor))&&normaliza(unidadeSaude(x))===normaliza(unidadeSaude(ult||{})))
+  abrirModal(esc(nome), ult?.origemDocumental ? 'Referência do laudo: ' + esc(ult.referenciaLaudo||'Consultar documento original') : mk && (!ult||mesmaUnidade(unidadeSaude(ult),mk[1])) ? 'Alvo cadastrado: ' + esc(mk[3]) + ' · referência: ' + esc(mk[2]) : itens.length + ' medição(ões)', (c, fechar) => {
+    const pts = registrosResultadoSaude(itens).filter(x => !isNaN(numeroResultadoSaude(x.valor))&&mesmaUnidade(unidadeSaude(x),unidadeSaude(ult||{})))
       .map(x => ({ r: fmtDataAno(x.data).slice(0, 5) + '/' + (x.data || '').slice(2, 4), v: numeroResultadoSaude(x.valor) }));
     if (pts.length > 1) {
       const s1 = el('<div class="secao"><h4>Evolução</h4></div>');
@@ -4313,7 +4378,7 @@ function modalMarcador(nome) {
       c.appendChild(el(`<div class="aviso" style="margin:0 0 12px;background:${sem === 'ruim' ? 'var(--vermelho-cl)' : sem === 'atencao' ? 'var(--areia-cl)' : sem==='ok'?'var(--verde-cl)':'var(--bg)'};
         border-color:${sem === 'ruim' ? 'var(--vermelho)' : sem === 'atencao' ? 'var(--areia)' : sem==='ok'?'var(--verde)':'var(--linha)'}">
         <b>${ch ? ch[2] : '—'}</b> — último: ${esc(ult.valor)}${unidadeSaude(ult) ? ' ' + esc(unidadeSaude(ult)) : ''} em ${fmtDataAno(ult.data)}.
-        ${ult.origemDocumental ? 'Referência do laudo: <b>'+esc(ult.referenciaLaudo||'Consultar documento original')+'</b>. '+(devURL(ult.origemDocumental.url)?'<a href="'+esc(devURL(ult.origemDocumental.url))+'" target="_blank" rel="noopener noreferrer">Abrir fonte'+(ult.origemDocumental.pagina?' · p. '+esc(ult.origemDocumental.pagina):'')+'</a>':'') : mk&&normaliza(unidadeSaude(ult))===normaliza(mk[1]) ? 'Alvo cadastrado: <b>' + esc(mk[3]) + '</b>. Referência cadastrada: ' + esc(mk[2]) + '.' : ''}</div>`));
+        ${ult.origemDocumental ? 'Referência do laudo: <b>'+esc(ult.referenciaLaudo||'Consultar documento original')+'</b>. '+(devURL(ult.origemDocumental.url)?'<a href="'+esc(devURL(ult.origemDocumental.url))+'" target="_blank" rel="noopener noreferrer">Abrir fonte'+(ult.origemDocumental.pagina?' · p. '+esc(ult.origemDocumental.pagina):'')+'</a>':'') : mk&&mesmaUnidade(unidadeSaude(ult),mk[1]) ? 'Alvo cadastrado: <b>' + esc(mk[3]) + '</b>. Referência cadastrada: ' + esc(mk[2]) + '.' : ''}</div>`));
     }
     const s2 = el('<div class="secao"><h4>Todas as medições</h4></div>');
     const rl = el('<div class="rolagem"></div>');
@@ -4368,7 +4433,7 @@ function modalExame(x) {
            </div>`
         : `<h4>Referência</h4><p style="font-size:12.5px;color:var(--suave)">Selecione um marcador para consultar as referências e os alvos cadastrados.</p>`;
       // histórico do mesmo exame
-      const hist = registrosResultadoSaude(E.exames.filter(y=>y.exame===x.exame)).filter(y=>Number.isFinite(numeroResultadoSaude(y.valor))&&normaliza(unidadeSaude(y))===normaliza(unidadeSaude(x)));
+      const hist = registrosResultadoSaude(E.exames.filter(y=>y.exame===x.exame)).filter(y=>Number.isFinite(numeroResultadoSaude(y.valor))&&mesmaUnidade(unidadeSaude(y),unidadeSaude(x)));
       if (hist.length > 1) alvo.innerHTML += `<div style="margin-top:12px">${gLinha(
         hist.map(y => ({ r: fmtData(y.data), v: numeroResultadoSaude(y.valor) || 0 })), { fmt: v => v.toFixed(1) })}</div>`;
     };
