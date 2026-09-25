@@ -106,13 +106,31 @@ test('bancos: o número aparece no cartão mesmo sem estar cadastrado, dizendo q
   assert.equal(s.document.querySelector('.banco-icone').textContent.trim(), '756', 'o crachá vira o número');
 });
 
-test('bancos: o seletor de empresa fica na coluna da esquerda', () => {
+/* A LATERAL É UM NÓ SÓ: abas em cima, empresas embaixo. Quando eram dois nós
+   irmãos, a grade pôs a barra de abas sozinha na coluna e a lista de empresas
+   atravessou a direita — foi assim que a tela quebrou. */
+test('bancos: abas e empresas moram na mesma coluna da esquerda', () => {
   assert.match(css, /\.bancos-layout\{display:grid;grid-template-columns:\d+px minmax\(0,1fr\)/);
-  assert.match(css, /\.bancos-layout>\.bancos-filtros\{grid-column:1/, 'o seletor na coluna 1');
-  assert.match(css, /\.bancos-layout>\.bancos-conteudo\{grid-column:2/, 'as contas na coluna 2');
-  assert.match(css, /\.bancos-layout \.bancos-empresas\{flex-direction:column/, 'empilhado, não em fileira');
+  assert.match(css, /\.bancos-layout>\.bancos-lateral\{grid-column:1/, 'a lateral inteira na coluna 1');
+  assert.match(css, /\.bancos-layout>\.workspace-pane\{grid-column:2/, 'o conteúdo na coluna 2');
+  assert.match(css, /\.bancos-lateral \.workspace-tabs\{flex-direction:column/, 'abas uma abaixo da outra');
+  assert.match(css, /\.bancos-layout \.bancos-empresas\{flex-direction:column/, 'empresas empilhadas');
   // e volta a ser fileira quando não há lateral
   assert.match(css, /@media\(max-width:860px\)\{[\s\S]*\.bancos-layout\{display:block\}/);
+});
+
+test('bancos: no DOM, a barra de abas e a lista de empresas estão dentro da lateral', () => {
+  const s = setup();
+  s.run('E.bancos=[{id:"b",banco:"X",titular:"T"}];E.contabilidades=[];bancosFonte={contas:[],erro:"",em:"",pendente:null}');
+  s.run("atual='bancos';const m=document.getElementById('main');m.replaceChildren();vBancos(m)");
+  const lat = s.document.querySelector('.bancos-lateral');
+  assert.ok(lat, 'a lateral tem de existir');
+  assert.ok(lat.querySelector('.workspace-tabs'), 'as abas dentro dela');
+  assert.ok(lat.querySelector('.bancos-empresas'), 'e a lista de empresas também');
+  // o painel fica só com as contas
+  const pane = s.document.querySelector('#bancos-bancos');
+  assert.equal(pane.querySelector('.bancos-empresas'), null, 'a lista não pode voltar para o painel');
+  assert.ok(pane.querySelector('.bancos-grade'), 'o painel fica com os cartões');
 });
 
 /* O amarelo do Banco do Brasil com texto branco dá 1,1:1 e o número some.

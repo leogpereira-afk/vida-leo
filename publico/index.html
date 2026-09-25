@@ -637,7 +637,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 }
 </style>
 <link rel="stylesheet" href="./refinamento.css?v=35e03ac04929">
-<link rel="stylesheet" href="empresas.css?v=bcdeafb48bba">
+<link rel="stylesheet" href="empresas.css?v=f46a5b2fd89a">
 <link rel="stylesheet" href="organograma.css?v=5075861ba133">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
@@ -9872,6 +9872,14 @@ async function vBancos(m){
   const abaAtual=['bancos','contabilidade','organograma'].includes(filtro.bancoAba)?filtro.bancoAba:'bancos';
   const abas=abasWorkspace(m,'bancos',[['bancos','🏦 Bancos'],['contabilidade','🧾 Contabilidade'],['organograma','🗂 Organograma']],
     abaAtual,id=>{filtro.bancoAba=id;rr('bancos')()});
+  /* UMA COLUNA SÓ À ESQUERDA: as três abas em cima, uma embaixo da outra, e a
+     lista de empresas logo abaixo delas. `abasWorkspace` pendura a barra como
+     irmã dos painéis; sem juntar as duas coisas num nó só, a grade punha a
+     barra sozinha na coluna e a lista de empresas atravessava a direita — que
+     foi exatamente o que quebrou na tela. */
+  const lateral=el('<aside class="bancos-lateral" aria-label="Áreas e empresas"></aside>');
+  lateral.appendChild(m.querySelector('.workspace-tabs'));
+  m.insertBefore(lateral,m.querySelector('.workspace-pane'));
   if(abaAtual==='contabilidade'){painelContabilidade(abas.paineis.contabilidade);return}
   if(abaAtual==='organograma'){
     if(typeof LeoOrganograma==='undefined'){abas.paineis.organograma.appendChild(el('<p class="empresa-nota">Não foi possível carregar o organograma. Atualize a página para tentar novamente.</p>'));return}
@@ -9881,8 +9889,11 @@ async function vBancos(m){
       onSelect:id=>{filtro.empresaOrganogramaId=id}});
     return;
   }
+  /* A lista de empresas mora na LATERAL, abaixo das abas; o painel fica só
+     com as contas, que é o que precisa da largura. */
+  lateral.appendChild(busca);
   const alvo=abas.paineis.bancos;
-  alvo.appendChild(busca);const lista=el('<div class="bancos-conteudo" aria-live="polite"></div>');alvo.appendChild(lista);
+  const lista=el('<div class="bancos-conteudo" aria-live="polite"></div>');alvo.appendChild(lista);
   input.oninput=()=>{filtro.bancoBusca=input.value;pintar()};
   function pintar(){
     if(!m.isConnected)return;lista.replaceChildren();

@@ -87,11 +87,15 @@
    seletores ainda nao estao a esquerda"). Em cima, a fileira de 11 empresas
    ocupava duas linhas e empurrava os cartoes para baixo da dobra. Na coluna da
    esquerda ela vira um indice: fica parada enquanto as contas rolam. */
-.bancos-layout{display:grid;grid-template-columns:232px minmax(0,1fr);gap:20px;align-items:start}
+.bancos-layout{display:grid;grid-template-columns:236px minmax(0,1fr);gap:20px;align-items:start}
 .bancos-layout>.topo{grid-column:1/-1}
-.bancos-layout>.bancos-filtros{grid-column:1;grid-row:2;position:sticky;top:12px;display:block}
-.bancos-layout>.bancos-conteudo{grid-column:2;grid-row:2;min-width:0}
-.bancos-layout>.bancos-filtros .bancos-escopo{margin:0}
+/* Tudo da lateral num no so: abas em cima, empresas embaixo. */
+.bancos-layout>.bancos-lateral{grid-column:1;grid-row:2;position:sticky;top:12px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.bancos-layout>.workspace-pane{grid-column:2;grid-row:2;min-width:0}
+.bancos-lateral .workspace-tabs{flex-direction:column;flex-wrap:nowrap;gap:2px;margin:0;width:100%}
+.bancos-lateral .workspace-tabs button{width:100%;justify-content:flex-start;text-align:left;padding:10px 12px;font-size:13px}
+.bancos-lateral .bancos-filtros{display:block}
+.bancos-lateral .bancos-escopo{margin:0}
 .bancos-layout .bancos-empresas{flex-direction:column;flex-wrap:nowrap;gap:2px;padding:0;max-height:calc(100vh - 120px);overflow-y:auto}
 .bancos-layout .banco-empresa-chip{width:100%;justify-content:space-between;text-align:left;border:0;background:transparent;border-radius:8px;min-height:38px;padding:8px 10px;font-size:12.5px}
 .bancos-layout .banco-empresa-chip:hover{background:var(--bg)}
@@ -100,7 +104,9 @@
 /* A lateral so vale quando ha lateral: abaixo disso volta a ser uma fileira. */
 @media(max-width:860px){
   .bancos-layout{display:block}
-  .bancos-layout>.bancos-filtros{position:static}
+  .bancos-layout>.bancos-lateral{position:static;display:block;margin-bottom:14px}
+  .bancos-lateral .workspace-tabs{flex-direction:row;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+  .bancos-lateral .workspace-tabs button{width:auto}
   .bancos-layout .bancos-empresas{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:8px;padding-bottom:8px;max-height:none}
   .bancos-layout .banco-empresa-chip{width:auto;flex:none;border:1px solid var(--linha);background:var(--card);min-height:40px}
 }
