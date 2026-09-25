@@ -637,7 +637,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 }
 </style>
 <link rel="stylesheet" href="./refinamento.css?v=a9b0b08ec1e1">
-<link rel="stylesheet" href="empresas.css?v=6c0e78d80262">
+<link rel="stylesheet" href="empresas.css?v=b7c4cc8cb464">
 <link rel="stylesheet" href="organograma.css?v=bcd62396b9da">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
@@ -1922,14 +1922,14 @@ const MODS=[
   {id:'agenda',ic:'📅',nome:'Agenda',grupo:'',render:vAgenda},
   {id:'rendimentos',ic:'📈',nome:'Rendimentos',grupo:'Dinheiro',render:vRendimentos},
   {id:'gastos',ic:'💸',nome:'Gastos',grupo:'',render:vGastos},
-  {id:'bancos',ic:'🏦',nome:'Bancos',grupo:'',render:vBancos},
+  {id:'empresas',ic:'🏢',nome:'Empresas',grupo:'',render:vEmpresas},
+  {id:'bancos',ic:'🏦',nome:'Gestão',grupo:'',render:vBancos},
   {id:'patrimonio',ic:'🏠',nome:'Patrimônio',grupo:'',render:vPatrimonio},
   {id:'caixavgv',ic:'💰',nome:'Caixa e VGV',grupo:'',render:vCaixaVGV},
   {id:'viagens',ic:'✈️',nome:'Viagens',grupo:'Vida',render:vViagens},
   {id:'demandas',ic:'✅',nome:'Demandas',grupo:'',render:vDemandas},
   {id:'saude',ic:'🩺',nome:'Saúde',grupo:'',render:vSaude},
   {id:'strava',ic:LOGO_STRAVA,nome:'Strava',grupo:'',render:vStrava},
-  {id:'empresas',ic:'🏢',nome:'Empresas',grupo:'Empresa',render:vEmpresas},
   {id:'estrategia',ic:'♟️',nome:'Planejamento estratégico',grupo:'',oculto:true,render:vEmpresas},
   {id:'fortemais',ic:'🏗️',nome:'Fortemais',grupo:'Projeto especial',render:vFortemais},
   {id:'domo',ic:'🏗️',nome:'Domo Construtora',url:'https://leogpereira-afk.github.io/domo/'},
@@ -10317,7 +10317,7 @@ function painelDocsPJ(cx,empresaNome){
 }
 
 async function vBancos(m){
-  m.classList.add('workspace-layout','bancos-layout');const topo=cab('Bancos','Contas, titulares e chaves PIX em um só lugar.');topo.appendChild(acao('+ Nova conta',()=>bancoModal()));m.appendChild(topo);
+  m.classList.add('workspace-layout','bancos-layout');const topo=cab('Gestão','Contas bancárias, contabilidade, seguros e referências em um só lugar.');topo.appendChild(acao('+ Nova conta',()=>bancoModal()));m.appendChild(topo);
   const busca=el('<div class="bancos-filtros"><label>Buscar conta<input type="search" aria-label="Buscar conta" placeholder="Banco, titular, agência, conta ou PIX"></label><div class="bancos-escopo"></div></div>');
   busca.querySelector('label').firstChild.textContent='';busca.querySelector('label').classList.add('bancos-busca-topo');topo.insertBefore(busca.querySelector('label'),topo.lastElementChild);
   const input=topo.querySelector('input');input.value=filtro.bancoBusca||'';
@@ -10917,7 +10917,10 @@ function vEmpresas(m){
   if(window.ResizeObserver){const observar=new window.ResizeObserver(()=>{if(!opcoes.isConnected){observar.disconnect();return}indicar()});observar.observe(opcoes)}
   if(!emp){const empty=el('<section class="workspace-empty"><h2>Sua direção começa pela empresa</h2><p>Cadastre a empresa para reunir estratégia, lideranças e referências.</p></section>');empty.appendChild(acao('Cadastrar empresa',()=>empresaModalFicha()));m.appendChild(empty);return;}
   filtro.empresaId=emp.id;filtro.estrEmpresaId=emp.id;
-  const contexto=el('<div class="empresa-contexto"><div><h2>'+esc(emp.nome||'Empresa sem nome')+'</h2><span>'+esc(emp.status||'Situação não informada')+'</span></div><small>'+esc(emp.cnpj||'')+'</small></div>');contexto.querySelector('div').prepend(empresaImagem(emp,'empresa-logo-cabecalho'));m.appendChild(contexto);
+  const contexto=el('<div class="empresa-contexto"><div><h2>'+esc(emp.nome||'Empresa sem nome')+'</h2><span>'+esc(emp.status||'Situação não informada')+'</span></div><small>'+esc(emp.cnpj||'')+'</small></div>');contexto.querySelector('div').prepend(empresaImagem(emp,'empresa-logo-cabecalho'));
+  const acoesEmpresa=el('<div class="empresa-acoes empresa-acoes-contexto"></div>');
+  acoesEmpresa.append(acao('Editar empresa',()=>empresaModalFicha(emp),'ghost mini'),acao('Excluir empresa',()=>empresaModalExcluir(emp),'ghost mini empresa-btn-excluir'));
+  contexto.appendChild(acoesEmpresa);m.appendChild(contexto);
   const abas=abasWorkspace(m,'empresas',[['cadastros','🧭 Visão de gestão'],['planejamento','♟️ Planejamento estratégico'],['liderancas','👥 Lideranças'],['organograma','Organograma'],['referencias','🏛️ Referências']],filtro.empresaAba||'cadastros',id=>{filtro.empresaAba=id;if(atual==='estrategia')irTela('empresas');else rr('empresas')()});
   if(filtro.empresaAba==='planejamento'){vEstrategia(abas.paineis.planejamento,emp);return;}
   if(filtro.empresaAba==='organograma'){
@@ -10926,7 +10929,7 @@ function vEmpresas(m){
   }
   const ficha=el('<div class="empresa-ficha"></div>');abas.paineis.cadastros.appendChild(ficha);
   const docs=empresaDocumentos(emp),obs=empresaObrigacoes(emp),contas=empresaContas(emp),bens=empresaRegistros(emp,'patrimonio'),planos=(E.planejamentoEmpresas||[]).filter(p=>p.empresaId===emp.id).sort((a,b)=>b.ano-a.ano);
-  const acoesFicha=el('<div class="empresa-acoes empresa-acoes-ficha"></div>');acoesFicha.append(acao(marcaDe(emp.nome).logo?'Trocar logo':'Adicionar logo',()=>empresaModalLogo(emp),'ghost mini'),acao('Excluir empresa',()=>empresaModalExcluir(emp),'ghost mini empresa-btn-excluir'));
+  const acoesFicha=el('<div class="empresa-acoes empresa-acoes-ficha"></div>');acoesFicha.append(acao(marcaDe(emp.nome).logo?'Trocar logo':'Adicionar logo',()=>empresaModalLogo(emp),'ghost mini'));
   centralEmpresa(emp,ficha,planos);
   const geral=empresaBloco('🏢 Dados e contatos','gerais','Informações cadastrais e quem procurar.','Editar dados',()=>empresaModalFicha(emp));
   const dl=el('<dl class="empresa-dados"></dl>');for(const [t,v] of [['CNPJ',emp.cnpj],['Abertura',emp.abertura?fmtDataAno(emp.abertura):''],['Atividade / CNAE',emp.atividade],['Inscrição estadual',emp.inscricaoEstadual],['Inscrição municipal',emp.inscricaoMunicipal],['Regime',emp.regime],['Sócios',emp.socios],['Endereço',[emp.endereco,emp.cidade,emp.uf,emp.cep].filter(Boolean).join(' · ')],['Contato',[emp.contato,emp.telefone,emp.email].filter(Boolean).join(' · ')],['Contabilidade',[emp.contador,emp.contadorContato].filter(Boolean).join(' · ')],['Referência bancária anterior',emp.banco],['Observações',emp.obs]])if(v)dl.appendChild(el('<div><dt>'+t+'</dt><dd>'+esc(v)+'</dd></div>'));
@@ -14442,9 +14445,9 @@ function vGuia(m) {
   ponteEmpresas.appendChild(acao('Abrir Empresas',()=>irTela('empresas'),'ghost'));
   m.appendChild(bloco('gu-empresas','🏢 Minhas empresas','Os mesmos cadastros, organizados em fichas.',ponteEmpresas));
 
-  /* Cadastro canônico em Dinheiro → Bancos; mantém a âncora dos atalhos antigos. */
-  const ponteBancos=el('<div class="corpo"><p>Contas pessoais e empresariais, PIX e contatos agora estão em Dinheiro → Bancos.</p></div>');
-  ponteBancos.appendChild(acao('Abrir Bancos',()=>irTela('bancos'),'ghost'));
+  /* Cadastro canônico em Dinheiro → Gestão; mantém a âncora dos atalhos antigos. */
+  const ponteBancos=el('<div class="corpo"><p>Contas pessoais e empresariais, PIX e contatos agora estão em Dinheiro → Gestão.</p></div>');
+  ponteBancos.appendChild(acao('Abrir Gestão',()=>irTela('bancos'),'ghost'));
   m.appendChild(bloco('gu-bancos','🏦 Bancos e PIX','Um único cadastro para suas contas.',ponteBancos));
 
   /* ---- 7. PROTEÇÃO DA FAMÍLIA ---- */

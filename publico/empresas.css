@@ -181,3 +181,7 @@
 .central-lider-historico{border-top:1px solid var(--linha);margin-top:14px;padding-top:10px}
 .central-lider-historico summary{cursor:pointer;font-size:13px;font-weight:600}
 .central-lider-historico li{font-size:12px;line-height:1.6;margin:10px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+
+.empresa-contexto{flex-wrap:wrap}
+.empresa-contexto .empresa-acoes-contexto{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
+.empresa-acoes-contexto .btn{white-space:nowrap}

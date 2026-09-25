@@ -22,3 +22,21 @@ test('acompanhamento preserva história e não aparece em outra empresa',()=>{
  a.document.querySelector('#empresa-acompanhamento button').click();assert.equal(a.run('p.registros[0].concluido'),true);
  a.run("filtro.empresaId='b';tela()");assert.doesNotMatch(a.document.querySelector('#empresa-acompanhamento').textContent,/Decisão de teste/);assert.equal(a.run('p.registros.length'),1);
 });
+
+test('Excluir empresa fica acessível no contexto em todas as abas sem excluir ao navegar',()=>{
+ const a=app(),antes=a.run('JSON.stringify(E)');
+ for(const aba of ['cadastros','planejamento','liderancas','referencias','organograma']){
+  a.run("filtro.empresaAba='"+aba+"';tela()");
+  const botoes=[...a.document.querySelectorAll('.empresa-contexto button')];
+  assert.ok(botoes.some(b=>b.textContent==='Excluir empresa'),aba);
+  assert.ok(botoes.some(b=>b.textContent==='Editar empresa'),aba);
+ }
+ assert.equal(a.run('JSON.stringify(E)'),antes);
+});
+test('Empresas pertence ao grupo Dinheiro e Gestão conserva a rota bancária',()=>{
+ const a=app();
+ assert.equal(a.run("MODS.find(m=>m.id==='bancos').nome"),'Gestão');
+ assert.equal(a.run("MODS.find(m=>m.id==='empresas').grupo"),'');
+ assert.ok(a.run("MODS.findIndex(m=>m.id==='empresas')>MODS.findIndex(m=>m.grupo==='Dinheiro')"));
+ assert.ok(a.run("MODS.findIndex(m=>m.id==='empresas')<MODS.findIndex(m=>m.grupo==='Vida')"));
+});
