@@ -1,0 +1,148 @@
+/* Painel operacional: informação primeiro, detalhes sob demanda.
+   Apenas a área de trabalho; formulários e organograma mantêm suas medidas. */
+@media screen {
+ :root{--painel-gap:12px}
+ body{line-height:1.45}
+ .side{width:218px;flex-basis:218px;padding:18px 12px}
+ .side .marca{padding-bottom:14px}.side .marca .logo-pessoal{max-width:190px}
+ .side .atalhos-topo{margin-bottom:10px}.side .nav button{min-height:36px;padding:7px 10px;font-size:13px;gap:9px}
+ .side .nav .sep{font-size:10px;letter-spacing:.08em;margin:14px 10px 4px}
+ .main{max-width:none;padding:22px clamp(16px,2vw,30px) 56px}
+ .pagina{min-width:0}.pagina>.topo{align-items:center;gap:12px;margin-bottom:16px}
+ .pagina>.topo h1{font-size:26px;line-height:1.2;letter-spacing:-.035em}
+ .pagina>.topo p{font-size:13px;margin:5px 0 0;line-height:1.4}
+ .pagina>.topo>div{min-width:0}.pagina>.topo .btn{flex-shrink:0}
+ .pagina .btn,.pagina .mais{min-height:36px;padding:7px 12px;font-size:12px;border-radius:8px}
+ .pagina .btn.mini{min-height:32px;padding:5px 9px}
+ .pagina .painel,.pagina .workspace-filters,.pagina .viagens-filtros,.pagina .config-filtros,.pagina .ff-list-filter{padding:10px 12px;gap:8px;margin-bottom:12px;border-radius:10px;min-width:0}
+ .pagina .painel>*,.pagina .workspace-filters>*,.pagina .viagens-filtros>*{min-width:0;max-width:100%}
+ .pagina .painel select,.pagina .workspace-filters select,.pagina .viagens-filtros select,.pagina .ff-list-filter select,.pagina .painel input,.pagina .workspace-filters input,.pagina .rotina-busca input,.pagina .config-filtros input,.pagina .ff-list-filter input{min-height:36px;padding:7px 10px;font:inherit;font-size:13px;border:1px solid var(--linha);border-radius:8px;background:var(--card);color:var(--tinta);max-width:100%;box-sizing:border-box}
+ .pagina .rotina-busca>span,.pagina .config-filtros label{font-size:11px}.pagina .rotina-busca{gap:4px}
+ .pagina .grade{gap:10px;margin-bottom:12px;grid-template-columns:repeat(auto-fit,minmax(min(175px,100%),1fr))}
+ .pagina .kpi{min-width:0;min-height:0;padding:12px 14px;border-radius:10px;box-shadow:none}
+ .pagina .kpi .rot{font-size:10px;line-height:1.35;min-height:0;letter-spacing:.045em;overflow-wrap:anywhere}
+ .pagina .kpi .val{font:650 clamp(20px,1.65vw,26px)/1.25 Inter,system-ui,sans-serif;letter-spacing:-.035em;margin:5px 0 3px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+ .pagina .kpi .sub{font-size:11px;line-height:1.4;overflow-wrap:anywhere}
+ .pagina .kpi .val img{max-height:24px;width:auto;max-width:32px;vertical-align:middle}
+ .pagina .bloco{margin-bottom:12px;border-radius:11px;box-shadow:none;min-width:0}
+ .pagina .bloco>header{min-height:42px;padding:10px 14px;gap:10px}
+ .pagina .bloco>header h2{font-size:14px;line-height:1.4;font-family:Inter,system-ui,sans-serif;letter-spacing:-.02em}
+ .pagina .bloco>header .dica{font-size:11px;line-height:1.4;min-width:0;overflow-wrap:anywhere}
+ .pagina .corpo{padding:12px 14px}.pagina .vazio{padding:18px 14px;font-size:13px}
+ .pagina .tabela-acoes{padding:7px 12px}.pagina .aviso{padding:9px 12px;margin-bottom:12px;font-size:12px;border-radius:9px}
+ .pagina .chip{display:inline-flex;align-items:center;max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.35;padding:3px 7px;font-size:10.5px}
+ .pagina table{font-size:12px}.pagina th{font-size:10px;letter-spacing:.035em;padding:8px}
+ .pagina .rolagem{max-width:100%;overscroll-behavior-x:contain;scrollbar-width:thin}
+ .pagina .finance-tabs,.pagina .workspace-tabs,.pagina .agenda-abas,.pagina .caixa-abas{display:flex;flex-wrap:wrap;gap:5px;padding:0;background:transparent;border:0;border-radius:0;margin:0 0 12px}
+ .pagina .finance-tabs button,.pagina .workspace-tabs button,.pagina .agenda-abas button,.pagina .caixa-abas button{flex:0 1 auto;min-height:36px;padding:7px 14px;border:1px solid var(--linha);background:var(--card);border-radius:20px;font-size:12px;line-height:1.35;color:var(--suave);max-width:100%;white-space:normal;overflow-wrap:anywhere;box-shadow:none}
+ .pagina .finance-tabs button[aria-pressed=true],.pagina .workspace-tabs button[aria-pressed=true],.pagina .agenda-abas button[aria-pressed=true],.pagina .caixa-abas button[aria-pressed=true]{background:var(--verde-cl);border-color:var(--verde);color:var(--verde)}
+ .pagina .workspace-metrics{grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 12px}
+ .pagina .workspace-metrics .kpi{padding:12px 14px}
+ .pagina .workspace-results{margin:0 0 10px;gap:10px}.pagina .workspace-note,.pagina .ff-note{font-size:11px;line-height:1.45;margin:8px 0 12px}
+ .pagina .workspace-filters input[type=search]{flex:2 1 200px}.pagina .workspace-filters>select{flex:1 1 150px}
+ .pagina .workspace-hero{padding:14px 16px;gap:16px;border-radius:11px;margin-bottom:12px}
+ .pagina .workspace-hero h2{font-size:20px;margin:3px 0 5px}.pagina .workspace-hero p{font-size:12px;line-height:1.45}
+ .pagina .workspace-card{padding:14px 16px;border-radius:11px}.pagina .workspace-card h3{font-size:17px;margin:0 0 6px}
+ .pagina .workspace-columns{gap:12px}.pagina .workspace-row{padding:9px 0;gap:10px}
+ .pagina .workspace-empty{padding:22px 18px;border-radius:11px}.pagina .workspace-empty h2{font-size:18px;margin:0 0 6px}.pagina .workspace-empty p{margin:0 0 10px;font-size:13px;line-height:1.5}
+ .pagina .workspace-empty p:last-child{margin-bottom:0}
+ /* Um único alinhamento para os cinco indicadores financeiros. */
+ .pagina.financeiro .finance-metrics{grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border-radius:11px;margin-bottom:12px}
+ .pagina.financeiro .finance-metrics .kpi{grid-column:auto;padding:14px;border-radius:0;border:0;border-right:1px solid var(--linha)}
+ .pagina.financeiro .finance-metrics .kpi:last-child{border-right:0}
+ .pagina.financeiro .finance-metrics .kpi:first-child{background:#3036a4;color:#fff}
+ .pagina.financeiro .finance-metrics .kpi .val{font-size:clamp(18px,1.55vw,25px);margin:6px 0}
+ .pagina.financeiro .finance-metrics .kpi:first-child .val{color:#fff}
+ .pagina.financeiro>.painel{padding:0}.pagina .finance-tools summary{padding:8px}
+ .pagina .finance-category{padding:10px 0}.pagina .finance-category-name,.pagina .finance-category-value{font-size:13px}
+ .pagina .finance-insight{padding:9px 12px;font-size:12px;margin:0 0 12px}.pagina .finance-insight summary{cursor:pointer;font-weight:600;min-height:22px}.pagina .finance-insight p{font-size:11px;line-height:1.45}
+ /* Filtros rápidos e indicadores secundários, sem repetir a faixa principal. */
+ .painel-chips{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+ .painel-chips button{border:1px solid var(--linha);background:var(--card);color:var(--suave);border-radius:20px;padding:6px 11px;min-height:34px;font:600 12px/1.35 Inter,system-ui,sans-serif;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+ .painel-chips button[aria-pressed=true]{background:var(--verde-cl);color:var(--verde);border-color:var(--verde)}
+ .painel-chips button b{font-variant-numeric:tabular-nums;margin-left:5px}
+ .painel-mais{margin:0 0 12px;border:1px solid var(--linha);border-radius:10px;background:var(--card)}
+ .painel-mais>summary{padding:10px 14px;cursor:pointer;font-size:12px;font-weight:600}.painel-mais>.grade{padding:0 10px 10px;margin:0}
+ .pagina .rotina-metricas{margin:0 0 12px;border-radius:10px}.pagina .rotina-metricas>div{padding:10px 14px}
+ .pagina .rotina-metricas strong{font-size:23px;margin:4px 0}.pagina .rotina-metricas span,.pagina .rotina-metricas small{font-size:11px}
+ .pagina .viagens-filtros{align-items:flex-end}.pagina .viagens-filtros>label:not(.rotina-busca){flex-direction:column;align-items:stretch;gap:4px;font-size:11px}
+ .pagina .viagens-filtros select{min-width:145px}.pagina .viagens-filtros>.rotina-busca{min-width:180px}
+ .pagina.viagens-layout table{width:100%;table-layout:fixed}.pagina.viagens-layout td{padding:8px!important;white-space:normal!important;overflow-wrap:anywhere;line-height:1.4;font-size:12px!important}
+ .pagina.viagens-layout th:nth-child(1),.pagina.viagens-layout th:nth-child(2){width:5%}.pagina.viagens-layout th:nth-child(3){width:15%}.pagina.viagens-layout th:nth-child(8){width:4%}.pagina.viagens-layout th:nth-child(9){width:11%}
+ .pagina.rotina-demandas td{white-space:normal;overflow-wrap:anywhere}
+ .pagina .ff-position{padding:9px 14px;margin:0 0 12px;gap:14px;border-radius:10px}.pagina .ff-position>div:not(.ff-position-track){gap:2px;font-size:11px}.pagina .ff-position b{font-size:13px}.pagina .ff-position-track{height:6px}
+ /* Saúde: o título acompanha os números, sem uma faixa de apresentação. */
+ .pagina .saude-resumo{border-radius:11px;margin-bottom:12px}
+ .pagina .saude-resumo-titulo{padding:10px 14px;background:var(--card);color:var(--tinta);border-bottom:1px solid var(--linha);display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+ .pagina .saude-resumo-titulo>span{display:none}.pagina .saude-resumo-titulo h2{font-size:14px;margin:0}.pagina .saude-resumo-titulo p{font-size:11px;color:var(--suave)}
+ .pagina.saude-layout .saude-resumo .grade{grid-template-columns:repeat(6,minmax(0,1fr));gap:0;margin:0}
+ .pagina.saude-layout .saude-resumo .kpi{padding:12px;border-radius:0}.pagina .saude-lembretes{padding:12px 14px;margin-bottom:12px;border-radius:11px}
+ .pagina.saude-layout>.painel select{flex:0 1 250px;min-height:36px;padding:8px 12px;font-size:13px}
+ /* Documentos em linhas: identidade, validade, referência e situação alinhadas. */
+ .pagina.planos-documents .workspace-grid{gap:7px}
+ .pagina.planos-documents .workspace-document{grid-template-columns:minmax(150px,1fr) minmax(245px,1.15fr) minmax(90px,.45fr);grid-template-areas:'nome dados status' 'pessoa dados status' 'local local local';gap:3px 16px;padding:12px 15px;border-radius:10px}
+ .pagina.planos-documents .workspace-item-title{grid-area:nome;font-size:14px;line-height:1.4;margin:0;overflow-wrap:anywhere}
+ .pagina.planos-documents .workspace-owner{grid-area:pessoa;font-size:12px;margin:0;overflow-wrap:anywhere}
+ .pagina.planos-documents .workspace-document-data{grid-area:dados;margin:0;align-self:center;gap:12px;font-size:10px}
+ .pagina.planos-documents .workspace-document-data b{font-size:12px;margin:2px 0 0}
+ .pagina.planos-documents .workspace-document-top{grid-area:status;margin:0;min-height:0;justify-content:flex-end;align-self:center}
+ .pagina.planos-documents .workspace-document-icon{display:none}
+ .pagina.planos-documents .workspace-document-footer{grid-area:local;padding-top:6px;margin-top:5px;font-size:10.5px}
+ .pagina.planos-opportunities .workspace-opportunity{padding:13px 16px;gap:6px 16px;border-radius:11px}.pagina.planos-opportunities .workspace-item-title{font-size:16px}
+ .pagina .workspace-opportunity .workspace-document-top{margin-bottom:4px;min-height:0}
+ .pagina .workspace-opportunity .workspace-next{padding:9px 12px;margin:4px 0}
+ /* Strava e Drive utilizam o mesmo ritmo dos demais módulos. */
+ .pagina .stv-tela .stv-ultimo{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px}
+ .pagina .stv-ultimo .stv-titulo{font:600 16px/1.4 Inter,system-ui,sans-serif}.pagina .stv-ultimo .stv-quando{font-size:11px}
+ .pagina .stv-ultimo .stv-metricas{grid-column:1/-1;grid-row:3;display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
+ .pagina .stv-ultimo .stv-metricas>div{padding:7px 11px;background:var(--bg);border-radius:8px;font-size:13px;min-width:100px}
+ .pagina .stv-ultimo .stv-acoes{grid-column:2;grid-row:1/3;align-self:center;margin:0}
+ .pagina .stv-sinc-linha{font-size:11px;margin-bottom:10px}.pagina .stv-abas{margin-bottom:8px}
+ .pagina .dv-pastas{grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:7px}.pagina .dv-pasta{padding:9px 10px;border-radius:9px}
+ .pagina .dv-pasta .ic{font-size:19px}.pagina .dv-pasta .nm{font-size:12px}.pagina .dv-pasta .sub{font-size:10px}
+ .pagina .dv-trilha{margin:8px 0;gap:7px;font-size:12px}
+ .pagina[data-pagina=drive]>.painel .btn{border-radius:18px}.pagina .dv-cota{font-size:11px}
+ .pagina .config-filtros{align-items:center}.pagina .config-filtros [role=status]{padding:0;white-space:nowrap}
+ .pagina .bancos-config .corpo{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:10px 0;margin-bottom:10px}
+ .pagina .bancos-config h2{font:600 14px Inter,system-ui,sans-serif;margin:0}.pagina .bancos-config p{font-size:12px;margin:0;flex:1}.pagina .bancos-config .btn{margin-left:auto}
+ .pagina .inicio-contexto{padding:12px 16px;gap:12px;margin-bottom:12px}.pagina .inicio-contexto strong{font-size:20px}.pagina .inicio-grade .kpi{min-height:0}
+ .pagina .caixa-fonte{padding:12px 16px;margin:0 0 12px}.pagina .caixa-fonte h2{font-size:15px}.pagina .caixa-fonte p{font-size:12px}
+ .pagina .indice-tela{padding:8px 12px;margin-bottom:12px;gap:10px;font-size:12px}.pagina .indice-tela select{min-height:34px}
+ .pagina .cartoes{gap:10px}.pagina .cartao{padding:14px;border-radius:10px}
+ .pagina .bloco:focus-within{scroll-margin-top:14px}
+ @media(max-width:1150px){
+  .pagina.financeiro .finance-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.pagina.financeiro .finance-metrics .kpi:first-child{grid-column:span 2}
+  .pagina.financeiro .finance-metrics .kpi{border-bottom:1px solid var(--linha)}
+  .pagina.saude-layout .saude-resumo .grade{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .pagina.viagens-layout th:nth-child(3){width:12%}
+ }
+ @media(max-width:860px){
+  .side{width:100%;padding:10px 14px;flex-basis:auto}.side .marca{padding:0}.side .marca .logo-pessoal{max-width:165px}.side .nav button{min-height:44px}
+  .main{padding:18px 14px 60px}.pagina>.topo h1{font-size:24px}
+  .pagina .workspace-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pagina.viagens-layout table{table-layout:auto}
+ }
+ @media(max-width:600px){
+  .pagina>.topo{gap:10px;margin-bottom:14px}.pagina>.topo .cresce{display:none}.pagina>.topo>.btn{margin-left:auto}
+  .pagina .btn,.pagina .btn.mini,.pagina .mais,.pagina .finance-tabs button,.pagina .workspace-tabs button,.pagina .agenda-abas button,.pagina .caixa-abas button,.painel-chips button{min-height:44px}
+  .pagina .painel select,.pagina .painel input,.pagina .workspace-filters input,.pagina .workspace-filters select,.pagina .viagens-filtros select,.pagina .rotina-busca input,.pagina .config-filtros input,.pagina .ff-list-filter input,.pagina .ff-list-filter select{font-size:16px;min-height:44px}
+  .pagina .grade{grid-template-columns:repeat(2,minmax(0,1fr))}.pagina .kpi{padding:11px 12px}.pagina .kpi .val{font-size:21px}
+  .pagina.financeiro .finance-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.pagina.financeiro .finance-metrics .kpi .val{font-size:20px}
+  .pagina .rotina-metricas>div{padding:10px 12px}.pagina .rotina-metricas strong{font-size:20px}
+  .pagina .workspace-tabs{flex-wrap:wrap;overflow:visible}.pagina .workspace-tabs>.btn{white-space:normal;flex:0 1 auto}
+  .pagina .workspace-hero{gap:10px}.pagina .workspace-hero>.btn{width:auto}.pagina .workspace-hero h2{font-size:18px}
+  .pagina.saude-layout .saude-resumo .grade{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pagina .saude-resumo-titulo{gap:4px}.pagina.saude-layout>.painel select{flex:1;font-size:16px;min-height:44px}
+  .pagina .viagens-filtros{grid-template-columns:repeat(2,minmax(0,1fr))}.pagina .viagens-filtros select{min-width:0}.pagina .viagens-filtros>.rotina-busca{min-width:0}
+  .pagina.viagens-layout th{width:auto!important}.pagina.viagens-layout td{font-size:13px!important}
+  .pagina.planos-documents .workspace-document{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'nome status' 'pessoa status' 'dados dados' 'local local';padding:12px;gap:5px 10px}
+  .pagina.planos-documents .workspace-document-data{margin-top:4px;gap:10px}.pagina.planos-documents .workspace-document-top{max-width:115px}
+  .pagina .workspace-filters input[type=search]{flex-basis:100%}.pagina .workspace-filters>select{flex:1 1 135px;min-width:0;width:auto}.pagina .workspace-filters .planos-clear{min-height:44px!important}
+  .pagina .dv-pastas{grid-template-columns:minmax(0,1fr)}.pagina .dv-pasta{min-height:54px}
+  .pagina .stv-tela .stv-ultimo{grid-template-columns:minmax(0,1fr)}.pagina .stv-ultimo .stv-acoes{grid-column:1;grid-row:4}.pagina .stv-ultimo .stv-metricas>div{flex:1 1 40%;min-width:0}
+  .pagina .config-filtros{display:flex;flex-wrap:wrap;gap:7px}.pagina .config-filtros label{flex-basis:100%}
+  .pagina .bancos-config p{flex-basis:100%}.pagina .bancos-config .btn{margin-left:0}
+ }
+ @media(pointer:coarse){.side .nav button,.pagina .btn,.pagina .btn.mini,.painel-chips button{min-height:44px}}
+}
+@media print{.finance-insight::details-content,.painel-mais::details-content{display:block;content-visibility:visible}.painel-chips{display:none!important}.painel-mais>summary{display:none}.painel-mais::details-content{display:block}}

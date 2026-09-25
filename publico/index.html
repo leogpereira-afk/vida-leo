@@ -645,6 +645,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 <link rel="stylesheet" href="./central-fluida.css?v=df0c674c8278">
 <link rel="stylesheet" href="./documentos-revisao.css?v=90d5f0ab4afe">
 <link rel="stylesheet" href="./metodo-vof.css?v=c123348dc276">
+<link rel="stylesheet" href="./painel-compacto.css?v=70889622e0b6">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -2094,12 +2095,35 @@ function prepararTabelas(pagina){
   });
 }
 
+/* Ajustes de apresentação não gravam preferências nem alteram cadastros. */
+function chipsPainel(rotulo,opcoes,atual,mudar){
+  const nav=el('<nav class="painel-chips"></nav>');nav.setAttribute('aria-label',rotulo);
+  opcoes.forEach(([id,nome,n])=>{const b=el('<button type="button"></button>');b.dataset.filtro=id;b.setAttribute('aria-pressed',String(id===atual));b.appendChild(document.createTextNode(nome+(n!=null?' ':'')));if(n!=null)b.appendChild(el('<b>'+esc(n)+'</b>'));b.onclick=()=>mudar(id);nav.appendChild(b)});return nav;
+}
+function organizarPainelCompacto(pagina,secao){
+  pagina.dataset.pagina=secao;
+  pagina.querySelectorAll('.finance-insight:not(details)').forEach(n=>{const d=el('<details class="finance-insight"><summary></summary></details>');d.querySelector('summary').textContent=n.querySelector('b')?.textContent||'Entenda este resumo';[...n.children].filter(x=>x.tagName!=='B').forEach(x=>d.appendChild(x));n.replaceWith(d)});
+  if(secao==='patrimonio'){
+    const painel=pagina.querySelector('.painel'),topo=pagina.querySelector('.topo');
+    if(painel&&topo){[...painel.querySelectorAll('button')].forEach(b=>topo.appendChild(b));painel.remove()}
+  }
+  if(['demandas','viagens'].includes(secao)){
+    const extra=[...pagina.children].find(x=>x.classList.contains('grade'));
+    if(extra){const d=el('<details class="painel-mais"><summary>Mais indicadores</summary></details>');extra.before(d);d.appendChild(extra)}
+  }
+  if(secao==='demandas'){
+    const select=pagina.querySelector('select[aria-label="Situação das demandas"]');
+    if(select){const nav=chipsPainel('Filtrar demandas',[['Todas','Todas'],['Pendentes','Pendentes'],['Atrasadas','Atrasadas'],['Alta prioridade','Alta prioridade'],['Concluída','Concluídas']],filtro.demandas,id=>{filtro.demandas=id;rr('demandas')()});pagina.querySelector('.painel').after(nav)}
+  }
+
+}
+
 function tela(){
   aplicarFonteInterface();
   const m=document.getElementById('main'),pagina=el('<div class="pagina"></div>');m.replaceChildren(pagina);
   const alvo=_alvoBloco;_alvoBloco=null;
   const mod=MODS.find(x=>x.id===atual&&!x.url);document.title=mod.nome+' · Central do Léo';
-  const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else if(atual==='caixavgv')organizarCaixaVGV(pagina,alvo);else if(atual==='config')organizarConfig(pagina,alvo);else if(atual==='demandas')organizarDemandasTopo(pagina);else indiceDaTela(pagina);prepararTabelas(pagina);if(typeof docIntegrarTela==='function')docIntegrarTela(pagina,atual);if(alvo)rolaAlvo(pagina,alvo)};
+  const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else if(atual==='caixavgv')organizarCaixaVGV(pagina,alvo);else if(atual==='config')organizarConfig(pagina,alvo);else if(atual==='demandas')organizarDemandasTopo(pagina);else indiceDaTela(pagina);prepararTabelas(pagina);if(typeof docIntegrarTela==='function')docIntegrarTela(pagina,atual);organizarPainelCompacto(pagina,atual);if(alvo)rolaAlvo(pagina,alvo)};
   const falhou=()=>{if(pagina.isConnected)pagina.appendChild(el('<p class="aviso" role="alert">Não foi possível concluir o carregamento. Abra esta seção novamente.</p>'))};
   try{const resultado=mod.render(pagina);if(resultado?.then)resultado.then(finalizar).catch(falhou);else finalizar()}catch(erro){falhou()}
   /* o botão flutuante é enfeite: se ele falhar (ou o DOM for simulado num teste),
@@ -2409,7 +2433,10 @@ function vViagens(m) {
   const anosV = [...new Set([...E.viagens.flatMap(v=>[v.ida,v.volta]).filter(dataISOValida).map(d=>d.slice(0,4)),String(anoHoje),String(+anoHoje+1)])].sort().reverse();
   const anoV = filtro.viagensAno;
   const noAno = E.viagens.filter(v=>viagemNoAno(v,anoV));
-  const lista = ordenarViagensRotina(buscaRotina(noAno.filter(v=>filtro.viagens==='Todas'||v.status===filtro.viagens),filtro.viagensBusca,['evento','cidade','hotel','transporte','obs']));
+  const recorte=filtro.viagensRecorte||'todas';
+  const atende=v=>recorte==='todas'||(recorte==='proximas'&&['proximas','andamento'].includes(faseViagem(v)))||(recorte==='sem-hotel'&&['proximas','andamento'].includes(faseViagem(v))&&!temHotelViagem(v))||(recorte==='conferir'&&faseViagem(v)==='conferir');
+  const baseViagens=buscaRotina(noAno.filter(v=>filtro.viagens==='Todas'||v.status===filtro.viagens),filtro.viagensBusca,['evento','cidade','hotel','transporte','obs']);
+  const lista = ordenarViagensRotina(baseViagens.filter(atende));
   const ativos = lista.filter(v=>v.status!=='Cancelado');
   const tot = ativos.reduce((s,v)=>s+custoViagem(v),0);
   const dias = ativos.reduce((s,v)=>s+(+diasEntre(v.ida,v.volta)||0),0);
@@ -2419,6 +2446,11 @@ function vViagens(m) {
   anoLabel.appendChild(seletor(anoV,[...anosV.map(a=>[a,a+' ('+E.viagens.filter(v=>viagemNoAno(v,a)).length+')']),['todos','Todos os anos']],v=>{filtro.viagensAno=v;r()}));
   statusLabel.appendChild(seletor(filtro.viagens,[['Todas','Todas ('+noAno.length+')'],...CFG('statusViagem').map(st=>[st,st+' ('+cont(st)+')'])],v=>{filtro.viagens=v;r()}));
   controles.appendChild(anoLabel);controles.appendChild(statusLabel);controles.appendChild(buscaRotinaCampo(filtro.viagensBusca,'Buscar viagem, destino ou hotel',v=>{filtro.viagensBusca=v;r()}));m.appendChild(controles);
+  m.appendChild(chipsPainel('Prioridades das viagens',[
+    ['todas','Todas',baseViagens.length],['proximas','Próximas',baseViagens.filter(v=>['proximas','andamento'].includes(faseViagem(v))).length],
+    ['sem-hotel','Sem hotel',baseViagens.filter(v=>['proximas','andamento'].includes(faseViagem(v))&&!temHotelViagem(v)).length],
+    ['conferir','Conferir datas',baseViagens.filter(v=>faseViagem(v)==='conferir').length]
+  ],recorte,id=>{filtro.viagensRecorte=id;r()}));
   m.appendChild(metricasRotina([['Viagens no filtro',lista.length,'Canceladas aparecem no histórico'],['Previsto / lançado',brl(tot),'Sem viagens canceladas'],['Dias de viagem',dias,'Períodos completos das viagens visíveis'],['Para conferir',ativos.filter(v=>faseViagem(v)==='conferir').length,'Datas incompletas ou invertidas']]));
 
 
@@ -2462,7 +2494,7 @@ function vViagens(m) {
       <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${custo ? brl(custo) : '—'}</td>
       <td style="padding:9px 10px;font-size:12px">${v.status === 'Cancelado' ? '<span style="color:var(--suave)">cancelada</span>'
         : !falta.length ? '<span class="chip" style="background:var(--verde-cl);color:var(--verde)">pronta</span>'
-        : '<span style="color:var(--vermelho)">falta ' + esc(falta.join(', ')) + '</span>'}</td>
+        : falta.map(x=>'<span class="chip" style="color:var(--vermelho)">'+esc(x)+'</span>').join(' ')}</td>
       <td style="padding:9px 10px">${chip(v.status)}</td>`;
     tr.onclick = () => modalViagem(v);
     tb.appendChild(tr);
@@ -4236,7 +4268,7 @@ function novoExameRotina(nome=''){novoRegistroRotina('Novo exame',E.exames,{data
   {k:'resultado',t:'Situação no laudo',opcoes:['','Aguardando','Normal','Atenção','Alterado']},{k:'medico',t:'Médico / laboratório'}],modalExame)}
 function novoCuidadoRotina(tipo){
   const opcoes={
-    peso:['Nova pesagem',E.peso,{data:hoje(),altura:ultimoRegistroSaude(E.peso,['altura'])?.altura||'',obs:''},[{k:'data',t:'Data',tipo:'date',obrigatorio:true},{k:'peso',t:'Peso (kg)',tipo:'number',min:'0.1',obrigatorio:true},{k:'altura',t:'Altura (m)',tipo:'number'},{k:'cintura',t:'Cintura (cm)',tipo:'number'},{k:'obs',t:'Como me senti'}],'sa-peso'],
+    peso:['Nova pesagem',E.peso,{data:hoje(),altura:ultimoRegistroSaude(E.peso,['altura'])?.altura||'',obs:''},[{k:'data',t:'Data',tipo:'date',obrigatorio:true},{k:'peso',t:'Peso (kg)',tipo:'number',min:'0.1',obrigatorio:true},{k:'altura',t:'Altura (m ou cm)',tipo:'number'},{k:'cintura',t:'Cintura (cm)',tipo:'number'},{k:'obs',t:'Como me senti'}],'sa-peso'],
     vitais:['Novos sinais vitais',E.vitais,{data:hoje(),obs:''},[{k:'data',t:'Data',tipo:'date',obrigatorio:true},{k:'sis',t:'Pressão sistólica (mmHg)',tipo:'number'},{k:'dia',t:'Pressão diastólica (mmHg)',tipo:'number'},{k:'fc',t:'Batimentos (bpm)',tipo:'number'},{k:'obs',t:'Observação'}],'sa-vit'],
     tratamentos:['Novo tratamento',E.tratamentos,{inicio:hoje(),fim:'',frequencia:'',status:'Em andamento'},[{k:'oque',t:'Tratamento / remédio',obrigatorio:true},{k:'motivo',t:'Motivo informado'},{k:'inicio',t:'Início',tipo:'date'},{k:'frequencia',t:'Frequência / dose prescrita'},{k:'medico',t:'Profissional responsável'}],'sa-trat'],
     vacinas:['Nova vacina',E.vacinas,{data:hoje(),proxima:'',viagem:'Não',obs:''},[{k:'vacina',t:'Vacina',obrigatorio:true},{k:'data',t:'Data da dose',tipo:'date',obrigatorio:true},{k:'proxima',t:'Próxima data informada',tipo:'date'},{k:'obs',t:'Observação'}],'sa-vac'],
@@ -4286,8 +4318,10 @@ function vSaude(m) {
   const ord = E.peso.filter(x=>dataISOValida(x.data)&&x.data<=hoje()&&+x.peso>0).sort((a, b) => (a.data || '').localeCompare(b.data || ''));
   const ult = ord[ord.length - 1], pri = ord[0];
   const dif = (ult && pri) ? (+ult.peso - +pri.peso) : 0;
-  const imc = (ult && ult.altura) ? (+ult.peso / Math.pow(+ult.altura, 2)) : 0;
-  const cintAlt = (ult && ult.altura && ult.cintura) ? (+ult.cintura / (+ult.altura * 100)) : 0;
+  // Aceita 1,80 m ou 180 cm sem alterar o registro original.
+  const alturaMetros=ult&&+ult.altura>0?(+ult.altura>3?+ult.altura/100:+ult.altura):0;
+  const imc = (ult && alturaMetros) ? (+ult.peso / Math.pow(alturaMetros, 2)) : 0;
+  const cintAlt = (ult && alturaMetros && +ult.cintura>0) ? (+ult.cintura / (alturaMetros * 100)) : 0;
   const emTrat = E.tratamentos.filter(t => t.status !== 'Encerrado'&&String(t.oque||'').trim()).length;
   const vit = E.vitais.filter(x=>dataISOValida(x.data)&&x.data<=hoje()).sort((a, b) => (a.data || '').localeCompare(b.data || ''));
   const uv = vit[vit.length - 1];
@@ -4408,7 +4442,7 @@ function vSaude(m) {
   /* ---- 4. peso e medidas ---- */
   m.appendChild(tabelaBloco('sa-peso', 'Peso e medidas', 'Registros mais recentes primeiro, sem perder o histórico.', [...E.peso].sort((a,b)=>(b.data||'').localeCompare(a.data||'')), [
     { k: 'data', t: 'Data', tipo: 'date' }, { k: 'peso', t: 'Peso (kg)', tipo: 'number', num: 1, w: 110 },
-    { k: 'altura', t: 'Altura (m)', tipo: 'number', num: 1, w: 110 }, { k: 'cintura', t: 'Cintura (cm)', tipo: 'number', num: 1, w: 120 },
+    { k: 'altura', t: 'Altura (m ou cm)', tipo: 'number', num: 1, w: 110 }, { k: 'cintura', t: 'Cintura (cm)', tipo: 'number', num: 1, w: 120 },
     { k: 'obs', t: 'Como me senti', ph: '—' },
   ], () => ({ data: hoje(), peso: '', altura: ult?.altura || '', cintura: '', obs: '' }), r,null,E.peso));
 
@@ -14776,8 +14810,11 @@ function organizarDemandasTopo(m){
 function organizarConfig(m,alvo){
   m.classList.add('config-fluida');const tools=el('<div class="config-filtros"><label>Encontrar uma configuração<input type="search" placeholder="Ex.: empresas, backup, documentos" aria-label="Encontrar uma configuração"></label><span role="status"></span></div>');
   const blocos=[...m.querySelectorAll('.bloco[data-bid]')],input=tools.querySelector('input');
-  const filtrar=()=>{let n=0;for(const b of blocos){b.hidden=!!input.value&&!normaliza(b.querySelector('header')?.textContent).includes(normaliza(input.value));if(!b.hidden)n++}tools.querySelector('[role=status]').textContent=n+' de '+blocos.length+' assuntos'};
+  let grupo='todos';const listas=new Set(GRUPOS_CFG.map(g=>'cf-'+g.k));
+  const noGrupo=b=>grupo==='todos'||(grupo==='conexoes'&&b.dataset.bid.startsWith('google-'))||(grupo==='listas'&&listas.has(b.dataset.bid))||(grupo==='aparencia'&&['cf-aparencia','cf-marcas'].includes(b.dataset.bid))||(grupo==='seguranca'&&['cf-senha','cf-acessos'].includes(b.dataset.bid));
+  const filtrar=()=>{let n=0;for(const b of blocos){b.hidden=!noGrupo(b)||(!!input.value&&!normaliza(b.querySelector('header')?.textContent).includes(normaliza(input.value)));if(!b.hidden)n++}tools.querySelector('[role=status]').textContent=n+' de '+blocos.length+' assuntos'};
   input.oninput=filtrar;filtrar();m.querySelector('.painel')?.replaceWith(tools);
+  const atalhos=chipsPainel('Grupos de configurações',[['todos','Todos'],['aparencia','Aparência e logos'],['conexoes','Conexões'],['listas','Listas'],['seguranca','Segurança']],grupo,id=>{grupo=id;atalhos.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.filtro===id)));filtrar()});tools.after(atalhos);
   if(alvo){const b=blocos.find(x=>x.dataset.bid===alvo);if(b){b.hidden=false;b.classList.remove('fechado');b.querySelector('header')?.setAttribute('aria-expanded','true')}}
 }
 
