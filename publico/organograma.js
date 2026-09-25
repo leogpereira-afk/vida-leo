@@ -180,7 +180,14 @@
       }
       for(const rotulo of rotulos){const quantidade=Math.max(...[...dados.values()].map(d=>d.cartao.blocos.find(b=>b.rotulo===rotulo).linhas.length));for(const d of dados.values()){const b=d.cartao.blocos.find(b=>b.rotulo===rotulo);while(b.linhas.length<quantidade)b.linhas.push('')}}
       const h=Math.max(100,...[...dados.values()].map(d=>60+d.cartao.nome.length*19+d.cartao.blocos.reduce((v,b)=>v+28+b.linhas.length*16,0)));
-      for(const d of dados.values())d.cartao.altura=h;niveis.fill(h);
+      for(const d of dados.values()){
+        const c=d.cartao,r=c.blocos.find(b=>b.rotulo==='Regime'),t=c.blocos.find(b=>b.rotulo==='Contabilidade');
+        const colunas=[r,t].map(b=>({rotulo:b.rotulo,linhas:linhas(b.texto||'Não informado',16)}));
+        c.blocos=c.blocos.filter(b=>b!==t).map(b=>b===r?{rotulo:'Regime e contabilidade',colunas,linhas:Array(Math.max(...colunas.map(x=>x.linhas.length))).fill('')}:b);
+        c.altura=60+c.nome.length*19+c.blocos.reduce((v,b)=>v+28+b.linhas.length*16,0);
+      }
+      const linhasDuplas=Math.max(...[...dados.values()].map(d=>d.cartao.blocos.find(b=>b.colunas).linhas.length));for(const d of dados.values()){const b=d.cartao.blocos.find(b=>b.colunas);d.cartao.altura+=(linhasDuplas-b.linhas.length)*16;b.linhas=Array(linhasDuplas).fill('')}
+      const alturaPadrao=Math.max(...[...dados.values()].map(d=>d.cartao.altura));for(const d of dados.values())d.cartao.altura=alturaPadrao;niveis.fill(alturaPadrao);
     }
     const yNiveis = niveis.map((_,i) => niveis.slice(0,i).reduce((s,h) => s+h+gapY,0) + 18);
     function posicionar(n, inicio) {
@@ -212,7 +219,7 @@
     }
     for (const d of dados.values()) {
       const {n,cartao:c,x,y} = d;
-      svg += `<g data-no-id="${esc(n.id)}" tabindex="0" role="button" aria-label="Editar ${esc(c.info.nome)}"><rect x="${x}" y="${y}" width="${largura}" height="${c.altura}" rx="14" fill="${cores.fundo}" stroke="${cores.linha}"/><rect x="${x}" y="${y}" width="${largura}" height="6" rx="3" fill="${d.nivel===0?cores.destaque:'#c4a877'}"/>`;
+      svg += `<g data-no-id="${esc(n.id)}" tabindex="0" role="button" aria-label="Editar ${esc(c.info.nome)}"><title>Clique para editar ${esc(c.info.nome)}</title><rect x="${x}" y="${y}" width="${largura}" height="${c.altura}" rx="14" fill="${cores.fundo}" stroke="${cores.linha}"/><rect x="${x}" y="${y}" width="${largura}" height="6" rx="3" fill="${d.nivel===0?cores.destaque:'#c4a877'}"/>`;
       svg += `<text x="${x+84}" y="${y+29}" font-size="10" font-weight="700" fill="${cores.suave}" font-family="Inter,system-ui,sans-serif">${esc((n.tipo||'Empresa').toUpperCase())}</text>`;
       if (c.info.logo && c.info.logoFundo) svg += `<rect x="${x+18}" y="${y+33}" width="54" height="54" rx="7" fill="${c.info.logoFundo}"/>`;
       if (c.info.logo) svg += `<image href="${esc(c.info.logo)}" x="${x+22}" y="${y+37}" width="46" height="46" preserveAspectRatio="xMidYMid meet"/>`;
@@ -220,6 +227,8 @@
       for (const linha of c.nome) { svg += `<text x="${x+84}" y="${ty}" font-size="16" font-weight="700" fill="${cores.tinta}" font-family="Inter,system-ui,sans-serif">${esc(linha)}</text>`; ty += 19; }
       ty += 7;
       for (const bloco of c.blocos) {
+        if(bloco.colunas){const topo=ty+17;bloco.colunas.forEach((col,i)=>{const cx=x+18+i*122;svg+=`<text x="${cx}" y="${topo}" font-size="10" fill="${cores.suave}" font-weight="700" font-family="Inter,system-ui,sans-serif">${esc(col.rotulo.toUpperCase())}</text>`;col.linhas.forEach((linha,j)=>{svg+=`<text x="${cx}" y="${topo+18+j*16}" font-size="13" fill="${cores.tinta}" font-family="Inter,system-ui,sans-serif">${esc(linha)} </text>`})});ty+=28+bloco.linhas.length*16;continue}
+
         ty += 17; svg += `<text x="${x+18}" y="${ty}" font-size="10" fill="${cores.suave}" font-weight="700" font-family="Inter,system-ui,sans-serif">${esc(bloco.rotulo.toUpperCase())}</text>`; ty += 18;
         for (const linha of bloco.linhas) { svg += `<text x="${x+18}" y="${ty}" font-size="13" fill="${cores.tinta}" font-family="Inter,system-ui,sans-serif">${esc(linha)}</text>`; ty += 16; }
         ty -= 7;
@@ -269,9 +278,13 @@
       return persistir(lista,o.id);
     }
     function abrir(titulo,sub,montar) {
-      if(ctx.openModal)return ctx.openModal(titulo,sub,montar);
+      if(ctx.openModal&&!telaCheia)return ctx.openModal(titulo,sub,montar);
       const fundo=criar('div','org-modal-fundo'),dialogo=criar('section','org-modal'),h=criar('h2','',titulo),p=criar('p','',sub),corpo=criar('div');
-      dialogo.setAttribute('role','dialog');dialogo.setAttribute('aria-modal','true');dialogo.append(h,p,corpo);fundo.append(dialogo);container.append(fundo);montar(corpo,()=>fundo.remove());
+      const anterior=doc.activeElement,fechar=()=>{fundo.remove();anterior?.focus?.()};
+      dialogo.setAttribute('role','dialog');dialogo.setAttribute('aria-modal','true');dialogo.setAttribute('aria-label',titulo);
+      const cabecalho=criar('header','org-modal-cab'),sair=botao('✕',fechar);sair.setAttribute('aria-label','Fechar edição');cabecalho.append(h,sair);dialogo.append(cabecalho,p,corpo);fundo.append(dialogo);container.append(fundo);
+      fundo.onkeydown=ev=>{if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();fechar()}if(ev.key==='Tab'){const itens=[...dialogo.querySelectorAll('button,input,select,textarea')].filter(x=>!x.disabled&&!x.hidden);const primeiro=itens[0],ultimo=itens.at(-1);if(ev.shiftKey&&doc.activeElement===primeiro){ev.preventDefault();ultimo?.focus()}else if(!ev.shiftKey&&doc.activeElement===ultimo){ev.preventDefault();primeiro?.focus()}}};
+      montar(corpo,fechar);sair.focus();
     }
     function form(corpo,fechar,campos,salvar,rotulo='Salvar') {
       const f=criar('form','org-form'),controles={};

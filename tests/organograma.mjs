@@ -157,3 +157,9 @@ test('Cards e PDF exibem regime, contabilidade e todos os sócios somente pelo p
  assert.equal(a.api.sociosResumidos('Maria Silva'),'Maria · % não informado');
  clicar(a,'Ajustar à tela');assert.equal(a.document.querySelector('.org-visao-geral svg').style.width,'100%');clicar(a,'Tamanho de leitura');assert.ok(a.document.querySelector('.org-visao-geral svg').style.width.endsWith('px'));
 });
+
+test('Editar em tela cheia abre diálogo visível no próprio organograma e cancelar preserva tela cheia',()=>{
+ const a=app();a.render();clicar(a,'Tela cheia');clicar(a,'Editar cards');clicar(a,'Editar','.org-no[data-no-id="a"]');
+ assert.ok(a.document.querySelector('.org-tela-cheia .org-modal-fundo [role=dialog]'));
+ assert.equal(a.document.querySelector('#modal form'),null);clicar(a,'Cancelar','.org-modal');assert.equal(a.document.querySelector('.org-modal'),null);assert.ok(a.document.querySelector('.org-tela-cheia'));
+});
