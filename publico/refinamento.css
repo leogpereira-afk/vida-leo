@@ -14,6 +14,10 @@ button:disabled{opacity:.55;cursor:wait}
 .menu-mobile{display:none}
 .nav button{min-height:42px;padding:10px 12px}
 .nav button.on{box-shadow:inset 3px 0 var(--verde)}
+.nav-empresas{display:grid;gap:3px;margin:2px 0 6px 14px;padding-left:8px;border-left:1px solid var(--linha)}
+.nav button.nav-empresa{min-height:34px;padding:7px 9px;font-size:12px;text-align:left;color:var(--suave)}
+.nav button.nav-empresa.on{color:var(--azul);background:color-mix(in srgb,var(--azul) 9%,transparent);box-shadow:inset 2px 0 var(--azul)}
+.nav-empresa-logo{width:20px!important;height:20px!important;min-width:20px!important;font-size:11px!important}
 .nav .sep{opacity:1;margin-top:18px;font-size:11px}
 .side>.ponte[onclick]{display:none}
 .ferramentas{margin:18px 6px 0;color:var(--suave);font-size:12px}
@@ -66,6 +70,8 @@ body:has(.fundo){overflow:hidden}
  .atalhos-topo{margin:0}.atalhos-topo>.btn{width:auto;white-space:nowrap;min-height:42px}.menu-mobile{display:block}
  .nav,.side>.ponte,.ferramentas{display:none}
  .side.menu-aberto .nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-column:1/-1;overflow:visible;padding:8px 0;gap:4px}
+ .side.menu-aberto .nav-empresas{grid-column:1/-1;grid-template-columns:repeat(2,minmax(0,1fr));margin:0;padding:0;border-left:0;gap:4px}
+ .side.menu-aberto .nav-empresa{min-height:42px}
  .nav button{white-space:normal;font-size:13px;min-height:44px}
  .side.menu-aberto>.ponte,.side.menu-aberto>.ferramentas{display:block;grid-column:1/-1}
  .side.menu-aberto>.ponte[onclick]{display:none}

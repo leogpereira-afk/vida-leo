@@ -634,7 +634,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
   .main{padding:20px 15px 60px}
 }
 </style>
-<link rel="stylesheet" href="./refinamento.css?v=35e03ac04929">
+<link rel="stylesheet" href="./refinamento.css?v=a9b0b08ec1e1">
 <link rel="stylesheet" href="empresas.css?v=3">
 <link rel="stylesheet" href="organograma.css?v=5075861ba133">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
@@ -1860,6 +1860,21 @@ function menu(){
       b.onclick=()=>window.open(m.url,'_blank','noopener');}
     else {b.onclick=()=>irTela(m.id);if(m.id===atual)b.setAttribute('aria-current','page')}
     nav.appendChild(b);
+    if(m.id==='empresas'){
+      const empresasLaterais=(E.empresasPJ||[]).filter(e=>String(e.nome||'').trim()).sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
+      if(empresasLaterais.length){
+        const grupo=el('<div class="nav-empresas" aria-label="Empresas cadastradas"></div>');
+        for(const empresa of empresasLaterais){
+          const ativa=atual==='empresas'&&filtro.empresaId===empresa.id;
+          const item=el(`<button type="button" class="nav-empresa${ativa?' on':''}"${ativa?' aria-current="page"':''}><span class="tx">${esc(empresa.nome)}</span></button>`);
+          item.prepend(empresaImagem(empresa,'nav-empresa-logo'));
+          item.title='Abrir '+empresa.nome;
+          item.onclick=()=>{filtro.empresaId=empresa.id;filtro.empresaAba='cadastros';irTela('empresas')};
+          grupo.appendChild(item);
+        }
+        nav.appendChild(grupo);
+      }
+    }
   });
 }
 function indiceDaTela(pagina){
