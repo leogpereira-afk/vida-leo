@@ -132,3 +132,17 @@ test('CNPJ do cadastro aparece no resumo, detalhes e PDF visual; referência do 
  a.e.organogramas[0].nos[0].cnpj='98.765.432/0001-10';assert.equal(a.api.identificar(a.e.organogramas[0].nos[0],a.e).cnpj,'98.765.432/0001-10');
  assert.equal(a.e.empresasPJ[0].cnpj,'12.345.678/0001-90');assert.equal(a.api.identificar({nome:'Livre'},a.e).cnpj,'');
 });
+
+test('Salvar reduz logos antigas e novas antes de persistir sem alterar outros dados',async()=>{
+ const a=app(),grande='data:image/png;base64,'+'A'.repeat(100000),pequena='data:image/webp;base64,YWJj';
+ a.e.organogramas[0].nos[0].logoPersonalizada=grande;
+ a.ctx.Image=class{naturalWidth=1200;naturalHeight=600;set src(v){this.onload()}};
+ const create=a.document.createElement.bind(a.document);a.document.createElement=tag=>tag==='canvas'?{getContext:()=>({drawImage(){}}),toDataURL:()=>pequena}:create(tag);
+ a.contexto.save=()=>{if(JSON.stringify(a.e).length>20000){const e=Error('quota');e.name='QuotaExceededError';throw e}a.calls.push('save')};
+ a.render();clicar(a,'Detalhar');clicar(a,'Editar','.org-no[data-no-id="b"]');
+ const f=a.document.querySelector('#modal form');f.querySelector('[name=cnpj]').value='12.345.678/0001-90';await f.onsubmit({preventDefault(){}});
+ assert.equal(a.e.organogramas[0].nos[0].logoPersonalizada,pequena);assert.equal(a.e.organogramas[0].nos[1].cnpj,'12.345.678/0001-90');assert.equal(a.e.organogramas[0].nos[2].parentId,'b');assert.ok(a.calls.includes('save'));assert.equal(a.document.querySelector('#modal form'),null);
+});
+test('Falta de espaço mantém formulário e dados anteriores com mensagem compreensível',()=>{
+ const a=app();a.contexto.save=()=>{const e=Error('quota exceeded');e.name='QuotaExceededError';throw e};a.render();const antes=JSON.stringify(a.e);clicar(a,'+ Adicionar item');enviar(a,{nome:'Portal teste'});assert.equal(JSON.stringify(a.e),antes);assert.match(a.document.querySelector('#modal .org-erro').textContent,/armazenamento.*cheio/);assert.equal(a.document.querySelector('[name=nome]').value,'Portal teste');
+});

@@ -80,6 +80,24 @@
     if (/^data:image\/(png|jpe?g|webp);base64,[a-z\d+/=\s]+$/i.test(v)) return v;
     try { const u = new URL(v); return u.protocol === 'https:' && !u.username && !u.password ? u.href : ''; } catch { return ''; }
   }
+  function otimizarLogo(valor) {
+    if(!String(valor).startsWith('data:image/') || valor.length<=60000)return Promise.resolve(valor);
+    return new Promise((resolve,reject)=>{
+      const img=new global.Image();img.onerror=()=>reject(Error('Não foi possível preparar a logomarca. Escolha outra imagem.'));
+      img.onload=()=>{try{
+        let melhor=valor;
+        for(const limite of [384,256,192,128]){
+          const escala=Math.min(1,limite/Math.max(img.naturalWidth,img.naturalHeight)),canvas=global.document.createElement('canvas');
+          canvas.width=Math.max(1,Math.round(img.naturalWidth*escala));canvas.height=Math.max(1,Math.round(img.naturalHeight*escala));
+          const g=canvas.getContext('2d');if(!g)throw Error('Não foi possível preparar a imagem.');g.drawImage(img,0,0,canvas.width,canvas.height);
+          const pequena=canvas.toDataURL('image/webp',.85);if(!logoSegura(pequena))throw Error('Imagem inválida.');if(pequena.length<melhor.length)melhor=pequena;if(melhor.length<=60000)break;
+        }
+        if(melhor.length>120000)throw Error('A logomarca ainda está muito grande. Escolha uma imagem menor.');resolve(melhor);
+      }catch(e){reject(e)}};img.src=valor;
+    });
+  }
+  function precisaOtimizar(lista){return lista.some(o=>o.nos.some(n=>['logo','logoPersonalizada'].some(k=>String(n[k]||'').startsWith('data:image/')&&n[k].length>60000)))}
+  async function otimizarOrganogramas(lista){const nova=clone(lista),cache=new Map();for(const o of nova)for(const n of o.nos)for(const chave of ['logo','logoPersonalizada'])if(n[chave]){const original=n[chave];if(!cache.has(original))cache.set(original,await otimizarLogo(original));n[chave]=cache.get(original)}return nova}
   function identificar(n, estado, ctx = {}) {
     const empresa = (estado.empresasPJ || []).find(e => e.id === n.empresaId);
     const nome = texto(n.nomePersonalizado) || empresa?.nome || n.nome || 'Empresa não encontrada';
@@ -128,7 +146,7 @@
     if (n.relacao || n.percentual !== '' && n.percentual != null) blocos.push({rotulo:'Ligação informada',linhas:linhas([n.relacao,n.percentual !== '' && n.percentual != null ? n.percentual.toLocaleString('pt-BR') + '%' : ''].filter(Boolean).join(' · '))});
     if (notas && n.observacoes) blocos.push({rotulo:'Observações',texto:n.observacoes,linhas:linhas(n.observacoes)});
     if (info.ausente) blocos.push({rotulo:'Cadastro',linhas:['Empresa não encontrada. Nome preservado.']});
-    const nome = linhas(info.nome,info.logo ? 23 : 31);
+    const nome = linhas(info.nome,20);while(nome.length<2)nome.push('');
     const altura = Math.max(info.logo?100:0,60 + nome.length * 19 + blocos.reduce((v,b) => v + 28 + b.linhas.length * 16,0));
     return {info,blocos,nome,altura};
   }
@@ -145,6 +163,7 @@
       return total;
     }
     const raizes = filhos(o); let totalX = Math.max(largura,raizes.reduce((s,n) => s + medir(n,0),0) + Math.max(0,raizes.length-1)*gap);
+    if(opts.resumo&&opts.horizontal){const h=Math.max(100,...niveis);for(const d of dados.values())d.cartao.altura=h;niveis.fill(h)}
     const yNiveis = niveis.map((_,i) => niveis.slice(0,i).reduce((s,h) => s+h+gapY,0) + 18);
     function posicionar(n, inicio) {
       const d = dados.get(n.id); d.x = inicio + (d.largura-largura)/2 + 18; d.y = yNiveis[d.nivel];
@@ -176,15 +195,15 @@
     for (const d of dados.values()) {
       const {n,cartao:c,x,y} = d;
       svg += `<g data-no-id="${esc(n.id)}" tabindex="0" role="button" aria-label="Editar ${esc(c.info.nome)}"><rect x="${x}" y="${y}" width="${largura}" height="${c.altura}" rx="14" fill="${cores.fundo}" stroke="${cores.linha}"/><rect x="${x}" y="${y}" width="${largura}" height="6" rx="3" fill="${d.nivel===0?cores.destaque:'#c4a877'}"/>`;
-      svg += `<text x="${x+18}" y="${y+29}" font-size="10" font-weight="700" fill="${cores.suave}" font-family="Arial,sans-serif">${esc((n.tipo||'Empresa').toUpperCase())}</text>`;
-      if (c.info.logo && c.info.logoFundo) svg += `<rect x="${x+203}" y="${y+33}" width="54" height="54" rx="7" fill="${c.info.logoFundo}"/>`;
-      if (c.info.logo) svg += `<image href="${esc(c.info.logo)}" x="${x+207}" y="${y+37}" width="46" height="46" preserveAspectRatio="xMidYMid meet"/>`;
+      svg += `<text x="${x+84}" y="${y+29}" font-size="10" font-weight="700" fill="${cores.suave}" font-family="Inter,system-ui,sans-serif">${esc((n.tipo||'Empresa').toUpperCase())}</text>`;
+      if (c.info.logo && c.info.logoFundo) svg += `<rect x="${x+18}" y="${y+33}" width="54" height="54" rx="7" fill="${c.info.logoFundo}"/>`;
+      if (c.info.logo) svg += `<image href="${esc(c.info.logo)}" x="${x+22}" y="${y+37}" width="46" height="46" preserveAspectRatio="xMidYMid meet"/>`;
       let ty = y+54;
-      for (const linha of c.nome) { svg += `<text x="${x+18}" y="${ty}" font-size="16" font-weight="700" fill="${cores.tinta}" font-family="Arial,sans-serif">${esc(linha)}</text>`; ty += 19; }
+      for (const linha of c.nome) { svg += `<text x="${x+84}" y="${ty}" font-size="16" font-weight="700" fill="${cores.tinta}" font-family="Inter,system-ui,sans-serif">${esc(linha)}</text>`; ty += 19; }
       ty += 7;
       for (const bloco of c.blocos) {
-        ty += 17; svg += `<text x="${x+18}" y="${ty}" font-size="10" fill="${cores.suave}" font-weight="700" font-family="Arial,sans-serif">${esc(bloco.rotulo.toUpperCase())}</text>`; ty += 18;
-        for (const linha of bloco.linhas) { svg += `<text x="${x+18}" y="${ty}" font-size="12" fill="${cores.tinta}" font-family="Arial,sans-serif">${esc(linha)}</text>`; ty += 16; }
+        ty += 17; svg += `<text x="${x+18}" y="${ty}" font-size="10" fill="${cores.suave}" font-weight="700" font-family="Inter,system-ui,sans-serif">${esc(bloco.rotulo.toUpperCase())}</text>`; ty += 18;
+        for (const linha of bloco.linhas) { svg += `<text x="${x+18}" y="${ty}" font-size="13" fill="${cores.tinta}" font-family="Inter,system-ui,sans-serif">${esc(linha)}</text>`; ty += 16; }
         ty -= 7;
       }
       svg += '</g>';
@@ -218,17 +237,18 @@
     function persistir(lista, proximoId) {
       validar(lista); const e=state(), anteriores=e.organogramas, mt=e._mt, tinhaMt=Object.prototype.hasOwnProperty.call(e,'_mt');
       e.organogramas=lista;
-      try { if(ctx.save()===false)throw Error('Não foi possível salvar.'); } catch(erro) { if(anteriores===undefined)delete e.organogramas;else e.organogramas=anteriores;if(tinhaMt)e._mt=mt;else delete e._mt;throw Error('Não foi possível salvar o organograma. '+erro.message); }
+      try { if(ctx.save()===false)throw Error('Não foi possível salvar.'); } catch(erro) { if(anteriores===undefined)delete e.organogramas;else e.organogramas=anteriores;if(tinhaMt)e._mt=mt;else delete e._mt;throw Error(erro.name==='QuotaExceededError'||/quota/i.test(erro.message)?'O armazenamento do navegador está cheio. Suas alterações continuam nesta janela. Não limpe os dados do navegador; faça um backup da Central antes de tentar novamente.':'Não foi possível salvar o organograma. '+erro.message); }
       selecionar(proximoId);pintar();
     }
     function conferirAtual(o,assinatura) {
       if(o && JSON.stringify((state().organogramas||[]).find(x=>x.id===o.id))!==assinatura)throw Error('Este organograma mudou enquanto a janela estava aberta. Feche e abra novamente para continuar.');
     }
-    function mudar(o,original,assinatura) {
+    function mudar(o,original,assinatura,otimizar=false,ativo=()=>true) {
       conferirAtual(original,assinatura);
       const atuais=state().organogramas||[],ix=atuais.findIndex(x=>x.id===o.id),lista=atuais.slice();
       if(ix<0)lista.push(o);else lista[ix]=o;
-      persistir(lista,o.id);
+      if(otimizar&&precisaOtimizar(lista)){const estadoAntes=JSON.stringify(atuais);return otimizarOrganogramas(lista).then(nova=>{if(!ativo())return;if(JSON.stringify(state().organogramas||[])!==estadoAntes)throw Error('O organograma mudou durante a preparação das imagens. Feche e abra novamente para conferir.');persistir(nova,o.id)})}
+      return persistir(lista,o.id);
     }
     function abrir(titulo,sub,montar) {
       if(ctx.openModal)return ctx.openModal(titulo,sub,montar);
@@ -248,7 +268,7 @@
         label.append(input);if(campo.dica)label.append(criar('small','',campo.dica));f.append(label);controles[campo.nome]=input;
       }
       const erro=criar('p','org-erro');erro.setAttribute('role','alert');const acoes=criar('div','org-form-acoes');acoes.append(botao('Cancelar',fechar));const ok=botao(rotulo,()=>{},'');ok.type='submit';acoes.append(ok);f.append(erro,acoes);
-      f.onsubmit=ev=>{ev.preventDefault();erro.textContent='';try{salvar(Object.fromEntries(Object.entries(controles).map(([k,c])=>[k,c.value])),fechar)}catch(e){erro.textContent=e.message;erro.scrollIntoView?.({block:'nearest'})}};
+      f.onsubmit=ev=>{ev.preventDefault();if(ok.disabled)return;erro.textContent='';const falha=e=>{erro.textContent=e.message;erro.scrollIntoView?.({block:'nearest'})};try{const resultado=salvar(Object.fromEntries(Object.entries(controles).map(([k,c])=>[k,c.value])),fechar);if(resultado?.then){ok.disabled=true;ok.textContent='Preparando imagens…';return resultado.catch(falha).finally(()=>{ok.disabled=false;ok.textContent=rotulo})}}catch(e){falha(e)}};
       corpo.append(f);return {f,controles,erro};
     }
     function editarDiagrama(o) {
@@ -270,7 +290,7 @@
           const emp=(state().empresasPJ||[]).find(e=>e.id===v.empresaId);
           if(v.empresaId&&!emp&&v.empresaId!==n?.empresaId)throw Error('Escolha uma empresa cadastrada.');
           const valor={...clone(n||{id:id(),ordem:o.nos.length}),...v,logoPersonalizada,nome:emp?.nome||texto(v.nome),nomePersonalizado:emp&&texto(v.nome)!==emp.nome?texto(v.nome):'',percentual:v.percentual===''?'':Number(v.percentual)};
-          mudar(salvarNo(o,valor),o,assinatura);fechar();
+          const resultado=mudar(salvarNo(o,valor),o,assinatura,true,()=>f.isConnected);if(resultado?.then)return resultado.then(fechar);fechar();
         });
         const bloco=criar('section','org-campo org-campo-full'),rotulo=criar('label','org-campo');rotulo.append(criar('span','','Logomarca do card'));
         const arquivo=criar('input');arquivo.type='file';arquivo.accept='image/png,image/jpeg,image/webp';rotulo.append(arquivo);
@@ -342,7 +362,7 @@
       else {
         painel.append(criar('p','org-orientacao','As linhas mostram as ligações que você informar. Sócios e participações são descritos separadamente.'));
         const visual=criar('div','org-visual-controles');visual.append(botao('Visão geral',()=>{modo='geral';pintar()},modo==='geral'?'':'ghost'),botao('Detalhar',()=>{modo='detalhes';pintar()},modo==='detalhes'?'':'ghost'),criar('span','org-ajuda',modo==='geral'?'Clique em um card para editar conteúdo e ligações.':'Role o desenho para ver todos os itens e suas informações.'));painel.append(visual);
-        if(modo==='geral'){const geral=criar('div','org-visao-geral');geral.innerHTML=diagramaSVG(o,state(),{notas:false,resumo:true,horizontal:true},ctx).svg;const editarPeloDesenho=ev=>{const alvo=ev.target.closest?.('[data-no-id]');if(!alvo)return;const no=o.nos.find(n=>n.id===alvo.getAttribute('data-no-id'));if(no)editarNo(o,no)};geral.onclick=editarPeloDesenho;geral.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();editarPeloDesenho(ev)}};painel.append(geral)}
+        if(modo==='geral'){const geral=criar('div','org-visao-geral');const desenho=diagramaSVG(o,state(),{notas:false,resumo:true,horizontal:true},ctx);geral.innerHTML=desenho.svg;geral.firstElementChild.style.maxWidth=desenho.largura+'px';geral.firstElementChild.style.margin='0 auto';const editarPeloDesenho=ev=>{const alvo=ev.target.closest?.('[data-no-id]');if(!alvo)return;const no=o.nos.find(n=>n.id===alvo.getAttribute('data-no-id'));if(no)editarNo(o,no)};geral.onclick=editarPeloDesenho;geral.onkeydown=ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();editarPeloDesenho(ev)}};painel.append(geral)}
         const viewport=criar('div','org-viewport');viewport.hidden=modo!=='detalhes'&&modo!=='editar';viewport.tabIndex=0;viewport.setAttribute('aria-label','Desenho do organograma. Use a rolagem horizontal para ver todos os itens.');
         if(modo==='editar')painel.append(criar('p','org-ajuda','← e → movem os cards para a esquerda e a direita, mantendo os cards abaixo. Use Separar para retirar um card da linha ou Editar → Card superior para ligá-lo novamente.'));
         function ramo(n){
@@ -376,5 +396,5 @@
     pintar();
     return {render:pintar,importarArquivo};
   }
-  global.LeoOrganograma={render,validar,salvarNo,removerNo,moverNo,listaImportacao,importarNoEstado,identificar,recorte,diagramaSVG,htmlExportacao};
+  global.LeoOrganograma={render,validar,salvarNo,removerNo,moverNo,listaImportacao,importarNoEstado,identificar,recorte,diagramaSVG,htmlExportacao,otimizarLogo,otimizarOrganogramas};
 })(globalThis);
