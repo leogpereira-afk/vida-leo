@@ -9859,6 +9859,136 @@ function contabilidadeModalLogo(x){
   });
 }
 
+/* ===================== AS OUTRAS ABAS DA CENTRAL FINANCEIRA =====================
+   Seguros, Documentos PF, Documentos PJ e Drive. NENHUMA delas inventa uma
+   lista nova: seguros continuam em E.seguros (os mesmos de Gastos), documentos
+   de pessoa em E.documentos (os mesmos da tela Documentos), documentos de
+   empresa dentro da ficha de cada empresa, e o Drive é a tela que já existe.
+   Segunda lista para o mesmo fato diverge na primeira semana. */
+
+/* O TITULAR DO SEGURO — empresa ou pessoa. O cadastro de seguros nunca teve
+   esse campo (nasceu dentro de Gastos, onde só importava quanto custa). Ele é
+   editável aqui; em Gastos a tabela continua como era, e os dois escrevem no
+   MESMO registro. */
+function seguroTitular(s){return String(s&&s.titular||'').trim()||'Sem titular'}
+function seguroModal(x,novo=false){
+  const registro=x||{id:uid(),_ffNovo:true,status:'Ativo',ciclo:'Anual'};
+  const pessoas=['Léo',...(E.pessoas||[]).map(p=>p.nome).filter(Boolean)];
+  const empresas=(E.empresasPJ||[]).map(e=>e.nome).filter(Boolean);
+  const defs=[
+    {k:'titular',t:'De quem é',req:true,grupo:'Identificação',
+     sugestoes:[...new Set([...empresas,...pessoas])],ajuda:'Empresa ou pessoa: é por aqui que a lista se agrupa.'},
+    {k:'tipo',t:'Tipo',opcoes:['',...CFG('tiposSeguro')]},
+    {k:'item',t:'O que cobre',ph:'o carro, a casa, minha vida'},
+    {k:'seguradora',t:'Seguradora',grupo:'Apólice'},{k:'apolice',t:'Apólice'},
+    {k:'capital',t:'Capital segurado (R$)',tipo:'moeda',min:0},
+    {k:'beneficiarios',t:'Quem recebe'},{k:'telefone',t:'Telefone do sinistro'},
+    {k:'valor',t:'Custo (R$)',tipo:'moeda',min:0,grupo:'Custo e vigência'},
+    {k:'ciclo',t:'Cobrança',opcoes:['Mensal','Anual']},
+    {k:'renova',t:'Renova em',tipo:'date'},
+    {k:'status',t:'Status',opcoes:['Ativo','Cancelado']},
+    {k:'obs',t:'Observações',tipo:'textarea',full:true,grupo:'Outros'},
+  ];
+  empresaFormulario(novo?'Novo seguro':'Editar seguro',
+    'O mesmo cadastro que aparece em Gastos. Não registre senhas.',defs,registro,(v,patch)=>{
+      financeiroSalvarRegistro(E.seguros,registro,{...v,...patch},patch);rr('bancos')();
+    });
+}
+function painelSeguros(cx,grupo){
+  const todos=(E.seguros||[]).filter(s=>!grupo||seguroTitular(s)===grupo);
+  const topo=el('<div class="bancos-origem"></div>');
+  topo.appendChild(el('<p><b>'+todos.length+'</b> apólice(s)'+(grupo?' · '+esc(grupo):'')+' · o mesmo cadastro que aparece em Gastos</p>'));
+  topo.appendChild(acao('+ Novo seguro',()=>seguroModal(null,true),'ghost mini'));
+  cx.appendChild(topo);
+  const grade=el('<div class="bancos-grade"></div>');cx.appendChild(grade);
+  if(!todos.length){grade.appendChild(el('<p class="empresa-nota">Nenhuma apólice aqui. Cadastre para acompanhar vigência e cobertura.</p>'));return}
+  const h=hoje();
+  for(const s of todos.slice().sort((a,b)=>String(a.renova||'9').localeCompare(String(b.renova||'9')))){
+    const dias=dataISOValida(s.renova)?Math.round((new Date(s.renova+'T12:00')-new Date(h+'T12:00'))/864e5):null;
+    const sit=s.status==='Cancelado'?['Cancelado','var(--suave)']
+      :dias==null?['Sem data de renovação','var(--suave)']
+      :dias<0?['Venceu em '+fmtDataAno(s.renova),'var(--vermelho)']
+      :dias<=45?['Renova em '+fmtDataAno(s.renova),'var(--areia)']
+      :['Renova em '+fmtDataAno(s.renova),'var(--verde)'];
+    const card=el('<article class="banco-card"><header><span class="banco-icone banco-icone-texto">🛡️</span><div>'
+      +'<h2>'+esc((s.tipo||'Seguro')+(s.item?' · '+s.item:''))+'</h2>'
+      +'<p>'+esc(s.seguradora||'Seguradora não informada')+'</p></div></header>'
+      +'<dl class="banco-dados-rapidos"></dl><div class="banco-contato"></div></article>');
+    const dl=card.querySelector('dl');
+    for(const [t,v] of [['Apólice',s.apolice],['Capital',s.capital?brl(+s.capital):''],
+        ['Custo',s.valor?brl(+s.valor)+(s.ciclo?'/'+String(s.ciclo).toLowerCase().replace('mensal','mês').replace('anual','ano'):''):''],
+        ['Quem recebe',s.beneficiarios]])
+      if(v)dl.appendChild(el('<div><dt>'+t+'</dt><dd>'+esc(v)+'</dd></div>'));
+    const ct=card.querySelector('.banco-contato');
+    ct.appendChild(el('<span class="banco-gerente" style="color:'+sit[1]+'"><i aria-hidden="true">📅</i>'+esc(sit[0])+'</span>'));
+    const fone=contatoWhatsappHTML(s.telefone,'banco-fone');
+    if(fone){fone.title='Telefone do sinistro';ct.appendChild(fone)}
+    const det=el('<details class="banco-detalhes"><summary>Detalhes</summary><div class="banco-detalhes-corpo"><dl></dl><footer></footer></div></details>');
+    card.appendChild(det);
+    for(const [t,v] of [['De quem é',s.titular],['Vigência',s.renova?fmtDataAno(s.renova):''],['Status',s.status],['Observações',s.obs]])
+      if(v)det.querySelector('dl').appendChild(el('<div><dt>'+esc(t)+'</dt><dd>'+esc(v)+'</dd></div>'));
+    det.querySelector('footer').appendChild(acao('Editar',()=>seguroModal(s),'ghost mini'));
+    det.querySelector('footer').appendChild(acao('Apólice e comprovantes',
+      ()=>abrirModal(esc((s.tipo||'Seguro')+(s.item?' · '+s.item:'')),esc(s.seguradora||''),
+        c2=>c2.appendChild(areaArquivos('seguro:'+s.id,'Apólice, carteirinha, comprovante de pagamento'))),'ghost mini'));
+    grade.appendChild(card);
+  }
+}
+
+/* DOCUMENTOS DE PESSOA: os mesmos de E.documentos, agrupados por dono. */
+function painelDocsPF(cx,pessoa){
+  const lista=(E.documentos||[]).filter(d=>!pessoa||(d.dono||'Léo')===pessoa);
+  const topo=el('<div class="bancos-origem"></div>');
+  topo.appendChild(el('<p><b>'+lista.length+'</b> documento(s)'+(pessoa?' · '+esc(pessoa):'')+' · os mesmos da tela Documentos</p>'));
+  topo.appendChild(acao('+ Novo documento',()=>novoDocumento(),'ghost mini'));
+  topo.appendChild(acao('Abrir tela Documentos',()=>irTela('documentos'),'ghost mini'));
+  cx.appendChild(topo);
+  const grade=el('<div class="bancos-grade"></div>');cx.appendChild(grade);
+  if(!lista.length){grade.appendChild(el('<p class="empresa-nota">Nenhum documento desta pessoa.</p>'));return}
+  for(const d of lista.slice().sort((a,b)=>String(a.validade||'9').localeCompare(String(b.validade||'9')))){
+    const st=statusDocumento(d);
+    const cor=st==='Vencido'?'var(--vermelho)':st==='Vencendo'?'var(--areia)':st==='Em dia'?'var(--verde)':'var(--suave)';
+    const card=el('<article class="banco-card"><header><span class="banco-icone banco-icone-texto">🪪</span><div>'
+      +'<h2>'+esc(d.nome||'Documento')+'</h2><p>'+esc(d.dono||'Léo')+'</p></div></header>'
+      +'<dl class="banco-dados-rapidos"></dl><div class="banco-contato"></div></article>');
+    const dl=card.querySelector('dl');
+    for(const [t,v] of [['Número',d.numero],['Onde está',d.onde]])
+      if(v)dl.appendChild(el('<div><dt>'+t+'</dt><dd>'+esc(v)+'</dd></div>'));
+    card.querySelector('.banco-contato').appendChild(
+      el('<span class="banco-gerente" style="color:'+cor+'"><i aria-hidden="true">📅</i>'+esc(st)+(d.validade?' · '+fmtDataAno(d.validade):'')+'</span>'));
+    const det=el('<details class="banco-detalhes"><summary>Detalhes</summary><div class="banco-detalhes-corpo"><dl></dl><footer></footer></div></details>');
+    card.appendChild(det);
+    if(d.obs)det.querySelector('dl').appendChild(el('<div><dt>Observações</dt><dd>'+esc(d.obs)+'</dd></div>'));
+    det.querySelector('footer').appendChild(acao('Abrir',()=>modalDoc(d),'ghost mini'));
+    grade.appendChild(card);
+  }
+}
+
+/* DOCUMENTOS DE EMPRESA: moram dentro da ficha da empresa, e é lá que se
+   editam. Aqui eles são LIDOS e agrupados, com o caminho de volta. */
+function painelDocsPJ(cx,empresaNome){
+  const empresas=(E.empresasPJ||[]).filter(e=>!empresaNome||e.nome===empresaNome);
+  const topo=el('<div class="bancos-origem"></div>');
+  const total=empresas.reduce((s,e)=>s+empresaDocumentos(e).length,0);
+  topo.appendChild(el('<p><b>'+total+'</b> documento(s)'+(empresaNome?' · '+esc(empresaNome):'')+' · guardados na ficha de cada empresa</p>'));
+  cx.appendChild(topo);
+  const grade=el('<div class="bancos-grade"></div>');cx.appendChild(grade);
+  let n=0;
+  for(const emp of empresas)for(const d of empresaDocumentos(emp)){
+    n++;
+    const card=el('<article class="banco-card"><header><span class="banco-icone banco-icone-texto">📑</span><div>'
+      +'<h2>'+esc(d.nome||d.tipo||'Documento')+'</h2><p>'+esc(emp.nome||'')+'</p></div></header>'
+      +'<dl class="banco-dados-rapidos"></dl><div class="banco-contato"></div></article>');
+    const dl=card.querySelector('dl');
+    for(const [t,v] of [['Tipo',d.tipo],['Número',d.numero],['Validade',d.validade?fmtDataAno(d.validade):'']])
+      if(v)dl.appendChild(el('<div><dt>'+t+'</dt><dd>'+esc(v)+'</dd></div>'));
+    const at=card.querySelector('.banco-contato');
+    at.appendChild(acao('Abrir na ficha da empresa',()=>{empresaAbrir(emp.id,'documentos')},'ghost mini'));
+    grade.appendChild(card);
+  }
+  if(!n)grade.appendChild(el('<p class="empresa-nota">Nenhum documento cadastrado'+(empresaNome?' nesta empresa':' nas empresas')+'. Eles são cadastrados na ficha da empresa.</p>'));
+}
+
 async function vBancos(m){
   m.classList.add('workspace-layout','bancos-layout');const topo=cab('Bancos','Contas, titulares e chaves PIX em um só lugar.');topo.appendChild(acao('+ Nova conta',()=>bancoModal()));m.appendChild(topo);
   const busca=el('<div class="bancos-filtros"><label>Buscar conta<input type="search" aria-label="Buscar conta" placeholder="Banco, titular, agência, conta ou PIX"></label><div class="bancos-escopo"></div></div>');
@@ -9869,9 +9999,10 @@ async function vBancos(m){
      quem é cada coisa" — e estavam em telas diferentes. O organograma
      CONTINUA também dentro de Empresas: ele é o mesmo componente, lido do
      mesmo E.organogramas, então tirar de lá tiraria de quem já usava. */
-  const abaAtual=['bancos','contabilidade','organograma'].includes(filtro.bancoAba)?filtro.bancoAba:'bancos';
-  const abas=abasWorkspace(m,'bancos',[['bancos','🏦 Bancos'],['contabilidade','🧾 Contabilidade'],['organograma','🗂 Organograma']],
-    abaAtual,id=>{filtro.bancoAba=id;rr('bancos')()});
+  const ABAS_BANCOS=[['bancos','🏦 Bancos'],['contabilidade','🧾 Contabilidade'],['seguros','🛡️ Seguros'],
+    ['docpf','🪪 Documentos PF'],['docpj','📑 Documentos PJ'],['drive','📁 Google Drive'],['organograma','🗂 Organograma']];
+  const abaAtual=ABAS_BANCOS.some(([k])=>k===filtro.bancoAba)?filtro.bancoAba:'bancos';
+  const abas=abasWorkspace(m,'bancos',ABAS_BANCOS,abaAtual,id=>{filtro.bancoAba=id;rr('bancos')()});
   /* UMA COLUNA SÓ À ESQUERDA: as três abas em cima, uma embaixo da outra, e a
      lista de empresas logo abaixo delas. `abasWorkspace` pendura a barra como
      irmã dos painéis; sem juntar as duas coisas num nó só, a grade punha a
@@ -9880,7 +10011,50 @@ async function vBancos(m){
   const lateral=el('<aside class="bancos-lateral" aria-label="Áreas e empresas"></aside>');
   lateral.appendChild(m.querySelector('.workspace-tabs'));
   m.insertBefore(lateral,m.querySelector('.workspace-pane'));
+  /* A LATERAL AGRUPA PELO QUE FAZ SENTIDO EM CADA ABA: empresa nos bancos e
+     nos documentos de empresa, pessoa nos documentos de pessoa, titular nos
+     seguros. A lista sai sempre dos DADOS, nunca de uma constante: assunto
+     que não existe não vira item de menu vazio. */
+  const gruposDaAba=chave=>{
+    if(chave==='seguros')return [...new Set((E.seguros||[]).map(seguroTitular))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    if(chave==='docpf')return [...new Set((E.documentos||[]).map(d=>d.dono||'Léo'))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    if(chave==='docpj')return (E.empresasPJ||[]).map(e=>e.nome).filter(Boolean).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    return [];
+  };
+  const contaDoGrupo=(chave,g)=>
+    chave==='seguros'?(E.seguros||[]).filter(s=>seguroTitular(s)===g).length
+    :chave==='docpf'?(E.documentos||[]).filter(d=>(d.dono||'Léo')===g).length
+    :chave==='docpj'?empresaDocumentos((E.empresasPJ||[]).find(e=>e.nome===g)||{}).length:0;
+  const listaLateral=(chave,painel)=>{
+    const itens=gruposDaAba(chave);
+    if(!itens.length)return '';
+    filtro.bancoGrupo=filtro.bancoGrupo||{};
+    let atualG=filtro.bancoGrupo[chave];
+    if(!itens.includes(atualG))atualG=itens[0];
+    filtro.bancoGrupo[chave]=atualG;
+    const nav=el('<nav class="bancos-empresas" aria-label="Agrupamento"></nav>');
+    for(const g of itens){
+      const b2=acao('',()=>{filtro.bancoGrupo[chave]=g;rr('bancos')()},'ghost');
+      b2.className='banco-empresa-chip';b2.setAttribute('aria-pressed',String(g===atualG));
+      b2.innerHTML='<span>'+esc(g)+'</span><b>'+contaDoGrupo(chave,g)+'</b>';
+      nav.appendChild(b2);
+    }
+    lateral.appendChild(el('<div class="bancos-filtros"><div class="bancos-escopo"></div></div>'));
+    lateral.lastElementChild.querySelector('.bancos-escopo').appendChild(nav);
+    return atualG;
+  };
   if(abaAtual==='contabilidade'){painelContabilidade(abas.paineis.contabilidade);return}
+  if(abaAtual==='seguros'){painelSeguros(abas.paineis.seguros,listaLateral('seguros'));return}
+  if(abaAtual==='docpf'){painelDocsPF(abas.paineis.docpf,listaLateral('docpf'));return}
+  if(abaAtual==='docpj'){painelDocsPJ(abas.paineis.docpj,listaLateral('docpj'));return}
+  if(abaAtual==='drive'){
+    /* O Drive é a tela que já existe, desenhada aqui dentro: uma segunda
+       implementação do mesmo navegador de pastas divergiria na primeira
+       mudança. Ela é assíncrona e cuida do próprio estado. */
+    try{vDrive(abas.paineis.drive)}
+    catch(e){abas.paineis.drive.appendChild(el('<p class="empresa-nota">Não consegui abrir o Drive aqui: '+esc(e.message||'')+'</p>'))}
+    return;
+  }
   if(abaAtual==='organograma'){
     if(typeof LeoOrganograma==='undefined'){abas.paineis.organograma.appendChild(el('<p class="empresa-nota">Não foi possível carregar o organograma. Atualize a página para tentar novamente.</p>'));return}
     LeoOrganograma.render(abas.paineis.organograma,{getState:()=>E,save:salvar,

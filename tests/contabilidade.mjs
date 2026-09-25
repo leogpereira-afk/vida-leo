@@ -10,13 +10,16 @@ const tela = (estado = '') => {
   return s;
 };
 
-test('bancos: as três abas existem, e Bancos é a primeira', () => {
+/* Eram três abas; o dono pediu mais quatro (Seguros, Documentos PF, Documentos
+   PJ e Drive) em 24/09/2026. A contagem exata vive em
+   tests/central-financeira-abas.mjs; aqui fica só o que não muda: Bancos é a
+   primeira e vem aberta, e Contabilidade e Organograma continuam existindo. */
+test('bancos: Bancos é a primeira aba e vem aberta', () => {
   const {document} = tela();
   const abas = [...document.querySelectorAll('.workspace-tabs button')].map(b => b.textContent.trim());
-  assert.equal(abas.length, 3);
+  assert.ok(abas.length >= 3, 'as abas têm de existir');
   assert.match(abas[0], /Bancos/);
-  assert.match(abas[1], /Contabilidade/);
-  assert.match(abas[2], /Organograma/);
+  assert.ok(abas.some(a => /Contabilidade/.test(a)) && abas.some(a => /Organograma/.test(a)));
   assert.equal(document.querySelector('.workspace-tabs button').getAttribute('aria-pressed'), 'true');
 });
 
