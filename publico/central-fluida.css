@@ -36,3 +36,17 @@
  .guia-workspace .dev-title{margin:12px 0 16px}.guia-workspace .dev-title h2{font-size:23px}.guia-workspace .dev-title p{font-size:13px}.guia-workspace .dev-title>.btn{margin-top:12px}
  .guia-workspace .dev-results-header{margin:12px 0 18px;gap:12px}.guia-workspace .dev-results-header h3{font-size:24px;margin:6px 0}.guia-workspace .planos-stream-links{gap:6px;margin-bottom:16px}
 }
+
+/* Formulários dentro de janelas: respeitar bordas e permitir colunas encolherem. */
+.mcorpo{max-width:100%;box-sizing:border-box}
+.mcorpo>form{min-width:0;max-width:100%;box-sizing:border-box}
+.mcorpo>.strategy-form{padding:20px 24px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.mcorpo :is(form,fieldset,label,.campos,.ff-fields,.ff-field,.rotina-fields,.lider-form-grupo){min-width:0}
+.mcorpo :is(input:not([type=checkbox]):not([type=radio]),select,textarea){max-width:100%;box-sizing:border-box}
+.mcorpo .ff-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+.strategy-form .lider-form-grupo label{display:grid;gap:8px;font-size:13px;align-content:start}
+.strategy-form-footer{min-width:0;flex-wrap:wrap;gap:12px}
+.mcorpo>.strategy-form+.empresa-nota{margin:0 24px 20px}
+@media(max-width:700px){.mcorpo>.strategy-form{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:620px){.mcorpo .ff-fields{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.mcorpo>.strategy-form{padding:16px}.mcorpo>.strategy-form+.empresa-nota{margin:0 16px 16px}.strategy-form .lider-form-grupo>div{grid-template-columns:minmax(0,1fr)}}
