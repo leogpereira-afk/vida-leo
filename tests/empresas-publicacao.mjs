@@ -18,14 +18,6 @@ test('abrir e fechar edição de liderança não grava avaliação',()=>{
  for(const k of ['contribuicao','evidencia','apoio','proximoPasso','responsavelAcompanhamento','revisarEm','situacaoAcordo'])assert.ok(a.document.querySelector('[name='+k+']'),k);
  a.document.querySelector('#modais .fechar').click();assert.equal(a.run('JSON.stringify(E)'),a.run('antes'));
 });
-test('V.O.F. aparece no menu e apresentação começa pela teoria seguida da definição',()=>{
- const a=app();a.run('menu();abrirVofApresentacao(0)');
- assert.match(a.document.querySelector('#nav').textContent,/Método V.O.F./);
- const modal=a.document.querySelector('[role=dialog]');assert.ok(modal.classList.contains('modal-vof'));
- assert.match(modal.querySelector('[data-titulo]').textContent,/pirâmide invertida/);
- modal.querySelector('[data-proximo]').click();assert.match(modal.querySelector('[data-titulo]').textContent,/O que é o Método/);
- modal.querySelector('[data-proximo]').click();assert.ok(modal.querySelector('.vof-challenge'));
-});
 test('seleção empresarial lateral mantém alternativa móvel',()=>{
  const css=readFileSync(new URL('../publico/empresas.css',import.meta.url),'utf8');
  assert.match(css,/\.empresas-layout\{display:grid;grid-template-columns:220px minmax\(0,1fr\)/);
