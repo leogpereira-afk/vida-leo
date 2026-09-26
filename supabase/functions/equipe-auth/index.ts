@@ -521,6 +521,33 @@ const publica = (c: any) => ({
 const freia = () => new Promise((r) => setTimeout(r, 400));
 const ERRO_LOGIN = "Usuário ou senha incorretos.";
 
+/* O CRACHÁ NASCEU DEPOIS DA SENHA PROVISÓRIA?
+   É a única situação em que a troca da própria senha dispensa a senha atual:
+   quem tem um crachá emitido depois que a provisória foi gravada acabou de
+   entrar COM ela, então já provou que sabe. Um crachá mais velho não prova
+   nada: ele vale 30 dias e mora no localStorage de uma origem que 11 sistemas
+   dividem. Antes desta regra, logo depois de a direção definir uma senha
+   provisória, qualquer crachá antigo da pessoa escolhia a senha nova dela em
+   todos os sistemas, inclusive na entrada única, sem saber senha nenhuma.
+
+   O carimbo é `equipe_contas.atualizado_em` da linha DESTE sistema. Todo
+   caminho que grava a provisória carimba na mesma escrita: o `salvarConta`
+   daqui e o `acesso_senha_gravar` do Painel. Ele também muda por outros
+   motivos (papel, nome, ativar ou desativar), e aí a regra fica mais rígida,
+   nunca mais frouxa: a pessoa digita a provisória, ou entra de novo.
+
+   O `iat` vem em segundos inteiros (arredondado para baixo) do login daqui e
+   da `acesso-entrar` do Painel. O `+ 1` compensa esse arredondamento: um
+   crachá do mesmo segundo da gravação não vira "antigo". Crachá sem `iat`,
+   carimbo ausente ou ilegível: antigo, pede a atual. */
+function crachaDepoisDaSenha(c: Record<string, any>, carimbo: unknown): boolean {
+  const iat = c?.iat;
+  if (typeof iat !== "number" || !Number.isFinite(iat)) return false;
+  const gravadaEm = Date.parse(String(carimbo ?? ""));
+  if (!Number.isFinite(gravadaEm)) return false;
+  return (iat + 1) * 1000 >= gravadaEm;
+}
+
 // ------------------------------------------------------------------ handler
 
 Deno.serve(async (req: Request) => {
@@ -611,11 +638,51 @@ Deno.serve(async (req: Request) => {
         const { data: conta } = await sb.from("equipe_contas").select("*")
           .eq("sistema", sistema).eq("usuario", c.sub).maybeSingle();
         if (!conta) return json({ erro: "Conta não encontrada." }, 404);
-        // Senha temporária (criada por outra pessoa) troca sem pedir a antiga —
-        // é justamente a que a pessoa não escolheu.
-        if (!conta.trocar_senha) {
+        /* A SENHA ATUAL SÓ É DISPENSADA com a senha provisória E um crachá
+           emitido depois dela (ver crachaDepoisDaSenha). É o caminho das telas
+           obrigatórias do Brief, do PCP e do POPs, que não mostram o campo:
+           a pessoa acabou de entrar com a provisória, o crachá é novo, e a
+           troca segue sem a atual. Nada mudou para quem sabe a senha atual. */
+        const provisoria = !!conta.trocar_senha;
+        if (!(provisoria && crachaDepoisDaSenha(c, conta.atualizado_em))) {
           const atual = String(body.senhaAtual ?? "");
-          if (!(await conferirSenha(atual, conta))) { await freia(); return json({ erro: "Senha atual incorreta." }, 401); }
+          const quem = String(c.sub);
+          const por = `${sistema}:${quem}`;
+          // Provisória com crachá antigo e sem a atual: não é tentativa contra
+          // senha nenhuma, então não gasta ficha do freio. Fica no histórico,
+          // porque é exatamente o formato do ataque que esta regra fecha.
+          if (provisoria && !atual) {
+            await registrar(sistema, quem, "troca-barrada", por, "crachá anterior à senha provisória, sem a senha atual");
+            return json({ erro: "Digite a senha atual (a provisória que você recebeu).", pedeSenhaAtual: true }, 401);
+          }
+          /* O FREIO, o mesmo do login (public.porta_travada), lido ANTES de
+             conferir: a ficha é consumida na mesma operação que decide, e é
+             isso que segura uma rajada em paralelo. O `freia()` sozinho nunca
+             foi freio. Balde próprio ("senha-atual", o mesmo nome que a
+             painel-auth do contrato das senhas usa na troca de senha do
+             Painel), e não o do login: quem tem um crachá roubado e erra a
+             atual não tranca o dono fora da entrada. E como a senha é uma só
+             em todos os sistemas, o balde também é um só por pessoa. Banco
+             sem responder aqui NÃO deixa passar: é caminho de escrita de
+             senha. */
+          const chave = normalizarUsuario(quem);
+          const { data: travou, error: erroFreio } = await sb.rpc("porta_travada", {
+            p_sistema: "senha-atual", p_usuario: chave,
+          });
+          if (erroFreio) {
+            return json({ erro: "Não consegui conferir a sua senha agora. Tente de novo em instantes." }, 503);
+          }
+          if (travou === true) {
+            await registrar(sistema, quem, "troca-barrada", por, "freio de tentativas");
+            return json({ erro: "Muitas tentativas seguidas. Espere 15 minutos e tente de novo." }, 429);
+          }
+          if (!(await conferirSenha(atual, conta))) {
+            await freia();
+            // O texto digitado NUNCA vai para o log: só o fato.
+            await registrar(sistema, quem, "senha-atual-errada", por,
+              provisoria ? "senha provisória, crachá anterior a ela" : "");
+            return json({ erro: "Senha atual incorreta." }, 401);
+          }
         }
         /* A SENHA VAI PARA TODOS OS LUGARES ONDE ELA MORA, e nao so para a
            linha deste sistema.
