@@ -30,7 +30,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const JWT_SECRET = Deno.env.get("EQUIPE_JWT_SECRET") ?? "";
 const LEO_SECRET = Deno.env.get("LEO_SESSION_SECRET") ?? "";
 const DIAS = 30;
-const SISTEMAS = ["brief", "pcp", "compras", "dre", "painel", "rh", "pops", "central", "bosques", "domo"] as const;
+const SISTEMAS = ["brief", "pcp", "compras", "dre", "painel", "rh", "pops", "vof", "central", "bosques", "domo"] as const;
 type Sistema = typeof SISTEMAS[number];
 
 // Papéis de cada sistema, com quem administra. Lista fechada: papel digitado
@@ -68,6 +68,12 @@ const PAPEIS: Record<Sistema, { todos: string[]; admin: string[] }> = {
   // Pops & Fabricação (03/08/2026): admin edita tudo e vê o mapa de treinamento;
   // gestor edita os POPs do(s) setor(es) dele; equipe lê e registra leitura.
   pops: { todos: ["admin", "gestor", "equipe"], admin: ["admin"] },
+  // Método V.O.F. (25/09/2026): sistema próprio do método do Léo, que saiu da
+  // Central. admin é o Léo (tudo, inclusive apagar e editar o conteúdo do APN);
+  // facilitador lê tudo e cria e edita turmas, empresas, diagnósticos, planos e
+  // salas, sem apagar. Participante de turma não tem conta. Sem entrada em
+  // TAB_CFG: o V.O.F. não espelha elenco na própria config.
+  vof: { todos: ["admin", "facilitador"], admin: ["admin"] },
 };
 
 /* Sistemas com mecanismo próprio: a Central administra, mas o login é lá.
