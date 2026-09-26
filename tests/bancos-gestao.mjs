@@ -6,3 +6,16 @@ function banco(linhas,error=null){const chamadas=[];const q={select(v){chamadas.
 test('consulta apenas bancos, pagina e retorna todos os titulares com campos permitidos',async()=>{const sb=banco(Array.from({length:501},(_,i)=>({id:String(i),registro:{banco:'Exemplo',titular:'Titular '+i,conta:i,senha:'nao-expor',saldo:100}})));const r=await lerBancosGestao(sb);assert.equal(r.contas.length,501);assert.equal(r.contas[500].titular,'Titular 500');assert.equal(r.contas[0].conta,'0');assert.ok(!('senha' in r.contas[0]));assert.ok(!('saldo' in r.contas[0]));assert.deepEqual(sb.chamadas.filter(x=>x[0]==='from'),[['from','painel_registros'],['from','painel_registros']]);assert.deepEqual(sb.chamadas.filter(x=>x[0]==='eq'),[['eq','colecao','bancos'],['eq','colecao','bancos']]);assert.deepEqual(sb.chamadas.filter(x=>x[0]==='range'),[['range',0,499],['range',500,999]]);});
 test('erro de leitura ou registro inválido não retorna sucesso parcial',async()=>{await assert.rejects(()=>lerBancosGestao(banco([],{message:'banco indisponível'})),/Não foi possível/);await assert.rejects(()=>lerBancosGestao(banco([{id:'a',registro:null}])),/formato inválido/);});
 test('porta bancária confere sessão da Central antes de ler e evita cache HTTP',()=>{const s=readFileSync(new URL('../supabase/functions/leo-sync/index.ts',import.meta.url),'utf8');const route=s.slice(s.indexOf('if (acao === "bancosGestao")'),s.indexOf('if (acao === "empresaDatas")'));assert.match(route,/tokenOk\(t\)/);assert.match(route,/401/);assert.ok(route.indexOf('tokenOk(t)')<route.indexOf('lerBancosGestao(sb)'));assert.match(route,/Cache-Control.*,.*no-store/);});
+
+test('número do banco confirmado no Painel chega à Central; logo e número inválido não',async()=>{
+  const sb=banco([{id:'a',registro:{banco:'Sicoob Credinor',titular:'Impresilk',codigoBanco:'756',logo:'data:image/png;base64,AAAA',senha:'x'}},{id:'b',registro:{banco:'BTG',titular:'Impresilk',codigoBanco:'20'}}]);
+  const r=await lerBancosGestao(sb);
+  assert.equal(r.contas[0].codigoBanco,'756');
+  assert.ok(!('logo' in r.contas[0]));assert.ok(!('senha' in r.contas[0]));
+  assert.equal(r.contas[1].codigoBanco,'','código com menos de 3 dígitos não passa');
+});
+test('BV é 413 na lista de bancos da Central (o 655 é o antigo, desde 21/09/2021)',()=>{
+  const s=readFileSync(new URL('../publico/index.html',import.meta.url),'utf8');
+  assert.match(s,/\['413','bv','#004B8D','votorantim'\]/);
+  assert.doesNotMatch(s,/\['655',/);
+});
