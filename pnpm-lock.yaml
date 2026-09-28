@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      '@netlify/blobs':
-        specifier: ^8.1.0
-        version: 8.2.0
     devDependencies:
       ical.js:
         specifier: 2.2.1
@@ -20,10 +16,6 @@ importers:
         version: 0.18.12
 
 packages:
-
-  '@netlify/blobs@8.2.0':
-    resolution: {integrity: sha512-9djLZHBKsoKk8XCgwWSEPK9QnT8qqxEQGuYh48gFIcNLvpBKkLnHbDZuyUxmNemCfDz7h0HnMXgSPnnUVgARhg==}
-    engines: {node: ^14.16.0 || >=16.0.0}
 
   boolbase@1.0.0:
     resolution: {integrity: sha512-JZOSA7Mo9sNGB8+UjSgzdLtokWAky1zbztM3WRLCbZ70/3cTANmQmOdR7y2g+J0e2WXywy1yS468tY+IruqEww==}
@@ -84,8 +76,6 @@ packages:
     resolution: {integrity: sha512-qz3o9CHXmJJPGBdqzab7qAYuW8kQGKNEuoHFYrBwV6hWIMcpAmxDLXojcHfFr9US1Pe6zUswEIJIbLI610fuqA==}
 
 snapshots:
-
-  '@netlify/blobs@8.2.0': {}
 
   boolbase@1.0.0: {}
 

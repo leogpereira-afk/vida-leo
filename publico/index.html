@@ -15116,10 +15116,9 @@ function sairApp(){
   if(!confirm('Sair deste aparelho? Seus dados continuam na nuvem.'))return;
   limparRascunhoSync();localStorage.removeItem(T_CHAVE);sessionStorage.removeItem(T_CHAVE);location.reload();
 }
-// Backend: Edge Function do Supabase (antes era a Netlify Function em
-// /api/sync). O contrato e o MESMO -- POST para entrar, GET para ler, PUT para
-// gravar. O nome leva prefixo porque o projeto e compartilhado com os sistemas
-// da empresa: uma function chamada "sync" seria a do RH.
+// Backend: Edge Function do Supabase -- POST para entrar, GET para ler, PUT
+// para gravar. O nome leva prefixo porque o projeto e compartilhado com os
+// sistemas da empresa: uma function chamada "sync" seria a do RH.
 const API_SYNC='https://heveemylixartyijxewh.supabase.co/functions/v1/leo-sync';
 // A entrada única da casa: mesmo usuário e mesma senha dos outros seis.
 // Sem chave nenhuma no bundle: a function responde sem apikey (verify_jwt=false,
