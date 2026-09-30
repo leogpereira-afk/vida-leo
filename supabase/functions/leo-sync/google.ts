@@ -32,10 +32,16 @@ const OAUTH_AUTH = "https://accounts.google.com/o/oauth2/v2/auth";
 const OAUTH_TOKEN = "https://oauth2.googleapis.com/token";
 const APP_URL = "https://leogpereira-afk.github.io/vida-leo/";
 /* O QUE A CENTRAL PEDE AO GOOGLE, e por que cada um (15/09/2026).
-   Três são de LEITURA e um escreve, mas escreve num quarto fechado:
+   Três são de LEITURA e dois escrevem:
 
    drive.readonly        navegar, ver e baixar. Nunca apagar, mover ou renomear.
    gmail.readonly        achar datas de compromisso nos e-mails. Só lê.
+   gmail.send            (30/09/2026) o Don Boy, assistente do Léo no Telegram,
+                         envia e-mail em nome dele. Só envia: não lê, não apaga
+                         e não mexe em rascunho. Cada e-mail só sai depois de o
+                         Léo ver a prévia e tocar em "Enviar" no Telegram. Quem
+                         envia é a Edge Function donboy-ponte deste projeto,
+                         com a mesma chave de renovação.
    calendar.readonly     mostrar os compromissos que já existem.
    calendar.app.created  criar lembrete. Este escopo NÃO alcança os calendários
                          de sempre do Léo: o app só enxerga e só escreve no
@@ -45,13 +51,16 @@ const APP_URL = "https://leogpereira-afk.github.io/vida-leo/";
 
    O PREÇO, dito em voz alta: guardar a chave de renovação aqui é o que faz a
    conexão acontecer sem janela nenhuma — e é também o que permite ao servidor
-   ler o Gmail e a agenda a qualquer momento, sem o Léo estar na frente. Foi
+   ler o Gmail e a agenda a qualquer momento, sem o Léo estar na frente, e
+   enviar e-mail em nome dele. O crachá curto que vai ao navegador carrega
+   todos os escopos, o envio inclusive; a Central não usa o envio. Foi
    escolha dele, depois de eu levantar exatamente isto. Quem quiser desfazer:
    o botão "Desconectar" da tela do Drive apaga a chave, e
    myaccount.google.com/connections corta do lado do Google. */
 const ESCOPOS = [
   "https://www.googleapis.com/auth/drive.readonly",
   "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/calendar.app.created",
 ];
