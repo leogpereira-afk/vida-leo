@@ -10438,7 +10438,7 @@ function driveTextoVolta(m){
   if(m==='negado')return 'Você não autorizou o acesso no Google, então nada foi conectado. Para ligar, clique em “Conectar o Google Drive” e aceite na tela do Google.';
   if(m==='escopo')return 'A autorização saiu sem a permissão de leitura do Drive. Conecte de novo e deixe a caixa marcada.';
   if(m.indexOf('escopo-')===0){
-    const nomes={'drive.readonly':'Google Drive','gmail.readonly':'Gmail','calendar.readonly':'Google Agenda (ler)','calendar.app.created':'Google Agenda (criar lembrete)'};
+    const nomes={'drive.readonly':'Google Drive','gmail.readonly':'Gmail','gmail.send':'Gmail (enviar, para o Don Boy)','calendar.readonly':'Google Agenda (ler)','calendar.app.created':'Google Agenda (criar lembrete)'};
     const faltou=m.slice(7).split(',').map(x=>nomes[x]||x).filter(Boolean);
     return 'A autorização saiu sem '+(faltou.length===1?'esta permissão':'estas permissões')+': '+faltou.join(', ')
       +'. O que veio continua valendo; para ligar o resto, conecte de novo e deixe todas as caixas marcadas.';
