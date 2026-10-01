@@ -663,6 +663,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./central-fluida.css?v=25438d2d9ef6">
 <link rel="stylesheet" href="./documentos-revisao.css?v=90d5f0ab4afe">
 <link rel="stylesheet" href="./painel-compacto.css?v=4baf1a7c4d03">
+<link rel="stylesheet" href="./saude-visual.css?v=f56a9fa49674">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -4115,6 +4116,14 @@ function organizarSaude(pagina,alvo){
   function selecionar(id){abaSaude=id;opcoes.forEach(([k])=>{paineis[k].hidden=k!==id;paineis[k].setAttribute('aria-hidden',String(k!==id));nav.querySelector('[data-area="'+k+'"]').setAttribute('aria-pressed',String(k===id))})}
   opcoes.forEach(([id,nome])=>{const bt=el('<button type="button"></button>');bt.textContent=nome;bt.dataset.area=id;bt.setAttribute('aria-controls','saude-'+id);paineis[id].id='saude-'+id;bt.onclick=()=>selecionar(id);nav.appendChild(bt);pagina.appendChild(paineis[id])});
   const resumo=paineis.resumo.querySelector('.saude-resumo');if(resumo)paineis.resumo.prepend(resumo);
+  const datas=paineis.resumo.querySelector('.saude-lembretes');
+  const graficos=[...paineis.resumo.querySelectorAll('[data-bid="sa-dash"], [data-bid="sa-pa"]')];
+  if(datas||graficos.length){
+    const faixa=el('<div class="saude-resumo-faixa"></div>');
+    if(datas)faixa.appendChild(datas);
+    if(graficos.length){const evolucao=el('<div class="saude-resumo-graficos"></div>');graficos.forEach(g=>evolucao.appendChild(g));faixa.appendChild(evolucao)}
+    paineis.resumo.appendChild(faixa);
+  }
   selecionar(alvo?abaDoBlocoSaude(alvo):abaSaude);
   /* A tela FORÇAVA todo quadro aberto a cada render — e mesmo assim o bloco()
      continuava gravando a escolha em E.colapso. Recolher, sair e voltar
@@ -4123,10 +4132,11 @@ function organizarSaude(pagina,alvo){
      escolha guardada, como no resto da Central. */
   pagina.querySelectorAll('table').forEach(t=>{const nomes=[...t.querySelectorAll('thead th')].map(x=>x.textContent);t.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>{td.dataset.label=nomes[i]||'Ações'}))});
   const painel=pagina.querySelector('.painel');
-  if(painel){const botoes=[...painel.querySelectorAll('button')];const escolher=el('<select aria-label="Adicionar registro de saúde"><option value="">+ Adicionar registro</option></select>');
+  if(painel){painel.classList.add('saude-acoes');const botoes=[...painel.querySelectorAll('button')];const escolher=el('<select aria-label="Adicionar registro de saúde"><option value="">+ Adicionar registro</option></select>');
     botoes.forEach((bt,i)=>{if(bt.textContent.trim().startsWith('+')){const op=document.createElement('option');op.value=String(i);op.textContent=bt.textContent.replace(/^\+\s*/,'');escolher.appendChild(op)}});
     escolher.onchange=()=>{if(escolher.value==='')return;botoes[+escolher.value].click();escolher.value=''};
-    const sos=botoes.find(b=>b.textContent.includes('emergência'));painel.replaceChildren(escolher);if(sos){sos.textContent='Ficha de emergência';painel.appendChild(sos)}
+    const sos=botoes.find(b=>b.textContent.includes('emergência'));painel.replaceChildren(el('<span class="saude-acoes-rotulo">Registrar</span>'),escolher);
+    if(sos){sos.textContent='Ficha de emergência';sos.classList.add('saude-sos');painel.appendChild(sos)}
   }
 }
 
@@ -4151,7 +4161,7 @@ function vSaude(m) {
   const n2 = v => (Math.round(v * 100) / 100).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
   const faixaIMC = v => v < 18.5 ? 'abaixo do peso' : v < 25 ? 'peso normal' : v < 30 ? 'sobrepeso' : 'obesidade';
 
-  m.appendChild(cab('Saúde', 'Acompanhe medidas, exames, tratamentos e seu histórico de saúde.'));
+  m.appendChild(el('<header class="topo saude-hero"><span class="saude-hero-icone" aria-hidden="true">🩺</span><div><span class="saude-hero-sobre">Seu espaço de saúde</span><h1>Saúde</h1><p>Medidas, exames, consultas e cuidados reunidos no seu histórico.</p></div><span class="cresce"></span></header>'));
   m.appendChild(painel(
     acao('+ Pesagem',()=>novoCuidadoRotina('peso')),
     acao('+ Sinais vitais',()=>novoCuidadoRotina('vitais'),'ghost'),
@@ -4360,14 +4370,14 @@ function vSaude(m) {
   const pesoRecente=ultimoRegistroSaude(E.peso,['peso']);
   const pressaoRecente=ultimoRegistroSaude(E.vitais,['sis','dia']);
   const pulsoRecente=ultimoRegistroSaude(E.vitais,['fc']);
-  const resumo=el(`<div class="saude-resumo"><div class="saude-resumo-titulo"><span>SEU ACOMPANHAMENTO</span><h2>Últimos registros</h2><p>Cada medida mantém a data em que foi registrada.</p></div><div class="grade">
+  const resumo=el(`<section class="saude-resumo" aria-label="Indicadores registrados"><div class="saude-resumo-titulo"><h2>Indicadores registrados</h2><p>Cada medida conserva a data do próprio registro.</p></div><div class="grade">
     ${kpi('Peso',pesoRecente?esc(pesoRecente.peso)+' kg':'—',pesoRecente?fmtDataAno(pesoRecente.data):'Sem pesagem registrada')}
-    ${kpi('IMC',imc?esc(n1(imc)):'—',imc?esc(faixaIMC(imc))+' · referência OMS':'Informe altura numa pesagem')}
-    ${kpi('Cintura / altura',cintAlt?esc(n2(cintAlt)):'—',cintAlt?esc(cintAlt<0.5?'abaixo de 0,50':'acima de 0,50')+' · referência usual':'Informe cintura e altura')}
+    ${kpi('IMC',imc?esc(n1(imc)):'—',imc?fmtDataAno(ult.data)+' · '+esc(faixaIMC(imc))+' · referência OMS':'Informe altura numa pesagem')}
+    ${kpi('Cintura / altura',cintAlt?esc(n2(cintAlt)):'—',cintAlt?fmtDataAno(ult.data)+' · '+esc(cintAlt<0.5?'abaixo de 0,50':'acima de 0,50')+' · referência usual':'Informe cintura e altura')}
     ${kpi('Pressão',pressaoRecente?esc(pressaoRecente.sis)+' / '+esc(pressaoRecente.dia):'—',pressaoRecente?fmtDataAno(pressaoRecente.data)+' · mmHg':'Sem medida completa')}
     ${kpi('Batimentos',pulsoRecente?esc(pulsoRecente.fc)+' bpm':'—',pulsoRecente?fmtDataAno(pulsoRecente.data):'Sem medida registrada')}
     ${kpi('Tratamentos',emTrat,'Em andamento ou contínuos')}
-  </div></div>`);
+  </div></section>`);
   ['sa-peso','sa-peso','sa-peso','sa-vit','sa-vit','sa-trat'].forEach((id,i)=>{const item=resumo.querySelectorAll('.kpi')[i];if(!item)return;item.classList.add('rotina-saude-atalho');item.tabIndex=0;item.setAttribute('role','button');item.setAttribute('aria-label','Abrir '+(['pesagens','IMC','cintura','pressão arterial','batimentos','tratamentos'][i]));item.onclick=()=>{abreBloco(id);r()};item.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();item.click()}}});
   m.appendChild(resumo);
   /* O RETORNO DA CONSULTA entra aqui junto do próximo exame e do próximo
@@ -4382,13 +4392,20 @@ function vSaude(m) {
        daqui — "o que vem aí na minha saúde". Encerrado não cobra nada. */
     ...E.tratamentos.filter(x=>x.status!=='Encerrado'&&dataISOValida(x.fim)).map(x=>({data:x.fim,nome:x.oque||'Tratamento',tipo:'Fim de tratamento',abrir:()=>{abreBloco('sa-trat');r()}}))
   ].sort((a,b)=>a.data.localeCompare(b.data));
-  const lembretes=el('<section class="saude-lembretes"><h2>Datas para acompanhar</h2><p>Somente datas informadas nos seus registros.</p></section>');
-  if(!datas.length)lembretes.appendChild(el('<div class="saude-sem-dados">Nenhuma próxima data cadastrada. Você pode informá-la em um exame ou vacina.</div>'));
+  const lembretes=el(`<section class="saude-lembretes"><div class="saude-card-cab"><div><h2>Datas para acompanhar</h2><p>Exames, vacinas, retornos e tratamentos com data informada.</p></div><span class="saude-contagem">${datas.length} ${datas.length===1?'data':'datas'}</span></div></section>`);
+  if(!datas.length){
+    const vazio=el('<div class="saude-vazio"><strong>Nenhuma data cadastrada</strong><p>Ao registrar uma próxima data em um exame, vacina, consulta ou tratamento, ela aparece aqui.</p><div class="saude-vazio-acoes"></div></div>');
+    vazio.querySelector('.saude-vazio-acoes').append(acao('Adicionar exame',()=>novoExameRotina(),'ghost'),acao('Adicionar vacina',()=>novoCuidadoRotina('vacinas'),'ghost'));
+    lembretes.appendChild(vazio);
+  }
   datas.forEach(x=>{const bt=el(`<button type="button"><span>${esc(x.nome)}<small>${x.tipo}${x.data<hoje()?' · Data passada — conferir registro':''}</small></span><b>${fmtDataAno(x.data)} ›</b></button>`);bt.onclick=x.abrir;lembretes.appendChild(bt)});
   m.appendChild(lembretes);
 
-  m.appendChild(bloco('sa-dash', 'Evolução do peso', 'Medições até hoje; datas futuras não entram na leitura atual.', graficoEl(gLinha(
-    ord.filter(p => p.peso).map(p => ({ r: fmtData(p.data), v: +p.peso })), { fmt: v => v.toFixed(1) + 'kg' }))));
+  const historicoPeso=ord.filter(p=>p.peso);
+  const corpoPeso=historicoPeso.length>=2?graficoEl(gLinha(historicoPeso.map(p=>({r:fmtData(p.data),v:+p.peso})),{fmt:v=>v.toFixed(1)+'kg'}))
+    :el(`<div class="saude-vazio"><strong>${historicoPeso.length?'Ainda há uma medição':'Sem pesagens registradas'}</strong><p>${historicoPeso.length?'Uma segunda pesagem permite mostrar a evolução ao longo do tempo.':'Registre uma pesagem para começar seu histórico.'}</p><div class="saude-vazio-acoes"></div></div>`);
+  if(historicoPeso.length<2)corpoPeso.querySelector('.saude-vazio-acoes').appendChild(acao('Registrar pesagem',()=>novoCuidadoRotina('peso'),'ghost'));
+  m.appendChild(bloco('sa-dash', 'Evolução do peso', 'Medições até hoje; datas futuras não entram na leitura atual.', corpoPeso));
   if (vit.filter(v => v.sis).length > 1) m.appendChild(bloco('sa-pa', 'Pressão arterial (máxima)', 'histórico das medições registradas', graficoEl(gLinha(
     vit.filter(v => v.sis).map(v => ({ r: fmtData(v.data), v: +v.sis })), { fmt: v => v.toFixed(0) }))));
 }
