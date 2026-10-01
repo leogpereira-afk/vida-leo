@@ -229,68 +229,56 @@ tr:hover .lixo{opacity:1}
 .modal.largo{max-width:min(1180px,97vw)}
 @media(max-width:640px){.dv-tab th.num,.dv-tab td.num{display:none}.dv-acoes{flex-direction:column;align-items:flex-end}.dv-tab .cam{max-width:110px}.dv-tab td.nm{min-width:110px}}
 /* Strava */
-/* ===================== Strava — botão flutuante, gaveta, abas e cards =====================
-   Prefixo .stv-. Só variáveis do app: o modo escuro vem de graça. O laranja Strava
-   (#FC4C02) mora apenas no ícone do botão e nos selos de PR. */
-
-/* botão flutuante (z 58 — abaixo do botão de recuperação do app, que usa 90) */
-.stv-btn{position:fixed;right:18px;bottom:18px;z-index:58;width:52px;height:52px;border-radius:50%;
-  border:1px solid var(--linha);background:var(--card);box-shadow:var(--sombra);cursor:pointer;
-  display:flex;align-items:center;justify-content:center;padding:0;transition:transform .12s,box-shadow .12s}
-.stv-btn[hidden]{display:none}
-.stv-btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px -8px rgba(0,0,0,.3)}
-.stv-btn:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
-.stv-btn svg{width:26px;height:26px;display:block}
-.stv-ponto{position:absolute;top:3px;right:3px;width:13px;height:13px;border-radius:50%;background:var(--verde);
-  border:2px solid var(--card);animation:stv-pulso 1.6s ease-out infinite}
-.stv-ponto[hidden]{display:none}
-@keyframes stv-pulso{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--verde) 55%,transparent)}100%{box-shadow:0 0 0 11px transparent}}
-@media(prefers-reduced-motion:reduce){.stv-ponto{animation:none}.stv-gaveta{transition:none}}
-
-/* gaveta lateral direita (z 59 — o modal do app, z 60, cobre os dois) */
-.stv-gaveta{position:fixed;top:0;right:0;bottom:0;width:420px;max-width:100vw;z-index:59;background:var(--bg);
-  border-left:1px solid var(--linha);box-shadow:-10px 0 34px -14px rgba(0,0,0,.28);display:flex;flex-direction:column;
-  transform:translateX(105%);transition:transform .22s ease,visibility 0s .22s;visibility:hidden}
-.stv-gaveta.aberta{transform:none;visibility:visible;transition:transform .22s ease}
-@media(max-width:640px){.stv-gaveta{width:100%}}
-/* a rolagem da gaveta não empurra a página atrás dela */
-.stv-gaveta,.stv-corpo{overscroll-behavior:contain}
-/* enquanto o botão "Recuperar textos preservados" (z 90) ocupa o canto, o do Strava sobe */
-body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
-.stv-cab{display:flex;align-items:center;gap:9px;padding:13px 14px;border-bottom:1px solid var(--linha);background:var(--card);flex:none}
-.stv-cab>svg{width:22px;height:22px;flex:none}
-.stv-cab h3{font-size:17px;line-height:1.2}
-.stv-cab .stv-sinc{font-size:11.5px;color:var(--suave);margin-top:1px}
-.stv-cab .cresce{flex:1}
-.stv-cab .btn.mini{padding:5px 9px}
-.stv-cab .stv-fechar{font-size:14px;line-height:1}
-.stv-abas-cx{display:flex;flex-direction:column;flex:1;min-height:0}
+/* ===================== Strava — uma página, dados em primeiro plano ===================== */
+.stv-hero,.stv-tela{--stv-acento:#b63b06;--stv-tom:#fff1e9}
 .stv-tela{display:block}
-
-/* abas — servem à gaveta e à tela cheia */
-.stv-abas{display:flex;gap:4px;flex-wrap:wrap;padding:10px 14px 0;flex:none}
-.stv-tela .stv-abas{padding:0 0 4px}
-.stv-abas button{border:1px solid var(--linha);background:var(--card);font:600 12.5px Inter;padding:6px 12px;border-radius:20px;cursor:pointer;color:var(--suave)}
+@media(prefers-color-scheme:dark){.stv-hero,.stv-tela{--stv-acento:#ff955e;--stv-tom:#37251c}}
+.stv-hero{display:flex;align-items:center;gap:17px;padding:21px 24px;margin-bottom:18px;
+  border:1px solid var(--linha);border-radius:18px;background:linear-gradient(110deg,var(--stv-tom),var(--card) 55%);box-shadow:var(--sombra)}
+.stv-hero-marca{display:grid;place-items:center;flex:none;width:52px;height:52px;border-radius:15px;background:var(--card);box-shadow:var(--sombra)}
+.stv-hero-marca svg{width:30px;height:30px}
+.stv-hero .rot{font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--stv-acento)}
+.stv-hero h1{font-size:26px;line-height:1.2;margin:2px 0 3px}
+.stv-hero p{font-size:13px;color:var(--suave)}
+.stv-abas-cx{min-width:0}
+.stv-abas{display:flex;gap:22px;overflow-x:auto;border-bottom:1px solid var(--linha);margin-bottom:9px;scrollbar-width:thin}
+.stv-abas button{flex:none;border:0;border-bottom:3px solid transparent;background:none;color:var(--suave);
+  font:600 13.5px Inter,system-ui,sans-serif;padding:10px 2px 11px;min-height:44px;cursor:pointer}
 .stv-abas button:hover{color:var(--tinta)}
-.stv-abas button.on{background:var(--verde);border-color:var(--verde);color:#fff}
-.stv-abas button:focus-visible{outline:2px solid var(--verde);outline-offset:2px}
-.stv-sinc-linha{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--suave);padding:6px 14px 0;flex:none}
-.stv-tela .stv-sinc-linha{padding:0 0 10px}
-.stv-corpo{flex:1;min-height:0;overflow-y:auto;padding:12px 14px 28px;-webkit-overflow-scrolling:touch}
-.stv-corpo.stv-largo{overflow:visible;padding:0}
-.stv-corpo .bloco{margin-bottom:12px}
+.stv-abas button.on{border-bottom-color:var(--stv-acento);color:var(--stv-acento)}
+.stv-abas button:focus-visible{outline:2px solid var(--stv-acento);outline-offset:-3px}
+.stv-sinc-linha{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--suave);margin-bottom:16px}
+.stv-sinc-linha>span:first-child:before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--sucesso);margin-right:8px;vertical-align:1px}
+.stv-sinc-linha.ruim>span:first-child:before{background:var(--vermelho)}
+.stv-sinc-linha .btn{padding:6px 11px;font-size:12px}
+.stv-corpo{min-width:0}
+.stv-resumo-destaque,.stv-resumo-apoio{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:14px;margin-bottom:14px}
+.stv-resumo-destaque>.bloco,.stv-resumo-apoio>.bloco{min-width:0;margin-bottom:0}
+.stv-resumo-destaque>.bloco{display:flex;flex-direction:column}
+.stv-resumo-destaque>.bloco .conteudo{flex:1}
+.stv-resumo-destaque .stv-ultimo{height:100%}
+.stv-resumo-destaque .stv-ultimo .stv-acoes{margin-top:auto;padding-top:12px}
+@media(max-width:800px){.stv-resumo-destaque,.stv-resumo-apoio{grid-template-columns:1fr}}
+@media(max-width:640px){.stv-hero{padding:17px;gap:12px}.stv-hero-marca{width:43px;height:43px}.stv-hero h1{font-size:22px}.stv-abas{gap:17px}}
+.stv-corpo .bloco{margin-bottom:14px}
+.stv-corpo .stv-resumo-destaque>.bloco,.stv-corpo .stv-resumo-apoio>.bloco{margin-bottom:0}
 .stv-corpo .bloco>header{padding:11px 14px}
 .stv-corpo .bloco>header h2{font-size:14.5px}
 .stv-corpo .bloco .conteudo{padding:12px 14px}
 .stv-largo .bloco .conteudo{padding:14px 17px}
+.stv-corpo .bloco[data-bid="stv-kpis"]{background:none;border:0;box-shadow:none;overflow:visible}
+.stv-corpo .bloco[data-bid="stv-kpis"]>header{padding:0 1px 10px;border:0;background:none}
+.stv-corpo .bloco[data-bid="stv-kpis"] .conteudo{padding:0}
 .stv-corpo .grade{gap:9px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:0}
 .stv-corpo .kpi{padding:11px 12px}
 .stv-corpo .kpi .val{font-size:20px}
 .stv-corpo .kpi .sub{line-height:1.5}
 .stv-corpo .kpi .sub .chip{margin-top:3px}
-.stv-largo .grade{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:13px}
-.stv-largo .kpi{padding:15px 16px}
-.stv-largo .kpi .val{font-size:23px}
+.stv-largo .grade{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.stv-largo .kpi{padding:15px 16px;border-top:3px solid var(--stv-acento);box-shadow:none}
+.stv-largo .kpi .val{font-size:24px}
+.stv-largo .kpi .sub{line-height:1.55}
+@media(max-width:800px){.stv-largo .grade{grid-template-columns:repeat(auto-fit,minmax(185px,1fr))}}
 .stv-acoes{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .stv-sub{font:600 12px Inter;color:var(--suave);margin:12px 0 4px}
 .stv-suave{color:var(--suave);font-size:12px}
@@ -302,7 +290,7 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 .stv-titulo .stv-ic{width:1.25em;height:1.25em}
 .stv-destaque .stv-ic{width:18px;height:18px;color:var(--verde)}
 .stv-rec-cab .stv-ic{width:14px;height:14px}
-.stv-ultimo .stv-titulo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:Fraunces,serif;font-size:16.5px;font-weight:600}
+.stv-ultimo .stv-titulo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:Fraunces,serif;font-size:19px;font-weight:600;line-height:1.3}
 .stv-ultimo .stv-quando{font-size:12.5px;color:var(--suave)}
 .stv-metricas{display:grid;gap:8px 12px;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));margin-top:4px}
 .stv-metricas div{font-size:13.5px;font-variant-numeric:tabular-nums}
@@ -435,7 +423,6 @@ body:has([data-abrir-rascunho-sync]) .stv-btn{bottom:84px}
 .stv-erro .aviso{margin-bottom:0}
 .stv-erro .btn{align-self:flex-start}
 
-@media print{.stv-btn,.stv-gaveta{display:none}}
 /* fim Strava */
 /* A barra do Google agora mora DENTRO da linha do topo, ao lado do
    "+ Novo compromisso": nada de cartão com borda, que ali viraria caixa
@@ -1959,9 +1946,6 @@ function tela(){
   const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else if(atual==='caixavgv')organizarCaixaVGV(pagina,alvo);else if(atual==='config')organizarConfig(pagina,alvo);else if(atual==='demandas')organizarDemandasTopo(pagina);else indiceDaTela(pagina);prepararTabelas(pagina);if(typeof docIntegrarTela==='function')docIntegrarTela(pagina,atual);organizarPainelCompacto(pagina,atual);if(alvo)rolaAlvo(pagina,alvo)};
   const falhou=()=>{if(pagina.isConnected)pagina.appendChild(el('<p class="aviso" role="alert">Não foi possível concluir o carregamento. Abra esta seção novamente.</p>'))};
   try{const resultado=mod.render(pagina);if(resultado?.then)resultado.then(finalizar).catch(falhou);else finalizar()}catch(erro){falhou()}
-  /* o botão flutuante é enfeite: se ele falhar (ou o DOM for simulado num teste),
-     a navegação não pode cair junto */
-  try{if(typeof stravaMontarBotao==='function')stravaMontarBotao()}catch(e){console.error('strava/botao',e)}
   return !!alvo;
 }
 const rr=id=>()=>{if(atual===id||(id==='estrategia'&&atual==='empresas'&&filtro.empresaAba==='planejamento')||(id==='empresas'&&atual==='estrategia'))tela()};
@@ -12829,7 +12813,7 @@ function stvMetaAtiva(config,recordes,curva){
     precisa5k:Math.round(stvRiegel(alvo,distM,5000)),
     atingida:prAtual!=null&&prAtual<=alvo,diaPR:rec?rec.dia:'',atividadeIdPR:rec?rec.atividadeId:null}}
 
-/* ===================== STRAVA — tela, gaveta, botão e gráficos =====================
+/* ===================== STRAVA — tela e gráficos =====================
    Tudo aqui é tela: usa só o contrato de strava_calc.js (stv*) e os helpers do app
    (el, esc, bloco, cab, acao, seletor, kpi, ranking, abrirModal, campos, tela,
    irTela, filtro, E, salvar, uid, hoje, dataLocal, fmtDataAno, apiSync, temSessao).
@@ -13005,18 +12989,18 @@ function stravaParseTempo(s){s=String(s||'').trim();if(!s)return null;const p=s.
 function stravaSincTexto(iso){const d=iso?new Date(iso):null;if(!d||isNaN(d))return 'Sem data de sincronização';return 'Dados do Strava de '+fmtDataAno(dataLocal(d))+' às '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
 const stravaVazio=txt=>el(`<div class="vazio">${esc(txt)}</div>`);
 const stravaNota=txt=>el(`<div class="stv-nota">${esc(txt)}</div>`);
-// re-renderiza o contêiner de abas em que `cx` está (gaveta ou tela)
+// re-renderiza a aba que contém o controle alterado
 const stravaR=cx=>()=>{const raiz=cx.closest('.stv-abas-cx');if(raiz&&raiz._stravaRender)raiz._stravaRender();else tela()};
-function stravaAtualizarGaveta(){const g=document.getElementById('stravaGaveta');if(g&&g.classList.contains('aberta'))stravaAbas(g.querySelector('.stv-abas-cx'),{largo:false})}
+function stravaAtualizarTela(){const cx=document.querySelector('.stv-tela');if(cx?.isConnected)stravaAbas(cx,{largo:true})}
 
 /* ---------- tela cheia (entrada do menu) ---------- */
 function vStrava(m){
-  m.appendChild(cab('Strava','Corridas, recordes, tendências e tênis, direto do Strava.'));
+  m.appendChild(el(`<header class="stv-hero"><span class="stv-hero-marca">${LOGO_STRAVA}</span><div><div class="rot">Movimento e evolução</div><h1>Strava</h1><p>Seus treinos, metas e recordes em um só lugar.</p></div></header>`));
   const cx=el('<div class="stv-tela"></div>');m.appendChild(cx);
   stravaAbas(cx,{largo:true});
 }
 
-/* ---------- abas (servem à gaveta e à tela) ---------- */
+/* ---------- abas da tela ---------- */
 const STRAVA_ABAS=[['resumo','Resumo'],['recordes','Recordes'],['tendencias','Tendências'],['tenis','Tênis'],['relatorios','Relatórios']];
 function stravaAbas(cx,{largo=false}={}){
   const ativa=STRAVA_ABAS.some(a=>a[0]===filtro.stravaAba)?filtro.stravaAba:'resumo';filtro.stravaAba=ativa;
@@ -13033,6 +13017,7 @@ function stravaAbas(cx,{largo=false}={}){
     const res=sy&&sy.resultado&&typeof sy.resultado==='object'?sy.resultado:null;
     const precisa=!!(sy&&(sy.autorizado===false||(res&&res.precisaAutorizar)));
     const nota=stravaTextoSync(sy,res,precisa),ruim=precisa||!!(res&&res.erro);
+    sinc.classList.toggle('ruim',ruim);
     sinc.replaceChildren(el(`<span>${esc(stravaSincTexto(dados.atualizadoEm))}</span>`));
     if(nota)sinc.appendChild(el(`<span class="stv-sinc-nota${ruim?' ruim':''}">${esc(nota)}</span>`));
     sinc.appendChild(acao('Atualizar',()=>{carregando('Atualizando…');stravaCarregar(true).then(mostrar).catch(falhar)},'ghost'));
@@ -13047,10 +13032,10 @@ function stravaAbas(cx,{largo=false}={}){
       corpo.appendChild(el(`<p class="aviso" role="alert">Não foi possível montar a aba ${esc(nomeAba)} com os dados recebidos: ${esc((e&&e.message)||String(e))}</p>`));
     }
     if(!largo)corpo.scrollTop=rolagem;
-    stravaMontarBotao();
   };
   const falhar=e=>{
     if(!corpo.isConnected)return;
+    sinc.classList.add('ruim');
     const cxErro=el(`<div class="stv-erro"><p class="aviso" role="alert">${esc((e&&e.message)||'Não foi possível carregar os dados do Strava.')}</p></div>`);
     cxErro.appendChild(acao('Tentar de novo',()=>{carregando();stravaCarregar(true).then(mostrar).catch(falhar)}));
     corpo.replaceChildren(cxErro);
@@ -13068,7 +13053,8 @@ function stravaAbaResumo(cx,dados,largo){
   // referência inicial da meta nunca nasce no código: congela aqui, com o PR de verdade
   if(stravaCongelarRef(cfg,rec))salvar();
   const mes=h.slice(0,7),ano=h.slice(0,4),mesAnt=stravaMesMais(mes,-1),fimMesAnt=stravaDiaMais(mes+'-01',-1);
-  const rHoje=stvResumo(A,h,h),rMes=stvResumo(A,mes+'-01',h),rAnt=stvResumo(A,mesAnt+'-01',fimMesAnt);
+  const diaComparado=Math.min(+h.slice(8,10),+fimMesAnt.slice(8,10));
+  const rHoje=stvResumo(A,h,h),rMes=stvResumo(A,mes+'-01',h),rAnt=stvResumo(A,mesAnt+'-01',stravaDiaMais(mesAnt+'-01',diaComparado-1));
   const rAno=stvResumo(A,ano+'-01-01',h),rAnoAnt=stvResumo(A,(+ano-1)+'-01-01',(+ano-1)+h.slice(4));
 
   /* 1.1 último treino */
@@ -13081,18 +13067,18 @@ function stravaAbaResumo(cx,dados,largo){
     <div class="stv-quando">${esc(STRAVA_MOD_NOME[mod])} · ${esc(stravaQuando(u))}${u.local?' · '+esc(u.local):''}</div>
     <div class="stv-metricas">${mets.map(([k,v])=>`<div><small>${esc(k)}</small>${esc(v)}</div>`).join('')}</div><div class="stv-acoes"></div></div>`);
   ult.querySelector('.stv-acoes').appendChild(stravaBtnVer(u.id));
-  cx.appendChild(bloco('stv-ultimo','Último treino','',ult));
+  const ultimoBloco=bloco('stv-ultimo','Último treino','',ult);
 
   /* 1.2 KPIs hoje / mês / ano */
   const treinou=rHoje.treinos>0;
   const subHoje=[stravaKcal(rHoje.calorias)].concat(rHoje.corridas?[stravaKmN(rHoje.kmCorrida)]:[]).concat([treinou?'treinou hoje':'ainda não treinou']).join(' · ');
-  const subMes=esc([stravaPlural(rMes.treinos,'treino','treinos'),stravaKcal(rMes.calorias),stravaDur(rMes.horas*3600),stravaPlural(rMes.prs,'recorde','recordes')].join(' · '))+'<br>'+stravaChipVar(stvVariacao(rMes.kmCorrida,rAnt.kmCorrida),'em km vs '+stravaMesCurto(mesAnt),'sem corrida em '+stravaMesCurto(mesAnt)+' para comparar');
+  const subMes=esc([stravaPlural(rMes.treinos,'treino','treinos'),stravaKcal(rMes.calorias),stravaDur(rMes.horas*3600),stravaPlural(rMes.prs,'recorde','recordes')].join(' · '))+'<br>'+stravaChipVar(stvVariacao(rMes.kmCorrida,rAnt.kmCorrida),'em km vs '+stravaMesCurto(mesAnt)+' até dia '+diaComparado,'sem corrida até dia '+diaComparado+' de '+stravaMesCurto(mesAnt)+' para comparar');
   const subAno=esc([stravaPlural(rAno.treinos,'treino','treinos'),stravaKcal(rAno.calorias),stravaPlural(rAno.prs,'recorde','recordes')].join(' · '))+'<br>'+stravaChipVar(stvVariacao(rAno.kmCorrida,rAnoAnt.kmCorrida),'em km vs mesmo período de '+(+ano-1),'sem corrida até esta data em '+(+ano-1)+' para comparar');
   const kp=el('<div class="grade"></div>');
   kp.innerHTML=kpi('Hoje',esc(stravaPlural(rHoje.treinos,'treino','treinos')),esc(subHoje),treinou?'v':'a')
     +kpi('Mês · '+esc(stravaMesRot(mes)),esc(stravaKmN(rMes.kmCorrida)),subMes,'')
     +kpi('Ano · '+esc(ano),esc(stravaKmN(rAno.kmCorrida)),subAno,'');
-  cx.appendChild(bloco('stv-kpis','Hoje, mês e ano','km de corrida; calorias de todas as modalidades',kp));
+  cx.appendChild(bloco('stv-kpis','Seu ritmo','Km de corrida; calorias de todas as modalidades',kp));
 
   /* 1.3 meta ativa */
   const meta=stvMetaAtiva(cfg,rec,curva),cxMeta=el('<div class="stv-meta"></div>');
@@ -13114,7 +13100,9 @@ function stravaAbaResumo(cx,dados,largo){
   }
   const acMeta=cxMeta.querySelector('.stv-acoes')||cxMeta.appendChild(el('<div class="stv-acoes"></div>'));
   acMeta.appendChild(acao('Metas',()=>stravaModalMetas(rec),'ghost'));
-  cx.appendChild(bloco('stv-meta','Meta ativa','',cxMeta));
+  const destaque=el('<div class="stv-resumo-destaque"></div>');
+  destaque.append(ultimoBloco,bloco('stv-meta','Meta ativa','',cxMeta));
+  cx.appendChild(destaque);
 
   /* 1.4 volume por modalidade (mês atual) */
   const pm=rMes.porModalidade,itensVol=[];
@@ -13124,7 +13112,8 @@ function stravaAbaResumo(cx,dados,largo){
   if(pm.outros.n)itensVol.push({ic:stvIcone('outros')+' ',r:'Outros · '+stravaPlural(pm.outros.n,'sessão','sessões'),v:pm.outros.kcal});
   const vol=el('<div></div>');
   vol.innerHTML=itensVol.length?ranking(itensVol,{fmt:stravaKcal,max:4,mostraPct:true}):'<div class="vazio">Nenhum treino neste mês ainda.</div>';
-  cx.appendChild(bloco('stv-volume','Volume por modalidade','mês atual · barra = calorias e % do total',vol));
+  const apoio=el('<div class="stv-resumo-apoio"></div>');
+  apoio.appendChild(bloco('stv-volume','Volume por modalidade','mês atual · barra = calorias e % do total',vol));
 
   /* 1.5 últimas 7 atividades */
   const rol=el('<ul class="stv-rol"></ul>');
@@ -13147,7 +13136,8 @@ function stravaAbaResumo(cx,dados,largo){
     <div class="stv-destaque">${stvIcone('pr')} <b>${maiorMes?esc(stvFmtKm(maiorMes.distanciaM)):'—'}</b><small>${maiorMes?'maior corrida do mês · '+esc(fmtDataAno(stvDia(maiorMes))):'nenhuma corrida no mês'}</small></div>
     <div class="stv-destaque">${stvIcone('medalha')} <b>${esc(stravaPlural(rMes.prs,'recorde','recordes'))}</b><small>no mês</small></div>
     <div class="stv-destaque">${stvIcone('calendario')} <b>${esc(stravaN(diasSemana))} de 7</b><small>dias com treino nesta semana</small></div></div>`);
-  cx.appendChild(bloco('stv-destaques','Sequência e destaques','',dest));
+  apoio.appendChild(bloco('stv-destaques','Sequência e destaques','',dest));
+  cx.appendChild(apoio);
 
   /* dicas */
   stravaMontarDicas(cx,d,cfg,h,r);
@@ -13400,7 +13390,7 @@ function stravaModalTenis(t){
     s.appendChild(el('<p class="stv-nota">O km acumulado vem do Strava. O limite define a barra de vida útil (padrão 600 km). A data de compra habilita o km por mês.</p>'));
     cx.appendChild(s);
     const acoes=el('<div class="secao"></div>');acoes.appendChild(acao('Concluir',fechar));cx.appendChild(acoes);
-  },stravaAtualizarGaveta);
+  },stravaAtualizarTela);
 }
 
 /* 1.3 metas: lista com ativar/apagar e formulário de nova meta (uma ativa por vez) */
@@ -13442,7 +13432,7 @@ function stravaModalMetas(recordes){
       nova.appendChild(acoes);cx.appendChild(nova);
     };
     montar();
-  },stravaAtualizarGaveta);
+  },stravaAtualizarTela);
 }
 
 /* ================= ABA 5 — RELATÓRIOS =================
@@ -13619,68 +13609,6 @@ function stravaRelatorioImprimir(rel,nomeT,corpo){
   w.document.close();
   setTimeout(()=>w.print(),400);
 }
-
-/* ================= BOTÃO FLUTUANTE + GAVETA ================= */
-let stravaEventosLigados=false;
-function stravaLigarEventos(){
-  if(stravaEventosLigados)return;stravaEventosLigados=true;
-  // ESC fecha a gaveta — mas só quando não há modal do app aberto (o modal cuida do próprio ESC)
-  document.addEventListener('keydown',ev=>{
-    if(ev.key!=='Escape')return;const g=document.getElementById('stravaGaveta');
-    if(!g||!g.classList.contains('aberta')||document.querySelector('.fundo'))return;
-    ev.preventDefault();stravaFecharGaveta();
-  });
-  // clique fora fecha; clique no botão, dentro da gaveta ou num modal não conta
-  document.addEventListener('click',ev=>{
-    const g=document.getElementById('stravaGaveta');if(!g||!g.classList.contains('aberta'))return;
-    /* pelo CAMINHO do evento, não pelo alvo: trocar de aba re-renderiza a gaveta
-       (replaceChildren) e o alvo já saiu do DOM quando o clique chega aqui —
-       decidindo por ev.target a gaveta se fechava sozinha a cada clique. */
-    const caminho=ev.composedPath?ev.composedPath():[ev.target];
-    if(caminho.some(x=>x===g||(x instanceof Element&&(x.id==='stravaBtn'||x.id==='modais'||x.classList.contains('fundo')))))return;
-    stravaFecharGaveta();
-  });
-}
-const stravaTreinouHoje=()=>{const h=hoje();return !!(stravaCache&&stravaCache.atividades.some(a=>stvDia(a)===h))};
-function stravaPontoVerde(btn){
-  const p=btn.querySelector('.stv-ponto');
-  const marcar=()=>{const ok=stravaTreinouHoje();p.hidden=!ok;btn.title=ok?'Strava · treino de hoje registrado':'Strava';btn.setAttribute('aria-label',(ok?'Treinou hoje. ':'')+'Abrir painel do Strava')};
-  if(stravaCache)marcar();else p.hidden=true;
-  // carrega em silêncio quando não há cache válido; depois de uma falha espera 5 min antes de insistir
-  if(!stravaCacheValido()&&Date.now()-stravaFalhaEm>3e5)stravaCarregar().then(marcar).catch(()=>{});
-}
-function stravaMontarBotao(){
-  if(typeof temSessao==='function'&&!temSessao()){document.getElementById('stravaBtn')?.remove();document.getElementById('stravaGaveta')?.remove();return}
-  stravaLigarEventos();
-  let btn=document.getElementById('stravaBtn');
-  if(!btn){
-    btn=el(`<button type="button" id="stravaBtn" class="stv-btn" aria-label="Abrir painel do Strava" aria-controls="stravaGaveta" aria-expanded="false" title="Strava">${LOGO_STRAVA}<span class="stv-ponto" hidden aria-hidden="true"></span></button>`);
-    btn.onclick=()=>stravaAlternarGaveta();document.body.appendChild(btn);
-  }
-  let g=document.getElementById('stravaGaveta');
-  if(!g){
-    g=el(`<aside id="stravaGaveta" class="stv-gaveta" role="complementary" aria-label="Painel do Strava"><div class="stv-cab">${LOGO_STRAVA}<div><h3>Strava</h3><div class="stv-sinc">Corridas, recordes, tendências e tênis</div></div><span class="cresce"></span></div><div class="stv-abas-cx"></div></aside>`);
-    const cabG=g.querySelector('.stv-cab');
-    cabG.appendChild(acao('Tela cheia',()=>{stravaFecharGaveta();irTela('strava')},'ghost'));
-    const x=el('<button type="button" class="btn ghost mini stv-fechar" aria-label="Fechar painel do Strava">✕</button>');x.onclick=()=>stravaFecharGaveta();cabG.appendChild(x);
-    document.body.appendChild(g);
-  }
-  const naTela=typeof atual!=='undefined'&&atual==='strava';
-  btn.hidden=naTela;if(naTela&&g.classList.contains('aberta'))stravaFecharGaveta();
-  stravaPontoVerde(btn);
-}
-function stravaAbrirGaveta(){
-  const g=document.getElementById('stravaGaveta'),btn=document.getElementById('stravaBtn');if(!g)return;
-  filtro.stravaGavetaAberta=true;g.classList.add('aberta');btn&&btn.setAttribute('aria-expanded','true');
-  stravaAbas(g.querySelector('.stv-abas-cx'),{largo:false});
-  const x=g.querySelector('.stv-fechar');x&&x.focus({preventScroll:true});
-}
-function stravaFecharGaveta(){
-  const g=document.getElementById('stravaGaveta'),btn=document.getElementById('stravaBtn');if(!g)return;
-  filtro.stravaGavetaAberta=false;g.classList.remove('aberta');btn&&btn.setAttribute('aria-expanded','false');
-  if(g.contains(document.activeElement)&&btn&&!btn.hidden)btn.focus({preventScroll:true});
-}
-function stravaAlternarGaveta(){const g=document.getElementById('stravaGaveta');if(g&&g.classList.contains('aberta'))stravaFecharGaveta();else stravaAbrirGaveta()}
 
 /* ================= GRÁFICOS SVG (strings; responsivos por viewBox) ================= */
 // x pode ser número, 'AAAA-MM-DD' ou 'AAAA-MM' (vira número de dias)
