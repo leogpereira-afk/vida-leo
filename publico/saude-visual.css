@@ -51,10 +51,11 @@
 @media(max-width:950px){.pagina.saude-layout .saude-resumo-faixa{grid-template-columns:minmax(0,1fr)}.pagina.saude-layout .saude-resumo-graficos{grid-template-columns:repeat(2,minmax(0,1fr))}.pagina.saude-layout .saude-resumo-graficos>.bloco:only-child{grid-column:1/-1}}
 @media(max-width:700px){.pagina.saude-layout .saude-resumo .grade{grid-template-columns:repeat(2,minmax(0,1fr))}.pagina.saude-layout .saude-resumo-graficos{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:600px){
-  .pagina.saude-layout .saude-hero{padding:16px;gap:12px}
+  .pagina.saude-layout .saude-hero{display:grid;grid-template-columns:42px minmax(0,1fr);align-items:start;padding:16px;gap:10px 12px}
   .pagina.saude-layout .saude-hero-icone{width:42px;height:42px;font-size:20px}
+  .pagina.saude-layout .saude-hero>div{min-width:0}
   .pagina.saude-layout .saude-hero h1{font-size:24px}
-  .pagina.saude-layout .saude-hero p{flex-basis:100%}
+  .pagina.saude-layout .saude-hero>.btn{grid-column:1/-1;justify-self:start;margin-left:0}
   .pagina.saude-layout>.saude-acoes{flex-wrap:wrap;padding:11px}
   .pagina.saude-layout .saude-acoes-rotulo{width:100%}
   .pagina.saude-layout>.saude-acoes select{flex:1 1 180px;min-width:0;font-size:16px}
@@ -63,5 +64,5 @@
   .pagina.saude-layout .saude-resumo .kpi{min-height:100px;padding:13px}
   .pagina.saude-layout .saude-resumo .kpi .val{font-size:22px}
 }
-@media(max-width:390px){.pagina.saude-layout .saude-resumo .grade{grid-template-columns:minmax(0,1fr)}.pagina.saude-layout>.saude-acoes .saude-sos{width:100%;justify-content:center}}
+@media(max-width:350px){.pagina.saude-layout .saude-resumo .grade{grid-template-columns:minmax(0,1fr)}.pagina.saude-layout>.saude-acoes .saude-sos{width:100%;justify-content:center}}
 @media print{.pagina.saude-layout .saude-hero{background:white}.pagina.saude-layout .saude-vazio-acoes,.pagina.saude-layout>.saude-acoes{display:none!important}}
