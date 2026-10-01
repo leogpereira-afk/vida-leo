@@ -48,7 +48,7 @@
 .pagina.saude-layout .saude-resumo-graficos>.bloco>header{padding:16px 18px}
 .pagina.saude-layout .saude-resumo-graficos>.bloco>.conteudo{min-height:0}
 
-@media(max-width:950px){.pagina.saude-layout .saude-resumo-faixa{grid-template-columns:minmax(0,1fr)}.pagina.saude-layout .saude-resumo-graficos{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:950px){.pagina.saude-layout .saude-resumo-faixa{grid-template-columns:minmax(0,1fr)}.pagina.saude-layout .saude-resumo-graficos{grid-template-columns:repeat(2,minmax(0,1fr))}.pagina.saude-layout .saude-resumo-graficos>.bloco:only-child{grid-column:1/-1}}
 @media(max-width:700px){.pagina.saude-layout .saude-resumo .grade{grid-template-columns:repeat(2,minmax(0,1fr))}.pagina.saude-layout .saude-resumo-graficos{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:600px){
   .pagina.saude-layout .saude-hero{padding:16px;gap:12px}
