@@ -1,0 +1,75 @@
+.aviao-layout{--av-azul:#253c74;--av-azul-cl:#e8eef8;--av-borda:var(--linha)}
+.aviao-layout .topo{align-items:center}
+.aviao-hero{display:flex;align-items:center;gap:21px;padding:24px 27px;margin-bottom:18px;border:1px solid #ced9ed;border-radius:22px;background:linear-gradient(120deg,#f8faff,#e9f0fa 62%,#f8f9fc);box-shadow:0 15px 35px -29px #253c74}
+.aviao-hero-icone{width:72px;height:72px;flex:0 0 72px;display:grid;place-items:center;border-radius:19px;background:#253c74;color:#fff;font-size:31px;box-shadow:0 11px 22px -14px #253c74}
+.aviao-eyebrow{font-size:10px;font-weight:700;letter-spacing:.15em;color:#526a91}
+.aviao-hero h2{font-family:Fraunces,Georgia,serif;font-size:29px;line-height:1.2;margin:5px 0}
+.aviao-hero p{color:#52627e;font-size:13px}
+.aviao-participacao{font-family:Fraunces,Georgia,serif;font-size:32px;font-weight:600;text-align:right;color:#253c74;white-space:nowrap}
+.aviao-participacao small{display:block;font:600 11px Inter,system-ui,sans-serif;color:#52627e}
+.aviao-abas{display:flex;gap:5px;overflow:auto;border-bottom:1px solid var(--linha);margin:0 0 22px}
+.aviao-abas button{border:0;border-bottom:3px solid transparent;background:transparent;color:var(--suave);padding:11px 15px;font:600 13px Inter,system-ui,sans-serif;white-space:nowrap;cursor:pointer}
+.aviao-abas button:hover{color:var(--tinta)}
+.aviao-abas button.on{color:var(--av-azul);border-bottom-color:var(--av-azul)}
+.aviao-metricas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:15px}
+.aviao-metricas .kpi{min-width:0}
+.aviao-metricas .kpi .val{font-size:21px;overflow-wrap:anywhere}
+.aviao-contexto{border:1px solid #d7e0ef;background:var(--av-azul-cl);color:#273a62;border-radius:13px;padding:12px 15px;margin:12px 0 17px;font-size:13px;line-height:1.6}
+.aviao-resumo-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--linha);border-radius:16px;background:var(--card);overflow:hidden;margin-bottom:16px;box-shadow:var(--sombra)}
+.aviao-resumo-grid>div{padding:18px;border-right:1px solid var(--linha);min-width:0}
+.aviao-resumo-grid>div:last-child{border-right:0}
+.aviao-resumo-grid small{display:block;color:var(--suave);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.aviao-resumo-grid strong{display:block;font-size:21px;margin-top:5px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.aviao-resumo-grid span{font-size:11px;color:var(--suave)}
+.aviao-pontes{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
+.aviao-vazio{border:1px dashed var(--linha);border-radius:16px;padding:22px;margin-bottom:17px;background:var(--card)}
+.aviao-vazio p{color:var(--suave);font-size:13px;max-width:65ch;margin-top:4px}
+.aviao-layout .corpo>.btn{margin:0 0 13px}
+.aviao-layout .aviao-tabela{width:100%;min-width:590px}
+.aviao-layout .aviao-tabela td{font-size:12.5px}
+.aviao-layout .aviao-tabela td:last-child{text-align:right}
+.aviao-layout .aviao-tabela .btn{white-space:nowrap}
+.aviao-muted{color:var(--suave);font-size:12.5px;line-height:1.55;margin:9px 0}
+.aviao-vinculo{margin:11px 0;padding:10px 12px;border-radius:9px;background:var(--azul-cl);color:var(--azul);font-size:12px}
+.aviao-sobre{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:23px 26px;border:1px solid var(--linha);border-radius:17px;background:var(--card);margin-bottom:16px}
+.aviao-sobre h2{font-size:22px}
+.aviao-sobre p{font-size:13px;color:var(--suave);max-width:64ch;margin-top:5px}
+.aviao-sobre-emblema{font-size:46px;line-height:1}
+.aviao-galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:12px}
+.aviao-galeria>.aviao-muted{grid-column:1/-1}
+.aviao-foto{overflow:hidden;border:1px solid var(--linha);border-radius:12px;background:var(--bg)}
+.aviao-foto img,.aviao-foto-indisp{display:block;width:100%;height:130px;object-fit:cover}
+.aviao-foto-indisp{display:grid;place-items:center;color:var(--suave);font-size:12px}
+.aviao-foto span{display:block;padding:7px 9px;font-size:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.aviao-recarregar{margin-bottom:15px}
+.aviao-viagem{display:flex;align-items:center;gap:13px;padding:11px 0;border-bottom:1px solid var(--linha)}
+.aviao-viagem>div{flex:1;min-width:0}
+.aviao-viagem small{display:block;color:var(--suave);font-size:12px}
+.aviao-viagem strong{font-variant-numeric:tabular-nums;white-space:nowrap}
+.aviao-import{padding:12px 3px}
+.aviao-import p{margin:0 0 12px}
+.aviao-import-grid{display:flex;gap:9px;flex-wrap:wrap;margin:15px 0}
+.aviao-import-grid span{background:var(--bg);border:1px solid var(--linha);border-radius:9px;padding:8px 11px;font-size:12px}
+.aviao-import label{display:block;font-weight:600;font-size:13px;margin:18px 0 3px}
+.aviao-import input{display:block;width:100%;max-width:280px;border:1px solid var(--linha);border-radius:9px;padding:9px 11px;margin-top:6px;font:inherit;background:var(--card);color:var(--tinta)}
+@media(prefers-color-scheme:dark){
+  .aviao-layout{--av-azul:#b6c7ff;--av-azul-cl:#222c42}
+  .aviao-hero{background:linear-gradient(120deg,#202b40,#1d2637);border-color:#3d4c67}
+  .aviao-hero-icone{background:#c2d1ff;color:#1a2b50}
+  .aviao-hero p,.aviao-eyebrow,.aviao-participacao small{color:#b2bfd5}
+  .aviao-participacao,.aviao-contexto{color:#dbe5ff}
+  .aviao-contexto{background:#212d42;border-color:#3b4a66}
+}
+@media(max-width:850px){.aviao-metricas,.aviao-resumo-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.aviao-resumo-grid>div:nth-child(2){border-right:0}.aviao-resumo-grid>div:nth-child(-n+2){border-bottom:1px solid var(--linha)}}
+@media(max-width:560px){
+  .aviao-hero{padding:18px;gap:13px;flex-wrap:wrap}
+  .aviao-hero-icone{width:50px;height:50px;flex-basis:50px;font-size:24px}
+  .aviao-hero h2{font-size:22px}
+  .aviao-participacao{font-size:24px;text-align:left;width:100%;padding-left:64px}
+  .aviao-metricas,.aviao-resumo-grid{grid-template-columns:1fr 1fr}
+  .aviao-metricas .kpi .val,.aviao-resumo-grid strong{font-size:17px}
+  .aviao-resumo-grid>div{padding:12px}
+  .aviao-sobre{padding:18px}
+  .aviao-sobre-emblema{display:none}
+  .aviao-viagem{flex-wrap:wrap}
+}

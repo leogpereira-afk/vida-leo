@@ -665,6 +665,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./painel-compacto.css?v=4baf1a7c4d03">
 <link rel="stylesheet" href="./saude-visual.css?v=c2264793fee0">
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
+<link rel="stylesheet" href="./aviao.css?v=5a47789ff812">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -1049,6 +1050,12 @@ async function importarArquivos(f) {
 const SEED={
   // Sem dados pessoais aqui: o HTML é público. Tudo vem da nuvem após o login.
   viagens:[],
+  // Dados patrimoniais e financeiros do avião são privados: entram pelo importador
+  // ou pelos formulários, nunca como valores embutidos no site público.
+  aviao:{nome:'',matricula:'',titularidade:'',historia:'',base:'',uso:'',participacao:null,valorReferencia:null,
+    valorCotaAtual:null,cotaBaseAeronave:null,manutencaoMinha:null,
+    manutencaoTotalAtual:null,manutencaoTotalFonte:null,aportes:[],mensalidades:[],despesas:[],
+    importacao:null},
   strava:{tenis:{},metas:[],dicasDispensadas:{}},
   planilhas:[],
   rendHist:{anos:[],empresas:{},totalAno:[],totalGeral:0,mediaAnual:0,parciais:[],aIdentificar:[],aplicPorInst:{},detalhe:{}},
@@ -1168,6 +1175,11 @@ function carregar(){
     if(!Array.isArray(v.roteiro))v.roteiro=[];
     if(!Array.isArray(v.lugares))v.lugares=[];
     if(!v.carro||typeof v.carro!=='object')v.carro={};});
+  d.aviao={...structuredClone(SEED.aviao),...((d.aviao&&typeof d.aviao==='object'&&!Array.isArray(d.aviao))?d.aviao:{})};
+  for(const k of ['aportes','mensalidades','despesas']){
+    if(!Array.isArray(d.aviao[k]))d.aviao[k]=[];
+    d.aviao[k].forEach(x=>{if(x&&!x.id)x.id=uid()});
+  }
   // internacional: deixa indefinido de propósito — a cidade decide sozinha (ehInternacional)
   d.metas.forEach(m=>{if(!Array.isArray(m.passos))m.passos=[]});
   /* MIGRAÇÃO DE UMA VEZ SÓ, NÃO DE TODA VEZ.
@@ -1747,6 +1759,7 @@ const MODS=[
   {id:'patrimonio',ic:'🏠',nome:'Patrimônio',grupo:'',render:vPatrimonio},
   {id:'caixavgv',ic:'💰',nome:'Caixa e VGV',grupo:'',render:vCaixaVGV},
   {id:'viagens',ic:'✈️',nome:'Viagens',grupo:'Vida',render:vViagens},
+  {id:'aviao',ic:'🛩️',nome:'Avião',grupo:'',render:vAviao},
   {id:'demandas',ic:'✅',nome:'Demandas',grupo:'',render:vDemandas},
   {id:'saude',ic:'🩺',nome:'Saúde',grupo:'',render:vSaude},
   {id:'strava',ic:LOGO_STRAVA,nome:'Strava',grupo:'',render:vStrava},
@@ -2014,7 +2027,15 @@ function docsViagem(v){
 // viagem "ok" = confirmada/realizada, hotel e transporte resolvidos e docs em dia
 const viagemOk=v=>['Confirmado','Realizado'].includes(v.status)&&temHotelViagem(v)
   &&String(v.transporte||'').trim()&&docsViagem(v).ok;
-const custoViagem=v=>v.custos&&v.custos.length?v.custos.reduce((s,c)=>s+(+c.valor||0),0):(+v.gastos||0);
+function despesasDoAviaoNaViagem(v){
+  if(!v||v.aviaoId!=='principal'||v.status==='Cancelado')return [];
+  return (E.aviao?.despesas||[]).filter(d=>d.viagemId===v.id&&d.status!=='Cancelado');
+}
+const custoViagem=v=>{
+  const diretos=(v.custos||[]).reduce((s,c)=>s+(+c.valor||0),0);
+  const aeronave=despesasDoAviaoNaViagem(v).reduce((s,d)=>s+(+d.minhaCota||0),0);
+  return diretos+aeronave||(+v.gastos||0);
+};
 
 /* ===================== INÍCIO ===================== */
 /* radar: varre TODAS as seções e junta o que precisa de atenção */
@@ -2210,7 +2231,7 @@ function novoRegistroRotina(titulo,lista,base,defs,abrir){
     c.appendChild(form);
   });
 }
-function novaViagemRotina(){novoRegistroRotina('Nova viagem',E.viagens,{ida:hoje(),volta:hoje(),status:'Em Planejamento',hotel:'',transporte:'',gastos:0,obs:'',custos:[],passagens:[],hoteis:[],tickets:[],viajantes:[],tipo:'Trabalho',planejar:false,roteiro:[],lugares:[],carro:{}},[
+function novaViagemRotina(noAviao=false){novoRegistroRotina('Nova viagem',E.viagens,{ida:hoje(),volta:hoje(),status:'Em Planejamento',hotel:'',transporte:noAviao?'Avião próprio':'',aviaoId:noAviao?'principal':'',gastos:0,obs:'',custos:[],passagens:[],hoteis:[],tickets:[],viajantes:[],tipo:'Trabalho',planejar:false,roteiro:[],lugares:[],carro:{}},[
   {k:'evento',t:'Nome da viagem',obrigatorio:true,ph:'Ex.: Férias em família'},
   {k:'cidade',t:'Destino',obrigatorio:true},{k:'ida',t:'Ida',tipo:'date',obrigatorio:true},{k:'volta',t:'Volta',tipo:'date',obrigatorio:true},
   {k:'tipo',t:'Tipo',opcoes:CFG('tiposViagem')},{k:'gastos',t:'Orçamento estimado (R$)',tipo:'number'}],modalViagem)}
@@ -2240,6 +2261,355 @@ function metricasRotina(itens){const cx=el('<div class="rotina-metricas"></div>'
 
 /* ===================== VIAGENS ===================== */
 const temHotelViagem=v=>!!String(v.hotel||'').trim()||(v.hoteis||[]).some(h=>!!String(h.nome||'').trim());
+
+/* O avião mora no mesmo estado privado de Viagens. A planilha é uma fonte
+   revisável; o HTML público nunca leva os valores particulares do Léo. */
+function aviaoDaPlanilha(m,d){
+  if(!String(m.A1||'').trim()||!/participa/i.test(String(m.F3||''))||!/manuten/i.test(String(m.F7||'')))
+    throw new Error('Esta não parece ser a planilha de custos do avião esperada.');
+  const n=v=>numeroPlanilha(v)??0, t=v=>String(v??'').trim();
+  const aportes=[],mensalidades=[],despesas=[];
+  for(let i=4;i<=100;i++){
+    const data=dataPlan(m['A'+i]),valor=n(m['C'+i]);
+    if(i<11&&data&&valor>0)aportes.push({chave:'aporte:'+data+':'+i,data,forma:t(m['B'+i]),valor});
+  }
+  for(let i=12;i<=250;i++){
+    const competencia=dataPlan(m['A'+i]),vencimento=dataPlan(m['B'+i]);
+    if(!competencia&&!vencimento)continue;
+    if(!competencia||!vencimento)throw new Error('Data incompleta em Custos mensais, linha '+i+'.');
+    mensalidades.push({chave:'mensal:'+competencia,competencia,vencimento,
+      minhaCota:n(m['D'+i]),status:t(m['E'+i])||'A Vencer',pagoEm:dataPlan(m['F'+i]),obs:t(m['G'+i])});
+  }
+  for(let i=6;i<=250;i++){
+    const data=dataPlan(d['A'+i]);if(!data)continue;
+    const categoria=t(d['B'+i]),descricao=t(d['C'+i]);
+    despesas.push({chave:'despesa:'+data+':'+categoria+':'+descricao,data,categoria,descricao,
+      valorTotal:n(d['D'+i]),minhaCota:n(d['E'+i]),status:t(d['F'+i])||'Pendente',obs:t(d['G'+i]),viagemId:''});
+  }
+  return {nome:t(m.A1),matricula:(t(m.A1).match(/\b[A-Z]{2}-[A-Z]{3}\b/)||[])[0]||'',
+    titularidade:t(m.A2).replace(/^Titularidade:\s*/i,''),participacao:n(m.G3),
+    valorReferencia:n(m.I3),valorCotaAtual:n(m.G4),cotaBaseAeronave:n(m.I4),
+    manutencaoMinha:n(m.G7),manutencaoTotalFonte:n(m.I7),
+    aportes,mensalidades,despesas};
+}
+function validarPacoteAviao(raw){
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Error('Arquivo de avião inválido.');
+  const p=raw.aviao&&typeof raw.aviao==='object'&&!Array.isArray(raw.aviao)?raw.aviao:raw;
+  for(const k of ['nome','matricula','titularidade'])if(typeof p[k]!=='string'||p[k].length>250)throw new Error('Campo inválido: '+k);
+  if(!/^[A-Z]{2}-[A-Z]{3}$/.test(p.matricula))throw new Error('Matrícula do avião inválida.');
+  for(const k of ['participacao','valorReferencia','valorCotaAtual','cotaBaseAeronave','manutencaoMinha','manutencaoTotalFonte']){
+    if(!Number.isFinite(p[k])||p[k]<0)throw new Error('Valor inválido: '+k);
+  }
+  if(p.participacao<=0||p.participacao>1)throw new Error('Participação precisa estar entre 0 e 100%.');
+  if(p.manutencaoTotalAtual!=null&&(!Number.isFinite(p.manutencaoTotalAtual)||p.manutencaoTotalAtual<=0))
+    throw new Error('Custo mensal total atual inválido.');
+  for(const k of ['aportes','mensalidades','despesas']){
+    if(!Array.isArray(p[k])||p[k].length>500)throw new Error('Lista inválida: '+k);
+    const vistos=new Set();
+    for(const x of p[k]){
+      if(!x||typeof x!=='object'||Array.isArray(x)||typeof x.chave!=='string'||!x.chave||vistos.has(x.chave))
+        throw new Error('Registro repetido ou inválido: '+k);
+      vistos.add(x.chave);
+      const datas=k==='aportes'?['data']:k==='mensalidades'?['competencia','vencimento']:['data'];
+      for(const d of datas)if(!dataISOValida(x[d]))throw new Error('Data inválida em '+k+'.');
+      for(const n of k==='aportes'?['valor']:k==='mensalidades'?['minhaCota']:['valorTotal','minhaCota'])
+        if(!Number.isFinite(x[n])||x[n]<0)throw new Error('Valor inválido em '+k+'.');
+      for(const [campo,valor] of Object.entries(x))if(typeof valor==='string'&&valor.length>1000)
+        throw new Error('Texto longo demais em '+k+'.'+campo);
+    }
+  }
+  return p;
+}
+function mesclarAviaoImportado(atual,p){
+  const proximo={...atual};
+  for(const k of ['nome','matricula','titularidade','participacao','valorReferencia','valorCotaAtual',
+    'cotaBaseAeronave','manutencaoMinha','manutencaoTotalFonte'])proximo[k]=p[k];
+  if(p.manutencaoTotalAtual!=null)proximo.manutencaoTotalAtual=p.manutencaoTotalAtual;
+  for(const k of ['aportes','mensalidades','despesas']){
+    const anteriores=atual[k]||[],porChave=new Map(anteriores.filter(x=>x.chave).map(x=>[x.chave,x]));
+    const vistos=new Set();
+    const importados=p[k].map(x=>{
+      vistos.add(x.chave);const ant=porChave.get(x.chave);
+      const item={...ant,...x,id:ant?.id||uid(),origem:'planilha'};
+      // Decisões feitas na tela são preservadas numa segunda importação.
+      if(ant?.editadoManual){
+        for(const campo of k==='aportes'?['data','forma','valor']:
+          k==='mensalidades'?['competencia','vencimento','minhaCota','status','pagoEm','obs']:
+          ['data','categoria','descricao','valorTotal','minhaCota','status','obs','viagemId'])
+          item[campo]=ant[campo];
+        item.editadoManual=true;
+      }
+      if(k==='despesas'&&ant?.viagemId)item.viagemId=ant.viagemId;
+      return item;
+    });
+    proximo[k]=[...importados,...anteriores.filter(x=>!x.chave||!vistos.has(x.chave))];
+  }
+  proximo.importacao={em:new Date().toISOString(),origem:'planilha de custos do avião'};
+  return proximo;
+}
+function totaisAviao(a){
+  const aportado=(a.aportes||[]).reduce((s,x)=>s+(+x.valor||0),0);
+  const mensalPago=(a.mensalidades||[]).filter(x=>x.status==='Pago').reduce((s,x)=>s+(+x.minhaCota||0),0);
+  const mensalAberto=(a.mensalidades||[]).filter(x=>!['Pago','Cancelado'].includes(x.status)).reduce((s,x)=>s+(+x.minhaCota||0),0);
+  const extras=(a.despesas||[]).filter(x=>x.status!=='Cancelado').reduce((s,x)=>s+(+x.minhaCota||0),0);
+  const ganho=(+a.valorCotaAtual||0)-aportado;
+  return {aportado,mensalPago,mensalAberto,extras,ganho};
+}
+async function lerArquivoAviao(f){
+  if(f.size>64*1024*1024)throw new Error('Arquivo maior que 64 MB.');
+  if(/\.xlsx$/i.test(f.name)){
+    const zip=await lerZipAuto(new Uint8Array(await f.arrayBuffer())),abas=abasDoXlsx(zip);
+    const cm=abas['Custos mensais'],cv=abas['Custos de Viagens'];
+    if(!cm||!cv)throw new Error('Preciso das abas Custos mensais e Custos de Viagens.');
+    return validarPacoteAviao(aviaoDaPlanilha(celulasDaAba(zip,cm),celulasDaAba(zip,cv)));
+  }
+  if(/\.json$/i.test(f.name)){
+    if(f.size>2*1024*1024)throw new Error('Arquivo de dados maior que 2 MB.');
+    return validarPacoteAviao(JSON.parse(await f.text()));
+  }
+  throw new Error('Escolha a planilha .xlsx ou o arquivo privado .json.');
+}
+async function importarAviao(f){
+  let p;try{p=await lerArquivoAviao(f)}catch(e){alert('Não consegui ler o avião: '+e.message);return}
+  const estadoLido=E;
+  abrirModal('Conferir importação do avião',esc(f.name),(c,fechar)=>{
+    const previa=el(`<div class="aviao-import">
+      <p>Confira os valores antes de gravar. Nada muda até você aplicar.</p>
+      <p><b>${esc(p.nome)}</b> · ${esc(p.matricula)} · ${(p.participacao*100).toLocaleString('pt-BR')}% da aeronave</p>
+      <div class="aviao-import-grid"><span>Pagamentos pela sua cota: <b>${p.aportes.length}</b></span><span>Mensalidades: <b>${p.mensalidades.length}</b></span><span>Despesas extras: <b>${p.despesas.length}</b></span></div>
+      <p>Sua mensalidade: <b>${brl(p.manutencaoMinha)}</b>. Total que consta na planilha: <b>${brl(p.manutencaoTotalFonte)}</b>.</p>
+      <label>Total mensal atual da aeronave (R$)<input type="number" min="0.01" step="0.01" inputmode="decimal" required></label>
+      <p class="aviao-muted">O total atual é independente da sua mensalidade: nenhuma porcentagem recalcula ${brl(p.manutencaoMinha)}.</p>
+      <p class="form-erro" role="alert"></p></div>`);
+    const total=previa.querySelector('input'),erro=previa.querySelector('[role=alert]');
+    total.value=E.aviao.manutencaoTotalAtual??p.manutencaoTotalAtual??'';
+    const botoes=el('<div class="secao modal-acoes"></div>');
+    botoes.appendChild(acao('Cancelar',fechar,'ghost'));
+    const aplicar=acao('Aplicar dados conferidos',()=>{
+      if(E!==estadoLido){erro.textContent='Os dados mudaram durante a conferência. Abra a importação de novo.';return}
+      const n=Number(total.value);
+      if(!Number.isFinite(n)||n<=0){erro.textContent='Informe o custo mensal total atual.';total.focus();return}
+      E.aviao=mesclarAviaoImportado(E.aviao,{...p,manutencaoTotalAtual:n});
+      salvar();fechar();
+    });
+    botoes.appendChild(aplicar);c.append(previa,botoes);
+  });
+}
+
+function modalValoresAviao(){
+  const a=E.aviao,d={...a,participacaoPct:(+a.participacao||0)*100};
+  abrirModal('Valores do avião','Dados privados. Ajuste cada valor conforme sua documentação.',(c,fechar)=>{
+    const defs=[
+      {k:'participacaoPct',t:'Participação na aeronave (%)',tipo:'number'},
+      {k:'valorReferencia',t:'Valor de referência da cota',tipo:'moeda'},
+      {k:'valorCotaAtual',t:'Valor atual estimado da cota',tipo:'moeda'},
+      {k:'cotaBaseAeronave',t:'Cota base da aeronave',tipo:'moeda'},
+      {k:'manutencaoTotalAtual',t:'Custo mensal total atual',tipo:'moeda'},
+      {k:'manutencaoMinha',t:'Minha mensalidade',tipo:'moeda'},
+    ].map(x=>({...x,rascunho:true}));
+    const sec=el('<div class="secao"></div>'),fs=campos(d,defs);
+    fs.querySelector('input[type=number]').step='0.01';
+    const erro=el('<p class="form-erro" role="alert"></p>');
+    sec.append(fs,el('<p class="aviao-muted">A participação é percentual da aeronave inteira. Sua mensalidade é um valor independente, informado por você.</p>'),erro);
+    const acoes=el('<div class="secao modal-acoes"></div>');
+    acoes.appendChild(acao('Cancelar',fechar,'ghost'));
+    acoes.appendChild(acao('Salvar valores',()=>{
+      for(const inp of fs.querySelectorAll('input'))if(inp.gravarEntrada?.()===false)return;
+      if(!(d.participacaoPct>0&&d.participacaoPct<=100)||!(d.manutencaoTotalAtual>0)||!(d.manutencaoMinha>=0)){
+        erro.textContent='Confira a participação e os custos mensais.';return;
+      }
+      for(const k of ['valorReferencia','valorCotaAtual','cotaBaseAeronave','manutencaoTotalAtual','manutencaoMinha'])
+        a[k]=+d[k]||0;
+      a.participacao=d.participacaoPct/100;salvar();fechar();
+    }));
+    c.append(sec,acoes);
+  });
+}
+function modalRegistroAviao(tipo,item){
+  const mensal=tipo==='mensalidades',aporte=tipo==='aportes',novo=!item;
+  const d=item?structuredClone(item):aporte?{id:uid(),data:hoje(),forma:'',valor:0,chave:''}:
+    mensal?{id:uid(),competencia:hoje().slice(0,7)+'-01',vencimento:hoje(),minhaCota:+E.aviao.manutencaoMinha||0,status:'A Vencer',pagoEm:'',obs:'',chave:''}:
+    {id:uid(),data:hoje(),categoria:'Combustível',descricao:'',valorTotal:0,minhaCota:0,status:'Pendente',obs:'',viagemId:'',chave:''};
+  const defs=aporte?[
+    {k:'data',t:'Data do aporte',tipo:'date'},{k:'forma',t:'Forma de pagamento'},
+    {k:'valor',t:'Valor pago',tipo:'moeda'}]:
+    mensal?[
+      {k:'competencia',t:'Competência',tipo:'date'},{k:'vencimento',t:'Vencimento',tipo:'date'},
+      {k:'minhaCota',t:'Minha parcela',tipo:'moeda'},
+      {k:'status',t:'Situação',tipo:'select',opcoes:['A Vencer','Pago','Cancelado']},
+      {k:'pagoEm',t:'Data do pagamento',tipo:'date'},
+      {k:'obs',t:'Observações',tipo:'textarea',full:true}]:[
+      {k:'data',t:'Data',tipo:'date'},
+      {k:'categoria',t:'Categoria',tipo:'select',opcoes:['Combustível','Taxas / Hangaragem','Manutenção Extra','Outro']},
+      {k:'descricao',t:'Descrição / rota',full:true},
+      {k:'valorTotal',t:'Custo total',tipo:'moeda'},
+      {k:'minhaCota',t:'Minha parte',tipo:'moeda'},
+      {k:'status',t:'Situação',tipo:'select',opcoes:['Pendente','Pago','Cancelado']},
+      {k:'viagemId',t:'Vincular a uma viagem',tipo:'select',opcoes:[{v:'',t:'Sem viagem vinculada'},...E.viagens.filter(v=>v.status!=='Cancelado').map(v=>({v:v.id,t:(v.evento||v.cidade||'Viagem')+' · '+(v.ida||'sem data')}))]},
+      {k:'obs',t:'Observações',tipo:'textarea',full:true},
+    ];
+  abrirModal((novo?'Adicionar ':'Editar ')+(aporte?'aporte':mensal?'mensalidade':'despesa do avião'),
+    'Os valores vinculados aparecem em Viagens sem criar outro lançamento.',(c,fechar)=>{
+      const sec=el('<div class="secao"></div>'),fs=campos(d,defs.map(x=>({...x,rascunho:true})));
+      const erro=el('<p class="form-erro" role="alert"></p>');sec.append(fs,erro);
+      const acoes=el('<div class="secao modal-acoes"></div>');
+      acoes.appendChild(acao('Cancelar',fechar,'ghost'));
+      if(item)acoes.appendChild(acao('Apagar registro',()=>{
+        if(!confirm('Apagar este registro do avião?'))return;
+        E.aviao[tipo]=E.aviao[tipo].filter(x=>x.id!==item.id);salvar();fechar();
+      },'ghost'));
+      acoes.appendChild(acao('Salvar registro',()=>{
+        for(const inp of fs.querySelectorAll('input,select,textarea'))if(inp.gravarEntrada?.()===false)return;
+        const datas=aporte?['data']:mensal?['competencia','vencimento']:['data'];
+        if(datas.some(k=>!dataISOValida(d[k]))){erro.textContent='Confira as datas.';return}
+        if(aporte&&!(d.valor>0)||mensal&&!(d.minhaCota>=0)||!aporte&&!mensal&&(!d.descricao?.trim()||!(d.valorTotal>=0)||!(d.minhaCota>=0))){
+          erro.textContent='Preencha os valores e a descrição.';return;
+        }
+        if(!aporte&&!mensal&&d.viagemId){
+          const v=E.viagens.find(x=>x.id===d.viagemId);
+          if(!v){erro.textContent='A viagem vinculada não existe mais.';return}
+          v.aviaoId='principal';if(!v.transporte)v.transporte='Avião próprio';
+        }
+        d.editadoManual=true;
+        if(item)Object.assign(item,d);else E.aviao[tipo].push(d);
+        salvar();fechar();
+      }));
+      c.append(sec,acoes);
+    });
+}
+function tabelaAviao(titulos,registros,linha,editar){
+  const rol=el('<div class="rolagem"></div>');
+  if(!registros.length){rol.appendChild(el('<div class="vazio">Nenhum registro ainda.</div>'));return rol}
+  const tabela=el('<table class="aviao-tabela"><thead><tr>'+titulos.map(t=>'<th>'+esc(t)+'</th>').join('')+'<th>Ação</th></tr></thead><tbody></tbody></table>');
+  const tb=tabela.querySelector('tbody');
+  registros.forEach(x=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=linha(x).map(t=>'<td>'+t+'</td>').join('')+'<td></td>';
+    tr.lastElementChild.appendChild(acao('Editar',()=>editar(x),'ghost'));
+    tb.appendChild(tr);
+  });
+  rol.appendChild(tabela);return rol;
+}
+function galeriaAviao(){
+  const cx=el('<div class="aviao-galeria"></div>');
+  const carregar=async()=>{
+    cx.replaceChildren(el('<p class="aviao-muted">Carregando fotos…</p>'));
+    try{
+      const arquivos=(await arqPor('aviao:principal')).filter(a=>/^image\/(png|jpeg|webp|gif)$/i.test(a.tipo||''));
+      if(!arquivos.length){cx.replaceChildren(el('<p class="aviao-muted">As fotos do avião vão aparecer aqui. Você pode adicioná-las abaixo.</p>'));return}
+      cx.replaceChildren();
+      for(const a of arquivos){
+        const card=el('<div class="aviao-foto"><span></span></div>');
+        card.querySelector('span').textContent=a.nome;
+        try{
+          const url=await arqUrlDe(a.id,false);
+          const img=document.createElement('img');img.src=url;img.alt=a.nome;img.loading='lazy';card.prepend(img);
+        }catch(e){card.prepend(el('<div class="aviao-foto-indisp">Foto indisponível</div>'))}
+        cx.appendChild(card);
+      }
+    }catch(e){cx.replaceChildren(el('<p class="aviao-muted">Não consegui carregar as fotos agora.</p>'))}
+  };
+  carregar();
+  const recarregar=acao('Atualizar fotos',carregar,'ghost');recarregar.classList.add('aviao-recarregar');
+  const todo=el('<div></div>');todo.append(cx,recarregar);return todo;
+}
+function vAviao(m){
+  m.classList.add('aviao-layout');const a=E.aviao,t=totaisAviao(a);
+  const topo=cab('Avião','Sua participação, manutenção, viagens e documentos em uma só visão.');
+  const inp=el('<input type="file" accept=".xlsx,.json" hidden>');
+  inp.onchange=()=>{const f=inp.files?.[0];if(f)importarAviao(f);inp.value=''};
+  topo.append(acao('Importar dados',()=>inp.click(),'ghost'),acao('+ Viagem no avião',()=>novaViagemRotina(true)),inp);
+  m.appendChild(topo);
+  const viagem=(E.viagens||[]).filter(v=>v.aviaoId==='principal');
+  m.appendChild(el(`<div class="aviao-hero">
+    <div class="aviao-hero-icone" aria-hidden="true">🛩️</div>
+    <div><span class="aviao-eyebrow">AERONAVE · VISÃO PRIVADA</span>
+      <h2>${esc(a.nome||'Meu avião')}</h2>
+      <p>${esc(a.matricula||'Cadastre a aeronave para começar')}${a.titularidade?' · '+esc(a.titularidade):''}</p>
+    </div><span class="cresce"></span><div class="aviao-participacao">${a.participacao!=null?(a.participacao*100).toLocaleString('pt-BR')+'%':'—'}<small>participação na aeronave</small></div>
+  </div>`));
+  const abas=[['visao','Visão geral'],['sobre','Sobre o avião'],['custos','Custos e aportes'],['viagens','Viagens']];
+  const atualAba=filtro.aviaoAba||'visao';
+  const nav=el('<nav class="aviao-abas" aria-label="Seções do avião"></nav>');
+  abas.forEach(([id,rot])=>{const b=el(`<button type="button" ${id===atualAba?'class="on" aria-current="page"':''}>${rot}</button>`);b.onclick=()=>{filtro.aviaoAba=id;tela()};nav.appendChild(b)});
+  m.appendChild(nav);
+  if(atualAba==='sobre'){
+    const intro=el('<div class="aviao-sobre"><div class="aviao-sobre-texto"><h2>A história do avião</h2><p>Registre o que esta aeronave representa, onde fica e como você a utiliza. As fotos que você enviar ficam junto desta ficha.</p></div><div class="aviao-sobre-emblema" aria-hidden="true">🛩️</div></div>');
+    m.appendChild(intro);
+    const dados=el('<div class="corpo"></div>');
+    dados.appendChild(campos(a,[
+      {k:'nome',t:'Nome / modelo'},{k:'matricula',t:'Matrícula'},
+      {k:'titularidade',t:'Titularidade'},{k:'base',t:'Base / hangar'},
+      {k:'uso',t:'Como você usa o avião',tipo:'textarea',full:true},
+      {k:'historia',t:'A história do avião',tipo:'textarea',full:true},
+    ]));
+    m.appendChild(bloco('av-sobre','Ficha da aeronave','Informações editáveis, sem inventar especificações técnicas.',dados));
+    const fotos=el('<div class="corpo"></div>');
+    fotos.appendChild(galeriaAviao());
+    fotos.appendChild(areaArquivos('aviao:principal','Adicionar fotos e documentos do avião'));
+    m.appendChild(bloco('av-fotos','Fotos e documentos','Envie as imagens quando estiverem prontas.',fotos));
+    return;
+  }
+  if(!a.matricula){
+    m.appendChild(el('<div class="aviao-vazio"><b>Seu avião ainda não foi importado.</b><p>Use “Importar dados” para trazer a planilha e conferir o custo atual antes de gravar. Depois, as viagens e os documentos ficam ligados aqui.</p></div>'));
+  }
+  if(atualAba==='visao'){
+    const ganhoRot=t.ganho>=0?'Valorização estimada da cota':'Diferença estimada da cota';
+    m.appendChild(el(`<div class="aviao-metricas">
+      ${kpi('Investido na minha cota',brl(t.aportado),(a.participacao!=null?(a.participacao*100).toLocaleString('pt-BR')+'% da aeronave · ':'')+(a.aportes||[]).length+' pagamentos da aquisição')}
+      ${kpi('Valor atual da minha cota',a.valorCotaAtual!=null?brl(a.valorCotaAtual):'—','Estimativa da planilha, não venda realizada')}
+      ${kpi(ganhoRot,a.valorCotaAtual!=null&&t.aportado>0?brl(t.ganho):'—','Valor da sua cota menos o que pagou; não é lucro realizado',t.ganho<0?'r':'v')}
+      ${kpi('Minha mensalidade',a.manutencaoMinha!=null?brl(a.manutencaoMinha):'—','Valor informado, sem recálculo automático')}
+    </div>`));
+    if(a.manutencaoTotalAtual!=null)m.appendChild(el(`<div class="aviao-contexto">🧾 Custo mensal total da aeronave: <b>${brl(a.manutencaoTotalAtual)}</b>. Sua parcela cadastrada: <b>${brl(a.manutencaoMinha)}</b>. Participação patrimonial: <b>${a.participacao!=null?(a.participacao*100).toLocaleString('pt-BR')+'%':'não informada'}</b>. Os valores não são calculados um a partir do outro.</div>`));
+    const proporcional=(+a.manutencaoTotalAtual||0)*(+a.participacao||0);
+    if(proporcional&&a.manutencaoMinha!=null&&Math.abs(a.manutencaoMinha-proporcional)>=0.01)
+      m.appendChild(el(`<div class="aviao-contexto">Sua parcela informada difere ${brl(Math.abs(a.manutencaoMinha-proporcional))} de ${(a.participacao*100).toLocaleString('pt-BR')}% do custo mensal total. O painel mantém a parcela informada, sem substituí-la pelo cálculo proporcional.</div>`));
+    const proximas=[...(a.mensalidades||[])].filter(x=>!['Pago','Cancelado'].includes(x.status)&&dataISOValida(x.vencimento)).sort((x,y)=>x.vencimento.localeCompare(y.vencimento));
+    const ac=el(`<div class="aviao-resumo-grid"><div><small>Próxima mensalidade</small><strong>${proximas.length?fmtDataAno(proximas[0].vencimento):'Nenhuma em aberto'}</strong><span>${proximas.length?brl(proximas[0].minhaCota):'—'}</span></div>
+      <div><small>Mensalidades em aberto</small><strong>${brl(t.mensalAberto)}</strong><span>${proximas.length} parcela(s) previstas</span></div>
+      <div><small>Despesas extras</small><strong>${brl(t.extras)}</strong><span>Minha parte, sem mensalidades</span></div>
+      <div><small>Viagens vinculadas</small><strong>${viagem.length}</strong><span>As mesmas viagens da Central</span></div></div>`);
+    m.appendChild(ac);
+    const ponte=el('<div class="aviao-pontes"></div>');
+    ponte.append(acao('Ver custos e aportes',()=>{filtro.aviaoAba='custos';tela()},'ghost'),
+      acao('Ver viagens',()=>{filtro.aviaoAba='viagens';tela()},'ghost'),
+      acao('Ajustar valores',modalValoresAviao,'ghost'));
+    m.appendChild(ponte);
+    return;
+  }
+  if(atualAba==='custos'){
+    const resumo=el(`<div class="aviao-resumo-grid"><div><small>Compra da minha cota</small><strong>${brl(t.aportado)}</strong></div>
+      <div><small>Mensalidades pagas</small><strong>${brl(t.mensalPago)}</strong></div>
+      <div><small>Mensalidades em aberto</small><strong>${brl(t.mensalAberto)}</strong></div>
+      <div><small>Minha parte nas despesas extras</small><strong>${brl(t.extras)}</strong></div></div>`);
+    m.appendChild(resumo);
+    const ajustar=acao('Revisar valores principais',modalValoresAviao,'ghost');m.appendChild(ajustar);
+    if(a.manutencaoTotalFonte!=null&&a.manutencaoTotalAtual!=null&&a.manutencaoTotalFonte!==a.manutencaoTotalAtual)
+      m.appendChild(el(`<div class="aviao-contexto">A planilha informa ${brl(a.manutencaoTotalFonte)} como total mensal. O valor atual informado é ${brl(a.manutencaoTotalAtual)}. Sua parcela de ${brl(a.manutencaoMinha)} foi mantida separadamente.</div>`));
+    const secao=(id,titulo,dica,lista,cabecalhos,linha,tipo)=>{
+      const cx=el('<div class="corpo"></div>');
+      cx.appendChild(acao('+ Adicionar',()=>modalRegistroAviao(tipo,null),'ghost'));
+      cx.appendChild(tabelaAviao(cabecalhos,lista,linha,x=>modalRegistroAviao(tipo,x)));
+      m.appendChild(bloco(id,titulo,dica,cx));
+    };
+    secao('av-aportes','Pagamentos da aquisição','O que você pagou para comprar sua participação na aeronave.',a.aportes,['Data','Forma','Valor'],x=>[esc(fmtDataAno(x.data)),esc(x.forma||'—'),brl(x.valor)],'aportes');
+    secao('av-mensal','Mensalidades','Vencimentos aparecem também na Agenda.',a.mensalidades,['Competência','Vencimento','Minha parcela','Situação'],x=>[esc(x.competencia?.slice(0,7)||'—'),esc(fmtDataAno(x.vencimento)),brl(x.minhaCota),esc(x.status||'—')],'mensalidades');
+    secao('av-extras','Despesas extras','Ao vincular uma viagem, sua parte compõe o custo dela sem duplicar o registro.',a.despesas,
+      ['Data','Categoria / descrição','Custo total','Minha parte','Viagem'],x=>[esc(fmtDataAno(x.data)),esc((x.categoria||'')+' · '+(x.descricao||'')),brl(x.valorTotal),brl(x.minhaCota),esc(E.viagens.find(v=>v.id===x.viagemId)?.evento||'—')],'despesas');
+    return;
+  }
+  const trips=el('<div class="corpo"></div>');
+  trips.appendChild(acao('+ Nova viagem no avião',()=>novaViagemRotina(true)));
+  trips.appendChild(el('<p class="aviao-muted">Estas são as próprias viagens da aba Viagens. Despesas extras vinculadas entram na soma da viagem; mensalidades ficam separadas.</p>'));
+  if(!viagem.length)trips.appendChild(el('<div class="vazio">Nenhuma viagem vinculada. Crie uma aqui ou selecione a aeronave numa viagem existente.</div>'));
+  else viagem.slice().sort((x,y)=>(x.ida||'').localeCompare(y.ida||'')).forEach(v=>{
+    const li=el(`<div class="aviao-viagem"><div><b>${esc(v.evento||v.cidade||'Viagem')}</b><small>${esc(fmtDataAno(v.ida))} · ${esc(v.cidade||'Destino não informado')} · ${esc(v.status||'')}</small></div><strong>${brl(custoViagem(v))}</strong></div>`);
+    li.appendChild(acao('Abrir',()=>modalViagem(v),'ghost'));trips.appendChild(li);
+  });
+  m.appendChild(bloco('av-viagens','Viagens neste avião','Um cadastro compartilhado com Viagens e Agenda.',trips));
+}
+
 function vViagens(m) {
   m.classList.add('viagens-layout');
   const r = rr('viagens');
@@ -2248,7 +2618,7 @@ function vViagens(m) {
   const semHotel = E.viagens.filter(v => ['proximas','andamento'].includes(faseViagem(v)) && !temHotelViagem(v)).length;
   const futIntl = E.viagens.filter(v => ['proximas','andamento'].includes(faseViagem(v)) && ehInternacional(v));
   const comProblema = futIntl.filter(v => !docsViagem(v).ok);
-  const novaViagem = novaViagemRotina;
+  const novaViagem = ()=>novaViagemRotina();
 
   const topo=cab('Viagens', 'Destinos, reservas e pendências em um só lugar.');
   topo.appendChild(acao('+ Nova viagem',novaViagem));m.appendChild(topo);
@@ -2473,6 +2843,10 @@ function modalViagem(v){
       {k:'ida',t:'Ida',tipo:'date'},{k:'volta',t:'Volta',tipo:'date'},
       {k:'hotel',t:'Hotel',ph:'nome / reserva'},
       {k:'transporte',t:'Transporte',tipo:'select',opcoes:['',...CFG('transportes')]},
+      {k:'aviaoId',t:'Aeronave desta viagem',tipo:'select',opcoes:[{v:'',t:'Sem vínculo com o avião'},{v:'principal',t:'Meu avião'}],
+        aoGravar:valor=>{if(!valor&&(E.aviao?.despesas||[]).some(d=>d.viagemId===v.id)){
+          alert('Esta viagem tem despesas do avião vinculadas. Desvincule-as na aba Avião antes de remover a aeronave.');return false}
+          return true}},
       {k:'status',t:'Status',tipo:'select',opcoes:CFG('statusViagem')},
       {k:'gastos',t:'Orçamento estimado (R$)',tipo:'number'},
       {k:'obs',t:'Observações',tipo:'textarea',full:true},
@@ -2883,6 +3257,8 @@ function modalViagem(v){
         ],()=>{salvar();pintaCustos()},`<td colspan="2">Total</td><td style="text-align:right">${brl2(total)}</td><td></td><td></td>`));
       } else rol.innerHTML='<div class="vazio">Sem custos lançados. Some alimentação, hotel, passagem…</div>';
       cc.appendChild(rol);
+      const vinculadas=despesasDoAviaoNaViagem(v);
+      if(vinculadas.length)cc.appendChild(el(`<div class="aviao-vinculo">🛩️ Da aba Avião: ${vinculadas.map(d=>`${esc(d.categoria||'Despesa')} · ${brl(+d.minhaCota||0)}`).join(' · ')}. Edite essas despesas na aba Avião para não lançar duas vezes.</div>`));
       // orçado x realizado: enquanto não há custos, vale o orçamento estimado
       if(v.custos.length&&+v.gastos){
         const dif=total-(+v.gastos);
@@ -2907,8 +3283,10 @@ function modalViagem(v){
     imp.onclick=()=>imprimirViagem(v);
     s4.appendChild(imp);
     const del=el('<button class="btn ghost" style="color:var(--vermelho)">Apagar viagem</button>');
-    del.onclick=async()=>{if(!confirm('Apagar esta viagem e seus arquivos?'))return;
+    del.onclick=async()=>{const vinculadas=(E.aviao?.despesas||[]).filter(d=>d.viagemId===v.id);
+      if(!confirm('Apagar esta viagem e seus arquivos?'+(vinculadas.length?'\n\n'+vinculadas.length+' despesa(s) permanecerão no livro do avião, sem vínculo com a viagem.':'')))return;
       if(!await apagarAnexosDe('viagem:'+v.id))return;
+      vinculadas.forEach(d=>{d.viagemId='';d.editadoManual=true});
       E.viagens=E.viagens.filter(x=>x.id!==v.id);salvar();fechar()};
     s4.appendChild(del);s4.appendChild(el('<span class="cresce"></span>'));
     const ok=el('<button class="btn">Pronto</button>');ok.onclick=fechar;s4.appendChild(ok);
@@ -2931,6 +3309,7 @@ const FONTES_AGENDA=[
   {k:'compromissos',rot:'Compromissos',ic:'📅',cor:'#1f2b4d'},
   {k:'documentos',  rot:'Documentos vencendo',ic:'🪪',cor:'#e8590c'},
   {k:'viagens',     rot:'Viagens',ic:'✈️',cor:'#1c7ed6'},
+  {k:'aviao',       rot:'Avião',ic:'🛩️',cor:'#5145a5'},
   {k:'aniversarios',rot:'Aniversários',ic:'🎂',cor:'#d6336c'},
   {k:'acoes',       rot:'Ações do plano',ic:'🎯',cor:'#2b8a3e'},
   {k:'oportunidades',rot:'Oportunidades',ic:'💡',cor:'#b8860b'},
@@ -3322,6 +3701,11 @@ function eventosDoEcossistema(){
   if(on('compromissos')) (E.agenda||[]).forEach(a=>{if(a.data)ev.push({
     data:a.data,ate:a.ate||a.data,hora:a.hora||'',titulo:a.titulo||'(sem título)',
     sub:[a.local,a.tipo].filter(Boolean).join(' · '),fonte:'compromissos',ic:'📅',proprio:true,ref:a});});
+
+  (E.aviao?.mensalidades||[]).filter(x=>dataISOValida(x.vencimento)&&x.status!=='Pago'&&x.status!=='Cancelado').forEach(x=>{
+    ev.push({data:x.vencimento,hora:'',titulo:'Avião · mensalidade '+(x.competencia?x.competencia.slice(0,7):''),
+      sub:brl(+x.minhaCota||0)+' · '+(E.aviao.matricula||'aeronave'),fonte:'aviao',ic:'🛩️',ir:'aviao',ref:x});
+  });
 
 
   /* ---- SAÚDE: o que tem data e ainda vai acontecer ----
@@ -11094,6 +11478,13 @@ function vPatrimonio(m){
 
   m.appendChild(cab('Patrimônio','Organize seus bens, acompanhe valores e dívidas e guarde os documentos.'));
   m.appendChild(painel('',acao('+ Novo bem',novo),'|'));
+  if(E.aviao?.matricula){
+    const a=E.aviao;
+    const av=el(`<div class="aviao-vinculo" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+      <span style="flex:1">🛩️ <b>Participação no avião ${esc(a.matricula)}</b> · ${a.participacao!=null?(a.participacao*100).toLocaleString('pt-BR')+'%':'participação a conferir'} · valor atual estimado da cota: ${a.valorCotaAtual!=null?brl(a.valorCotaAtual):'não informado'}. A cota fica em seu painel próprio e não entra no total de bens desta página para evitar dupla contagem.</span></div>`);
+    av.appendChild(acao('Abrir avião',()=>irTela('aviao'),'ghost'));
+    m.appendChild(av);
+  }
   const filtrosBem=el('<div class="ff-list-filter"><input type="search" aria-label="Buscar bem" placeholder="Buscar bem, local ou documento…"></div>');
   const buscarBem=filtrosBem.querySelector('input');buscarBem.value=buscaBem;buscarBem.onchange=()=>{filtro.ffBemBusca=buscarBem.value;r()};
   filtrosBem.appendChild(seletor(tipoBem,[['Todos','Todos os tipos'],...[...new Set(todosBens.map(x=>x.tipo).filter(Boolean))].sort().map(x=>[x,x])],v=>{filtro.ffBemTipo=v;r()},'Tipo de bem'));
@@ -11390,6 +11781,17 @@ function vGastos(m){
       ...(meses.includes(mesAtual())?[]:[[mesAtual(),rot(mesAtual())+' (atual)']]),['todos','Todos os meses']],
       v=>{filtro.gastosMes=v;r()},'Mês dos gastos'),
     acao('+ Novo gasto',()=>modalLancamentoGasto({id:uid(),...novoLanc()},true)),'|'));
+  if(E.aviao?.matricula){
+    const a=E.aviao,mesmoPeriodo=data=>todos||String(data||'').slice(0,7)===mes;
+    const parcelas=(a.mensalidades||[]).filter(x=>x.status!=='Cancelado'&&mesmoPeriodo(x.vencimento));
+    const extras=(a.despesas||[]).filter(x=>x.status!=='Cancelado'&&mesmoPeriodo(x.data));
+    const valorParc=parcelas.reduce((s,x)=>s+(+x.minhaCota||0),0);
+    const valorExtra=extras.reduce((s,x)=>s+(+x.minhaCota||0),0);
+    const av=el(`<div class="aviao-vinculo" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+      <span style="flex:1">🛩️ <b>${esc(a.nome||a.matricula)}</b> · ${parcelas.length} parcela(s) programada(s), ${brl(valorParc)} · ${extras.length} despesa(s) extra(s), ${brl(valorExtra)} ${todos?'no histórico':'neste mês'}. O livro do avião é ligado a Viagens e Agenda; estes valores ficam fora do total de Gastos desta página para evitar dupla contagem com seus lançamentos pessoais.</span></div>`);
+    av.appendChild(acao('Abrir custos do avião',()=>{filtro.aviaoAba='custos';irTela('aviao')},'ghost'));
+    m.appendChild(av);
+  }
 
   m.appendChild(ligaKpis(el(`<div class="grade">
     ${kpi(todos?'Custo estimado do período':'Custo estimado do mês',brl(tot),'Lançamentos + recorrentes cadastrados','r','classe')}
@@ -15233,6 +15635,9 @@ function validarBackup(j){
   for(const [col,camposLista] of Object.entries(listasInternas))for(const x of j[col]||[])for(const k of camposLista){
     if(x[k]!==undefined&&(!Array.isArray(x[k])||x[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))throw new Error('Lista inválida: '+col+'.'+k);
   }
+  if(j.aviao)for(const k of ['aportes','mensalidades','despesas'])
+    if(j.aviao[k]!==undefined&&(!Array.isArray(j.aviao[k])||j.aviao[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))
+      throw new Error('Lista inválida: aviao.'+k);
   validarBackupEmpresas(j);
   if(j.organogramas?.length){if(typeof LeoOrganograma==='undefined')throw Error('Atualize a página para validar os organogramas antes de restaurar.');LeoOrganograma.validar(j.organogramas);}
   if(j.desenvolvimento)for(const k of ['fontes','leituras','revisoes','reflexoes','validacoes','resultados'])if(j.desenvolvimento[k]!==undefined&&(!Array.isArray(j.desenvolvimento[k])||j.desenvolvimento[k].some(x=>!x||typeof x!=='object'||Array.isArray(x))))throw new Error('Lista inválida: desenvolvimento.'+k);
