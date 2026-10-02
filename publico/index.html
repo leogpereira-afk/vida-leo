@@ -664,7 +664,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./documentos-revisao.css?v=90d5f0ab4afe">
 <link rel="stylesheet" href="./painel-compacto.css?v=4baf1a7c4d03">
 <link rel="stylesheet" href="./saude-visual.css?v=c2264793fee0">
-<link rel="stylesheet" href="./rendimentos-graficos.css?v=2c83b90f64df">
+<link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -8686,6 +8686,38 @@ function linhaAcumuladaRendimento(meses){
     <path d="${area}" fill="url(#rd-area-grad)"/><path d="${caminho}" class="rd-svg-line"/>
     ${meses.map((m,i)=>`<circle cx="${x(i)}" cy="${y(m.acumulado)}" r="4" class="rd-svg-point"><title>${esc(m.nome)}: ${brl(m.acumulado)}</title></circle><text x="${x(i)}" y="${altura-8}" text-anchor="middle" class="rd-svg-axis">${esc(m.nome)}</text>`).join('')}</svg></div>`;
 }
+/* Duas curvas sobre a mesma escala: pontos vazados e grade horizontal, como
+   a referência visual. Valor ausente interrompe a curva; nunca vira zero. */
+function linhasComparativasRendimento(meses,series,rotulo){
+  const largura=760,altura=255,esq=76,dir=18,cima=20,baixo=36;
+  const valores=meses.flatMap(m=>series.map(s=>m[s.chave])).filter(v=>v!=null&&Number.isFinite(v));
+  if(!valores.length)return '';
+  const maior=Math.max(0,...valores),menor=Math.min(0,...valores),faixa=maior-menor||1;
+  const x=i=>esq+(meses.length===1?0.5:i/(meses.length-1))*(largura-esq-dir);
+  const y=v=>cima+(maior-v)/faixa*(altura-cima-baixo);
+  const curvas=series.map(s=>{
+    let aberto=false;
+    const caminho=meses.map((m,i)=>{const v=m[s.chave];if(v==null||!Number.isFinite(v)){aberto=false;return ''}const trecho=(aberto?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1);aberto=true;return trecho}).filter(Boolean).join(' ');
+    return caminho?`<g data-rd-serie="${esc(s.chave)}" style="--rd-serie:${s.cor}"><path d="${caminho}" class="rd-dual-line"/>${meses.map((m,i)=>m[s.chave]==null||!Number.isFinite(m[s.chave])?'':`<circle cx="${x(i)}" cy="${y(m[s.chave])}" r="5" class="rd-dual-point"><title>${esc(m.nome)} · ${esc(s.nome)}: ${brl(m[s.chave])}</title></circle>`).join('')}</g>`:'';
+  }).join('');
+  return `<div class="rd-chart-legend">${series.map(s=>`<span><i style="background:${s.cor}"></i>${esc(s.nome)}</span>`).join('')}</div>
+    <div class="rd-line-scroll" role="region" tabindex="0" aria-label="${esc(rotulo)}. Role horizontalmente em telas pequenas.">
+      <svg viewBox="0 0 ${largura} ${altura}" role="img" aria-label="${esc(rotulo)}">
+        ${[maior,(maior+menor)/2,menor].map(v=>`<line x1="${esq}" x2="${largura-dir}" y1="${y(v)}" y2="${y(v)}" class="rd-svg-grid"/><text x="${esq-8}" y="${y(v)+4}" text-anchor="end" class="rd-svg-axis">${esc(curtoRendimento(v))}</text>`).join('')}
+        ${curvas}${meses.map((m,i)=>`<text x="${x(i)}" y="${altura-8}" text-anchor="middle" class="rd-svg-axis">${esc(m.nome)}</text>`).join('')}
+      </svg></div>`;
+}
+function mesesComparaveisRendimento(lancamentos,ano,empresa){
+  const meses=MESES.map(nome=>({nome,valor:0,quantidade:0}));
+  let semData=0;
+  lancamentos.filter(x=>String(x.data||'').startsWith(String(ano))&&(empresa==='Todas'||x.empresa===empresa)).forEach(x=>{
+    if(!dataISOValida(x.data)||/lançado em 31\/12/i.test(x.obs||'')){semData++;return}
+    const i=Number(x.data.slice(5,7))-1;
+    meses[i].valor+=Number.isFinite(Number(x.valor))?Number(x.valor):0;
+    meses[i].quantidade++;
+  });
+  return {meses,primeiro:meses.findIndex(x=>x.quantidade>0),ultimo:meses.reduce((u,x,i)=>x.quantidade?i:u,-1),semData};
+}
 function cartaoGraficoRendimento(titulo,descricao,conteudo,rodape='',tabela=''){
   return `<section class="rd-chart-card"><div class="rd-chart-heading"><div><h2>${esc(titulo)}</h2><p>${esc(descricao)}</p></div></div>${conteudo}${rodape?`<p class="rd-chart-foot">${rodape}</p>`:''}${tabela?`<details class="rd-chart-data"><summary>Ver valores do gráfico</summary>${tabela}</details>`:''}</section>`;
 }
@@ -8710,12 +8742,19 @@ function graficoRendimentos(hist,lancamentos,ano,empresa,todos,aoAno){
     esc(fonteNota)+(Math.abs(d.diferencaFontes)>1?` A soma das origens informadas difere do total em ${brl(d.diferencaFontes)}.`:''),tabela('Fonte',fontes))));
   if(todos){area.appendChild(el('<p class="rd-visual-note">Selecione um ano no filtro acima para analisar meses e acumulado. O histórico antigo só tem totais anuais quando não há lançamentos datados.</p>'));return area}
   if(d.ultimoMes<0){area.appendChild(el('<p class="rd-visual-note">Não há lançamentos com mês confiável neste recorte. A evolução anual continua disponível; os gráficos mensais aparecem quando houver datas reais.</p>'));return area}
-  const meses=d.meses.map(x=>({rotulo:x.nome,valor:x.valor}));
-  const notaMes=`Lançamentos datados até ${d.meses.at(-1).nome}. ${d.semMes.length?d.semMes.length+' registro(s) sem mês confiável ('+brl(d.valorSemMes)+') ficam fora destes gráficos. ':''}Meses sem lançamento dentro do período aparecem como zero. No celular, deslize para ver mais meses.`;
-  const secMensal=el(cartaoGraficoRendimento('Rendimentos mês a mês','Veja os picos, quedas e intervalos sem entradas registradas.',
-    barrasRendimento(meses,[{chave:'valor',nome:'Rendimento',cor:'var(--rd-mes)'}],'Rendimentos mensais'),esc(notaMes),
-    tabela('Mês',meses.map(x=>({nome:x.rotulo,valor:x.valor})))));
-  quadros.appendChild(secMensal);
+  const anterior=mesesComparaveisRendimento(lancamentos,ano-1,empresa);
+  const primeiroAtual=d.meses.findIndex(x=>x.quantidade>0);
+  const anteriorVisivel=anterior.primeiro>=0&&Math.max(primeiroAtual,anterior.primeiro)<=Math.min(d.ultimoMes,anterior.ultimo);
+  const comparacao=d.meses.map(x=>({nome:x.nome,atual:x.indice>=primeiroAtual?x.valor:null,
+    anterior:anteriorVisivel&&x.indice>=anterior.primeiro&&x.indice<=anterior.ultimo?anterior.meses[x.indice].valor:null}));
+  const seriesComparacao=[...(anteriorVisivel?[{chave:'anterior',nome:String(ano-1),cor:'var(--rd-prev)'}]:[]),
+    {chave:'atual',nome:String(ano),cor:'var(--rd-current)'}];
+  const tabelaComparacao=`<div class="rd-data-scroll"><table><thead><tr><th>Mês</th><th>${ano-1}</th><th>${ano}</th></tr></thead><tbody>${comparacao.map(x=>`<tr><th>${esc(x.nome)}</th><td>${x.anterior==null?'—':brl(x.anterior)}</td><td>${x.atual==null?'—':brl(x.atual)}</td></tr>`).join('')}</tbody></table></div>`;
+  const notaMes=`Até ${d.meses.at(-1).nome}, sem projetar meses futuros. ${anteriorVisivel?'Meses fora da cobertura de cada ano não são mostrados como zero. ':`Não há meses com datas confiáveis nos dois anos até ${d.meses.at(-1).nome}; a linha cinza não é desenhada. `}${d.semMes.length?d.semMes.length+' registro(s) de '+ano+' sem mês confiável ('+brl(d.valorSemMes)+') ficam fora da curva. ':''}${anterior.semData?anterior.semData+' registro(s) de '+(ano-1)+' sem mês confiável ficam fora da curva. ':''}No celular, deslize para ver mais meses.`;
+  const secMensal=el(cartaoGraficoRendimento('Tendência mês a mês',`${ano} em verde-lima · ${ano-1} em cinza, quando há datas reais nos dois anos.`,
+    linhasComparativasRendimento(comparacao,seriesComparacao,`Rendimentos mensais de ${ano} e ${ano-1}`),esc(notaMes),tabelaComparacao));
+  secMensal.classList.add('rd-chart-trend');
+  quadros.prepend(secMensal);
   const ac=el(cartaoGraficoRendimento('Acumulado dos lançamentos','Saldo acumulado dos lançamentos datados, mês a mês, sem projetar o futuro.',
     linhaAcumuladaRendimento(d.meses),
     esc(`Soma dos meses com data real: ${brl(d.somaMensal)}. Total anual do histórico: ${brl(d.total)}. ${Math.abs(d.total-d.somaMensal)>1?'A diferença inclui valores sem mês confiável ou ajustes do histórico.':'As duas somas coincidem neste recorte.'}`),

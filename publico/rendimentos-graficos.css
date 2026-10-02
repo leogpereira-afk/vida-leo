@@ -1,5 +1,5 @@
 /* Análise visual de Rendimentos: leitura, origem e cobertura dos dados. */
-.pagina.ff-rendimentos .rd-visual{--rd-ano:#4f62cf;--rd-mes:#258778;margin:0 0 24px}
+.pagina.ff-rendimentos .rd-visual{--rd-ano:#4f62cf;--rd-mes:#258778;--rd-prev:#59615e;--rd-current:#9bad1d;margin:0 0 24px}
 .pagina.ff-rendimentos .rd-visual-top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:2px 0 18px}
 .pagina.ff-rendimentos .rd-eyebrow{display:block;margin-bottom:5px;color:var(--sucesso);font-size:10px;font-weight:750;letter-spacing:.12em}
 .pagina.ff-rendimentos .rd-visual-top h2{margin:0;color:var(--tinta);font:650 23px/1.2 Inter,system-ui,sans-serif;letter-spacing:-.035em}
@@ -42,6 +42,8 @@
 .pagina.ff-rendimentos .rd-svg-axis{fill:var(--suave);font:10px Inter,system-ui,sans-serif}
 .pagina.ff-rendimentos .rd-svg-line{fill:none;stroke:var(--marca);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
 .pagina.ff-rendimentos .rd-svg-point{fill:var(--card);stroke:var(--marca);stroke-width:2.5}
+.pagina.ff-rendimentos .rd-dual-line{fill:none;stroke:var(--rd-serie);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
+.pagina.ff-rendimentos .rd-dual-point{fill:var(--card);stroke:var(--rd-serie);stroke-width:3}
 .pagina.ff-rendimentos .rd-source-list{display:grid;gap:12px;max-height:344px;padding:2px 4px 2px 0;overflow-y:auto;scrollbar-width:thin}
 .pagina.ff-rendimentos .rd-source-row>div{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:12px}
 .pagina.ff-rendimentos .rd-source-row b{min-width:0;overflow-wrap:anywhere;font-weight:600}
@@ -58,7 +60,7 @@
 .pagina.ff-rendimentos .rd-data-scroll td{text-align:right;font-variant-numeric:tabular-nums}
 .pagina.ff-rendimentos .rd-chart-empty,.pagina.ff-rendimentos .rd-visual-note{padding:18px;border:1px solid var(--linha);border-radius:12px;background:var(--bg);color:var(--suave);font-size:12px;line-height:1.55}
 .pagina.ff-rendimentos .rd-visual-note{margin-top:16px}
-@media(prefers-color-scheme:dark){.pagina.ff-rendimentos .rd-visual{--rd-ano:#9aafff;--rd-mes:#60c6b1}}
+@media(prefers-color-scheme:dark){.pagina.ff-rendimentos .rd-visual{--rd-ano:#9aafff;--rd-mes:#60c6b1;--rd-prev:#b3bdb7;--rd-current:#d1e04a}}
 @media(max-width:920px){.pagina.ff-rendimentos .rd-chart-grid{grid-template-columns:minmax(0,1fr)}.pagina.ff-rendimentos .rd-chart-card{grid-column:1/-1}}
 @media(max-width:600px){.pagina.ff-rendimentos.financeiro>.painel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;padding:10px 12px}.pagina.ff-rendimentos.financeiro>.painel>.rot,.pagina.ff-rendimentos.financeiro>.painel>.finance-tools{grid-column:1/-1}.pagina.ff-rendimentos.financeiro>.painel>select{width:100%;min-width:0}.pagina.ff-rendimentos.financeiro>.painel>.div{display:none}}
 @media(max-width:420px){.pagina.ff-rendimentos.financeiro>.painel{grid-template-columns:minmax(0,1fr)}}
