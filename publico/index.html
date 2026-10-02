@@ -664,6 +664,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./documentos-revisao.css?v=90d5f0ab4afe">
 <link rel="stylesheet" href="./painel-compacto.css?v=4baf1a7c4d03">
 <link rel="stylesheet" href="./saude-visual.css?v=c2264793fee0">
+<link rel="stylesheet" href="./rendimentos-graficos.css?v=2c83b90f64df">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -1798,13 +1799,16 @@ function resumoRendimentoFiltrado(hist,empresa,ano,todos=false){
 const abasFinanceiras={};
 function abaDoBlocoFinanceiro(id,secao){
   if(id=== 'gt-lista'||id==='rd-lanc')return 'lancamentos';
+  if(secao==='rendimentos'&&id==='rd-graficos')return 'graficos';
   if(/^gt-(casa|assin|seg|plano)$/.test(id))return 'recorrentes';
   if(secao==='rendimentos'&&['rd-dash','rd-conf','rd-acum','rd-emp','rd-hist'].includes(id))return 'historico';
   return 'resumo';
 }
 function organizarFinanceiro(pagina,secao,alvo){
   pagina.classList.add('financeiro');
-  const opcoes=[['resumo','Resumo'],['lancamentos','Lançamentos'],[secao==='gastos'?'recorrentes':'historico',secao==='gastos'?'Recorrentes':'Histórico']];
+  const opcoes=secao==='rendimentos'
+    ?[['resumo','Resumo'],['graficos','Gráficos'],['lancamentos','Lançamentos'],['historico','Histórico']]
+    :[['resumo','Resumo'],['lancamentos','Lançamentos'],['recorrentes','Recorrentes']];
   const nav=el('<nav class="finance-tabs" aria-label="Visões financeiras"></nav>');
   const paineis=Object.fromEntries(opcoes.map(([id])=>[id,el('<div class="finance-pane"></div>')]));
   let atualGrupo='resumo';
@@ -8622,6 +8626,104 @@ function histVivo(){
   _hvEstado=E;_hvMt=E._mt;return _hvCache;
 }
 
+/* Os gráficos usam os totais anuais do histórico e os meses dos lançamentos
+   datados. Uma data artificial de 31/12 não vira uma tendência de dezembro. */
+function dadosGraficosRendimento(hist,lancamentos,ano,empresa,todos){
+  const numero=v=>Number.isFinite(Number(v))?Number(v):0;
+  const indice=hist.anos.indexOf(ano);
+  const serie=empresa==='Todas'?hist.totalAno:(hist.empresas[empresa]||hist.anos.map(()=>0));
+  const parciais=new Set((hist.parciais||[]).map(Number));
+  const anos=hist.anos.map((a,i)=>({ano:a,valor:numero(serie[i]),parcial:parciais.has(a)||a===anoHoje}));
+  const total=todos?anos.reduce((s,x)=>s+x.valor,0):numero(serie[indice]);
+  const selecionados=lancamentos.filter(x=>(todos||String(x.data||'').startsWith(String(ano)))&&(empresa==='Todas'||x.empresa===empresa));
+  const reais=selecionados.filter(x=>dataISOValida(x.data)&&!/lançado em 31\/12/i.test(x.obs||''));
+  const semMes=selecionados.filter(x=>!reais.includes(x));
+  const meses=MESES.map((nome,i)=>({nome,indice:i,valor:0,quantidade:0}));
+  reais.forEach(x=>{const i=Number(x.data.slice(5,7))-1;if(i>=0&&i<12){meses[i].valor+=numero(x.valor);meses[i].quantidade++}});
+  const ultimoMes=meses.reduce((ultimo,x)=>x.quantidade?x.indice:ultimo,-1);
+  let acumulado=0;
+  const mesesVisiveis=meses.slice(0,ultimoMes+1).map(x=>({...x,acumulado:acumulado+=x.valor}));
+  const fontes=empresa==='Todas'
+    ?Object.entries(hist.empresas||{}).map(([nome,valores])=>({nome,valor:todos?valores.reduce((s,v)=>s+numero(v),0):numero(valores[indice])}))
+    :Object.entries(selecionados.reduce((map,x)=>{const nome=String(x.instituicao||x.tipo||'Sem classificação').trim()||'Sem classificação';map[nome]=(map[nome]||0)+numero(x.valor);return map},Object.create(null)))
+      .map(([nome,valor])=>({nome,valor}));
+  const somaFontes=fontes.reduce((s,x)=>s+x.valor,0);
+  if(total-somaFontes>1)fontes.push({nome:empresa==='Todas'?'Sem empresa identificada':'Sem origem detalhada',valor:total-somaFontes});
+  return {anos,total,meses:mesesVisiveis,ultimoMes,semMes,valorSemMes:semMes.reduce((s,x)=>s+numero(x.valor),0),
+    somaMensal:mesesVisiveis.reduce((s,x)=>s+x.valor,0),fontes:fontes.filter(x=>x.valor!==0).sort((a,b)=>Math.abs(b.valor)-Math.abs(a.valor)),
+    diferencaFontes:total-somaFontes,empresa,todos,ano};
+}
+const curtoRendimento=v=>'R$ '+new Intl.NumberFormat('pt-BR',{notation:'compact',maximumFractionDigits:1}).format(v);
+function barrasRendimento(linhas,series,rotulo){
+  const valores=linhas.flatMap(x=>series.map(s=>Number(x[s.chave])||0));
+  const maior=Math.max(0,...valores),menor=Math.min(0,...valores),faixa=maior-menor||1;
+  const pos=v=>(maior-v)/faixa*100,zero=pos(0);
+  const marcas=[{v:maior,p:0},{v:(maior+menor)/2,p:50},{v:menor,p:100}];
+  return `<div class="rd-chart-legend">${series.map(s=>`<span><i style="background:${s.cor}"></i>${esc(s.nome)}</span>`).join('')}${linhas.some(x=>x.parcial)?'<span><i class="rd-partial-key"></i>* Ano parcial</span>':''}</div>
+    <div class="rd-chart-scroll" role="region" tabindex="0" aria-label="${esc(rotulo)}. Role horizontalmente em telas pequenas.">
+    <div class="rd-bar-chart" style="min-width:${Math.max(440,linhas.length*34+82)}px">
+      <div class="rd-y-axis" aria-hidden="true">${marcas.map(x=>`<span style="top:${x.p}%">${esc(curtoRendimento(x.v))}</span>`).join('')}</div>
+      <div class="rd-bar-field"><div class="rd-grid" aria-hidden="true">${marcas.map(x=>`<i style="top:${x.p}%"></i>`).join('')}<i class="rd-zero" style="top:${zero}%"></i></div>
+        <div class="rd-columns">${linhas.map(x=>{
+          const dica=series.map(s=>s.nome+': '+brl(Number(x[s.chave])||0)).join(' · ');
+          const tag=x.ano?'button':'div';
+          return `<${tag} ${x.ano?'type="button"': 'role="img" tabindex="0"'} class="rd-column${x.parcial?' rd-partial':''}" ${x.ano?`data-rd-ano="${x.ano}"`:''} aria-label="${esc(x.rotulo+' · '+dica+(x.parcial?' · ano parcial':''))}">
+            <span class="rd-column-bars" aria-hidden="true">${series.map(s=>{const v=Number(x[s.chave])||0;return `<span class="rd-series-cell"><i style="--rd-top:${Math.min(pos(v),zero)}%;--rd-height:${Math.max(0.8,Math.abs(pos(v)-zero))}%;--rd-cor:${s.cor}"></i></span>`}).join('')}</span>
+            <span class="rd-column-label">${esc(x.rotulo)}${x.parcial?' *':''}</span>
+            <span class="rd-tooltip"><b>${esc(x.rotulo)}${x.parcial?' · parcial':''}</b>${series.map(s=>`<span>${esc(s.nome)} <strong>${brl(Number(x[s.chave])||0)}</strong></span>`).join('')}</span>
+          </${tag}>`}).join('')}</div></div></div></div>`;
+}
+function linhaAcumuladaRendimento(meses){
+  if(!meses.length)return '';
+  const largura=760,altura=255,esq=76,dir=18,cima=18,baixo=35;
+  const valores=meses.map(x=>x.acumulado),maior=Math.max(0,...valores),menor=Math.min(0,...valores),faixa=maior-menor||1;
+  const x=i=>esq+(meses.length===1?0.5:i/(meses.length-1))*(largura-esq-dir);
+  const y=v=>cima+(maior-v)/faixa*(altura-cima-baixo);
+  const caminho=meses.map((m,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(m.acumulado).toFixed(1)).join(' ');
+  const zero=y(0),area=caminho+' L'+x(meses.length-1).toFixed(1)+' '+zero.toFixed(1)+' L'+x(0).toFixed(1)+' '+zero.toFixed(1)+' Z';
+  return `<div class="rd-line-scroll" role="region" tabindex="0" aria-label="Acumulado dos lançamentos por mês. Role horizontalmente em telas pequenas."><svg viewBox="0 0 ${largura} ${altura}" role="img" aria-label="Evolução acumulada de ${esc(meses[0].nome)} a ${esc(meses.at(-1).nome)}"><defs><linearGradient id="rd-area-grad" x1="0" x2="0" y1="0" y2="1"><stop offset="0" style="stop-color:var(--marca);stop-opacity:.22"/><stop offset="1" style="stop-color:var(--marca);stop-opacity:0"/></linearGradient></defs>
+    ${[maior,(maior+menor)/2,menor].map(v=>`<line x1="${esq}" x2="${largura-dir}" y1="${y(v)}" y2="${y(v)}" class="rd-svg-grid"/><text x="${esq-8}" y="${y(v)+4}" text-anchor="end" class="rd-svg-axis">${esc(curtoRendimento(v))}</text>`).join('')}
+    <path d="${area}" fill="url(#rd-area-grad)"/><path d="${caminho}" class="rd-svg-line"/>
+    ${meses.map((m,i)=>`<circle cx="${x(i)}" cy="${y(m.acumulado)}" r="4" class="rd-svg-point"><title>${esc(m.nome)}: ${brl(m.acumulado)}</title></circle><text x="${x(i)}" y="${altura-8}" text-anchor="middle" class="rd-svg-axis">${esc(m.nome)}</text>`).join('')}</svg></div>`;
+}
+function cartaoGraficoRendimento(titulo,descricao,conteudo,rodape='',tabela=''){
+  return `<section class="rd-chart-card"><div class="rd-chart-heading"><div><h2>${esc(titulo)}</h2><p>${esc(descricao)}</p></div></div>${conteudo}${rodape?`<p class="rd-chart-foot">${rodape}</p>`:''}${tabela?`<details class="rd-chart-data"><summary>Ver valores do gráfico</summary>${tabela}</details>`:''}</section>`;
+}
+function graficoRendimentos(hist,lancamentos,ano,empresa,todos,aoAno){
+  const d=dadosGraficosRendimento(hist,lancamentos,ano,empresa,todos);
+  const area=el('<section class="rd-visual" data-bid="rd-graficos" aria-label="Gráficos de rendimentos"></section>');
+  area.appendChild(el(`<header class="rd-visual-top"><div><span class="rd-eyebrow">ANÁLISE VISUAL</span><h2>Gráficos de rendimentos</h2><p>${esc(todos?'Todos os anos':String(ano))} · ${esc(empresa==='Todas'?'Todas as empresas':empresa)}. Totais anuais e lançamentos mensais têm coberturas diferentes.</p></div></header>`));
+  const quadros=el('<div class="rd-chart-grid"></div>');area.appendChild(quadros);
+  const tabela=(cab,rows)=>`<div class="rd-data-scroll"><table><thead><tr><th>${cab}</th><th>Valor</th></tr></thead><tbody>${rows.map(x=>`<tr><th>${esc(String(x.nome))}</th><td>${brl(x.valor)}</td></tr>`).join('')}</tbody></table></div>`;
+  const anuais=d.anos.map(x=>({rotulo:String(x.ano),ano:x.ano,valor:x.valor,parcial:x.parcial}));
+  quadros.appendChild(el(cartaoGraficoRendimento('Evolução anual','Compare os anos do recorte; * marca ano parcial.',
+    barrasRendimento(anuais,[{chave:'valor',nome:'Rendimento',cor:'var(--rd-ano)'}],'Rendimentos anuais'),
+    'Totais do histórico consolidado. Clique em um ano para abrir seus gráficos. No celular, deslize para ver mais anos.',tabela('Ano',anuais.map(x=>({nome:x.rotulo+(x.parcial?' · parcial':''),valor:x.valor}))))));
+  quadros.querySelectorAll('[data-rd-ano]').forEach(bt=>bt.onclick=()=>aoAno(+bt.dataset.rdAno));
+  const fontes=d.fontes;
+  const maxFonte=Math.max(1,...fontes.map(x=>Math.abs(x.valor)));
+  const composicao=fontes.length?`<div class="rd-source-list">${fontes.map(x=>`<div class="rd-source-row"><div><b>${esc(x.nome)}</b><strong>${brl(x.valor)}</strong></div><span class="rd-source-track" aria-hidden="true"><i style="width:${Math.abs(x.valor)/maxFonte*100}%"></i></span><small>${d.total?esc((x.valor/d.total*100).toFixed(1).replace('.',',')+'% do total'):'Sem base percentual'}</small></div>`).join('')}</div>`
+    :'<div class="rd-chart-empty">Nenhuma fonte detalhada neste recorte.</div>';
+  const fonteTitulo=empresa==='Todas'?'Participação por empresa':'Origem informada nos lançamentos';
+  const fonteNota=empresa==='Todas'?'Valores por empresa do histórico consolidado.':'Detalhe por instituição; quando ela falta, usa o tipo cadastrado. Valores sem lançamento detalhado ficam identificados à parte.';
+  quadros.appendChild(el(cartaoGraficoRendimento(fonteTitulo,'Veja a concentração das entradas no período.',composicao,
+    esc(fonteNota)+(Math.abs(d.diferencaFontes)>1?` A soma das origens informadas difere do total em ${brl(d.diferencaFontes)}.`:''),tabela('Fonte',fontes))));
+  if(todos){area.appendChild(el('<p class="rd-visual-note">Selecione um ano no filtro acima para analisar meses e acumulado. O histórico antigo só tem totais anuais quando não há lançamentos datados.</p>'));return area}
+  if(d.ultimoMes<0){area.appendChild(el('<p class="rd-visual-note">Não há lançamentos com mês confiável neste recorte. A evolução anual continua disponível; os gráficos mensais aparecem quando houver datas reais.</p>'));return area}
+  const meses=d.meses.map(x=>({rotulo:x.nome,valor:x.valor}));
+  const notaMes=`Lançamentos datados até ${d.meses.at(-1).nome}. ${d.semMes.length?d.semMes.length+' registro(s) sem mês confiável ('+brl(d.valorSemMes)+') ficam fora destes gráficos. ':''}Meses sem lançamento dentro do período aparecem como zero. No celular, deslize para ver mais meses.`;
+  const secMensal=el(cartaoGraficoRendimento('Rendimentos mês a mês','Veja os picos, quedas e intervalos sem entradas registradas.',
+    barrasRendimento(meses,[{chave:'valor',nome:'Rendimento',cor:'var(--rd-mes)'}],'Rendimentos mensais'),esc(notaMes),
+    tabela('Mês',meses.map(x=>({nome:x.rotulo,valor:x.valor})))));
+  quadros.appendChild(secMensal);
+  const ac=el(cartaoGraficoRendimento('Acumulado dos lançamentos','Saldo acumulado dos lançamentos datados, mês a mês, sem projetar o futuro.',
+    linhaAcumuladaRendimento(d.meses),
+    esc(`Soma dos meses com data real: ${brl(d.somaMensal)}. Total anual do histórico: ${brl(d.total)}. ${Math.abs(d.total-d.somaMensal)>1?'A diferença inclui valores sem mês confiável ou ajustes do histórico.':'As duas somas coincidem neste recorte.'}`),
+    tabela('Até o mês',d.meses.map(x=>({nome:x.nome,valor:x.acumulado})))));
+  quadros.appendChild(ac);
+  return area;
+}
+
 function vRendimentos(m){
   m.classList.add('ff-rendimentos');
   const r=rr('rendimentos');const H=histVivo();
@@ -8629,6 +8731,7 @@ function vRendimentos(m){
     m.appendChild(cab('Rendimentos','Quanto você ganha — por mês, por empresa e no acumulado.'));
     m.appendChild(el(`<div class="aviso">Nenhum rendimento disponível neste aparelho. Se já possui dados, use <b>Sincronizar</b> no menu lateral para recuperá-los.</div>`));
     m.appendChild(acao('+ Novo rendimento',()=>modalRendimento({id:uid(),data:hoje(),empresa:empresasParaLancar()[0]||'Outro',instituicao:'',tipo:'',valor:0,obs:''},true)));
+    m.appendChild(el('<section class="rd-visual" data-bid="rd-graficos" aria-label="Gráficos de rendimentos"><header class="rd-visual-top"><div><span class="rd-eyebrow">ANÁLISE VISUAL</span><h2>Gráficos de rendimentos</h2><p>Evolução, meses, acumulado e origem das entradas.</p></div></header><p class="rd-visual-note">Não há rendimentos disponíveis neste aparelho. Sincronize seus dados ou cadastre um rendimento para começar a análise.</p></section>'));
     return;
   }
   const parciais=H.parciais||H.incompletos||[];
@@ -9345,6 +9448,10 @@ function vRendimentos(m){
     const men=m.querySelector(':scope > [data-bid="rd-mensal"]');
     if(prim&&lan&&prim!==lan){ m.insertBefore(lan,prim); if(men)m.insertBefore(men,prim); }
   }
+
+  m.appendChild(graficoRendimentos(H,E.rendimentos,ano,empSel,todos,a=>{
+    filtro.rendAno=a;filtro.rendAnoSel=-1;r();
+  }));
 
 }
 

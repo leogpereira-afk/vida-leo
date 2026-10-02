@@ -1,0 +1,66 @@
+/* Análise visual de Rendimentos: leitura, origem e cobertura dos dados. */
+.pagina.ff-rendimentos .rd-visual{--rd-ano:#4f62cf;--rd-mes:#258778;margin:0 0 24px}
+.pagina.ff-rendimentos .rd-visual-top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:2px 0 18px}
+.pagina.ff-rendimentos .rd-eyebrow{display:block;margin-bottom:5px;color:var(--sucesso);font-size:10px;font-weight:750;letter-spacing:.12em}
+.pagina.ff-rendimentos .rd-visual-top h2{margin:0;color:var(--tinta);font:650 23px/1.2 Inter,system-ui,sans-serif;letter-spacing:-.035em}
+.pagina.ff-rendimentos .rd-visual-top p{margin:7px 0 0;color:var(--suave);font-size:12.5px;line-height:1.5}
+.pagina.ff-rendimentos .rd-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.pagina.ff-rendimentos .rd-chart-card{min-width:0;padding:20px 21px;border:1px solid var(--linha);border-radius:16px;background:var(--card);box-shadow:0 2px 11px #263b6409}
+.pagina.ff-rendimentos .rd-chart-card:first-child,.pagina.ff-rendimentos .rd-chart-card:nth-child(2){grid-column:1/-1}
+.pagina.ff-rendimentos .rd-chart-heading{margin-bottom:17px}
+.pagina.ff-rendimentos .rd-chart-heading h2{margin:0;color:var(--tinta);font:650 17px/1.35 Inter,system-ui,sans-serif;letter-spacing:-.025em}
+.pagina.ff-rendimentos .rd-chart-heading p{margin:5px 0 0;color:var(--suave);font-size:12px;line-height:1.5}
+.pagina.ff-rendimentos .rd-chart-legend{display:flex;flex-wrap:wrap;gap:9px 16px;align-items:center;margin:0 0 15px;color:var(--suave);font-size:11px}
+.pagina.ff-rendimentos .rd-chart-legend span{display:inline-flex;align-items:center;gap:7px}
+.pagina.ff-rendimentos .rd-chart-legend i{display:block;width:10px;height:10px;border-radius:3px}
+.pagina.ff-rendimentos .rd-chart-legend .rd-partial-key{border:1px dashed var(--suave);background:var(--bg)}
+.pagina.ff-rendimentos .rd-chart-scroll,.pagina.ff-rendimentos .rd-line-scroll{max-width:100%;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:var(--linha) transparent}
+.pagina.ff-rendimentos .rd-chart-scroll:focus-visible,.pagina.ff-rendimentos .rd-line-scroll:focus-visible{outline:3px solid var(--foco);outline-offset:-3px}
+.pagina.ff-rendimentos .rd-bar-chart{display:flex;width:100%;height:263px;padding:14px 6px 0 0}
+.pagina.ff-rendimentos .rd-y-axis{position:relative;flex:0 0 82px;height:218px;color:var(--suave);font-size:10px;font-variant-numeric:tabular-nums}
+.pagina.ff-rendimentos .rd-y-axis span{position:absolute;right:10px;transform:translateY(-50%);white-space:nowrap}
+.pagina.ff-rendimentos .rd-bar-field{position:relative;flex:1;min-width:0}
+.pagina.ff-rendimentos .rd-grid{position:absolute;inset:0 0 auto;height:218px;pointer-events:none}
+.pagina.ff-rendimentos .rd-grid i{position:absolute;left:0;right:0;border-top:1px dashed var(--linha)}
+.pagina.ff-rendimentos .rd-grid .rd-zero{border-top:1px solid var(--suave);opacity:.5}
+.pagina.ff-rendimentos .rd-columns{position:relative;display:flex;height:250px}
+.pagina.ff-rendimentos .rd-column{position:relative;flex:1;min-width:0;height:250px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--tinta);font:inherit;cursor:default}
+.pagina.ff-rendimentos .rd-column[data-rd-ano]{cursor:pointer}
+.pagina.ff-rendimentos .rd-column:hover,.pagina.ff-rendimentos .rd-column:focus-visible{background:var(--marca-cl)}
+.pagina.ff-rendimentos .rd-column-bars{position:absolute;top:0;left:10%;right:10%;height:218px;display:flex;gap:3px}
+.pagina.ff-rendimentos .rd-series-cell{position:relative;flex:1;min-width:0}
+.pagina.ff-rendimentos .rd-series-cell i{position:absolute;top:var(--rd-top);left:10%;width:80%;height:var(--rd-height);min-height:2px;border-radius:5px 5px 2px 2px;background:var(--rd-cor)}
+.pagina.ff-rendimentos .rd-partial .rd-series-cell i{opacity:.56}
+.pagina.ff-rendimentos .rd-column-label{position:absolute;top:226px;left:0;width:100%;text-align:center;color:var(--suave);font-size:10px;font-weight:600;white-space:nowrap}
+.pagina.ff-rendimentos .rd-tooltip{display:none;position:absolute;z-index:3;top:8px;left:50%;transform:translateX(-50%);min-width:160px;max-width:230px;padding:10px 12px;border-radius:10px;background:var(--tinta);color:var(--card);box-shadow:var(--sombra);font-size:11px;line-height:1.45;white-space:normal;pointer-events:none}
+.pagina.ff-rendimentos .rd-tooltip b,.pagina.ff-rendimentos .rd-tooltip span{display:block}
+.pagina.ff-rendimentos .rd-tooltip span{margin-top:4px}
+.pagina.ff-rendimentos .rd-column:hover .rd-tooltip,.pagina.ff-rendimentos .rd-column:focus-visible .rd-tooltip{display:block}
+.pagina.ff-rendimentos .rd-chart-foot{margin:14px 0 0;color:var(--suave);font-size:11.5px;line-height:1.55}
+.pagina.ff-rendimentos .rd-line-scroll svg{display:block;width:100%;min-width:480px;height:auto;max-height:300px}
+.pagina.ff-rendimentos .rd-svg-grid{stroke:var(--linha);stroke-dasharray:4 4}
+.pagina.ff-rendimentos .rd-svg-axis{fill:var(--suave);font:10px Inter,system-ui,sans-serif}
+.pagina.ff-rendimentos .rd-svg-line{fill:none;stroke:var(--marca);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.pagina.ff-rendimentos .rd-svg-point{fill:var(--card);stroke:var(--marca);stroke-width:2.5}
+.pagina.ff-rendimentos .rd-source-list{display:grid;gap:12px;max-height:344px;padding:2px 4px 2px 0;overflow-y:auto;scrollbar-width:thin}
+.pagina.ff-rendimentos .rd-source-row>div{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:12px}
+.pagina.ff-rendimentos .rd-source-row b{min-width:0;overflow-wrap:anywhere;font-weight:600}
+.pagina.ff-rendimentos .rd-source-row strong{flex:none;font-size:12px;font-variant-numeric:tabular-nums}
+.pagina.ff-rendimentos .rd-source-track{display:block;height:7px;margin:7px 0 3px;overflow:hidden;border-radius:99px;background:var(--bg)}
+.pagina.ff-rendimentos .rd-source-track i{display:block;height:100%;border-radius:99px;background:var(--rd-mes)}
+.pagina.ff-rendimentos .rd-source-row small{color:var(--suave);font-size:10px}
+.pagina.ff-rendimentos .rd-chart-data{margin-top:14px;padding-top:12px;border-top:1px solid var(--linha)}
+.pagina.ff-rendimentos .rd-chart-data summary{min-height:36px;color:var(--marca);font-size:12px;font-weight:650;cursor:pointer}
+.pagina.ff-rendimentos .rd-data-scroll{max-height:270px;overflow:auto}
+.pagina.ff-rendimentos .rd-data-scroll table{width:100%;border-collapse:collapse;font-size:12px}
+.pagina.ff-rendimentos .rd-data-scroll th,.pagina.ff-rendimentos .rd-data-scroll td{padding:7px 5px;border-bottom:1px solid var(--linha)}
+.pagina.ff-rendimentos .rd-data-scroll th{text-align:left;font-weight:550}
+.pagina.ff-rendimentos .rd-data-scroll td{text-align:right;font-variant-numeric:tabular-nums}
+.pagina.ff-rendimentos .rd-chart-empty,.pagina.ff-rendimentos .rd-visual-note{padding:18px;border:1px solid var(--linha);border-radius:12px;background:var(--bg);color:var(--suave);font-size:12px;line-height:1.55}
+.pagina.ff-rendimentos .rd-visual-note{margin-top:16px}
+@media(prefers-color-scheme:dark){.pagina.ff-rendimentos .rd-visual{--rd-ano:#9aafff;--rd-mes:#60c6b1}}
+@media(max-width:920px){.pagina.ff-rendimentos .rd-chart-grid{grid-template-columns:minmax(0,1fr)}.pagina.ff-rendimentos .rd-chart-card{grid-column:1/-1}}
+@media(max-width:600px){.pagina.ff-rendimentos.financeiro>.painel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;padding:10px 12px}.pagina.ff-rendimentos.financeiro>.painel>.rot,.pagina.ff-rendimentos.financeiro>.painel>.finance-tools{grid-column:1/-1}.pagina.ff-rendimentos.financeiro>.painel>select{width:100%;min-width:0}.pagina.ff-rendimentos.financeiro>.painel>.div{display:none}}
+@media(max-width:420px){.pagina.ff-rendimentos.financeiro>.painel{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.pagina.ff-rendimentos .rd-visual-top h2{font-size:20px}.pagina.ff-rendimentos .rd-chart-card{padding:16px 14px}.pagina.ff-rendimentos .rd-chart-heading h2{font-size:16px}.pagina.ff-rendimentos .rd-chart-scroll{margin:0 -4px}.pagina.ff-rendimentos .rd-source-row>div{align-items:flex-start}.pagina.ff-rendimentos .rd-source-row strong{text-align:right}}
+@media print{.pagina.ff-rendimentos .rd-chart-grid{display:block}.pagina.ff-rendimentos .rd-chart-card{margin-bottom:16px;break-inside:avoid}.pagina.ff-rendimentos .rd-chart-scroll,.pagina.ff-rendimentos .rd-line-scroll,.pagina.ff-rendimentos .rd-source-list,.pagina.ff-rendimentos .rd-data-scroll{overflow:visible;max-height:none}.pagina.ff-rendimentos .rd-chart-data{display:none}.pagina.ff-rendimentos .rd-series-cell i,.pagina.ff-rendimentos .rd-source-track i{print-color-adjust:exact}}
