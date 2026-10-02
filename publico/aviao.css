@@ -52,6 +52,44 @@
 .aviao-import-grid span{background:var(--bg);border:1px solid var(--linha);border-radius:9px;padding:8px 11px;font-size:12px}
 .aviao-import label{display:block;font-weight:600;font-size:13px;margin:18px 0 3px}
 .aviao-import input{display:block;width:100%;max-width:280px;border:1px solid var(--linha);border-radius:9px;padding:9px 11px;margin-top:6px;font:inherit;background:var(--card);color:var(--tinta)}
+.aviao-colagem textarea{display:block;box-sizing:border-box;width:100%;margin-top:7px;padding:10px 12px;resize:vertical;border:1px solid var(--linha);border-radius:9px;font:12px ui-monospace,monospace;background:var(--card);color:var(--tinta)}
+.aviao-planilha{min-width:0;padding-bottom:20px}
+.aviao-sheet-tabs{display:flex;gap:6px;border-bottom:2px solid #435e91;margin-bottom:18px;overflow:auto}
+.aviao-sheet-tabs button{padding:11px 20px;border:1px solid var(--linha);border-bottom:0;border-radius:10px 10px 0 0;font:600 13px Inter,system-ui,sans-serif;white-space:nowrap;background:var(--card);color:var(--suave);cursor:pointer}
+.aviao-sheet-tabs button.on{background:#2a3e66;border-color:#2a3e66;color:white}
+.aviao-sheet-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px;align-items:start}
+.aviao-sheet-section{min-width:0;border:1px solid var(--linha);border-radius:12px;overflow:hidden;margin-bottom:16px;background:var(--card)}
+.aviao-sheet-section>header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 16px;background:#2a3e66;color:#fff}
+.aviao-sheet-section>header h2{font:650 15px Inter,system-ui,sans-serif;letter-spacing:0}
+.aviao-sheet-section>header p{font-size:11px;color:#d3def1;line-height:1.4;margin:4px 0 0}
+.aviao-sheet-section>header .btn{background:#fff;color:#2a3e66;border-color:transparent;white-space:nowrap;font-size:11px;padding:7px 10px;flex-shrink:0}
+.aviao-sheet-indicadores{display:grid;grid-template-columns:1fr 1fr;margin:0}
+.aviao-sheet-indicadores>div{padding:10px 15px;border-bottom:1px solid var(--linha);min-width:0}
+.aviao-sheet-indicadores>div:nth-child(odd){border-right:1px solid var(--linha)}
+.aviao-sheet-indicadores>div:nth-last-child(-n+2){border-bottom:0;background:var(--av-azul-cl)}
+.aviao-sheet-indicadores dt{font-size:11px;color:var(--suave);margin:0 0 4px}
+.aviao-sheet-indicadores dd{font-size:15px;font-weight:650;font-variant-numeric:tabular-nums;margin:0;overflow-wrap:anywhere}
+.aviao-sheet-resumo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--linha);border-radius:12px;overflow:hidden;margin-bottom:15px;background:var(--card)}
+.aviao-sheet-resumo>div{padding:14px 16px;border-right:1px solid var(--linha);min-width:0}
+.aviao-sheet-resumo>div:last-child{border-right:0}
+.aviao-sheet-resumo small{display:block;font-size:11px;color:var(--suave)}
+.aviao-sheet-resumo strong{display:block;font-size:21px;font-weight:650;letter-spacing:-.02em;margin:5px 0;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.aviao-sheet-resumo span{font-size:11px;color:var(--suave)}
+.aviao-sheet-nota{font-size:12px;color:var(--suave);line-height:1.5;margin:0 0 14px;padding:0 2px}
+.aviao-planilha .rolagem{max-width:100%;overflow:auto}
+.aviao-planilha .aviao-tabela{min-width:980px;border-collapse:collapse;margin:0}
+.aviao-sheet-top .aviao-tabela{min-width:440px}
+.aviao-planilha .aviao-tabela th{background:#435e91;color:#fff;text-transform:none;font-size:11px;font-weight:600;padding:10px 12px;white-space:nowrap}
+.aviao-planilha .aviao-tabela td{padding:9px 12px;font-size:12px;line-height:1.4;vertical-align:middle;border-bottom:1px solid var(--linha)}
+.aviao-planilha .aviao-tabela tbody tr:nth-child(odd){background:color-mix(in srgb,var(--av-azul-cl) 45%,var(--card))}
+.aviao-planilha .aviao-tabela tbody tr:hover{background:var(--av-azul-cl)}
+.aviao-planilha .aviao-tabela .av-num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.aviao-planilha .aviao-tabela tfoot th,.aviao-planilha .aviao-tabela tfoot td{background:var(--av-azul-cl);color:var(--tinta);font-weight:700;padding:12px;border-top:2px solid #435e91}
+.aviao-planilha .aviao-tabela td .btn{padding:5px 9px;font-size:11px;border-radius:6px}
+.av-status{display:inline-block;border-radius:5px;padding:4px 7px;font-size:11px;font-weight:650;white-space:nowrap}
+.av-pago{background:#dcf3e4;color:#21623c}.av-pendente{background:#fff0ca;color:#765011}.av-cancelado{background:#e8e8ed;color:#555563}
+@media(max-width:1100px){.aviao-sheet-top{grid-template-columns:1fr}.aviao-sheet-top .aviao-tabela{min-width:440px}.aviao-sheet-resumo strong{font-size:18px}}
+@media(max-width:650px){.aviao-sheet-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}.aviao-sheet-resumo>div:nth-child(2){border-right:0}.aviao-sheet-resumo>div:nth-child(-n+2){border-bottom:1px solid var(--linha)}.aviao-sheet-section>header{align-items:flex-start;flex-wrap:wrap}.aviao-sheet-tabs button{padding:10px 13px}.aviao-sheet-indicadores dd{font-size:14px}}
 @media(prefers-color-scheme:dark){
   .aviao-layout{--av-azul:#b6c7ff;--av-azul-cl:#222c42}
   .aviao-hero{background:linear-gradient(120deg,#202b40,#1d2637);border-color:#3d4c67}
