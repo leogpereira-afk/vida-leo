@@ -666,6 +666,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./saude-visual.css?v=c2264793fee0">
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
 <link rel="stylesheet" href="./aviao.css?v=44fae810ca9e">
+<link rel="stylesheet" href="./fortemais-previsao.css?v=bbcadcc573cd">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -701,6 +702,7 @@ tr:hover .lixo{opacity:1}
 <script src="./google-datas.js?v=85c5d36986f3"></script>
 <script src="./documentos-revisao.js?v=f54d2ba958f9"></script>
 <script src="./organograma.js?v=3a5db1c22c87"></script>
+<script src="./fortemais-financeiro.js?v=48296dd2f793"></script>
 <script>
 /* ============================================================
    Central do Léo — painel pessoal, um arquivo só.
@@ -1926,7 +1928,7 @@ function prepararTabelas(pagina){
       tr.tabIndex=0;tr.setAttribute('role','button');tr.setAttribute('aria-label','Abrir '+tr.textContent.trim().replace(/\s+/g,' ').slice(0,100));
       tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tr.click()}};
     }});
-    if(pagina.classList.contains('financeiro')||pagina.classList.contains('saude-layout')||t.classList.contains('aviao-tabela')||t.parentElement.closest('table'))return;
+    if(pagina.classList.contains('financeiro')||pagina.classList.contains('saude-layout')||t.classList.contains('aviao-tabela')||t.classList.contains('fm-orcamento')||t.parentElement.closest('table'))return;
     const ths=[...t.querySelectorAll('thead>tr>th')].filter(x=>x.closest('table')===t);
     if(!ths.length||!linhas.length||linhas.some(tr=>tr.children.length!==ths.length||tr.querySelector('[colspan],table')))return;
     t.classList.add('tabela-adaptavel');
@@ -5772,10 +5774,136 @@ function fmPainelLinks(){
   return sec;
 }
 
+/* Previsão financeira: dados próprios de cada obra, independentes do realizado. */
+const FM_PREV_CAMPOS=[['venda','Valor de venda previsto (R$)'],['terreno','Custo do terreno (R$)'],['construcao','Custo de construção (R$)'],['documentacaoPct','Documentação (% da venda)'],['comissaoPct','Comissão (% da venda)'],['impostoPct','Imposto (% da venda)'],['outras','Outros custos previstos (R$)']];
+function fmPrevDados(o){return o.fmPrevisao||{investidores:[],fluxos:[]}}
+function fmPrevGravar(o,p,anterior){
+  if(arguments.length<3)anterior=o.fmPrevisao;
+  if(!E.obras.includes(o)||o.fmPrevisao!==anterior)throw Error('A obra foi atualizada. Feche e abra novamente antes de salvar.');
+  const existia=Object.hasOwn(o,'fmPrevisao'),mt=E._mt,tinhaMt=Object.hasOwn(E,'_mt');o.fmPrevisao=structuredClone(p);
+  try{salvar()}catch(e){if(existia)o.fmPrevisao=anterior;else delete o.fmPrevisao;if(tinhaMt)E._mt=mt;else delete E._mt;throw Error('Não foi possível salvar a previsão. Os dados anteriores foram mantidos.');}
+}
+function fmPrevValor(v,rotulo,opcional=false){
+  if(opcional&&(v==null||String(v).trim()===''))return 0;
+  if(v==null||String(v).trim()==='')throw Error('Preencha '+rotulo+'. Use 0 quando não houver custo.');
+  const n=typeof v==='number'?v:financeiroNumero(v);if(!Number.isFinite(n))throw Error('Informe um número válido.');if(n<0)throw Error(rotulo+' não pode ser negativo.');return n;
+}
+function fmPrevNormalizar(v){
+  const p={};for(const [k,t] of FM_PREV_CAMPOS){p[k]=fmPrevValor(v[k],t,k==='outras');if(k.endsWith('Pct')&&p[k]>100)throw Error(t+' não pode superar 100%.');}
+  if(p.venda<=0)throw Error('Informe um valor de venda maior que zero.');return p;
+}
+function fmPrevLerModelo(zip){
+  const rows=linhasDoXlsx(zip),porNome=n=>rows.find(r=>normaliza(r.A||'')===normaliza(n));
+  const cel=(nome,col,zero=false)=>{const r=porNome(nome);if(!r)throw Error('Não encontrei a linha “'+nome+'” no Dashboard.');if(zero&&(r[col]==null||r[col]===''))return 0;const n=numeroPlanilha(r[col]);if(n===null)throw Error('Confira o valor de “'+nome+'” na planilha.');return n;};
+  return fmPrevNormalizar({venda:cel('Valor de Venda','B'),terreno:cel('Custo do Terreno','B'),construcao:cel('Custo de Construção','B'),documentacaoPct:cel('Previsão Documentação','C',true)*100,comissaoPct:cel('Previsão Comissão Vendedor','C',true)*100,impostoPct:cel('Previsão do Imposto','C',true)*100,outras:0});
+}
+function fmPrevEditar(o){
+  const anterior=o.fmPrevisao,p=structuredClone(fmPrevDados(o));
+  abrirModal('Previsão de lucro',esc(o.nome||'Obra')+' · estimativas, sem alterar os valores realizados.',(c,fechar)=>{
+    const b=el('<div class="secao fm-previsao-editor"></div>');
+    b.appendChild(el('<p class="fm-nota">Informe os custos previstos. Documentação, comissão e imposto são calculados sobre a venda, como no modelo da planilha. Use 0 quando não houver custo.</p>'));
+    const form=devFormulario(b,FM_PREV_CAMPOS.map(([k,t])=>({k,t,req:k!=='outras'})),Object.fromEntries(FM_PREV_CAMPOS.map(([k])=>[k,p[k]==null?'':String(p[k]).replace('.',',')])),'Salvar previsão',v=>{fmPrevGravar(o,{...p,...fmPrevNormalizar(v)},anterior);fechar()});
+    form.querySelectorAll('input').forEach(x=>x.inputMode='decimal');
+    const arquivo=el('<input type="file" accept=".xlsx,.xlsm" hidden>'),info=el('<p class="fm-nota" role="status"></p>');
+    const importar=acao('Importar valores da planilha',()=>arquivo.click(),'ghost');
+    arquivo.onchange=async()=>{const f=arquivo.files?.[0];if(!f)return;importar.disabled=true;info.textContent='Lendo a previsão…';try{if(f.size>64*1024*1024)throw Error('Use um arquivo de até 64 MB.');const valores=fmPrevLerModelo(await lerZipAuto(new Uint8Array(await f.arrayBuffer())));for(const [k] of FM_PREV_CAMPOS)form.querySelector('[name='+k+']').value=String(valores[k]).replace('.',',');info.textContent='Previsão carregada. Confira e clique em Salvar previsão. Nenhum lançamento realizado foi importado.';}catch(e){info.textContent=e.message}finally{importar.disabled=false;arquivo.value=''}};
+    const ac=el('<div class="fm-acoes"></div>');ac.append(importar,acao('Cancelar',fechar,'ghost'));b.append(ac,arquivo,info);c.appendChild(b);
+  });
+}
+function fmPrevInvestidorSalvar(o,v,item,anterior){
+  const p=structuredClone(fmPrevDados(o)),lista=p.investidores||[],nome=String(v.nome||'').trim();
+  if(!nome)throw Error('Informe o nome do investidor.');if(lista.some(x=>x.id!==item?.id&&normaliza(x.nome)===normaliza(nome)))throw Error('Este investidor já está na previsão. Edite o cadastro existente.');
+  const pct=fmPrevValor(v.pct,'participação no lucro'),aporte=fmPrevValor(v.aporte,'aporte previsto',true);if(pct>100)throw Error('A participação deve ficar entre 0% e 100%.');
+  const novo={id:item?.id||uid(),nome,pct,aporte};p.investidores=item?lista.map(x=>x.id===item.id?novo:x):[...lista,novo];fmPrevGravar(o,p,anterior);
+}
+function fmPrevInvestidor(o,item){
+  const anterior=o.fmPrevisao;
+  abrirModal(item?'Editar investidor previsto':'Adicionar investidor',esc(o.nome||'Obra')+' · defina o aporte e a participação combinada no lucro.',(c,fechar)=>{
+    const b=el('<div class="secao fm-previsao-editor"></div>');devFormulario(b,[{k:'nome',t:'Nome do investidor',req:true,full:true},{k:'pct',t:'Participação no lucro (%)',req:true},{k:'aporte',t:'Aporte previsto (R$)'}],item?{...item,pct:String(item.pct).replace('.',','),aporte:String(item.aporte).replace('.',',')}:{},'Salvar investidor',v=>{fmPrevInvestidorSalvar(o,v,item,anterior);fechar()});
+    const ac=el('<div class="fm-acoes"></div>');ac.appendChild(acao('Cancelar',fechar,'ghost'));
+    if(item)ac.appendChild(acao('Remover investidor',()=>{try{const p=structuredClone(fmPrevDados(o));if((p.fluxos||[]).some(x=>x.investidorId===item.id))throw Error('Este investidor tem fluxos previstos. Remova ou transfira esses lançamentos antes.');if(!confirm('Remover este investidor da previsão?'))return;p.investidores=p.investidores.filter(x=>x.id!==item.id);fmPrevGravar(o,p,anterior);fechar()}catch(e){const a=b.querySelector('[role=alert]');a.hidden=false;a.textContent=e.message}},'ghost'));b.appendChild(ac);c.appendChild(b);
+  });
+}
+function fmPrevFluxoSalvar(o,v,item,anterior){
+  const p=structuredClone(fmPrevDados(o)),investidor=(p.investidores||[]).find(x=>x.nome===v.investidor);
+  if(!investidor)throw Error('Selecione um investidor cadastrado nesta previsão.');if(!dataISOValida(v.data))throw Error('Informe uma data válida.');
+  if(!['Aporte previsto','Recebimento previsto'].includes(v.tipo))throw Error('Escolha aporte ou recebimento previsto.');
+  const valor=fmPrevValor(v.valor,'valor');if(valor<=0)throw Error('Informe um valor maior que zero.');
+  const fluxo={id:item?.id||uid(),investidorId:investidor.id,tipo:v.tipo,data:v.data,valor,obs:String(v.obs||'').trim()};
+  p.fluxos=item?(p.fluxos||[]).map(x=>x.id===item.id?fluxo:x):[...(p.fluxos||[]),fluxo];fmPrevGravar(o,p,anterior);
+}
+function fmPrevFluxo(o,item){
+  const anterior=o.fmPrevisao,p=fmPrevDados(o);if(!p.investidores?.length){fmPrevInvestidor(o);return}
+  abrirModal(item?'Editar fluxo previsto':'Adicionar fluxo previsto','Use as datas previstas. Recebimento inclui devolução do capital e lucro quando houver.',(c,fechar)=>{
+    const b=el('<div class="secao fm-previsao-editor"></div>');
+    const inicial=item?{...item,investidor:p.investidores.find(x=>x.id===item.investidorId)?.nome||'',valor:String(item.valor).replace('.',',')}:{tipo:'Aporte previsto'};
+    devFormulario(b,[{k:'investidor',t:'Investidor',opcoes:p.investidores.map(x=>x.nome),req:true},{k:'tipo',t:'Movimento',opcoes:['Aporte previsto','Recebimento previsto'],req:true},{k:'data',t:'Data prevista',tipo:'date',req:true},{k:'valor',t:'Valor previsto (R$)',req:true},{k:'obs',t:'Observações',tipo:'textarea',full:true}],inicial,'Salvar fluxo previsto',v=>{fmPrevFluxoSalvar(o,v,item,anterior);fechar()});
+    const ac=el('<div class="fm-acoes"></div>');ac.appendChild(acao('Cancelar',fechar,'ghost'));
+    if(item)ac.appendChild(acao('Remover fluxo',()=>{if(!confirm('Remover este fluxo da previsão?'))return;try{fmPrevGravar(o,{...p,fluxos:p.fluxos.filter(x=>x.id!==item.id)},anterior);fechar()}catch(e){const a=b.querySelector('[role=alert]');a.hidden=false;a.textContent=e.message}},'ghost'));b.appendChild(ac);c.appendChild(b);
+  });
+}
+const fmPrevPct=v=>v==null?'—':v.toLocaleString('pt-BR',{maximumFractionDigits:2})+'%';
+function fmPrevContas(o){
+  const p=fmPrevDados(o),prev=FortemaisFinance.previsao(p),investidores=p.investidores||[],pct=investidores.reduce((s,x)=>s+(+x.pct||0),0),rateioOk=investidores.length>0&&Math.abs(pct-100)<.001;
+  const linhas=investidores.map(i=>{const fs=(p.fluxos||[]).filter(x=>x.investidorId===i.id).map(x=>({data:x.data,valor:(x.tipo==='Aporte previsto'?-1:1)*Number(x.valor)}));return{...i,lucro:prev.ok&&rateioOk?prev.lucro*i.pct/100:null,fluxos:fs,...FortemaisFinance.retorno(fs)}});
+  return{p,prev,linhas,pct,rateioOk};
+}
+function fmPrevTabelaLucro(o){
+  const {prev:v}=fmPrevContas(o),rows=[['Valor de venda','venda'],['Custo do terreno','terreno'],['Custo de construção','construcao'],['Documentação','documentacao'],['Comissão do vendedor','comissao'],['Imposto','imposto'],['Outros custos','outras'],['Custo total previsto','custo'],['Lucro previsto','lucro']];
+  return '<table class="fm-tabela fm-orcamento"><thead><tr><th>Previsão do imóvel</th><th>Valor previsto</th><th>% da venda</th></tr></thead><tbody>'+rows.map(([nome,k])=>`<tr class="${['lucro','custo'].includes(k)?'fm-total':''}"><td>${nome}</td><td class="${v.ok&&v[k]<0?'fm-negativo':''}">${v.ok?brl(v[k]):'—'}</td><td>${v.ok?fmPrevPct(v[k]/v.venda*100):'—'}</td></tr>`).join('')+'</tbody></table>';
+}
+function fmPrevTabelaRetorno(o){
+  const {linhas}=fmPrevContas(o);
+  return '<table class="fm-tabela"><thead><tr><th>Investidor</th><th>Aportes no fluxo</th><th>Recebimentos no fluxo</th><th>Resultado previsto</th><th>ROI previsto</th><th>TIR prevista a.a.</th></tr></thead><tbody>'+linhas.map(i=>`<tr><td class="fm-fluxo-nome"><b>${esc(i.nome)}</b>${i.motivo?'<small>'+esc(i.motivo)+'</small>':''}</td><td>${brl(i.aportado)}</td><td>${brl(i.recebido)}</td><td>${i.saldo==null||!i.fluxos.length?'—':brl(i.saldo)}</td><td>${fmPrevPct(i.roi)}</td><td>${fmPrevPct(i.tir)}</td></tr>`).join('')+'</tbody></table>';
+}
+function fmPrevPainel(o){
+  const {p,prev:v,linhas,pct,rateioOk}=fmPrevContas(o),c=el('<section class="fm-previsao"><header><div><h3>Previsão de lucro do imóvel</h3><p class="fm-nota">Orçamento e divisão do lucro esperado. Valores previstos, separados do realizado.</p></div><div class="fm-acoes"></div></header></section>');
+  c.querySelector('.fm-acoes').append(acao(v.ok?'Editar previsão':'Preencher previsão',()=>fmPrevEditar(o)),acao('PDF da previsão',()=>fmPrevPdf(o),'ghost'));
+  if(!v.ok){const vazio=el('<div class="fm-vazio"><b>Planeje o resultado antes de investir</b><p>Preencha a venda e os custos estimados ou importe o Dashboard da sua planilha. Depois distribua o lucro entre quantos investidores precisar.</p></div>');c.appendChild(vazio)}
+  else{
+    c.appendChild(el(`<div class="fm-kpis"><div class="fm-kpi"><small>Venda prevista</small><b>${brl(v.venda)}</b></div><div class="fm-kpi"><small>Custo total previsto</small><b>${brl(v.custo)}</b></div><div class="fm-kpi foco"><small>Lucro esperado</small><b class="${v.lucro<0?'fm-negativo':''}">${brl(v.lucro)}</b></div></div>`));
+    const partes=[['Terreno',v.terreno,'#9e8d78'],['Construção',v.construcao,'#585ef0'],['Documentação e venda',v.documentacao+v.comissao+v.imposto+v.outras,'#e8aa58'],['Lucro',Math.max(0,v.lucro),'#319b87']],base=partes.reduce((s,x)=>s+x[1],0);
+    c.appendChild(el('<div><div class="fm-budget-chart" aria-hidden="true">'+partes.map(x=>`<span style="width:${base?x[1]/base*100:0}%;background:${x[2]}"></span>`).join('')+'</div><div class="fm-legenda">'+partes.map(x=>`<span><i style="background:${x[2]}"></i>${x[0]}</span>`).join('')+'</div></div>'));
+  }
+  c.appendChild(el('<div class="rolagem">'+fmPrevTabelaLucro(o)+'</div>'));
+  c.appendChild(el('<h4>Investidores e divisão do lucro previsto</h4>'));
+  const ac=el('<div class="fm-acoes"></div>');ac.appendChild(acao('+ Investidor',()=>fmPrevInvestidor(o),'ghost'));c.appendChild(ac);
+  if(linhas.length){const t=el('<div class="rolagem"><table class="fm-tabela"><thead><tr><th>Investidor</th><th>Aporte previsto</th><th>Participação no lucro</th><th>Lucro previsto</th><th></th></tr></thead><tbody></tbody></table></div>');for(const i of linhas){const tr=elTr(`<td>${esc(i.nome)}</td><td>${brl(i.aporte)}</td><td>${fmPrevPct(i.pct)}</td><td>${i.lucro==null?'—':brl(i.lucro)}</td><td></td>`);tr.lastElementChild.appendChild(acao('Editar',()=>fmPrevInvestidor(o,(p.investidores||[]).find(x=>x.id===i.id)),'ghost'));t.querySelector('tbody').appendChild(tr)}c.appendChild(t);
+    if(!rateioOk)c.appendChild(el(`<p class="fm-alerta">As participações somam ${fmPrevPct(pct)}. Ajuste para 100% para calcular a divisão do lucro. Nenhum percentual é alterado automaticamente.</p>`));
+    const aporte=linhas.reduce((s,x)=>s+(+x.aporte||0),0);c.appendChild(el(`<p class="fm-nota">Aportes planejados: <b>${brl(aporte)}</b>${v.ok?' · diferença para o custo total previsto: <b>'+brl(v.custo-aporte)+'</b>':''}. Participação no lucro e participação no capital podem ser diferentes.</p>`));
+  }else c.appendChild(el('<p class="fm-nota">Adicione os investidores e informe a participação combinada de cada um.</p>'));
+  return c;
+}
+function fmPrevRetornoPainel(o){
+  const {p,prev:v,linhas}=fmPrevContas(o),c=el('<section class="fm-previsao"><header><div><h3>ROI e TIR previstos</h3><p class="fm-nota">Simulação com datas futuras ou planejadas. Estes valores não são recebimentos realizados.</p></div><div class="fm-acoes"></div></header></section>');
+  c.querySelector('.fm-acoes').append(acao('+ Fluxo previsto',()=>fmPrevFluxo(o)),acao('PDF da previsão',()=>fmPrevPdf(o),'ghost'));
+  c.appendChild(el(`<div><div class="fm-kpis"><div class="fm-kpi foco"><small>ROI previsto do imóvel</small><b>${v.ok?fmPrevPct(v.roi):'—'}</b></div><div class="fm-kpi"><small>Margem prevista sobre a venda</small><b>${v.ok?fmPrevPct(v.margem):'—'}</b></div><div class="fm-kpi"><small>Investidores na previsão</small><b>${linhas.length}</b></div></div><p class="fm-nota">ROI do imóvel = lucro previsto ÷ custo total previsto. O ROI de cada investidor usa seus aportes e recebimentos planejados. A TIR considera as datas, em taxa anual com base de 365 dias.</p></div>`));
+  if(linhas.length)c.appendChild(el('<div class="rolagem">'+fmPrevTabelaRetorno(o)+'</div>'));else c.appendChild(el('<p class="fm-vazio">Cadastre os investidores na tabela de previsão de lucro para montar os fluxos.</p>'));
+  const divergentes=linhas.filter(i=>i.fluxos.length&&(Math.abs(i.aportado-i.aporte)>.01||(i.lucro!=null&&Math.abs(i.recebido-(i.aporte+i.lucro))>.01)));
+  if(divergentes.length)c.appendChild(el('<p class="fm-alerta">Confira o fluxo de '+divergentes.map(i=>esc(i.nome)).join(', ')+': os valores diferem dos aportes ou da devolução de capital mais lucro da previsão. Os fluxos não mudam automaticamente quando o orçamento é editado.</p>'));
+  c.appendChild(el('<div><h4>Datas e valores previstos</h4><p class="fm-nota">Lance cada aporte e cada recebimento. No recebimento, inclua o capital devolvido e o lucro esperado. Você pode distribuir os valores em várias datas.</p></div>'));
+  const tabela=el('<div class="rolagem"><table class="fm-tabela"><thead><tr><th>Data prevista</th><th>Investidor</th><th>Movimento</th><th>Valor</th><th></th></tr></thead><tbody></tbody></table></div>');
+  for(const x of [...(p.fluxos||[])].sort((a,b)=>a.data.localeCompare(b.data))){const nome=linhas.find(i=>i.id===x.investidorId)?.nome||'Investidor não encontrado',tr=elTr(`<td>${esc(fmtDataAno(x.data))}${x.obs?'<small>'+esc(x.obs)+'</small>':''}</td><td>${esc(nome)}</td><td>${esc(x.tipo)}</td><td>${brl(x.valor)}</td><td></td>`);tr.lastElementChild.appendChild(acao('Editar',()=>fmPrevFluxo(o,x),'ghost'));tabela.querySelector('tbody').appendChild(tr)}
+  if(p.fluxos?.length)c.appendChild(tabela);else c.appendChild(el('<p class="fm-vazio">Nenhum fluxo previsto. Use “+ Fluxo previsto” para informar as datas e calcular o retorno.</p>'));
+  return c;
+}
+function fmPrevPdf(o){
+  const w=window.open('','_blank');if(!w){alert('Libere o pop-up para salvar a previsão em PDF.');return}
+  const {prev:v,linhas,pct,rateioOk,p}=fmPrevContas(o);
+  w.document.write(`<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Previsão ${esc(o.nome||'Fortemais')}</title><style>body{font:11px/1.4 Arial,sans-serif;color:#202332;margin:30px}h1{font-size:25px}h2{font-size:17px;color:#3e45ee;margin-top:25px}table{width:100%;border-collapse:collapse;font-size:11px}td,th{padding:6px;border-bottom:1px solid #ddd;text-align:left}td:not(:first-child),th:not(:first-child){text-align:right}th,.fm-total{background:#f0f1ff}small{display:block;color:#656978;font-size:10px}tr{break-inside:avoid}h2{break-after:avoid}.fm-pdf-retorno{break-before:page}thead{display:table-header-group}@page{size:A4 landscape;margin:15mm}@media print{body{margin:0}}</style><h1>Fortemais · ${esc(o.nome||'Obra')}</h1><p>Previsão financeira · ${esc(fmtDataAno(hoje()))}. Valores estimados, sem representar resultado realizado.</p><h2>Previsão de lucro do imóvel</h2>${fmPrevTabelaLucro(o)}<h2>Distribuição do lucro previsto</h2><p>${rateioOk?'Participações: 100%.':'Participações a conferir: '+fmPrevPct(pct)+'.'}</p><table><thead><tr><th>Investidor</th><th>Aporte previsto</th><th>Participação</th><th>Lucro previsto</th></tr></thead><tbody>${linhas.map(i=>`<tr><td>${esc(i.nome)}</td><td>${brl(i.aporte)}</td><td>${fmPrevPct(i.pct)}</td><td>${i.lucro==null?'—':brl(i.lucro)}</td></tr>`).join('')}</tbody></table><h2 class="fm-pdf-retorno">ROI e TIR previstos</h2><p>ROI do imóvel: ${v.ok?fmPrevPct(v.roi):'—'} · margem sobre a venda: ${v.ok?fmPrevPct(v.margem):'—'}.</p>${fmPrevTabelaRetorno(o)}<p>TIR anual, base de 365 dias, conforme datas dos fluxos abaixo. Os fluxos são independentes do orçamento e devem ser revisados quando as estimativas mudarem.</p><table><thead><tr><th>Data prevista</th><th>Investidor</th><th>Movimento</th><th>Valor</th><th>Observações</th></tr></thead><tbody>${[...(p.fluxos||[])].sort((a,b)=>a.data.localeCompare(b.data)).map(x=>`<tr><td>${esc(fmtDataAno(x.data))}</td><td>${esc(linhas.find(i=>i.id===x.investidorId)?.nome||'Não encontrado')}</td><td>${esc(x.tipo)}</td><td>${brl(x.valor)}</td><td>${esc(x.obs||'')}</td></tr>`).join('')}</tbody></table></html>`);w.document.close();setTimeout(()=>w.print(),300);
+}
+function fmPrevAbas(c,o){
+  const existente=el('<div class="fm-conteudo" data-fm-pagina="realizado"></div>');while(c.firstChild)existente.appendChild(c.firstChild);
+  const prev=fmPrevPainel(o),ret=fmPrevRetornoPainel(o);prev.classList.add('fm-conteudo');ret.classList.add('fm-conteudo');prev.dataset.fmPagina='previsao';ret.dataset.fmPagina='retorno';
+  const nav=el('<nav class="fm-tabs" aria-label="Dados da obra"></nav>'),paginas=[prev,ret,existente];
+  filtro.fmAbas=filtro.fmAbas||{};const ativar=id=>{filtro.fmAbas[o.id]=id;paginas.forEach(p=>p.hidden=p.dataset.fmPagina!==id);nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.pagina===id)))};
+  for(const [id,nome] of [['previsao','Previsão de lucro'],['retorno','ROI e TIR previstos'],['realizado','Dados e realizado']]){const b=acao(nome,()=>ativar(id),'ghost');b.dataset.pagina=id;nav.appendChild(b)}c.append(nav,...paginas);ativar(filtro.fmAbas[o.id]||'previsao');
+}
+
 /* ---------------- a tela ---------------- */
 async function vFortemais(m){
   m.classList.add('fortemais-fluida');const r=rr('fortemais');
-  m.appendChild(cab('Fortemais','Cada obra: o que custou, quem aportou, por quanto saiu e o que sobrou.'));
+  m.appendChild(cab('Fortemais','Planeje o lucro de cada imóvel e o retorno previsto dos investidores.'));
   m.appendChild(fmPainelLinks());
 
   const resumo=await fmResumo();
@@ -5795,7 +5923,7 @@ async function vFortemais(m){
   if(filtro.fmAno!=='todas'&&filtro.fmAno!=='aberto'&&!anos.includes(filtro.fmAno))filtro.fmAno='todas';
 
   const novaObra=()=>{const o={id:uid(),nome:'',empresa:'Fortemais',tipo:CFG('tiposObra')[0],
-    status:'Vendida',endereco:'',area:0,areaTerreno:0,inicio:'',fim:'',
+    status:'Em andamento',endereco:'',area:0,areaTerreno:0,inicio:'',fim:'',
     vendaValor:0,vendaData:'',recebidoEm:'',comprador:'',impostoValor:0,
     comissaoValor:0,outrasDeducoes:0,obs:''};
     novoRegistroTabela('Nova obra',[{k:'nome',t:'Nome da obra'},{k:'empresa',t:'Empresa',tipo:'sugestao',opcoes:CFG('empresas')},{k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposObra')},{k:'status',t:'Situação',tipo:'sugestao',opcoes:['Em andamento','Vendida']},{k:'endereco',t:'Endereço'}],()=>o,E.obras,()=>{filtro.fmAberta=o.id;r()})};
@@ -5815,49 +5943,38 @@ async function vFortemais(m){
 
   const oc=el('<div class="corpo" style="padding-top:2px"></div>');
   if(!E.obras.length){
-    oc.appendChild(el('<div class="vazio">Nenhuma obra ainda. Quando terminar uma, lance aqui — ou traga o export do ERP no bloco abaixo.</div>'));
+    oc.appendChild(el('<div class="vazio">Cadastre uma obra para montar a previsão de lucro e os retornos dos investidores.</div>'));
   } else if(!visiveis.length){
     oc.appendChild(el('<div class="vazio">Nenhuma obra neste ano.</div>'));
   }
   visiveis.forEach(({o,c})=>{
     const aberta=filtro.fmAberta===o.id;
     const an=anoDe(o);
-    const cont=el('<div style="border-bottom:1px solid var(--linha)"></div>');
-    const linha=el(`<div style="display:flex;align-items:center;gap:10px;padding:12px 6px;cursor:pointer;flex-wrap:wrap">
-      <b>${esc(o.nome||'Obra sem nome')}</b>
-      ${an?`<span class="tag">${an}</span>`:'<span class="tag">em aberto</span>'}
-      <span class="cresce"></span>
-      <span style="font-size:11px;color:var(--suave)">venda</span>
-      <span style="font-variant-numeric:tabular-nums;font-weight:600">${c.venda?brl(c.venda):'—'}</span>
-      <span style="font-size:11px;color:var(--suave)">custo</span>
-      <span style="color:${c.semDados?'var(--suave)':'var(--vermelho)'};font-variant-numeric:tabular-nums;font-weight:600"${c.semDados?' title="servidor não respondeu"':''}>${c.semDados?'—':brl(c.custo)}</span>
-      <span style="font-size:11px;color:var(--suave)">lucro</span>
-      <span style="color:${c.podeLucro?(c.lucro>=0?'var(--verde)':'var(--vermelho)'):'var(--suave)'};font-variant-numeric:tabular-nums;font-weight:600;min-width:104px;text-align:right">${c.podeLucro?brl(c.lucro):'—'}</span>
-      <span class="seta" style="transform:rotate(${aberta?0:-90}deg);transition:transform .15s">▼</span>
+    const v=FortemaisFinance.previsao(fmPrevDados(o));
+    const cont=el('<div class="fm-projeto"></div>');
+    const linha=el(`<div class="fm-projeto-abre">
+      <div><small>${esc(o.empresa||'Fortemais')} · ${esc(o.status||'Em planejamento')}${an?' · '+esc(an):''}</small><strong>${esc(o.nome||'Obra sem nome')}</strong></div>
+      <div><small>Venda prevista</small><b>${v.ok?brl(v.venda):'A preencher'}</b></div>
+      <div><small>Lucro previsto</small><b class="${v.ok&&v.lucro<0?'fm-negativo':'fm-destaque'}">${v.ok?brl(v.lucro):'A preencher'}</b></div>
+      <span class="seta" aria-hidden="true" style="transform:rotate(${aberta?0:-90}deg)">▼</span>
     </div>`);
     linha.setAttribute('role','button');linha.tabIndex=0;linha.setAttribute('aria-expanded',String(aberta));
     linha.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();linha.click()}};
     linha.onclick=()=>{filtro.fmAberta=aberta?null:o.id;r()};
     cont.appendChild(linha);
     if(aberta){
-      const det=el('<div style="padding:2px 6px 18px"></div>');
+      const det=el('<div class="fm-projeto-detalhe"></div>');
       det.appendChild(el('<div class="vazio" style="padding:14px">Abrindo…</div>'));
       cont.appendChild(det);
-      fichaObraEm(det,o,()=>{filtro.fmAberta=null;r()}).then(()=>{det.firstElementChild&&det.firstElementChild.classList&&det.firstElementChild.remove()});
+      fichaObraEm(det,o,()=>{filtro.fmAberta=null;r()});
     }
     oc.appendChild(cont);
   });
   if(visiveis.length){
-    const totC=visiveis.reduce((s2,x)=>s2+(x.c.semDados?0:x.c.custo),0);
-    const semC=visiveis.filter(x=>x.c.semDados).length;
-    const totV=visiveis.reduce((s2,x)=>s2+(+x.c.venda||0),0);
-    const vend=visiveis.filter(x=>x.c.podeLucro);
-    const totL=vend.reduce((s2,x)=>s2+x.c.lucro,0);
-    oc.appendChild(el(`<div style="display:flex;gap:10px;justify-content:flex-end;padding:11px 6px 2px;font-size:12.5px;color:var(--suave)">
-      ${visiveis.length} obra(s)${totV?' · venda <b>'+brl(totV)+'</b>':''} · custo <b style="color:var(--vermelho)">${brl(totC)}</b>${semC?' <span style="color:var(--areia)">(faltam '+semC+' — servidor)</span>':''}
-      ${vend.length?` · lucro <b style="color:${totL>=0?'var(--verde)':'var(--vermelho)'}">${brl(totL)}</b>`:''}</div>`));
+    const previstas=visiveis.map(x=>FortemaisFinance.previsao(fmPrevDados(x.o))).filter(x=>x.ok);
+    oc.appendChild(el(`<p class="fm-nota">${visiveis.length} obra(s) · ${previstas.length} com previsão preenchida${previstas.length?' · lucro previsto somado: <b>'+brl(previstas.reduce((s,x)=>s+x.lucro,0))+'</b>':''}.</p>`));
   }
-  m.appendChild(bloco('fm-obras','🏗️ Obras','uma linha por obra — clique para expandir',oc));
+  m.appendChild(bloco('fm-obras','🏗️ Obras','abra o projeto para planejar custos e retornos',oc));
 
   /* ---- comparar obras: é onde o dinheiro vaza ---- */
   if(visiveis.filter(x=>x.c.custo>0).length>1){
@@ -5887,7 +6004,9 @@ async function vFortemais(m){
     m.appendChild(bloco('fm-comparar','📐 Comparar obras','o mesmo número, obra a obra',cp));
   }
 
-  m.appendChild(bloco('fm-importar','📥 Importar custos do ERP','o arquivo que você exporta, do jeito que ele sai',blocoImportarObra()));
+  const importar=bloco('fm-importar','📥 Importar custos do ERP','lançamentos realizados do sistema de obras',blocoImportarObra());
+  if(E.colapso['fm-importar']==null){importar.classList.add('fechado');importar.querySelector('header').setAttribute('aria-expanded','false')}
+  m.appendChild(importar);
 }
 
 
@@ -6501,8 +6620,9 @@ async function fichaObraEm(c,o,fechar){
     s9.appendChild(pdf);
     const okb=el('<button class="btn">Pronto</button>');okb.onclick=fechar;s9.appendChild(okb);
     c.appendChild(s9);
+    fmPrevAbas(c,o);
     };
-    montar();
+    c.replaceChildren();montar();
 }
 
 
