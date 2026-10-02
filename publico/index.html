@@ -2565,27 +2565,16 @@ function resumoPlanilhaAviao(a){
     combustivel:soma(despesas.filter(x=>x.categoria==='Combustível'),'valorTotal'),
     manutencaoExtra:soma(despesas.filter(x=>x.categoria==='Manutenção Extra'),'valorTotal')};
 }
-function vPlanilhaAviao(m){
-  const a=E.aviao,r=resumoPlanilhaAviao(a),mensais=filtro.aviaoPlanilha!=='viagens';
-  const dinheiro=v=>v==null?'—':brl(v),percentual=v=>v==null?'—':(v*100).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%';
-  const status=x=>'<span class="av-status '+(x.status==='Pago'?'av-pago':x.status==='Cancelado'?'av-cancelado':'av-pendente')+'">'+esc(x.status||'Pendente')+'</span>';
-  const sheet=el('<div class="aviao-planilha"></div>');
-  const nav=el('<nav class="aviao-sheet-tabs" aria-label="Abas da planilha"></nav>');
-  for(const [id,rotulo] of [['mensais','Custos mensais'],['viagens','Custos de viagens']]){
-    const ativo=mensais?id==='mensais':id==='viagens';
-    const b=el('<button type="button"'+(ativo?' class="on" aria-current="page"':'')+'>'+rotulo+'</button>');
-    b.onclick=()=>{filtro.aviaoPlanilha=id;tela()};nav.appendChild(b);
-  }
-  sheet.appendChild(nav);
-  const resumo=(itens)=>el('<div class="aviao-sheet-resumo">'+itens.map(([t,v,d])=>'<div><small>'+esc(t)+'</small><strong>'+v+'</strong><span>'+esc(d||'')+'</span></div>').join('')+'</div>');
-  const secao=(id,titulo,dica,conteudo,acaoTexto,adicionar)=>{
+function secaoPlanilhaAviao(id,titulo,dica,conteudo,acaoTexto,adicionar){
     const sec=el('<section class="aviao-sheet-section" data-bid="'+id+'"><header><div><h2>'+esc(titulo)+'</h2><p>'+esc(dica)+'</p></div></header></section>');
     if(adicionar)sec.querySelector('header').appendChild(acao(acaoTexto,adicionar,'ghost'));
     sec.appendChild(conteudo);return sec;
-  };
-  if(mensais){
+}
+function vParticipacaoAviao(m){
+  const a=E.aviao,r=resumoPlanilhaAviao(a);
+  const dinheiro=v=>v==null?'—':brl(v),percentual=v=>v==null?'—':(v*100).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%';
     const superior=el('<div class="aviao-sheet-top"></div>');
-    superior.appendChild(secao('av-aportes','Aquisição da minha cota','Pagamentos que compõem o valor investido.',
+    superior.appendChild(secaoPlanilhaAviao('av-aportes','Aquisição da minha cota','Pagamentos que compõem o valor investido.',
       tabelaAviao(['Data','Forma de pagamento','Valor pago'],a.aportes,x=>[esc(fmtDataAno(x.data)),esc(x.forma||'—'),brl(x.valor)],x=>modalRegistroAviao('aportes',x),
         {nome:'Pagamento da aquisição',numericas:[2],rodape:['Total pago na cota','',brl(r.aporte)]}),'+ Pagamento',()=>modalRegistroAviao('aportes',null)));
     const indicadores=el('<dl class="aviao-sheet-indicadores"></dl>');
@@ -2597,14 +2586,29 @@ function vPlanilhaAviao(m){
       ['Minha manutenção mensal',dinheiro(a.manutencaoMinha)],['Custo mensal total atual',dinheiro(a.manutencaoTotalAtual)]]){
       indicadores.appendChild(el('<div><dt>'+esc(t)+'</dt><dd>'+v+'</dd></div>'));
     }
-    superior.appendChild(secao('av-valores','Participação e valores','Estimativas patrimoniais; ganhos ainda não realizados.',indicadores,'Ajustar valores',modalValoresAviao));
-    sheet.appendChild(superior);
+    superior.appendChild(secaoPlanilhaAviao('av-valores','Participação e valores','Estimativas patrimoniais; ganhos ainda não realizados.',indicadores,'Ajustar valores',modalValoresAviao));
+    const sheet=el('<div class="aviao-planilha"></div>');sheet.appendChild(superior);m.appendChild(sheet);
+}
+function vPlanilhaAviao(m){
+  const a=E.aviao,r=resumoPlanilhaAviao(a),mensais=filtro.aviaoPlanilha!=='viagens';
+  const dinheiro=v=>v==null?'—':brl(v);
+  const status=x=>'<span class="av-status '+(x.status==='Pago'?'av-pago':x.status==='Cancelado'?'av-cancelado':'av-pendente')+'">'+esc(x.status||'Pendente')+'</span>';
+  const sheet=el('<div class="aviao-planilha"></div>');
+  const nav=el('<nav class="aviao-sheet-tabs" aria-label="Abas da planilha"></nav>');
+  for(const [id,rotulo] of [['mensais','Custos mensais'],['viagens','Custos de viagens']]){
+    const ativo=mensais?id==='mensais':id==='viagens';
+    const b=el('<button type="button"'+(ativo?' class="on" aria-current="page"':'')+'>'+rotulo+'</button>');
+    b.onclick=()=>{filtro.aviaoPlanilha=id;tela()};nav.appendChild(b);
+  }
+  sheet.appendChild(nav);
+  const resumo=(itens)=>el('<div class="aviao-sheet-resumo">'+itens.map(([t,v,d])=>'<div><small>'+esc(t)+'</small><strong>'+v+'</strong><span>'+esc(d||'')+'</span></div>').join('')+'</div>');
+  if(mensais){
     sheet.appendChild(resumo([['Total pago',brl(r.pago),'Mensalidades pagas'],['Total pendente',brl(r.pendente),'Mensalidades em aberto'],
       ['Próximo vencimento',r.proxima?fmtDataAno(r.proxima):'—','Primeira parcela em aberto'],['Custo mensal',dinheiro(a.manutencaoMinha),'Minha cota'] ]));
     if(a.manutencaoTotalFonte!=null&&a.manutencaoTotalAtual!=null&&a.manutencaoTotalFonte!==a.manutencaoTotalAtual)
       sheet.appendChild(el('<p class="aviao-sheet-nota">Custo mensal atual: <b>'+brl(a.manutencaoTotalAtual)+'</b>. O arquivo original informa <b>'+brl(a.manutencaoTotalFonte)+'</b>; a coluna “Valor total” preserva o valor de cada linha importada. Minha cota permanece em <b>'+dinheiro(a.manutencaoMinha)+'</b>.</p>'));
     const linhas=[...a.mensalidades].sort((x,y)=>x.competencia.localeCompare(y.competencia));
-    sheet.appendChild(secao('av-mensal','Custos mensais','Mesmas colunas da planilha. Edite a linha para registrar o pagamento.',
+    sheet.appendChild(secaoPlanilhaAviao('av-mensal','Custos mensais','Mesmas colunas da planilha. Edite a linha para registrar o pagamento.',
       tabelaAviao(['Competência','Vencimento','Valor total','Minha cota','Status','Data pagamento','Observações'],linhas,
         x=>[esc(x.competencia?.slice(0,7).split('-').reverse().join('/')||'—'),esc(fmtDataAno(x.vencimento)),dinheiro(totalMensalidadeAviao(a,x)),brl(x.minhaCota),status(x),x.pagoEm?esc(fmtDataAno(x.pagoEm)):'—',esc(x.obs||'—')],
         x=>modalRegistroAviao('mensalidades',x),{nome:'Mensalidade',numericas:[2,3],rodape:['Total · sem cancelados','',dinheiro(r.totalMensal),brl(r.totalCotas),'','','']}),
@@ -2613,7 +2617,7 @@ function vPlanilhaAviao(m){
     sheet.appendChild(resumo([['Total de despesas',brl(r.despesas),'Valor total da aeronave'],['Combustível',brl(r.combustivel),'Valor total'],
       ['Manutenção extra',brl(r.manutencaoExtra),'Valor total'],['Minha cota total',brl(r.minhaParte),'Minha parte nas despesas']]));
     const linhas=[...a.despesas].sort((x,y)=>x.data.localeCompare(y.data));
-    sheet.appendChild(secao('av-extras','Custos de viagens','As despesas são vinculadas às mesmas viagens da Central.',
+    sheet.appendChild(secaoPlanilhaAviao('av-extras','Custos de viagens','As despesas são vinculadas às mesmas viagens da Central.',
       tabelaAviao(['Data','Categoria','Descrição / rota','Valor total','Minha cota','Status','Observações','Viagem vinculada'],linhas,
         x=>[esc(fmtDataAno(x.data)),esc(x.categoria||'—'),esc(x.descricao||'—'),brl(x.valorTotal),brl(x.minhaCota),status(x),esc(x.obs||'—'),esc(E.viagens.find(v=>v.id===x.viagemId)?.evento||'Sem vínculo')],
         x=>modalRegistroAviao('despesas',x),{nome:'Despesa de viagem',numericas:[3,4],rodape:['Total · sem cancelados','','',brl(r.despesas),brl(r.minhaParte),'','','']}),
@@ -2621,6 +2625,32 @@ function vPlanilhaAviao(m){
     sheet.appendChild(el('<p class="aviao-sheet-nota">A coluna “Minha cota” mantém o valor informado no arquivo ou no cadastro. Para relacionar um custo a uma viagem, clique em “Editar” e escolha a viagem correspondente.</p>'));
   }
   m.appendChild(sheet);
+}
+function vincularViagemAviao(){
+  const estadoLido=E;
+  const disponiveis=(E.viagens||[]).filter(v=>!v.aviaoId&&v.status!=='Cancelado')
+    .slice().sort((a,b)=>(b.ida||'').localeCompare(a.ida||''));
+  abrirModal('Vincular viagem existente','Escolha uma viagem da Central. O vínculo usa o mesmo cadastro, com suas datas, reservas e custos.',(c,fechar)=>{
+    if(!disponiveis.length){
+      c.appendChild(el('<p class="vazio">Nenhuma viagem disponível: as viagens já vinculadas ou canceladas não aparecem nesta lista.</p>'));
+      c.appendChild(acao('Fechar',fechar,'ghost'));return;
+    }
+    const form=el('<div class="secao"><label>Viagem<select aria-label="Viagem para vincular"><option value="">Selecione uma viagem</option></select></label><p class="form-erro" role="alert"></p></div>');
+    const sel=form.querySelector('select'),erro=form.querySelector('[role=alert]');
+    for(const v of disponiveis){const o=document.createElement('option');o.value=v.id;
+      o.textContent=(v.evento||v.cidade||'Viagem')+' · '+fmtDataAno(v.ida)+(v.cidade?' · '+v.cidade:'');sel.appendChild(o)}
+    const acoes=el('<div class="secao modal-acoes"></div>');
+    acoes.appendChild(acao('Cancelar',fechar,'ghost'));
+    const aplicar=acao('Vincular ao avião',()=>{
+      if(E!==estadoLido){erro.textContent='Os dados foram atualizados. Feche e abra esta janela novamente.';return}
+      const v=E.viagens.find(x=>x.id===sel.value);
+      if(!v||v.aviaoId||v.status==='Cancelado'){erro.textContent='Selecione uma viagem disponível.';return}
+      v.aviaoId='principal';if(!v.transporte)v.transporte='Avião próprio';
+      filtro.aviaoAba='viagens';salvar();fechar();
+    });
+    aplicar.disabled=true;sel.onchange=()=>{aplicar.disabled=!sel.value;erro.textContent=''};
+    acoes.appendChild(aplicar);c.append(form,acoes);
+  });
 }
 function galeriaAviao(){
   const cx=el('<div class="aviao-galeria"></div>');
@@ -2666,6 +2696,7 @@ function vAviao(m){
   abas.forEach(([id,rot])=>{const b=el(`<button type="button" ${id===atualAba?'class="on" aria-current="page"':''}>${rot}</button>`);b.onclick=()=>{filtro.aviaoAba=id;tela()};nav.appendChild(b)});
   m.appendChild(nav);
   if(atualAba==='sobre'){
+    vParticipacaoAviao(m);
     const intro=el('<div class="aviao-sobre"><div class="aviao-sobre-texto"><h2>A história do avião</h2><p>Registre o que esta aeronave representa, onde fica e como você a utiliza. As fotos que você enviar ficam junto desta ficha.</p></div><div class="aviao-sobre-emblema" aria-hidden="true">🛩️</div></div>');
     m.appendChild(intro);
     const dados=el('<div class="corpo"></div>');
@@ -2704,7 +2735,7 @@ function vAviao(m){
       <div><small>Viagens vinculadas</small><strong>${viagem.length}</strong><span>As mesmas viagens da Central</span></div></div>`);
     m.appendChild(ac);
     const ponte=el('<div class="aviao-pontes"></div>');
-    ponte.append(acao('Ver custos e aportes',()=>{filtro.aviaoAba='custos';tela()},'ghost'),
+    ponte.append(acao('Ver planilha de custos',()=>{filtro.aviaoAba='custos';tela()},'ghost'),
       acao('Ver viagens',()=>{filtro.aviaoAba='viagens';tela()},'ghost'),
       acao('Ajustar valores',modalValoresAviao,'ghost'));
     m.appendChild(ponte);
@@ -2712,9 +2743,11 @@ function vAviao(m){
   }
   if(atualAba==='custos'){vPlanilhaAviao(m);return}
   const trips=el('<div class="corpo"></div>');
-  trips.appendChild(acao('+ Nova viagem no avião',()=>novaViagemRotina(true)));
+  const acoesViagem=el('<div class="aviao-pontes"></div>');
+  acoesViagem.append(acao('Vincular viagem existente',vincularViagemAviao),acao('+ Nova viagem no avião',()=>novaViagemRotina(true),'ghost'));
+  trips.appendChild(acoesViagem);
   trips.appendChild(el('<p class="aviao-muted">Estas são as próprias viagens da aba Viagens. Despesas extras vinculadas entram na soma da viagem; mensalidades ficam separadas.</p>'));
-  if(!viagem.length)trips.appendChild(el('<div class="vazio">Nenhuma viagem vinculada. Crie uma aqui ou selecione a aeronave numa viagem existente.</div>'));
+  if(!viagem.length)trips.appendChild(el('<div class="vazio">Nenhuma viagem vinculada. Use “Vincular viagem existente” para escolher uma viagem já cadastrada, ou crie uma nova.</div>'));
   else viagem.slice().sort((x,y)=>(x.ida||'').localeCompare(y.ida||'')).forEach(v=>{
     const li=el(`<div class="aviao-viagem"><div><b>${esc(v.evento||v.cidade||'Viagem')}</b><small>${esc(fmtDataAno(v.ida))} · ${esc(v.cidade||'Destino não informado')} · ${esc(v.status||'')}</small></div><strong>${brl(custoViagem(v))}</strong></div>`);
     li.appendChild(acao('Abrir',()=>modalViagem(v),'ghost'));trips.appendChild(li);

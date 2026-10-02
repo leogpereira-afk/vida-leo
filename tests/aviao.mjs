@@ -115,7 +115,8 @@ test('custos: linhas importadas aparecem no livro do avião com edição',()=>{
   const {run,ctx,document}=setup(),x=planilha();
   ctx.m=x.mensal;ctx.d=x.viagem;
   run("E.aviao=mesclarAviaoImportado(E.aviao,validarPacoteAviao({...aviaoDaPlanilha(m,d),manutencaoTotalAtual:5000}));filtro.aviaoAba='custos';vAviao(document.getElementById('main'))");
-  assert.equal(document.querySelectorAll('[data-bid="av-aportes"] tbody tr').length,3);
+  assert.equal(document.querySelectorAll('[data-bid="av-aportes"]').length,0);
+  assert.equal(document.querySelectorAll('[data-bid="av-valores"]').length,0);
   assert.equal(document.querySelectorAll('[data-bid="av-mensal"] tbody tr').length,2);
   const mensal=document.querySelector('[data-bid="av-mensal"]');
   for(const coluna of ['Competência','Vencimento','Valor total','Minha cota','Status','Data pagamento','Observações'])
@@ -206,4 +207,42 @@ test('backup: estrutura do avião é validada e SEED público começa vazio',()=
   assert.equal(run("SEED.aviao.matricula"),'');
   assert.equal(run("SEED.aviao.manutencaoTotalAtual"),null);
   assert.equal(run("SEED.aviao.aportes.length"),0);
+});
+
+
+test('Sobre o avião recebe aquisição e valores, com edição preservada',()=>{
+  const {run,ctx,document}=setup(),x=planilha();ctx.m=x.mensal;ctx.d=x.viagem;
+  run("E.aviao=mesclarAviaoImportado(E.aviao,{...aviaoDaPlanilha(m,d),manutencaoTotalAtual:5000});filtro.aviaoAba='sobre';vAviao(document.getElementById('main'))");
+  assert.equal(document.querySelectorAll('[data-bid="av-aportes"] tbody tr').length,3);
+  assert.ok(document.querySelector('[data-bid="av-valores"]'));
+  assert.equal(document.querySelectorAll('[data-bid="av-mensal"]').length,0);
+  document.querySelector('[data-bid="av-aportes"] tbody button').click();
+  assert.match(document.querySelector('[role=dialog]').textContent,/Editar aporte/);
+});
+
+test('vincular viagem usa o cadastro existente, preserva custos e transporte e não duplica',()=>{
+  const {run,document}=setup();
+  run("E.viagens=[{id:'v1',evento:'Reunião',ida:'2030-10-10',status:'Confirmado',transporte:'Carro e avião',custos:[{valor:100}],hotel:'Reserva mantida'},{id:'v2',evento:'Já vinculada',aviaoId:'principal'},{id:'v3',evento:'Cancelada',status:'Cancelado'}];filtro.aviaoAba='viagens';vAviao(document.getElementById('main'))");
+  [...document.querySelectorAll('button')].find(b=>b.textContent==='Vincular viagem existente').click();
+  const dlg=document.querySelector('[role=dialog]'),sel=dlg.querySelector('select');
+  assert.equal(sel.options.length,2);
+  assert.equal(run('E.viagens[0].aviaoId'),undefined);
+  const ok=[...dlg.querySelectorAll('button')].find(b=>b.textContent==='Vincular ao avião');
+  assert.equal(ok.disabled,true);sel.querySelector('[value="v1"]').selected=true;sel.onchange();ok.click();
+  assert.equal(run('E.viagens.length'),3);assert.equal(run('E.viagens[0].aviaoId'),'principal');
+  assert.equal(run('E.viagens[0].transporte'),'Carro e avião');assert.equal(run('E.viagens[0].hotel'),'Reserva mantida');
+  assert.equal(run('custoViagem(E.viagens[0])'),100);
+  assert.equal(document.querySelector('[role=dialog]'),null);
+});
+
+test('cancelar vínculo não altera dados; atualização durante escolha exige reabrir',()=>{
+  const {run,document}=setup();
+  run("E.viagens=[{id:'v1',evento:'Teste',status:'Confirmado'}];vincularViagemAviao()");
+  [...document.querySelector('[role=dialog]').querySelectorAll('button')].find(b=>b.textContent==='Cancelar').click();
+  assert.equal(run('E.viagens[0].aviaoId'),undefined);
+  run('vincularViagemAviao()');const dlg=document.querySelector('[role=dialog]'),sel=dlg.querySelector('select');
+  sel.querySelector('[value="v1"]').selected=true;sel.onchange();run('E=structuredClone(E)');
+  [...dlg.querySelectorAll('button')].find(b=>b.textContent==='Vincular ao avião').click();
+  assert.match(dlg.querySelector('[role=alert]').textContent,/atualizados/);
+  assert.equal(run('E.viagens[0].aviaoId'),undefined);
 });
