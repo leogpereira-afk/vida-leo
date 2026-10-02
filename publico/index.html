@@ -1052,7 +1052,8 @@ const SEED={
   viagens:[],
   // Dados patrimoniais e financeiros do avião são privados: entram pelo importador
   // ou pelos formulários, nunca como valores embutidos no site público.
-  aviao:{nome:'',matricula:'',titularidade:'',historia:'',base:'',uso:'',participacao:null,valorReferencia:null,
+  aviao:{nome:'',matricula:'',titularidade:'',historia:'',base:'',uso:'',
+    administradora:'',responsavelAdmin:'',telefoneAdmin:'',emailAdmin:'',contatosAdmin:'',participacao:null,valorReferencia:null,
     valorCotaAtual:null,cotaBaseAeronave:null,manutencaoMinha:null,
     manutencaoTotalAtual:null,manutencaoTotalFonte:null,aportes:[],mensalidades:[],despesas:[],
     importacao:null},
@@ -2475,7 +2476,6 @@ function modalRegistroAviao(tipo,item){
     {k:'valor',t:'Valor pago',tipo:'moeda'}]:
     mensal?[
       {k:'competencia',t:'Competência',tipo:'date'},{k:'vencimento',t:'Vencimento',tipo:'date'},
-      {k:'valorTotal',t:'Valor total da mensalidade',tipo:'moeda'},
       {k:'minhaCota',t:'Minha parcela',tipo:'moeda'},
       {k:'status',t:'Situação',tipo:'select',opcoes:['A Vencer','Pago','Cancelado']},
       {k:'pagoEm',t:'Data do pagamento',tipo:'date'},
@@ -2605,13 +2605,13 @@ function vPlanilhaAviao(m){
   if(mensais){
     sheet.appendChild(resumo([['Total pago',brl(r.pago),'Mensalidades pagas'],['Total pendente',brl(r.pendente),'Mensalidades em aberto'],
       ['Próximo vencimento',r.proxima?fmtDataAno(r.proxima):'—','Primeira parcela em aberto'],['Custo mensal',dinheiro(a.manutencaoMinha),'Minha cota'] ]));
-    if(a.manutencaoTotalFonte!=null&&a.manutencaoTotalAtual!=null&&a.manutencaoTotalFonte!==a.manutencaoTotalAtual)
-      sheet.appendChild(el('<p class="aviao-sheet-nota">Custo mensal atual: <b>'+brl(a.manutencaoTotalAtual)+'</b>. O arquivo original informa <b>'+brl(a.manutencaoTotalFonte)+'</b>; a coluna “Valor total” preserva o valor de cada linha importada. Minha cota permanece em <b>'+dinheiro(a.manutencaoMinha)+'</b>.</p>'));
+    if(a.manutencaoTotalAtual!=null)
+      sheet.appendChild(el('<p class="aviao-sheet-nota">Custo mensal atual da aeronave: <b>'+brl(a.manutencaoTotalAtual)+'</b>. Minha cota: <b>'+dinheiro(a.manutencaoMinha)+'</b>.</p>'));
     const linhas=[...a.mensalidades].sort((x,y)=>x.competencia.localeCompare(y.competencia));
-    sheet.appendChild(secaoPlanilhaAviao('av-mensal','Custos mensais','Mesmas colunas da planilha. Edite a linha para registrar o pagamento.',
-      tabelaAviao(['Competência','Vencimento','Valor total','Minha cota','Status','Data pagamento','Observações'],linhas,
-        x=>[esc(x.competencia?.slice(0,7).split('-').reverse().join('/')||'—'),esc(fmtDataAno(x.vencimento)),dinheiro(totalMensalidadeAviao(a,x)),brl(x.minhaCota),status(x),x.pagoEm?esc(fmtDataAno(x.pagoEm)):'—',esc(x.obs||'—')],
-        x=>modalRegistroAviao('mensalidades',x),{nome:'Mensalidade',numericas:[2,3],rodape:['Total · sem cancelados','',dinheiro(r.totalMensal),brl(r.totalCotas),'','','']}),
+    sheet.appendChild(secaoPlanilhaAviao('av-mensal','Custos mensais','Suas mensalidades. Edite a linha para registrar o pagamento.',
+      tabelaAviao(['Competência','Vencimento','Minha cota','Status','Data pagamento','Observações'],linhas,
+        x=>[esc(x.competencia?.slice(0,7).split('-').reverse().join('/')||'—'),esc(fmtDataAno(x.vencimento)),brl(x.minhaCota),status(x),x.pagoEm?esc(fmtDataAno(x.pagoEm)):'—',esc(x.obs||'—')],
+        x=>modalRegistroAviao('mensalidades',x),{nome:'Mensalidade',numericas:[2],rodape:['Total · sem cancelados','',brl(r.totalCotas),'','','']}),
       '+ Mensalidade',()=>modalRegistroAviao('mensalidades',null)));
   }else{
     sheet.appendChild(resumo([['Total de despesas',brl(r.despesas),'Valor total da aeronave'],['Combustível',brl(r.combustivel),'Valor total'],
@@ -2707,6 +2707,15 @@ function vAviao(m){
       {k:'historia',t:'A história do avião',tipo:'textarea',full:true},
     ]));
     m.appendChild(bloco('av-sobre','Ficha da aeronave','Informações editáveis, sem inventar especificações técnicas.',dados));
+    const administracao=el('<div class="corpo"></div>');
+    administracao.appendChild(campos(a,[
+      {k:'administradora',t:'Administradora do avião'},
+      {k:'responsavelAdmin',t:'Responsável / contato principal'},
+      {k:'telefoneAdmin',t:'Telefone / WhatsApp',tipo:'tel'},
+      {k:'emailAdmin',t:'E-mail da administração',tipo:'email'},
+      {k:'contatosAdmin',t:'Outros contatos e observações',tipo:'textarea',full:true},
+    ]));
+    m.appendChild(bloco('av-administracao','Administração e contatos','Quem administra a aeronave e como entrar em contato.',administracao));
     const fotos=el('<div class="corpo"></div>');
     fotos.appendChild(galeriaAviao());
     fotos.appendChild(areaArquivos('aviao:principal','Adicionar fotos e documentos do avião'));

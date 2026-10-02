@@ -119,7 +119,7 @@ test('custos: linhas importadas aparecem no livro do avião com edição',()=>{
   assert.equal(document.querySelectorAll('[data-bid="av-valores"]').length,0);
   assert.equal(document.querySelectorAll('[data-bid="av-mensal"] tbody tr').length,2);
   const mensal=document.querySelector('[data-bid="av-mensal"]');
-  for(const coluna of ['Competência','Vencimento','Valor total','Minha cota','Status','Data pagamento','Observações'])
+  for(const coluna of ['Competência','Vencimento','Minha cota','Status','Data pagamento','Observações'])
     assert.ok([...mensal.querySelectorAll('th')].some(th=>th.textContent===coluna),coluna);
   assert.match(mensal.textContent,/Pagamento conferido/);
   assert.match(document.getElementById('main').textContent,/5\.000,00/);
@@ -142,21 +142,26 @@ test('resumo da planilha reconcilia aquisição, referência, mensalidades e des
 
 test('reimportação acrescenta a coluna de total em cadastros antigos e preserva valores editados',()=>{
   const {run,ctx}=setup(),x=planilha();ctx.m=x.mensal;ctx.d=x.viagem;
-  run("var p=aviaoDaPlanilha(m,d);E.aviao=mesclarAviaoImportado(E.aviao,p);delete E.aviao.mensalidades[0].valorTotal;E.aviao.mensalidades[0].editadoManual=true;E.aviao.mensalidades[0].obs='Conferido por mim';E.aviao.mensalidades[1].valorTotal=5000;E.aviao.mensalidades[1].editadoManual=true;E.aviao=mesclarAviaoImportado(E.aviao,p)");
+  run("var p=aviaoDaPlanilha(m,d);E.aviao=mesclarAviaoImportado(E.aviao,p);E.aviao.administradora='Administradora exemplo';E.aviao.telefoneAdmin='Contato preservado';delete E.aviao.mensalidades[0].valorTotal;E.aviao.mensalidades[0].editadoManual=true;E.aviao.mensalidades[0].obs='Conferido por mim';E.aviao.mensalidades[1].valorTotal=5000;E.aviao.mensalidades[1].editadoManual=true;E.aviao=mesclarAviaoImportado(E.aviao,p)");
   assert.equal(run('E.aviao.mensalidades[0].valorTotal'),3000);
   assert.equal(run('E.aviao.mensalidades[0].obs'),'Conferido por mim');
   assert.equal(run('E.aviao.mensalidades[1].valorTotal'),5000);
+  assert.equal(run('E.aviao.administradora'),'Administradora exemplo');
+  assert.equal(run('E.aviao.telefoneAdmin'),'Contato preservado');
   assert.equal(run('E.aviao.mensalidades.length'),2);
 });
 
-test('planilha preserva observações como texto e separa custo mensal atual dos totais importados',()=>{
+test('mensalidades exibem só minha cota e preservam observações e dados importados',()=>{
   const {run,ctx,document}=setup(),x=planilha();ctx.m=x.mensal;ctx.d=x.viagem;
   run("E.aviao=mesclarAviaoImportado(E.aviao,{...aviaoDaPlanilha(m,d),manutencaoTotalAtual:5000});E.aviao.mensalidades[0].obs='<img src=x onerror=alert(1)>';filtro.aviaoAba='custos';vAviao(document.getElementById('main'))");
   const mensal=document.querySelector('[data-bid="av-mensal"]');
   assert.equal(mensal.querySelectorAll('img').length,0);assert.match(mensal.textContent,/<img/);
-  assert.match(mensal.querySelector('tbody').textContent,/3\.000,00/);
+  assert.doesNotMatch(mensal.textContent,/Valor total|3\.000,00|6\.000,00/);
+  assert.equal(run('E.aviao.mensalidades[0].valorTotal'),3000);
   assert.match(document.querySelector('.aviao-sheet-nota').textContent,/5\.000,00/);
-  assert.match(mensal.querySelector('tfoot').textContent,/6\.000,00/);
+  assert.match(mensal.querySelector('tfoot').textContent,/1\.800,00/);
+  mensal.querySelector('tbody button').click();
+  assert.doesNotMatch(document.querySelector('[role=dialog]').textContent,/Valor total da mensalidade/);
 });
 
 test('colar do Excel mantém células vazias, aspas, quebras e porcentagem brasileira',()=>{
@@ -215,6 +220,8 @@ test('Sobre o avião recebe aquisição e valores, com edição preservada',()=>
   run("E.aviao=mesclarAviaoImportado(E.aviao,{...aviaoDaPlanilha(m,d),manutencaoTotalAtual:5000});filtro.aviaoAba='sobre';vAviao(document.getElementById('main'))");
   assert.equal(document.querySelectorAll('[data-bid="av-aportes"] tbody tr').length,3);
   assert.ok(document.querySelector('[data-bid="av-valores"]'));
+  assert.ok(document.querySelector('[data-bid="av-administracao"] input[type=tel]'));
+  assert.ok(document.querySelector('[data-bid="av-administracao"] input[type=email]'));
   assert.equal(document.querySelectorAll('[data-bid="av-mensal"]').length,0);
   document.querySelector('[data-bid="av-aportes"] tbody button').click();
   assert.match(document.querySelector('[role=dialog]').textContent,/Editar aporte/);
