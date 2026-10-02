@@ -666,7 +666,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./saude-visual.css?v=c2264793fee0">
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
 <link rel="stylesheet" href="./aviao.css?v=44fae810ca9e">
-<link rel="stylesheet" href="./fortemais-previsao.css?v=eaa9abc2d24b">
+<link rel="stylesheet" href="./fortemais-previsao.css?v=e0f0615bdf9a">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -5799,10 +5799,36 @@ function fmObraEditar(o){
     const ac=el('<div class="fm-acoes"></div>');ac.append(acao('Cancelar',fechar,'ghost'),form.querySelector('button[type=submit]'));form.appendChild(ac);c.appendChild(b);
   });
 }
+const fmExclusoes=new Set();
+async function fmObraExcluir(o,concluir=()=>tela()){
+  if(fmExclusoes.has(o.id))return;
+  if(!E.obras.includes(o)){alert('Este projeto foi atualizado. Abra a lista novamente.');return}
+  if(!confirm('Excluir o projeto “'+(o.nome||'Sem nome')+'”?\n\nSerão removidos o cadastro, as previsões, os sócios da previsão, os fluxos previstos, os custos, os aportes e os anexos deste projeto. Esta ação não pode ser desfeita.'))return;
+  fmExclusoes.add(o.id);const estado=E;
+  try{
+    if(!await apagarAnexosDe('obra:'+o.id))return;
+    if(E!==estado||!E.obras.includes(o)){alert('Os dados mudaram durante a exclusão. O cadastro foi preservado; confira os anexos antes de tentar novamente.');return}
+    const resposta=await apiSync('POST',{acao:'obraCustosApagar',obra:o.id});
+    if(!resposta?.ok)throw Error(resposta?.erro||'o servidor não confirmou a exclusão dos custos');
+    fmEsquecer();
+    if(E!==estado||!E.obras.includes(o)){alert('Os custos e anexos foram removidos, mas os dados do cadastro mudaram. Atualize a lista antes de continuar.');return}
+    const obras=E.obras,aportes=E.obraAportes,mt=E._mt,tinhaMt=Object.hasOwn(E,'_mt');
+    E.obras=obras.filter(x=>x.id!==o.id);E.obraAportes=aportes.filter(x=>x.obra!==o.id);
+    try{salvar()}catch(e){E.obras=obras;E.obraAportes=aportes;if(tinhaMt)E._mt=mt;else delete E._mt;alert('Os custos e anexos foram removidos, mas não foi possível salvar a exclusão do cadastro. O projeto continua na lista. Tente novamente.');return}
+    if(filtro.fmAberta===o.id)delete filtro.fmAberta;
+    if(filtro.fmAbas)delete filtro.fmAbas[o.id];
+    concluir();
+  }catch(e){alert('Não foi possível concluir a exclusão: '+(e.message||e)+'.\n\nO cadastro foi preservado. Alguns anexos podem já ter sido removidos. Confira antes de tentar novamente.');}
+  finally{fmExclusoes.delete(o.id)}
+}
+function fmBotaoExcluir(o,concluir){
+  const b=acao('Excluir projeto',async()=>{b.disabled=true;try{await fmObraExcluir(o,concluir)}finally{b.disabled=false}},'ghost');
+  b.classList.add('fm-excluir');return b;
+}
 const fmMetros=v=>+v>0?Number(v).toLocaleString('pt-BR',{maximumFractionDigits:2})+' m²':'Não informado';
 function fmObraResumo(o){
   const socios=fmPrevDados(o).investidores||[],c=el(`<section class="fm-identidade" aria-label="Cadastro da obra"><div class="fm-identidade-cab"><div><span class="fm-eyebrow">⌂ DADOS DA OBRA</span><p>${esc(o.endereco||'Complete a localização e as medidas do imóvel.')}</p></div><div class="fm-acoes"></div></div><dl class="fm-medidas"><div><dt>Lote</dt><dd>${esc(o.lote||'Não informado')}</dd></div><div><dt>Quadra</dt><dd>${esc(o.quadra||'Não informada')}</dd></div><div><dt>Terreno</dt><dd>${fmMetros(o.areaTerreno)}</dd></div><div><dt>Área construída</dt><dd>${fmMetros(o.area)}</dd></div></dl><div class="fm-socios-resumo"><span class="fm-eyebrow">♧ SÓCIOS E INVESTIDORES</span><div class="fm-socios-chips"></div></div></section>`);
-  c.querySelector('.fm-acoes').append(acao('Editar obra',()=>fmObraEditar(o),'ghost'),acao('+ Sócio',()=>fmPrevInvestidor(o)));
+  c.querySelector('.fm-acoes').append(acao('Editar obra',()=>fmObraEditar(o),'ghost'),acao('+ Sócio',()=>fmPrevInvestidor(o)),fmBotaoExcluir(o));
   const chips=c.querySelector('.fm-socios-chips');for(const i of socios){const b=acao(i.nome+' · '+fmPrevPct(i.pct)+' do lucro',()=>fmPrevInvestidor(o,i),'ghost');b.classList.add('fm-socio-chip');chips.appendChild(b)}
   if(!socios.length)chips.appendChild(el('<span class="fm-nota">Adicione os participantes e defina a divisão do lucro.</span>'));return c;
 }
@@ -6625,30 +6651,8 @@ async function fichaObraEm(c,o,fechar){
       Recebeu parte em bem (carro, lote)? Lance o valor cheio na venda e anote nas observações da ficha.</p>`));
     c.appendChild(s7);
 
-    /* Sem seção de arquivos: isto é um PAINEL DE RESULTADO, não um arquivo
-       morto — decisão do dono. O apagarAnexosDe no botão de apagar fica, por
-       segurança, para limpar qualquer anexo que tenha entrado antes disso. */
     const s9=el('<div class="secao" style="display:flex;gap:9px"></div>');
-    const del=el('<button class="btn ghost" style="color:var(--vermelho)">Apagar obra</button>');
-    del.onclick=async()=>{
-      if(!confirm('Apagar esta obra, os lançamentos de custo dela no servidor e os aportes?'))return;
-      if(!await apagarAnexosDe('obra:'+o.id))return;
-      /* MANDA APAGAR SEMPRE, sem perguntar ao cache se existe custo. O cache
-         pode estar velho (ou nem ter carregado, se o servidor falhou ao abrir
-         a ficha) — e aí a ficha saía do estado deixando centenas de linhas
-         órfãs no banco, sem nada apontando para elas. Apagar o que não existe
-         é inofensivo; deixar órfão é lixo que ninguém mais alcança. */
-      try{
-        const dd=await apiSync('POST',{acao:'obraCustosApagar',obra:o.id});
-        if(!dd||!dd.ok)throw new Error((dd&&dd.erro)||'o servidor não confirmou');
-        fmEsquecer();
-      }catch(e){
-        alert('Não consegui apagar os custos no servidor: '+(e.message||e)+
-          '\n\nNada foi apagado — a obra continua aqui. Tente de novo com conexão.');return;
-      }
-      E.obraAportes=E.obraAportes.filter(x=>x.obra!==o.id);
-      E.obras=E.obras.filter(x=>x.id!==o.id);salvar();fechar();
-    };
+    const del=fmBotaoExcluir(o,fechar);
     s9.appendChild(del);s9.appendChild(el('<span class="cresce"></span>'));
     const pdf=el('<button class="btn ghost">🖨 Salvar em PDF</button>');
     pdf.onclick=()=>imprimirObra(o,(_fmResumo||{})[o.id]||rr2,custos);
