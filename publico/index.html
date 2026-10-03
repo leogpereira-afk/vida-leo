@@ -2011,20 +2011,20 @@ function docsViagem(v){
     const meus=E.documentos.filter(d=>mesmaPessoa(d.dono||'Léo',nome));
     const pass=meus.find(d=>/passaporte/i.test(d.nome||''));
     if(!pass)marca({nome,doc:'Passaporte',sit:'não cadastrado',ruim:true});
-    else if(!pass.validade)marca({nome,doc:'Passaporte',sit:'sem data de validade',ruim:true});
-    else if(pass.validade<volta)marca({nome,doc:'Passaporte',sit:'VENCE ANTES DA VOLTA — '+fmtDataAno(pass.validade),ruim:true});
-    else if(pass.validade<limite)marca({nome,doc:'Passaporte',sit:'vence '+fmtDataAno(pass.validade)+' — sem a folga de 6 meses',aviso:true});
-    else marca({nome,doc:'Passaporte',sit:'ok até '+fmtDataAno(pass.validade)});
+    else if(!pass.validade)marca({nome,doc:'Passaporte',sit:'sem data de validade',ruim:true,registro:pass});
+    else if(pass.validade<volta)marca({nome,doc:'Passaporte',sit:'VENCE ANTES DA VOLTA — '+fmtDataAno(pass.validade),ruim:true,registro:pass});
+    else if(pass.validade<limite)marca({nome,doc:'Passaporte',sit:'vence '+fmtDataAno(pass.validade)+' — sem a folga de 6 meses',aviso:true,registro:pass});
+    else marca({nome,doc:'Passaporte',sit:'ok até '+fmtDataAno(pass.validade),registro:pass});
     const vistos=meus.filter(d=>/visto/i.test(d.nome||''));
     if(!vistos.length)marca({nome,doc:'Visto',sit:'nenhum cadastrado — confira se o destino exige',aviso:true});
     vistos.forEach(d=>{
-      if(!d.validade)marca({nome,doc:d.nome,sit:'sem validade',aviso:true});
-      else if(d.validade<volta)marca({nome,doc:d.nome,sit:'VENCE '+fmtDataAno(d.validade),ruim:true});
-      else marca({nome,doc:d.nome,sit:'ok até '+fmtDataAno(d.validade)});
+      if(!d.validade)marca({nome,doc:d.nome,sit:'sem validade',aviso:true,registro:d});
+      else if(d.validade<volta)marca({nome,doc:d.nome,sit:'VENCE '+fmtDataAno(d.validade),ruim:true,registro:d});
+      else marca({nome,doc:d.nome,sit:'ok até '+fmtDataAno(d.validade),registro:d});
     });
   });
   (E.vacinas||[]).filter(x=>x.viagem==='Sim'&&x.proxima&&x.proxima<(v.ida||volta))
-    .forEach(x=>marca({nome:'Léo',doc:x.vacina||'Vacina',sit:'reforço vencido antes da ida',ruim:true}));
+    .forEach(x=>marca({nome:'Léo',doc:x.vacina||'Vacina',sit:'reforço vencido antes da ida',ruim:true,tipo:'vacina',registro:x}));
   return {intl:true,ok,itens};
 }
 // viagem "ok" = confirmada/realizada, hotel e transporte resolvidos e docs em dia
@@ -3279,14 +3279,27 @@ function modalViagem(v){
         ${d.ok?'✅ <b>Documentação em dia</b> até a data da volta'+(atencao?', mas há '+atencao+' ponto(s) para conferir.':' — passaporte com a folga de 6 meses.')
                :'⚠️ <b>Tem documento pendente</b> — resolva antes de fechar a viagem.'}</div>`));
       const cor=i=>i.ruim?'var(--vermelho)':i.aviso?'var(--ambar,#b26a00)':'var(--verde)';
+      const abrirItem=i=>{
+        fechar();
+        if(i.tipo==='vacina'){abreBloco('sa-vac');irTela('saude');return}
+        filtro.docPessoa=i.nome;filtro.docBusca=i.registro?.nome||i.doc;filtro.docStatus='Todos';
+        irTela('documentos');
+        const existente=i.registro&&E.documentos.find(d=>d===i.registro||(i.registro.id&&d.id===i.registro.id));
+        if(existente)modalDoc(existente);
+        else novoDocumento(i.nome,i.doc);
+      };
+      const acaoItem=i=>i.tipo==='vacina'?'Ver vacina':i.registro?(i.ruim||i.aviso?'Abrir':'Ver'):(i.doc==='Visto'?'Conferir':'Cadastrar');
       const tb2=el('<div class="rolagem"></div>');
-      tb2.innerHTML=`<table><thead><tr><th>Pessoa</th><th>Documento</th><th>Situação</th></tr></thead><tbody>
-        ${d.itens.map(i=>`<tr><td style="padding:8px 10px">${esc(i.nome)}</td>
+      tb2.innerHTML=`<table><thead><tr><th>Pessoa</th><th>Documento</th><th>Situação</th><th>Ação</th></tr></thead><tbody>
+        ${d.itens.map((i,n)=>`<tr><td style="padding:8px 10px">${esc(i.nome)}</td>
           <td style="padding:8px 10px">${esc(i.doc)}</td>
-          <td style="padding:8px 10px;color:${cor(i)};font-weight:${i.ruim?'600':'400'}">${esc(i.sit)}</td></tr>`).join('')}
+          <td style="padding:8px 10px;color:${cor(i)};font-weight:${i.ruim?'600':'400'}">${esc(i.sit)}</td>
+          <td style="padding:8px 10px"><button type="button" class="btn mini ghost" style="white-space:nowrap" data-doc-viagem="${n}"
+            aria-label="${esc(acaoItem(i)+' '+i.doc+' de '+i.nome)}">${esc(acaoItem(i))} →</button></td></tr>`).join('')}
       </tbody></table>`;
+      tb2.querySelectorAll('[data-doc-viagem]').forEach(b=>b.onclick=()=>abrirItem(d.itens[+b.dataset.docViagem]));
       cx3.appendChild(tb2);
-      cx3.appendChild(el('<div style="font-size:12px;color:var(--suave);margin-top:9px">Cadastre e atualize em <b>🪪 Documentos</b> — o campo <i>De quem</i> precisa bater com o nome da pessoa.</div>'));
+      cx3.appendChild(el('<div style="font-size:12px;color:var(--suave);margin-top:9px">Use a ação de cada linha para abrir o cadastro correspondente. A ausência de visto pede conferência das regras do destino.</div>'));
       sd.appendChild(cx3);
     };
     pintaDocs(); c.appendChild(sd);
@@ -14758,7 +14771,7 @@ function stvGrafDonut({fatias=[],centro='',fmt=null}={}){
 /* ================== FIM STRAVA ================== */
 function vDocumentos(m){
   m.classList.add('workspace-layout','documentos-workspace','planos-documents');
-  const lista=E.documentos,donos=[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...lista.map(d=>d.dono||'Léo')])];
+  const lista=E.documentos,donos=[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...lista.map(d=>d.dono||'Léo'),...(filtro.docPessoa&&filtro.docPessoa!=='Todos'?[filtro.docPessoa]:[])])];
   const novo=()=>novoDocumento();
   const topo=cab('Documentos','Encontre o que precisa e acompanhe as validades da família.');topo.appendChild(acao('+ Novo documento',novo));m.appendChild(topo);
   const total=s=>lista.filter(d=>statusDocumento(d)===s).length;
@@ -14781,9 +14794,9 @@ function vDocumentos(m){
 }
 
 
-function novoDocumento(donoInicial=''){
+function novoDocumento(donoInicial='',nomeInicial=''){
   abrirModal('Novo documento','Identifique o documento. Depois você poderá anexar a foto ou o PDF.',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');
-    devFormulario(b,[{k:'nome',t:'Nome do documento',req:true,full:true,ph:'Passaporte, certidão, contrato…'},{k:'dono',t:'De quem é?',req:true,opcoes:[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...E.documentos.map(d=>d.dono).filter(Boolean)])]},{k:'numero',t:'Número ou referência'},{k:'validade',t:'Válido até (se houver)',tipo:'date'},{k:'onde',t:'Onde está o original?',full:true}],{dono:donoInicial||(filtro.docPessoa&&filtro.docPessoa!=='Todos'?filtro.docPessoa:'Léo')},'Criar documento',v=>{const d={id:uid(),...v,obs:''};E.documentos.push(d);salvar();fechar();modalDoc(d)});c.appendChild(b)},rr('documentos'));
+    devFormulario(b,[{k:'nome',t:'Nome do documento',req:true,full:true,ph:'Passaporte, certidão, contrato…'},{k:'dono',t:'De quem é?',req:true,opcoes:[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...E.documentos.map(d=>d.dono).filter(Boolean)])]},{k:'numero',t:'Número ou referência'},{k:'validade',t:'Válido até (se houver)',tipo:'date'},{k:'onde',t:'Onde está o original?',full:true}],{nome:nomeInicial,dono:donoInicial||(filtro.docPessoa&&filtro.docPessoa!=='Todos'?filtro.docPessoa:'Léo')},'Criar documento',v=>{const d={id:uid(),...v,obs:''};E.documentos.push(d);salvar();fechar();modalDoc(d)});c.appendChild(b)},rr('documentos'));
 }
 function modalDoc(d){
   abrirModal(esc(d.nome||'Novo documento'),esc(d.dono||''),(c,fechar)=>{
