@@ -51,6 +51,52 @@ test('documentos PF: agrupa por pessoa e não duplica a lista', () => {
   assert.equal(cards.length, 1, 'uma pessoa por vez');
 });
 
+test('documentos PF: permite cadastrar parente sem documento pela própria lateral', () => {
+  const {run, document} = tela("filtro.bancoAba='docpf';E.documentos=[]");
+  const editar = document.querySelector('.docpf-lateral-tools button');
+  assert.match(editar.textContent, /Editar nomes/);
+  editar.click();
+  const form = document.querySelector('#modais .docpf-adicionar');
+  form.querySelector('input').value = '  Ana   Maria  ';
+  form.dispatchEvent(new document.defaultView.Event('submit', {bubbles:true,cancelable:true}));
+  assert.equal(run("E.pessoas.find(p=>p.nome==='Ana Maria')?.relacao"), 'Outro');
+  assert.match(document.querySelector('.bancos-lateral .bancos-empresas').textContent, /Ana Maria0/);
+  assert.equal(run('E.documentos.length'), 0);
+});
+
+test('documentos PF: remover nome transfere documentos sem apagar cadastro ou anexos', () => {
+  const {run, document} = tela(`filtro.bancoAba='docpf';
+    E.pessoas=[{id:'p-ana',nome:'Ana',relacao:'Filha',nascimento:'2010-01-01'}];
+    E.documentos=[{id:'d-ana',nome:'Passaporte',dono:'Ana',validade:'2030-01-01'}];
+    filtro.bancoGrupo={docpf:'Ana'}`);
+  document.querySelector('.docpf-lateral-tools button').click();
+  const linha=[...document.querySelectorAll('.docpf-pessoa')].find(x=>x.querySelector('b')?.textContent==='Ana');
+  linha.querySelector('button').click();
+  const confirmacao=document.querySelector('#modais .fundo:last-child');
+  assert.match(confirmacao.textContent, /1 documento/);
+  assert.match(confirmacao.querySelector('select').textContent,/Léo/);
+  [...confirmacao.querySelectorAll('button')].find(b=>b.textContent==='Transferir e remover nome').click();
+  assert.equal(run("E.documentos[0].dono"),'Léo');
+  assert.equal(run("E.documentos[0].id"),'d-ana');
+  assert.equal(run("E.pessoas[0].mostrarDocumentosPF"),false);
+  assert.equal(run("E.pessoas[0].nascimento"),'2010-01-01');
+  assert.equal(document.querySelector('.bancos-lateral .bancos-empresas').textContent.includes('Ana'),false);
+  assert.match(document.querySelector('#bancos-docpf').textContent,/Passaporte/);
+});
+
+test('documentos PF: nome sem documentos pode sair e voltar sem duplicar pessoa', () => {
+  const {run,document}=tela("filtro.bancoAba='docpf';E.pessoas=[{id:'p',nome:'Sofia',relacao:'Filha'}]");
+  run("removerNomeDocumentosPF('Sofia')");
+  assert.equal(run('E.pessoas.length'),1);
+  assert.equal(run("nomesDocumentosPF().includes('Sofia')"),false);
+  run("adicionarNomeDocumentosPF('sofia')");
+  assert.equal(run('E.pessoas.length'),1);
+  assert.equal(run("nomesDocumentosPF().includes('Sofia')"),true);
+  assert.throws(()=>run("adicionarNomeDocumentosPF('SÓFIA')"),/já aparece/);
+  assert.throws(()=>run("removerNomeDocumentosPF('Léo')"),/principal/);
+  assert.equal(document.querySelectorAll('#modais .fundo').length,0);
+});
+
 test('documentos PJ: lê da ficha da empresa e oferece o caminho de volta', () => {
   const {document} = tela(`filtro.bancoAba='docpj';
     E.empresasPJ=[{id:'e1',nome:'Impresilk',documentosEmpresa:[{id:'x',nome:'Contrato social',tipo:'Societário'}]}]`);

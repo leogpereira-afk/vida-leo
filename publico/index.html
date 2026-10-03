@@ -655,7 +655,7 @@ tr:hover .lixo{opacity:1}
 }
 </style>
 <link rel="stylesheet" href="./refinamento.css?v=a9b0b08ec1e1">
-<link rel="stylesheet" href="empresas.css?v=b7c4cc8cb464">
+<link rel="stylesheet" href="empresas.css?v=d682fd5c358d">
 <link rel="stylesheet" href="organograma.css?v=bcd62396b9da">
 <link rel="stylesheet" href="./financeiro-fluido.css?v=d63ef8e99259">
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
@@ -10992,11 +10992,82 @@ function painelSeguros(cx,grupo){
 }
 
 /* DOCUMENTOS DE PESSOA: os mesmos de E.documentos, agrupados por dono. */
+function nomesDocumentosPF(){
+  const nomes=['Léo',...(E.pessoas||[]).filter(p=>p.mostrarDocumentosPF!==false).map(p=>p.nome),
+    ...(E.documentos||[]).map(d=>d.dono||'Léo')];
+  return nomes.filter((nome,i)=>nome&&nomes.findIndex(outro=>mesmaPessoa(outro,nome))===i)
+    .sort((a,b)=>a.localeCompare(b,'pt-BR'));
+}
+function quantidadeDocumentosPF(nome){return (E.documentos||[]).filter(d=>mesmaPessoa(d.dono||'Léo',nome)).length}
+function adicionarNomeDocumentosPF(nome){
+  nome=String(nome||'').trim().replace(/\s+/g,' ');
+  if(!nome)throw new Error('Informe o nome da pessoa.');
+  if(nomesDocumentosPF().some(n=>mesmaPessoa(n,nome)))throw new Error('Esse nome já aparece na lista.');
+  const pessoa=(E.pessoas||[]).find(p=>mesmaPessoa(p.nome,nome));
+  if(pessoa)pessoa.mostrarDocumentosPF=true;
+  else E.pessoas.push({id:uid(),nome,relacao:'Outro',nascimento:'',gosta:'',obs:''});
+  filtro.bancoGrupo=filtro.bancoGrupo||{};filtro.bancoGrupo.docpf=pessoa?.nome||nome;
+  salvar();
+}
+function removerNomeDocumentosPF(nome,destino){
+  if(mesmaPessoa(nome,'Léo'))throw new Error('Léo é o titular principal e permanece na lista.');
+  const docs=(E.documentos||[]).filter(d=>mesmaPessoa(d.dono||'Léo',nome));
+  if(docs.length){
+    if(!destino||mesmaPessoa(destino,nome)||!nomesDocumentosPF().some(n=>mesmaPessoa(n,destino)))
+      throw new Error('Escolha outra pessoa para receber os documentos.');
+    docs.forEach(d=>{d.dono=destino});
+  }
+  (E.pessoas||[]).filter(p=>mesmaPessoa(p.nome,nome)).forEach(p=>{p.mostrarDocumentosPF=false});
+  filtro.bancoGrupo=filtro.bancoGrupo||{};filtro.bancoGrupo.docpf=destino||'Léo';
+  if(mesmaPessoa(filtro.docPessoa,nome))filtro.docPessoa='Todos';
+  salvar();
+}
+function gerenciarNomesDocumentosPF(){
+  abrirModal('Pessoas dos documentos','Adicione parentes e organize os nomes desta lista.',(c,fechar)=>{
+    const area=el('<div class="secao docpf-gerenciar"></div>');
+    const form=el('<form class="docpf-adicionar"><label for="docpf-novo-nome">Adicionar pessoa</label><div><input id="docpf-novo-nome" name="nome" type="text" autocomplete="off" placeholder="Nome do parente" required><button class="btn" type="submit">Adicionar</button></div><p class="docpf-erro" role="alert" hidden></p></form>');
+    form.onsubmit=ev=>{ev.preventDefault();try{adicionarNomeDocumentosPF(form.querySelector('[name="nome"]').value);fechar()}catch(e){const erro=form.querySelector('[role="alert"]');erro.textContent=e.message;erro.hidden=false}};
+    area.appendChild(form);
+    area.appendChild(el('<p class="workspace-note">Remover tira o nome desta lista. O cadastro da pessoa, aniversários e arquivos continuam guardados. Se houver documentos, escolha para quem transferi-los.</p>'));
+    const lista=el('<div class="docpf-pessoas"></div>');
+    for(const nome of nomesDocumentosPF()){
+      const linha=el('<div class="docpf-pessoa"><div><b>'+esc(nome)+'</b><small>'+quantidadeDocumentosPF(nome)+' documento(s)</small></div></div>');
+      if(mesmaPessoa(nome,'Léo'))linha.appendChild(el('<span class="docpf-principal">Principal</span>'));
+      else linha.appendChild(acao('Remover',()=>confirmarRemocaoNomeDocumentosPF(nome,fechar),'ghost mini'));
+      lista.appendChild(linha);
+    }
+    area.appendChild(lista);c.appendChild(area);
+  });
+}
+function confirmarRemocaoNomeDocumentosPF(nome,fecharGerenciador){
+  const quantidade=quantidadeDocumentosPF(nome);
+  abrirModal('Remover '+esc(nome)+' da lista',quantidade?quantidade+' documento(s) precisam de um novo titular.':'O cadastro da pessoa continuará guardado.',(c,fechar)=>{
+    const area=el('<div class="secao docpf-remover"></div>');
+    let destino='';
+    if(quantidade){
+      const opcoes=nomesDocumentosPF().filter(n=>!mesmaPessoa(n,nome));
+      const rotulo=el('<label>Transferir documentos para</label>');
+      const select=el('<select></select>');
+      for(const n of opcoes){const opt=el('<option></option>');opt.value=n;opt.textContent=n;select.appendChild(opt)}
+      destino=opcoes.some(n=>mesmaPessoa(n,'Léo'))?'Léo':opcoes[0];
+      select.value=destino;select.onchange=()=>{destino=select.value};
+      rotulo.appendChild(select);area.appendChild(rotulo);
+      area.appendChild(el('<p class="workspace-note">Os documentos e seus anexos serão preservados com o novo titular.</p>'));
+    }
+    const erro=el('<p class="docpf-erro" role="alert" hidden></p>');area.appendChild(erro);
+    const botoes=el('<div class="docpf-acoes"></div>');
+    botoes.appendChild(acao('Cancelar',fechar,'ghost'));
+    botoes.appendChild(acao(quantidade?'Transferir e remover nome':'Remover nome',()=>{
+      try{removerNomeDocumentosPF(nome,destino);fechar();fecharGerenciador()}catch(e){erro.textContent=e.message;erro.hidden=false}
+    }));
+    area.appendChild(botoes);c.appendChild(area);
+  });
+}
 function painelDocsPF(cx,pessoa){
-  const lista=(E.documentos||[]).filter(d=>!pessoa||(d.dono||'Léo')===pessoa);
+  const lista=(E.documentos||[]).filter(d=>!pessoa||mesmaPessoa(d.dono||'Léo',pessoa));
   const topo=el('<div class="bancos-origem"></div>');
   topo.appendChild(el('<p><b>'+lista.length+'</b> documento(s)'+(pessoa?' · '+esc(pessoa):'')+' · os mesmos da tela Documentos</p>'));
-  topo.appendChild(acao('+ Novo documento',()=>novoDocumento(),'ghost mini'));
+  topo.appendChild(acao('+ Novo documento',()=>novoDocumento(pessoa),'ghost mini'));
   topo.appendChild(acao('Abrir tela Documentos',()=>irTela('documentos'),'ghost mini'));
   cx.appendChild(topo);
   const grade=el('<div class="bancos-grade"></div>');cx.appendChild(grade);
@@ -11073,13 +11144,13 @@ async function vBancos(m){
      que não existe não vira item de menu vazio. */
   const gruposDaAba=chave=>{
     if(chave==='seguros')return [...new Set((E.seguros||[]).map(seguroTitular))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
-    if(chave==='docpf')return [...new Set((E.documentos||[]).map(d=>d.dono||'Léo'))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    if(chave==='docpf')return nomesDocumentosPF();
     if(chave==='docpj')return (E.empresasPJ||[]).map(e=>e.nome).filter(Boolean).sort((a,b)=>a.localeCompare(b,'pt-BR'));
     return [];
   };
   const contaDoGrupo=(chave,g)=>
     chave==='seguros'?(E.seguros||[]).filter(s=>seguroTitular(s)===g).length
-    :chave==='docpf'?(E.documentos||[]).filter(d=>(d.dono||'Léo')===g).length
+    :chave==='docpf'?quantidadeDocumentosPF(g)
     :chave==='docpj'?empresaDocumentos((E.empresasPJ||[]).find(e=>e.nome===g)||{}).length:0;
   const listaLateral=(chave,painel)=>{
     const itens=gruposDaAba(chave);
@@ -11094,6 +11165,11 @@ async function vBancos(m){
       b2.className='banco-empresa-chip';b2.setAttribute('aria-pressed',String(g===atualG));
       b2.innerHTML='<span>'+esc(g)+'</span><b>'+contaDoGrupo(chave,g)+'</b>';
       nav.appendChild(b2);
+    }
+    if(chave==='docpf'){
+      const ferramentas=el('<div class="docpf-lateral-tools"><b>Parentes e documentos</b></div>');
+      ferramentas.appendChild(acao('Editar nomes',gerenciarNomesDocumentosPF,'ghost mini'));
+      lateral.appendChild(ferramentas);
     }
     lateral.appendChild(el('<div class="bancos-filtros"><div class="bancos-escopo"></div></div>'));
     lateral.lastElementChild.querySelector('.bancos-escopo').appendChild(nav);
@@ -14683,7 +14759,7 @@ function stvGrafDonut({fatias=[],centro='',fmt=null}={}){
 function vDocumentos(m){
   m.classList.add('workspace-layout','documentos-workspace','planos-documents');
   const lista=E.documentos,donos=[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...lista.map(d=>d.dono||'Léo')])];
-  const novo=novoDocumento;
+  const novo=()=>novoDocumento();
   const topo=cab('Documentos','Encontre o que precisa e acompanhe as validades da família.');topo.appendChild(acao('+ Novo documento',novo));m.appendChild(topo);
   const total=s=>lista.filter(d=>statusDocumento(d)===s).length;
   const filtrar=s=>{filtro.docStatus=s;situacao.value=s;pintar()};
@@ -14705,9 +14781,9 @@ function vDocumentos(m){
 }
 
 
-function novoDocumento(){
+function novoDocumento(donoInicial=''){
   abrirModal('Novo documento','Identifique o documento. Depois você poderá anexar a foto ou o PDF.',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');
-    devFormulario(b,[{k:'nome',t:'Nome do documento',req:true,full:true,ph:'Passaporte, certidão, contrato…'},{k:'dono',t:'De quem é?',req:true,opcoes:[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...E.documentos.map(d=>d.dono).filter(Boolean)])]},{k:'numero',t:'Número ou referência'},{k:'validade',t:'Válido até (se houver)',tipo:'date'},{k:'onde',t:'Onde está o original?',full:true}],{dono:filtro.docPessoa&&filtro.docPessoa!=='Todos'?filtro.docPessoa:'Léo'},'Criar documento',v=>{const d={id:uid(),...v,obs:''};E.documentos.push(d);salvar();fechar();modalDoc(d)});c.appendChild(b)},rr('documentos'));
+    devFormulario(b,[{k:'nome',t:'Nome do documento',req:true,full:true,ph:'Passaporte, certidão, contrato…'},{k:'dono',t:'De quem é?',req:true,opcoes:[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...E.documentos.map(d=>d.dono).filter(Boolean)])]},{k:'numero',t:'Número ou referência'},{k:'validade',t:'Válido até (se houver)',tipo:'date'},{k:'onde',t:'Onde está o original?',full:true}],{dono:donoInicial||(filtro.docPessoa&&filtro.docPessoa!=='Todos'?filtro.docPessoa:'Léo')},'Criar documento',v=>{const d={id:uid(),...v,obs:''};E.documentos.push(d);salvar();fechar();modalDoc(d)});c.appendChild(b)},rr('documentos'));
 }
 function modalDoc(d){
   abrirModal(esc(d.nome||'Novo documento'),esc(d.dono||''),(c,fechar)=>{

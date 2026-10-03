@@ -101,6 +101,14 @@
 .bancos-layout .banco-empresa-chip:hover{background:var(--bg)}
 .bancos-layout .banco-empresa-chip[aria-pressed="true"]{background:var(--verde-cl);color:var(--verde);font-weight:600}
 .bancos-layout .banco-empresa-chip span{white-space:normal;overflow-wrap:anywhere}
+.docpf-lateral-tools{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:2px 8px 0;font-size:12px;color:var(--suave)}
+.docpf-lateral-tools .btn{white-space:nowrap;padding:6px 8px;font-size:11px}
+.docpf-gerenciar{display:grid;gap:16px}.docpf-adicionar label{display:block;font-size:13px;font-weight:650;margin-bottom:7px}
+.docpf-adicionar>div{display:flex;gap:8px}.docpf-adicionar input,.docpf-remover select{min-width:0;width:100%;padding:10px 12px;border:1px solid var(--linha);border-radius:9px;background:var(--card);color:var(--tinta);font:inherit}
+.docpf-adicionar .btn{flex:none}.docpf-erro{color:var(--vermelho);font-size:13px}.docpf-erro[hidden]{display:none}
+.docpf-pessoas{border:1px solid var(--linha);border-radius:12px;overflow:hidden}.docpf-pessoa{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid var(--linha)}.docpf-pessoa:last-child{border-bottom:0}.docpf-pessoa>div{min-width:0}.docpf-pessoa b{display:block;font-size:14px;overflow-wrap:anywhere}.docpf-pessoa small{display:block;color:var(--suave);margin-top:3px}.docpf-principal{color:var(--suave);font-size:12px}
+.docpf-remover label{display:grid;gap:7px;font-size:13px;font-weight:650}.docpf-acoes{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:16px}
+@media(max-width:600px){.docpf-adicionar>div{flex-wrap:wrap}.docpf-adicionar .btn{width:100%}.docpf-lateral-tools{margin-bottom:7px}}
 /* A lateral so vale quando ha lateral: abaixo disso volta a ser uma fileira. */
 @media(max-width:860px){
   .bancos-layout{display:block}
