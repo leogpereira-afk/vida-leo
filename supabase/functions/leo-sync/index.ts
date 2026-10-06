@@ -31,6 +31,7 @@ import { googleAcao } from "./google.ts";
 // a porta do Painel exige crachá do Painel, e crachá é por sistema.
 import { empresaAcao } from "./empresa.ts";
 import { lerBancosGestao } from "./bancos.ts";
+import { donboyAcao } from "./donboy.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -127,6 +128,8 @@ interface Cracha {
   uso: string;
   exp: number;
   iat: number | null;
+  sub: string;
+  papel: string;
 }
 
 async function crachaPayload(token: string): Promise<Cracha | null> {
@@ -156,6 +159,8 @@ async function crachaPayload(token: string): Promise<Cracha | null> {
       uso: typeof p.uso === "string" ? p.uso : "",
       exp: p.exp,
       iat: typeof p.iat === "number" && Number.isFinite(p.iat) ? p.iat : null,
+      sub: typeof p.sub === "string" ? p.sub : "",
+      papel: typeof p.papel === "string" ? p.papel : "",
     };
   } catch {
     return null;
@@ -254,6 +259,15 @@ Deno.serve(async (req: Request) => {
   if (req.method === "POST") {
     const corpo = await req.json().catch(() => ({}));
     const { acao, senha, senhaAtual, senhaNova, id: corpoId } = corpo;
+
+    // O concierge contém histórico pessoal. Além da sessão Central válida,
+    // esta porta exige o próprio dono e jamais aceita crachá de OAuth.
+    if (["donboy_painel","donboy_testar","donboy_memoria_listar","donboy_memoria_adicionar","donboy_memoria_link"].includes(acao)) {
+      const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+      const p = await crachaPayload(t);
+      if (!p || p.uso !== "" || p.sub.toLowerCase() !== DONO || p.papel !== "dono") return json({erro:"Não autorizado"},401);
+      return await donboyAcao(acao,corpo,sb);
+    }
 
     // Troca a sessao longa por um cracha curto de administracao.
     if (acao === "crachaAdmin") {

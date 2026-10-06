@@ -667,6 +667,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
 <link rel="stylesheet" href="./aviao.css?v=44fae810ca9e">
 <link rel="stylesheet" href="./fortemais-previsao.css?v=cdb9222e7265">
+<link rel="stylesheet" href="./donboy-painel.css?v=6fb174b65acf">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -1747,12 +1748,219 @@ function vMetodoVOF(m){
   </section>`));
 }
 
+/* ---------------- DON BOY: acompanhamento privado ---------------- */
+// O painel usa a porta autenticada da Central. Nada deste diagnóstico
+// entra no estado E, no armazenamento do navegador ou na sincronização PUT.
+const donboyPainelEstado={dados:null,carregando:false,erro:'',teste:null,testando:false,comando:'',pedido:null};
+function donboyData(valor){const d=new Date(valor||'');return Number.isFinite(+d)?d.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'Não informado'}
+function donboyUsd(valor){return typeof valor==='number'&&Number.isFinite(valor)&&valor>=0?new Intl.NumberFormat('pt-BR',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:4}).format(valor):'Não informado'}
+function donboyBytes(valor){return typeof valor==='number'&&Number.isFinite(valor)&&valor>=0?(valor>=1048576?(valor/1048576).toFixed(1).replace('.',',')+' MB':Math.max(1,Math.ceil(valor/1024))+' KB'):'Tamanho não informado'}
+function donboyLista(v){return Array.isArray(v)?v:[]}
+function donboyTexto(v,falta='Não informado'){return typeof v==='string'&&v.trim()?v:typeof v==='number'&&Number.isFinite(v)?String(v):falta}
+function donboyRecibos(turno){
+  return donboyLista(turno?.consultas).flatMap(c=>{
+    if(typeof c!=='string'||!c.startsWith('telegram_anexo_confirmado: '))return [];
+    try{const r=JSON.parse(c.slice('telegram_anexo_confirmado: '.length));return typeof r.nome==='string'&&Number.isSafeInteger(r.messageId)&&r.messageId>0&&Number.isSafeInteger(r.bytes)&&r.bytes>0?[r]:[]}catch{return []}
+  });
+}
+function donboyEstadoTurno(t){
+  const e=String(t?.estado||'');
+  return ({entregue:['Resposta entregue','ok'],falhou:['Falhou','erro'],falha:['Falhou','erro'],erro:['Falhou','erro'],entrega_incerta:['Entrega a conferir','atencao'],gerando:['Preparando resposta','atencao'],gerado:['Resposta preparada','neutro'],processando:['Em andamento','atencao'],enviando:['Enviando','atencao'],pendente:['Pendente','atencao']})[e]||[e||'Sem situação','neutro'];
+}
+function donboyTelegram(url){try{const u=new URL(url);return u.protocol==='https:'&&u.hostname==='t.me'&&!u.username&&!u.password&&!u.port&&/^\/[A-Za-z0-9_]{5,32}\/?$/.test(u.pathname)?u.href:''}catch{return ''}}
+function donboyErro(e){return /403/.test(String(e?.message))?'Este painel está disponível somente para o acesso do dono.':/401/.test(String(e?.message))?'Sua sessão expirou. Entre novamente para consultar.':'Não foi possível consultar o DON BOY agora. Tente atualizar em instantes.'}
+function donboyCard(titulo,sub,conteudo,extra=''){return `<section class="db-card ${extra}"><header><div><h2>${esc(titulo)}</h2>${sub?`<p>${esc(sub)}</p>`:''}</div></header><div class="db-card-corpo">${conteudo}</div></section>`}
+function donboyConexoes(d){
+  const itens=donboyLista(d.capacidades);
+  if(!itens.length)return '<p class="db-vazio">O servidor ainda não informou as conexões deste assistente.</p>';
+  return '<div class="db-conexoes">'+itens.map(c=>{
+    const conf=({configurada:'Configurada',implementada:'Recurso implementado',pendente:'Configuração pendente',indisponivel:'Indisponível'})[c.configuracao]||'Não verificada';
+    const v=c.verificacao;const verifica=v==='nao_testada_nesta_consulta'?'Não testada nesta consulta':typeof v==='string'?v:donboyTexto(v?.detalhe,donboyTexto(v?.status,'Sem teste registrado'));
+    const modo=({previa_e_botao_enviar:'Prévia e aprovação para enviar',busca_e_entrega_sob_pedido:'Busca e entrega quando você pedir',somente_sob_pedido:'Somente quando você pedir',desativada_por_preferencia:'Desativada por sua preferência',somente_leitura:'Somente leitura',leitura_e_gravacao_sob_pedido:'Consulta e registro quando solicitado',comando_spotify:'Comando /spotify',previa_e_confirmacao:'Prévia e confirmação'})[c.modo]||donboyTexto(c.modo);
+    const em=v&&typeof v==='object'?v.em||v.testadoEm:'';
+    return `<article class="db-conexao"><div class="db-conexao-topo"><h3>${esc(donboyTexto(c.nome,c.id||'Conexão'))}</h3><span class="db-tag neutro">${esc(conf)}</span></div><p>${esc(donboyTexto(c.faz,''))}</p><dl><div><dt>Modo</dt><dd>${esc(modo)}</dd></div><div><dt>Verificação</dt><dd>${esc(verifica)}${em?' · '+esc(donboyData(em)):''}</dd></div></dl></article>`;
+  }).join('')+'</div>';
+}
+function donboyAtividade(d){
+  const turnos=donboyLista(d.ultimosTurnos).slice(0,20);
+  if(!turnos.length)return '<p class="db-vazio">Nenhum pedido recente foi informado pelo servidor.</p>';
+  return '<ol class="db-atividade">'+turnos.map(t=>{
+    const [rotulo,classe]=donboyEstadoTurno(t),recibos=donboyRecibos(t);
+    const consultas=donboyLista(t.consultas).filter(c=>typeof c==='string'&&!c.startsWith('telegram_anexo_confirmado: ')).slice(0,10);
+    return `<li><div class="db-turno-topo"><strong>Pedido ${esc(donboyTexto(t.id,'sem número'))}</strong><span class="db-tag ${classe}">${esc(rotulo)}</span></div><p class="db-micro">${esc(donboyData(t.iniciado_em))}${t.modelo?' · '+esc(t.modelo):''}</p>${t.erro?`<p class="db-falha">${esc(String(t.erro).slice(0,800))}</p>`:''}<p class="db-recibo ${recibos.length?'confirmado':''}">${recibos.length?`${recibos.length} anexo${recibos.length===1?'':'s'} com envio confirmado pelo Telegram`:'Sem comprovante de envio de anexo neste registro'}</p>${recibos.length?'<ul class="db-anexos">'+recibos.map(r=>`<li>${esc(r.nome)} <small>${esc(donboyBytes(r.bytes))}</small></li>`).join('')+'</ul>':''}${consultas.length?`<details class="db-detalhes"><summary>Ver consultas deste pedido</summary><ul>${consultas.map(c=>`<li>${esc(c)}</li>`).join('')}</ul></details>`:''}</li>`;
+  }).join('')+'</ol>';
+}
+function donboyCustos(d){
+  const custos=d.custos||{},lim=d.limites||{};
+  const colunas=[['openai','OpenAI'],['claude','Claude']].map(([id,nome])=>{
+    const custo=custos[id]||{},n=custo.chamadas;
+    return `<div class="db-custo" data-donboy-custo-${id}><span>${nome}</span><strong>${esc(donboyUsd(custo.custoUsd))}</strong><small>${Number.isSafeInteger(n)&&n>=0?n+' chamada'+(n===1?'':'s'):'Quantidade não informada'}</small></div>`;
+  }).join('');
+  const desconhecido=custos.desconhecido;
+  return `<div class="db-custos">${colunas}</div><p class="db-micro">Período: ${esc(donboyTexto(custos.mes))}. Valores estimados de uso em dólar; não incluem conversão, impostos ou ajustes da fatura.</p>${desconhecido?.chamadas>0?`<p class="db-aviso">Há ${esc(desconhecido.chamadas)} chamada(s) sem provedor identificado: ${esc(donboyUsd(desconhecido.custoUsd))}.</p>`:''}${typeof lim.referenciaBrl==='number'?`<p class="db-orcamento">Referência mensal: <b>${esc(brl(lim.referenciaBrl))}</b>. ${lim.tetoAutomatico===true?'O servidor informa um teto automático ativo.':'Ainda não há bloqueio automático por orçamento.'}</p>`:''}${typeof lim.observacao==='string'&&lim.observacao.trim()?`<p class="db-micro" data-donboy-limites>${esc(lim.observacao)}</p>`:''}`;
+}
+function donboyResultadoTeste(r){
+  if(!r)return '<p class="db-vazio">A resposta e os arquivos localizados aparecerão aqui.</p>';
+  if(r.erro)return `<p class="db-falha" role="alert">${esc(r.erro)}</p>`;
+  const anexos=donboyLista(r.anexos);
+  return `<div class="db-resultado"><span class="db-tag neutro">Consulta concluída · sem envio</span><div class="db-resposta">${esc(donboyTexto(r.texto,''))}</div>${anexos.length?`<h3>Arquivos preparados no teste</h3><ul class="db-anexos">${anexos.map(a=>`<li>${esc(donboyTexto(a.nome,'Arquivo'))}<small>${esc(donboyBytes(a.bytes))}</small></li>`).join('')}</ul><p class="db-micro">Estes anexos não foram enviados pelo Telegram.</p>`:''}${donboyLista(r.consultas).length?`<details class="db-detalhes"><summary>Ver consultas realizadas</summary><ul>${r.consultas.filter(c=>typeof c==='string').map(c=>`<li>${esc(c)}</li>`).join('')}</ul></details>`:''}</div>`;
+}
+async function donboyAtualizar(){
+  if(donboyPainelEstado.pedido)return donboyPainelEstado.pedido;
+  donboyPainelEstado.carregando=true;donboyPainelEstado.erro='';
+  const pedido=(async()=>{try{
+    const d=await apiSync('POST',{acao:'donboy_painel'});
+    if(!d||typeof d!=='object'||!d.inteligencia||!Array.isArray(d.capacidades)||!Array.isArray(d.ultimosTurnos))throw Error('resposta inválida');
+    donboyPainelEstado.dados=d;
+  }catch(e){donboyPainelEstado.erro=donboyErro(e)}finally{donboyPainelEstado.carregando=false;donboyPainelEstado.pedido=null}})();
+  donboyPainelEstado.pedido=pedido;return pedido;
+}
+async function donboyTestar(comando){
+  const texto=String(comando||'').trim();
+  if(donboyPainelEstado.testando)return;
+  if(!texto||texto.length>1500){donboyPainelEstado.teste={erro:'Escreva uma consulta de até 1.500 caracteres.'};return}
+  donboyPainelEstado.comando=texto;donboyPainelEstado.testando=true;donboyPainelEstado.teste=null;
+  try{
+    const r=await apiSync('POST',{acao:'donboy_testar',comando:texto});
+    if(!r||r.somente_leitura!==true||r.telegram_enviado!==false||typeof r.texto!=='string')throw Error('garantias ausentes');
+    donboyPainelEstado.teste=r;
+  }catch{donboyPainelEstado.teste={erro:'Não consegui concluir esta consulta com a confirmação de somente leitura. Nenhum envio foi solicitado por este painel.'}}
+  finally{donboyPainelEstado.testando=false}
+}
+// Arquivos só saem do navegador após o botão Guardar na memória. O estado da
+// tela é transitório e não entra na sincronização de dados pessoais da Central.
+const DONBOY_MEMORIA_MAX=3*1024*1024;
+const DONBOY_MEMORIA_TIPOS={pdf:'application/pdf',jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',txt:'text/plain',md:'text/markdown',csv:'text/csv'};
+const donboyMemoriaEstado={modo:'arquivo',url:'',assunto:'',documentos:null,proximoInicio:null,listando:false,erroLista:'',arquivo:null,titulo:'',origem:'',empresa:'',resultado:null,erroEnvio:'',enviando:false};
+function donboyMemoriaValidar(f){
+  if(!f||typeof f.name!=='string'||!Number.isSafeInteger(f.size)||f.size<=0)return 'Escolha um arquivo com conteúdo.';
+  if(f.size>DONBOY_MEMORIA_MAX)return 'Use um arquivo de até 3 MB.';
+  if(!DONBOY_MEMORIA_TIPOS[f.name.toLowerCase().split('.').pop()])return 'Use PDF, JPG, PNG, WebP, TXT, Markdown ou CSV.';
+  if(f.name.length>150||/[\u0000-\u001f\u007f]/.test(f.name))return 'Use um nome de arquivo curto e sem caracteres especiais de controle.';
+  return '';
+}
+function donboyMemoriaSelecionar(f){
+  const s=donboyMemoriaEstado;if(s.enviando)return false;
+  s.erroEnvio=donboyMemoriaValidar(f);s.resultado=null;s.arquivo=s.erroEnvio?null:f;return !s.erroEnvio;
+}
+function donboyMemoriaEstadoFonte(d){
+  return ({recebido:['Recebido · leitura pendente','atencao'],disponivel:['Disponível para consulta','ok'],revisao:['Revisar leitura','atencao'],falhou:['Leitura não concluída','erro']})[d?.estado]||['Situação não informada','neutro'];
+}
+function donboyMemoriaData(valor){return typeof valor==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(valor)?valor.slice(8,10)+'/'+valor.slice(5,7)+'/'+valor.slice(0,4):donboyData(valor)}
+function donboyMemoriaFonte(d){
+  const [rotulo,cor]=donboyMemoriaEstadoFonte(d),obs=donboyLista(d.observacoes).filter(v=>typeof v==='string').slice(0,8);
+  const leitura=({texto_original:'Texto original indexado',extracao_ia:'Referência extraída por IA',acervo_existente:'Referência do acervo anterior'})[d.leitura]||'Sem leitura confirmada';
+  const origem=[d.empresa,d.origem].filter(v=>typeof v==='string'&&v.trim()).join(' · ');
+  const data=d.dataBase?((d.naturezaData==='recebimento'?'Data de recebimento: ':d.naturezaData==='base_existente'?'Data registrada no acervo: ':'Data de referência: ')+donboyMemoriaData(d.dataBase)):'Recebido em '+donboyData(d.recebidoEm);
+  return `<li data-donboy-fonte><div><strong>${esc(donboyTexto(d.titulo,d.nome||'Documento'))}</strong><p class="db-micro">${esc(donboyTexto(d.nome,''))}${origem?' · '+esc(origem):''}</p></div><span class="db-tag ${cor}">${esc(rotulo)}</span><div class="db-memoria-detalhe">${esc(leitura)}${Number.isSafeInteger(d.caracteres)&&d.caracteres>0?' · '+d.caracteres.toLocaleString('pt-BR')+' caracteres':''}. ${esc(data)}${d.arquivoGuardado===false?' · Original não armazenado neste acervo.':''}${obs.length?'<p>'+obs.map(esc).join(' · ')+'</p>':''}${d.erro?'<p>'+esc(d.erro)+'</p>':''}</div></li>`;
+}
+async function donboyMemoriaListar(mais=false){
+  const s=donboyMemoriaEstado;if(s.listando||mais&&s.proximoInicio===null)return;
+  const inicio=mais?s.proximoInicio:0;s.listando=true;s.erroLista='';
+  try{
+    const r=await apiSync('POST',{acao:'donboy_memoria_listar',inicio,limite:20});
+    if(!r||!Array.isArray(r.documentos)||r.documentos.some(d=>!d||typeof d.chave!=='string')||!(r.proximoInicio===null||Number.isSafeInteger(r.proximoInicio)&&r.proximoInicio>inicio))throw Error('lista inválida');
+    const fontes=mais?[...(s.documentos||[]),...r.documentos]:r.documentos;
+    s.documentos=Array.from(new Map(fontes.map(d=>[d.chave,d])).values());s.proximoInicio=r.proximoInicio;
+  }catch{s.erroLista='Não foi possível atualizar as fontes da memória. Tente novamente.'}
+  finally{s.listando=false}
+}
+async function donboyMemoriaGuardar(){
+  const s=donboyMemoriaEstado;if(s.enviando)return;
+  s.erroEnvio=donboyMemoriaValidar(s.arquivo);if(s.erroEnvio)return;
+  const arquivo=s.arquivo,meta={};for(const k of ['titulo','origem','empresa']){const v=String(s[k]||'').trim();const max=k==='empresa'?80:160;if(v.length>max){s.erroEnvio='Use até '+max+' caracteres no campo '+(k==='empresa'?'Empresa ou contexto':k)+'.';return}if(v)meta[k]=v}
+  s.enviando=true;s.resultado=null;s.erroEnvio='';
+  try{
+    const bytes=new Uint8Array(await arquivo.arrayBuffer());if(bytes.length!==arquivo.size||bytes.length>DONBOY_MEMORIA_MAX)throw Error('arquivo alterado');
+    let binario='';for(let p=0;p<bytes.length;p+=32768)binario+=String.fromCharCode(...bytes.subarray(p,p+32768));
+    const r=await apiSync('POST',{acao:'donboy_memoria_adicionar',nome:arquivo.name,mime:DONBOY_MEMORIA_TIPOS[arquivo.name.toLowerCase().split('.').pop()],base64:btoa(binario),...meta});
+    if(!r||r.telegram_enviado!==false||!r.documento||typeof r.documento.chave!=='string'||!['recebido','disponivel','revisao','falhou'].includes(r.documento.estado))throw Error('resposta inválida');
+    s.resultado=r;s.arquivo=null;s.titulo='';s.origem='';s.empresa='';
+    if(s.documentos)s.documentos=[r.documento,...s.documentos.filter(d=>d.chave!==r.documento.chave)];
+  }catch{s.erroEnvio='Não foi possível confirmar o salvamento. Atualize as fontes antes de tentar novamente; o arquivo pode já ter sido recebido.'}
+  finally{s.enviando=false}
+}
+function donboyMemoriaUrl(valor){
+  if(typeof valor!=='string'||valor.trim().length>2000)return '';
+  try{const u=new URL(valor.trim());return u.protocol==='https:'&&!u.username&&!u.password?u.href:''}catch{return ''}
+}
+async function donboyMemoriaGuardarLink(){
+  const s=donboyMemoriaEstado;if(s.enviando)return;
+  const url=donboyMemoriaUrl(s.url);s.erroEnvio='';
+  if(!url){s.erroEnvio='Cole um link HTTPS válido, sem senha e com até 2.000 caracteres.';return}
+  const meta={};for(const [k,max] of [['titulo',160],['assunto',500],['empresa',80]]){const v=String(s[k]||'').trim();if(v.length>max){s.erroEnvio='Use até '+max+' caracteres no campo '+k+'.';return}if(v)meta[k]=v}
+  s.enviando=true;s.resultado=null;
+  try{
+    const r=await apiSync('POST',{acao:'donboy_memoria_link',url,...meta});
+    if(!r||r.telegram_enviado!==false||!r.documento||typeof r.documento.chave!=='string'||!['recebido','disponivel','revisao','falhou'].includes(r.documento.estado))throw Error('resposta inválida');
+    s.resultado=r;s.url='';s.titulo='';s.assunto='';s.empresa='';
+    if(s.documentos)s.documentos=[r.documento,...s.documentos.filter(d=>d.chave!==r.documento.chave)];
+  }catch{s.erroEnvio='Não foi possível confirmar a leitura e o salvamento do link. Confira o acesso ao conteúdo e atualize as fontes antes de tentar novamente.'}
+  finally{s.enviando=false}
+}
+function donboyMemoriaCard(redesenhar){
+  const s=donboyMemoriaEstado,link=s.modo==='link',doc=s.resultado?.documento,[rotulo,cor]=donboyMemoriaEstadoFonte(doc);
+  const campos=link?[['titulo','Título','Ex.: catálogo ou tema de estudo'],['empresa','Empresa ou contexto','Ex.: Impresilk, Fortemais ou pessoal']]:[['titulo','Título','Ex.: Manual de instalação 2026'],['origem','Origem','Ex.: documento aprovado pela diretoria'],['empresa','Empresa ou contexto','Ex.: Impresilk, Fortemais ou pessoal']];
+  const resultado=s.erroEnvio?`<p class="db-falha" role="alert">${esc(s.erroEnvio)}</p>`:s.enviando?'<p class="db-vazio" role="status">Preparando a referência. Aguarde a confirmação da leitura…</p>':doc?`<div class="${cor==='ok'?'db-memoria-ok':'db-aviso'}" role="status"><strong>${s.resultado.duplicado?'Esta referência já está na memória.':esc(rotulo)}</strong>${doc.estado==='disponivel'?'O conteúdo está disponível para o DON BOY consultar.':doc.estado==='recebido'?'A fonte foi recebida, mas a leitura ainda não foi confirmada.':'Confira as observações abaixo. Este conteúdo ainda não está disponível para consulta.'}</div><ul class="db-memoria-lista">${donboyMemoriaFonte(doc)}</ul>`:'';
+  const fontes=s.documentos?.length?`<ul class="db-memoria-lista">${s.documentos.map(donboyMemoriaFonte).join('')}</ul>`:s.documentos?'<p class="db-vazio">Nenhuma fonte foi informada. Comece por um documento ou link que o DON BOY deve conhecer.</p>':`<p class="db-vazio">${s.erroLista?'As fontes não foram carregadas.':'Consultando as fontes disponíveis…'}</p>`;
+  const seletor=link?`<div class="db-memoria-link"><label for="db-memoria-url">Link do Drive ou da internet</label><input id="db-memoria-url" name="url" type="url" maxlength="2000" placeholder="https://…" value="${esc(s.url)}" ${s.enviando?'disabled':''} required><p class="db-micro">Use o link de um arquivo do Drive ou de uma página pública. Colar um link não conecta uma conta nem libera conteúdo privado.</p><label for="db-memoria-assunto">Assunto para orientar a leitura <small>(opcional)</small></label><textarea id="db-memoria-assunto" name="assunto" rows="3" maxlength="500" placeholder="Ex.: processos de instalação, prazos e cuidados da Impresilk" ${s.enviando?'disabled':''}>${esc(s.assunto)}</textarea></div>`:
+    `<div><div class="db-memoria-arquivo" data-donboy-drop><span class="db-memoria-icone" aria-hidden="true">↥</span><strong>${s.arquivo?esc(s.arquivo.name):'Escolha ou arraste um arquivo'}</strong><p class="db-micro">${s.arquivo?esc(donboyBytes(s.arquivo.size)):'PDF de até 20 páginas, JPG, PNG, WebP, TXT, Markdown ou CSV. Até 3 MB por arquivo.'}</p><label for="db-memoria-arquivo" class="sr-only">Arquivo para guardar na memória</label><input id="db-memoria-arquivo" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.txt,.md,.csv" ${s.enviando?'disabled':''}></div><div class="db-memoria-etapas" aria-label="Etapas do documento"><span>1. Recebido</span><span>2. Leitura</span><span>3. Disponível</span></div></div>`;
+  const card=el(donboyCard('Memória do DON BOY','Adicione arquivos ou links e acompanhe o que já pode ser consultado.',`
+    <div class="db-memoria-intro"><p class="db-micro">Guarde referências das suas empresas, métodos e projetos. A situação de leitura aparece em cada fonte.</p><span class="db-tag neutro">Acervo privado</span></div>
+    <div class="db-memoria-modos" role="group" aria-label="Tipo de fonte"><button type="button" data-donboy-modo="arquivo" aria-pressed="${!link}" ${s.enviando?'disabled':''}>↥ Adicionar arquivo</button><button type="button" data-donboy-modo="link" aria-pressed="${link}" ${s.enviando?'disabled':''}>↗ Adicionar link</button></div>
+    <form data-donboy-memoria><div class="db-memoria-form">${seletor}<div class="db-memoria-campos">${campos.map(([k,t,p])=>`<div><label for="db-memoria-${k}">${t} <small>(opcional)</small></label><input id="db-memoria-${k}" name="${k}" type="text" maxlength="${k==='empresa'?80:160}" value="${esc(s[k])}" placeholder="${esc(p)}" ${s.enviando?'disabled':''}></div>`).join('')}${link?'<p class="db-micro">A leitura usa as conexões que já estão autorizadas ou o conteúdo público do endereço. Informe o assunto para dar contexto à referência.</p>':''}</div></div>
+    <div class="db-memoria-enviar"><button type="submit" class="btn" ${s.enviando||(link?!s.url.trim():!s.arquivo)?'disabled':''}>${s.enviando?'Guardando…':link?'Ler e guardar':'Guardar na memória'}</button><p class="db-micro">${link?'Apenas a página ou o arquivo indicado será lido; não percorre o site inteiro.':'Este botão autoriza guardar o arquivo e extrair seu conteúdo.'} A leitura com IA pode consumir créditos. Nenhum envio pelo Telegram.</p></div></form>
+    <div class="db-memoria-status" aria-live="polite">${resultado}</div><div class="db-memoria-lista-cab"><h3>Fontes da memória${s.documentos?' · '+s.documentos.length+' exibida'+(s.documentos.length===1?'':'s'):''}</h3><button type="button" class="btn ghost" data-donboy-fontes ${s.listando||s.enviando?'disabled':''}>${s.listando?'Atualizando…':'Atualizar fontes'}</button></div>${s.erroLista?`<p class="db-falha" role="alert">${esc(s.erroLista)}${s.documentos?' A lista abaixo é da última consulta.':''}</p>`:''}${fontes}${s.proximoInicio!==null?`<button type="button" class="btn ghost" data-donboy-fontes-mais ${s.listando||s.enviando?'disabled':''}>Ver mais fontes</button>`:''}`,'db-memoria'));
+  card.querySelectorAll('[data-donboy-modo]').forEach(btn=>{btn.onclick=()=>{if(s.enviando)return;s.modo=btn.dataset.donboyModo;s.erroEnvio='';s.resultado=null;redesenhar()}});
+  for(const [k] of campos){const campo=card.querySelector('[name='+k+']');campo.oninput=()=>s[k]=campo.value}
+  if(link){for(const k of ['url','assunto']){const campo=card.querySelector('[name='+k+']');campo.oninput=()=>{s[k]=campo.value;card.querySelector('button[type=submit]').disabled=s.enviando||!s.url.trim()}}}
+  else{
+    card.querySelector('input[type=file]').onchange=ev=>{const f=ev.target.files?.[0];if(f){donboyMemoriaSelecionar(f);redesenhar()}};
+    const drop=card.querySelector('[data-donboy-drop]');drop.ondragover=ev=>{ev.preventDefault();if(!s.enviando)drop.classList.add('dragover')};drop.ondragleave=()=>drop.classList.remove('dragover');drop.ondrop=ev=>{ev.preventDefault();drop.classList.remove('dragover');if(s.enviando)return;const arquivos=ev.dataTransfer?.files;if(arquivos?.length!==1){s.erroEnvio='Adicione um arquivo por vez.';s.resultado=null;s.arquivo=null;redesenhar();return}donboyMemoriaSelecionar(arquivos[0]);redesenhar()};
+  }
+  card.querySelector('form').onsubmit=async ev=>{ev.preventDefault();const p=link?donboyMemoriaGuardarLink():donboyMemoriaGuardar();redesenhar();await p;redesenhar()};
+  card.querySelector('[data-donboy-fontes]').onclick=async()=>{const p=donboyMemoriaListar();redesenhar();await p;redesenhar()};
+  const mais=card.querySelector('[data-donboy-fontes-mais]');if(mais)mais.onclick=async()=>{const p=donboyMemoriaListar(true);redesenhar();await p;redesenhar()};
+  return card;
+}
+
+async function vDonBoy(m){
+  m.classList.add('donboy-layout');
+  const desenhar=()=>{
+    if(!m.isConnected)return;
+    const s=donboyPainelEstado,d=s.dados,i=d?.inteligencia||{};
+    m.replaceChildren(cab('DON BOY','Acompanhe respostas, arquivos e consumo do seu assistente.'));
+    const topo=m.querySelector('.topo');
+    const bt=acao(s.carregando?'Atualizando…':'Atualizar',async()=>{const p=donboyAtualizar();desenhar();await p;desenhar()},'ghost');bt.disabled=s.carregando;bt.dataset.donboyAtualizar='';topo.appendChild(bt);
+    const telegram=donboyTelegram(d?.telegramUrl);if(telegram)topo.appendChild(el(`<a class="btn" href="${esc(telegram)}" target="_blank" rel="noopener noreferrer">Abrir no Telegram ↗</a>`));
+    const status=s.erro||s.carregando?'':d?'Consultado em '+donboyData(d.consultadoEm||d.geradoEm):'Aguardando consulta';
+    m.appendChild(el(`<p class="db-status ${s.erro?'erro':''}" data-donboy-status role="${s.erro?'alert':'status'}" aria-live="polite">${esc(s.erro||(s.carregando?'Consultando o DON BOY…':status))}${s.erro&&d?'<span>Os dados abaixo são da última consulta bem-sucedida.</span>':''}</p>`));
+    if(d){
+      const recentes=donboyLista(d.ultimosTurnos),falhas=recentes.filter(t=>['falha','falhou','erro','entrega_incerta'].includes(t.estado)).length;
+      m.appendChild(el(`<div class="db-resumo"><div><small>Modelo ativo</small><strong>${esc(donboyTexto(i.modelo))}</strong><span>${esc(donboyTexto(i.provedor))}</span></div><div><small>Raciocínio</small><strong>${esc(i.esforco==='max'?'Máximo':donboyTexto(i.esforco))}</strong><span>${esc(donboyTexto(i.esforco,''))}</span></div><div><small>Versão do assistente</small><strong>${esc(donboyTexto(d.versao))}</strong><span>Informada pelo servidor</span></div><div><small>Atenção nos pedidos recentes</small><strong>${falhas}</strong><span>${recentes.length} registros consultados</span></div></div>`));
+    }
+    m.appendChild(donboyMemoriaCard(desenhar));
+    const grid=el('<div class="db-grade"></div>'),principal=el('<div class="db-coluna"></div>'),lateral=el('<div class="db-coluna"></div>');grid.append(principal,lateral);m.appendChild(grid);
+    if(d){principal.appendChild(el(donboyCard('Conexões e recursos','Confira o que está configurado e o que teve uso verificado.',donboyConexoes(d))));principal.appendChild(el(donboyCard('Respostas e arquivos recentes','O comprovante de anexo aparece somente após confirmação do Telegram.',donboyAtividade(d))));lateral.appendChild(el(donboyCard('Consumo por provedor','OpenAI e Claude, separados.',donboyCustos(d))))}
+    const teste=el(donboyCard('Consultar o DON BOY','Faça um teste aqui antes de repetir o pedido no Telegram.',`<form data-donboy-teste><label for="db-comando">O que você quer consultar?</label><textarea id="db-comando" maxlength="1500" rows="3" placeholder="Ex.: procure o contrato SP LG no meu Google Drive" aria-describedby="db-teste-limite" ${s.testando?'disabled':''}>${esc(s.comando)}</textarea><p class="db-micro" id="db-teste-limite">Somente consulta. Não envia mensagens nem altera seus registros. O teste pode consumir créditos de IA.</p><div class="db-teste-acoes"><button type="submit" class="btn" ${s.testando?'disabled':''}>${s.testando?'Consultando…':'Testar consulta'}</button><span class="db-micro">Até 1.500 caracteres</span></div></form><div class="db-teste-resultado" aria-live="polite">${s.testando?'<p class="db-vazio">Consultando as fontes disponíveis…</p>':donboyResultadoTeste(s.teste)}</div>`,'db-teste'));
+    lateral.appendChild(teste);
+    const form=teste.querySelector('form'),campo=teste.querySelector('textarea');campo.oninput=()=>{s.comando=campo.value};form.onsubmit=async ev=>{ev.preventDefault();const p=donboyTestar(campo.value);desenhar();await p;desenhar()};
+    if(d){
+      const pendentes=donboyLista(d.pendentes);
+      lateral.appendChild(el(donboyCard('Aguardando confirmação','Pedidos preparados que ainda dependem da sua decisão.',pendentes.length?'<ul class="db-pendentes">'+pendentes.map(p=>`<li><strong>${esc(donboyTexto(p.tipo,'Pedido'))}</strong><span>${esc(donboyTexto(p.estado))}</span><small>${esc(donboyData(p.criado_em))}</small></li>`).join('')+'</ul>':'<p class="db-vazio">Nenhuma pendência foi informada.</p>')));
+    }
+  };
+  desenhar();
+  const consultas=[];if(!donboyPainelEstado.dados&&!donboyPainelEstado.erro)consultas.push(donboyAtualizar());if(donboyMemoriaEstado.documentos===null&&!donboyMemoriaEstado.erroLista)consultas.push(donboyMemoriaListar());if(consultas.length){desenhar();await Promise.all(consultas);desenhar()}
+}
+
 /* ---------------- navegação ---------------- */
 // logos de verdade na lateral (o emoji não faz jus)
 const LOGO_DRIVE='<svg viewBox="0 0 87.3 78" aria-hidden="true"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>';
 const LOGO_STRAVA='<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#FC4C02" d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>';
 const MODS=[
   {id:'inicio',ic:'🏠',nome:'Início',grupo:'',render:vInicio},
+  {id:'donboy',ic:'◈',nome:'DON BOY',grupo:'',render:vDonBoy},
   {id:'agenda',ic:'📅',nome:'Agenda',grupo:'',render:vAgenda},
   {id:'planilhas',ic:'📊',nome:'Planilhas',grupo:'',render:vPlanilhas},
   {id:'rendimentos',ic:'📈',nome:'Rendimentos',grupo:'Dinheiro',render:vRendimentos},

@@ -15,7 +15,8 @@
 #
 #   export SUPABASE_ACCESS_TOKEN=sbp_...
 #   ./scripts/publicar-functions.sh                 # publica todas
-#   ./scripts/publicar-functions.sh painel-auth     # so uma
+#   ./scripts/publicar-functions.sh leo-sync        # so uma
+#   ./scripts/publicar-functions.sh --changed BASE_SHA HEAD_SHA # somente alteradas no push
 #
 # O token NAO fica gravado em lugar nenhum: sai do ambiente e some quando o
 # terminal fecha. Nunca escreva ele num arquivo do repositorio -- este repo e
@@ -27,14 +28,58 @@ REF="${SUPABASE_PROJECT_REF:-heveemylixartyijxewh}"
 TOKEN="${SUPABASE_ACCESS_TOKEN:-}"
 RAIZ="$(cd "$(dirname "$0")/../supabase/functions" && pwd)"
 
-if [ -z "$TOKEN" ]; then
-  echo "Falta o token. Rode:  export SUPABASE_ACCESS_TOKEN=sbp_..." >&2
-  exit 1
+FUNCOES=("$@")
+if [ "${1:-}" = "--changed" ]; then
+  if [ "$#" -ne 3 ] || ! [[ "$2" =~ ^[0-9a-fA-F]{40}$ ]] || ! [[ "$3" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    echo "Use --changed BASE_SHA HEAD_SHA com duas referencias completas." >&2
+    exit 2
+  fi
+  BASE="$2"
+  CABECA="$3"
+  cd "$RAIZ/../.."
+  if [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+    BASE=$(git hash-object -t tree /dev/null)
+  else
+    git cat-file -e "$BASE^{commit}" 2>/dev/null || { echo "A referencia anterior nao esta disponivel; nenhum deploy realizado." >&2; exit 2; }
+  fi
+  git cat-file -e "$CABECA^{commit}" 2>/dev/null || { echo "A referencia atual nao esta disponivel; nenhum deploy realizado." >&2; exit 2; }
+  [ "$(git rev-parse HEAD)" = "$CABECA" ] || { echo "O checkout nao corresponde ao push; nenhum deploy realizado." >&2; exit 2; }
+  # --no-renames inclui origem e destino quando um modulo muda de function.
+  # Nomes de function sao slugs; caminhos fora desse formato falham fechados.
+  ALTERADOS=$(git -c core.quotePath=false diff --no-renames --name-only "$BASE" "$CABECA" -- supabase/functions/) || exit 2
+  FUNCOES=()
+  while IFS= read -r caminho; do
+    [ -n "$caminho" ] || continue
+    case "$caminho" in
+      supabase/functions/*/*) fn="${caminho#supabase/functions/}"; fn="${fn%%/*}" ;;
+      *) echo "Arquivo compartilhado de functions alterado: selecione as functions explicitamente." >&2; exit 2 ;;
+    esac
+    if [[ "$fn" = _* ]]; then
+      echo "Dependencia compartilhada alterada: revise os imports e selecione as functions explicitamente. Nenhum deploy automatico." >&2
+      exit 2
+    fi
+    [[ "$fn" =~ ^[a-z][a-z0-9_-]*$ ]] || { echo "Nome de function invalido; nenhum deploy realizado." >&2; exit 2; }
+    if [ ! -f "$RAIZ/$fn/index.ts" ]; then
+      echo "$fn: removida do repositorio; nao sera removida nem republicada no servidor automaticamente."
+      continue
+    fi
+    case " ${FUNCOES[*]:-} " in *" $fn "*) ;; *) FUNCOES+=("$fn") ;; esac
+  done <<< "$ALTERADOS"
+  if [ ${#FUNCOES[@]} -eq 0 ]; then
+    echo "Nenhuma function alterada neste push. Nenhum deploy realizado."
+    exit 0
+  fi
+elif [ ${#FUNCOES[@]} -eq 0 ]; then
+  # Execucao manual conserva a opcao explicita de publicar o conjunto.
+  FUNCOES=(equipe-auth leo-sync)
 fi
 
-FUNCOES=("$@")
-if [ ${#FUNCOES[@]} -eq 0 ]; then
-  FUNCOES=(equipe-auth leo-sync)
+for fn in "${FUNCOES[@]}"; do
+  [[ "$fn" =~ ^[a-z][a-z0-9_-]*$ ]] || { echo "Nome de function invalido." >&2; exit 2; }
+done
+if [ -z "$TOKEN" ]; then
+  echo "Falta SUPABASE_ACCESS_TOKEN. Nenhuma function foi publicada." >&2
+  exit 1
 fi
 
 cd "$RAIZ"

@@ -25,7 +25,11 @@ on:
       - 'supabase/functions/**'
       - 'scripts/publicar-functions.sh'
       - '.github/workflows/functions.yml'
+      - 'tests/functions-publicacao.mjs'
   workflow_dispatch: {}
+
+permissions:
+  contents: read
 
 # Duas publicações ao mesmo tempo mandariam versões diferentes da mesma
 # function; a última a chegar venceria, e não necessariamente é a mais nova.
@@ -38,22 +42,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: O secret existe?
-        env:
-          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: |
-          if [ -z "$TOKEN" ]; then
-            echo "::error::Falta o secret SUPABASE_ACCESS_TOKEN. As functions NAO foram publicadas -- o que esta no ar continua sendo a versao anterior."
-            exit 1
-          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
 
-      - name: Publicar todas as functions da pasta
+      - name: Conferir selecao de functions sem acessar o Supabase
+        run: node --test tests/functions-publicacao.mjs
+
+      - name: Publicar functions alteradas (ou todas na execucao manual)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          EVENTO: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          chmod +x scripts/publicar-functions.sh
-          ./scripts/publicar-functions.sh
+          if [ "$EVENTO" = "workflow_dispatch" ]; then
+            bash ./scripts/publicar-functions.sh
+          else
+            bash ./scripts/publicar-functions.sh --changed "$BASE_SHA" "$HEAD_SHA"
+          fi
 
       # O script ja falha por function que nao publicou (exit 1). Este passo so
       # deixa no log QUAL versao ficou no ar, para quem for conferir depois nao

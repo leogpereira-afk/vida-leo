@@ -65,11 +65,12 @@ test('Saúde na agenda: a fonte existe nos chips e tem cor', () => {
   assert.match(run("corFonte('saude')"), /^#[0-9a-f]{6}$/i);
 });
 
-test('Agenda fica logo abaixo de Início no menu', () => {
+test('Agenda continua no topo, após Início e DON BOY', () => {
   const run = app();
   const ids = JSON.parse(run("JSON.stringify(MODS.map(m=>m.id))"));
   assert.equal(ids[0], 'inicio');
-  assert.equal(ids[1], 'agenda');
+  assert.equal(ids[1], 'donboy');
+  assert.equal(ids[2], 'agenda');
   assert.equal(ids.filter(x => x === 'agenda').length, 1, 'Agenda duplicada no menu');
 });
 
