@@ -123,7 +123,7 @@ const MODULOS_PAINEL = ["gestao", "contas-atrasadas", "orcamentos",
   // da casa). Entraram nas TRES listas na mesma hora, de proposito: e esta
   // aqui, a terceira, que de fato concede -- as duas de cima ja estavam certas
   // nas vezes em que permutas e campanhas nao funcionaram.
-  "agenda", "calendario-empresa",
+  "agenda", "calendario-empresa", "reunioes",
   // 14/09/2026 -- `documentos` ("Documentos e ativos") nasce aqui como modulo
   // de verdade. Ate hoje a tela nao tinha modulo NENHUM: a rota do Painel
   // abria sem `Restrito`, o item entrava no menu fora do filtro, e a porta de
