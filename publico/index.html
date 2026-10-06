@@ -1786,8 +1786,9 @@ function donboyAtividade(d){
   if(!turnos.length)return '<p class="db-vazio">Nenhum pedido recente foi informado pelo servidor.</p>';
   return '<ol class="db-atividade">'+turnos.map(t=>{
     const [rotulo,classe]=donboyEstadoTurno(t),recibos=donboyRecibos(t);
+    const etapas=donboyLista(t.etapas).slice(0,40);
     const consultas=donboyLista(t.consultas).filter(c=>typeof c==='string'&&!c.startsWith('telegram_anexo_confirmado: ')).slice(0,10);
-    return `<li><div class="db-turno-topo"><strong>Pedido ${esc(donboyTexto(t.id,'sem número'))}</strong><span class="db-tag ${classe}">${esc(rotulo)}</span></div><p class="db-micro">${esc(donboyData(t.iniciado_em))}${t.modelo?' · '+esc(t.modelo):''}</p>${t.erro?`<p class="db-falha">${esc(String(t.erro).slice(0,800))}</p>`:''}<p class="db-recibo ${recibos.length?'confirmado':''}">${recibos.length?`${recibos.length} anexo${recibos.length===1?'':'s'} com envio confirmado pelo Telegram`:'Sem comprovante de envio de anexo neste registro'}</p>${recibos.length?'<ul class="db-anexos">'+recibos.map(r=>`<li>${esc(r.nome)} <small>${esc(donboyBytes(r.bytes))}</small></li>`).join('')+'</ul>':''}${consultas.length?`<details class="db-detalhes"><summary>Ver consultas deste pedido</summary><ul>${consultas.map(c=>`<li>${esc(c)}</li>`).join('')}</ul></details>`:''}</li>`;
+    return `<li><div class="db-turno-topo"><strong>Pedido ${esc(donboyTexto(t.id,'sem número'))}</strong><span class="db-tag ${classe}">${esc(rotulo)}</span></div><p class="db-micro">${esc(donboyData(t.iniciado_em))}${t.modelo?' · '+esc(t.modelo):''}</p><p class="db-micro">Pedido: ${esc(({parcial:'Há partes pendentes',evidencias_disponiveis:'Evidências de execução disponíveis',nao_aferida:'Conclusão não aferida'})[t.conclusao]||'Conclusão não aferida')}. Entrega da resposta não comprova conclusão de todas as ações.</p>${etapas.length?'<ul class="db-anexos">'+etapas.map(e=>'<li>'+esc(({buscar_arquivos_drive:'Busca no Drive',ler_arquivo_drive:'Leitura do documento',preparar_anexo_drive:'Preparação do arquivo',ver_agenda:'Consulta da agenda',criar_lembrete:'Criação na agenda'})[e.ferramenta]||String(e.ferramenta).replaceAll('_',' '))+' — '+esc(({concluida:'resultado recebido',preparada:'preparado',falhou:'não concluído'})[e.estado]||e.estado)+'</li>').join('')+'</ul>':''}${t.erro?`<p class="db-falha">${esc(String(t.erro).slice(0,800))}</p>`:''}<p class="db-recibo ${recibos.length?'confirmado':''}">${recibos.length?`${recibos.length} anexo${recibos.length===1?'':'s'} com envio confirmado pelo Telegram`:'Sem comprovante de envio de anexo neste registro'}</p>${recibos.length?'<ul class="db-anexos">'+recibos.map(r=>`<li>${esc(r.nome)} <small>${esc(donboyBytes(r.bytes))}</small></li>`).join('')+'</ul>':''}${consultas.length?`<details class="db-detalhes"><summary>Ver consultas deste pedido</summary><ul>${consultas.map(c=>`<li>${esc(c)}</li>`).join('')}</ul></details>`:''}</li>`;
   }).join('')+'</ol>';
 }
 function donboyCustos(d){
@@ -1803,7 +1804,7 @@ function donboyResultadoTeste(r){
   if(!r)return '<p class="db-vazio">A resposta e os arquivos localizados aparecerão aqui.</p>';
   if(r.erro)return `<p class="db-falha" role="alert">${esc(r.erro)}</p>`;
   const anexos=donboyLista(r.anexos);
-  return `<div class="db-resultado"><span class="db-tag neutro">Consulta concluída · sem envio</span><div class="db-resposta">${esc(donboyTexto(r.texto,''))}</div>${anexos.length?`<h3>Arquivos preparados no teste</h3><ul class="db-anexos">${anexos.map(a=>`<li>${esc(donboyTexto(a.nome,'Arquivo'))}<small>${esc(donboyBytes(a.bytes))}</small></li>`).join('')}</ul><p class="db-micro">Estes anexos não foram enviados pelo Telegram.</p>`:''}${donboyLista(r.consultas).length?`<details class="db-detalhes"><summary>Ver consultas realizadas</summary><ul>${r.consultas.filter(c=>typeof c==='string').map(c=>`<li>${esc(c)}</li>`).join('')}</ul></details>`:''}</div>`;
+  return `<div class="db-resultado"><span class="db-tag neutro">Teste de leitura · não cria nem envia</span><div class="db-resposta">${esc(donboyTexto(r.texto,''))}</div>${anexos.length?`<h3>Arquivos preparados no teste</h3><ul class="db-anexos">${anexos.map(a=>`<li>${esc(donboyTexto(a.nome,'Arquivo'))}<small>${esc(donboyBytes(a.bytes))}</small></li>`).join('')}</ul><p class="db-micro">Estes anexos não foram enviados pelo Telegram.</p>`:''}${donboyLista(r.consultas).length?`<details class="db-detalhes"><summary>Ver consultas realizadas</summary><ul>${r.consultas.filter(c=>typeof c==='string').map(c=>`<li>${esc(c)}</li>`).join('')}</ul></details>`:''}</div>`;
 }
 async function donboyAtualizar(){
   if(donboyPainelEstado.pedido)return donboyPainelEstado.pedido;
@@ -1821,9 +1822,12 @@ async function donboyTestar(comando){
   if(!texto||texto.length>1500){donboyPainelEstado.teste={erro:'Escreva uma consulta de até 1.500 caracteres.'};return}
   donboyPainelEstado.comando=texto;donboyPainelEstado.testando=true;donboyPainelEstado.teste=null;
   try{
-    const r=await apiSync('POST',{acao:'donboy_testar',comando:texto});
+    const anterior=donboyLista(donboyPainelEstado.historicoTeste).slice(-8);
+    const r=await apiSync('POST',{acao:'donboy_testar',comando:texto,historico:anterior});
     if(!r||r.somente_leitura!==true||r.telegram_enviado!==false||typeof r.texto!=='string')throw Error('garantias ausentes');
     donboyPainelEstado.teste=r;
+    const agora=new Date().toISOString();
+    donboyPainelEstado.historicoTeste=[...anterior,{papel:'user',conteudo:texto,em:agora},{papel:'assistant',conteudo:r.texto.slice(0,6000),em:agora}].slice(-8);
   }catch{donboyPainelEstado.teste={erro:'Não consegui concluir esta consulta com a confirmação de somente leitura. Nenhum envio foi solicitado por este painel.'}}
   finally{donboyPainelEstado.testando=false}
 }

@@ -37,7 +37,7 @@ async function donboyLerResposta(resposta: Response, limite = DONBOY_MAX_RESPOST
 function donboyProjetarPainel(d: DonboyObjeto) {
   if (!donboyObjeto(d.inteligencia) || !Array.isArray(d.capacidades) || !Array.isArray(d.ultimosTurnos) ||
       !Array.isArray(d.pendentes) || !donboyObjeto(d.custos)) throw Error("painel inválido");
-  const turno = (v: unknown) => donboyCampos(v,["id","estado","iniciado_em","finalizado_em","modelo","duracao_ms","custo_usd","erro","consultas"]);
+  const turno = (v: unknown) => donboyCampos(v,["id","estado","iniciado_em","finalizado_em","modelo","duracao_ms","custo_usd","erro","consultas","etapas","conclusao","entregaResposta"]);
   return {
     ...donboyCampos(d,["versao","geradoEm","consultadoEm"]),
     inteligencia: donboyCampos(d.inteligencia,["provedor","modelo","esforco"]),
@@ -167,10 +167,19 @@ export async function donboyAcao(acao: string, corpo: unknown, sb: DonboyBanco, 
     if ("erro" in preparado) return donboyJson({ok:false,erro:preparado.erro},preparado.status);
     memoriaDados=preparado.dados;
   }
-  const permitidos = teste ? ["acao","comando"] : ["acao"];
+  const permitidos = teste ? ["acao","comando","historico"] : ["acao"];
   if (!memoria && (Object.keys(corpo).some(k=>!permitidos.includes(k)) ||
       (teste && (typeof corpo.comando !== "string" || !corpo.comando.trim() || corpo.comando.length > 2000)))) {
     return donboyJson({erro:"Informe somente o comando, com até 2.000 caracteres."},400);
+  }
+  let historicoTeste: {papel:string;conteudo:string;em?:string}[]=[];
+  if(teste&&corpo.historico!==undefined){
+    if(!Array.isArray(corpo.historico)||corpo.historico.length>8||corpo.historico.length%2!==0)return donboyJson({erro:'Histórico de teste inválido.'},400);
+    for(const [i,m] of corpo.historico.entries()){
+      if(!donboyObjeto(m)||Object.keys(m).some(k=>!['papel','conteudo','em'].includes(k))||m.papel!==(i%2===0?'user':'assistant')||typeof m.conteudo!=='string'||!m.conteudo.trim()||m.conteudo.length>6000||m.em!==undefined&&(typeof m.em!=='string'||!Number.isFinite(Date.parse(m.em))))return donboyJson({erro:'Histórico de teste inválido.'},400);
+      historicoTeste.push({papel:m.papel as string,conteudo:m.conteudo, ...(m.em?{em:m.em as string}:{})});
+    }
+    if(JSON.stringify(historicoTeste).length>15000)return donboyJson({erro:'Histórico de teste acima do limite.'},400);
   }
   let hash: string;
   try {
@@ -180,7 +189,7 @@ export async function donboyAcao(acao: string, corpo: unknown, sb: DonboyBanco, 
   } catch { return donboyJson({erro:"A ligação privada com o DON BOY precisa ser conferida. Nenhum comando foi enviado."},503); }
   const destino = memoria ? (link ? "memoria-link" : adicionar ? "memoria-adicionar" : "memoria-listar") : teste ? "testar-conversa" : "painel";
   const agora = new Date();
-  const corpoRaw = JSON.stringify(memoria ? memoriaDados : teste ? {historico:[{papel:"user",conteudo:String(corpo.comando).trim(),em:agora.toISOString()}]} : {});
+  const corpoRaw = JSON.stringify(memoria ? memoriaDados : teste ? {historico:[...historicoTeste,{papel:"user",conteudo:String(corpo.comando).trim(),em:agora.toISOString()}]} : {});
   const timestamp = String(Math.floor(agora.getTime()/1000));
   try {
     const encoder = new TextEncoder();

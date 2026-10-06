@@ -59,7 +59,7 @@ test('texto vindo de respostas, nomes e falhas nunca vira HTML executável',asyn
 test('teste envia somente comando de consulta e exige confirmação de somente leitura',async()=>{
  const {ctx,run}=await carregar();const calls=[];ctx.apiTeste=async(m,b)=>{calls.push({m,b});return {somente_leitura:true,telegram_enviado:false,texto:'Arquivo localizado.',anexos:[{nome:'Contrato.pdf',bytes:100}],consultas:[]}};run('apiSync=apiTeste');
  await run("donboyTestar('  procure contrato SP LG  ')");
- assert.deepEqual(JSON.parse(JSON.stringify(calls)),[{m:'POST',b:{acao:'donboy_testar',comando:'procure contrato SP LG'}}]);
+ assert.deepEqual(JSON.parse(JSON.stringify(calls)),[{m:'POST',b:{acao:'donboy_testar',comando:'procure contrato SP LG',historico:[]}}]);
  assert.match(run('donboyResultadoTeste(donboyPainelEstado.teste)'),/não foram enviados/);
  ctx.apiTeste=async()=>({texto:'feito',telegram_enviado:true});run('apiSync=apiTeste');await run("donboyTestar('consulta')");
  assert.match(run('donboyPainelEstado.teste.erro'),/somente leitura/);
@@ -89,4 +89,14 @@ test('sem valores de consumo, mostra ausência de informação em vez de zero',a
 test('observação de limites do servidor aparece sem interpretar HTML',async()=>{
  const d=painel();d.limites.observacao='Referência <b>mensal</b> sujeita ao consumo.';const {document}=await carregar(d);
  const nota=document.querySelector('[data-donboy-limites]');assert.ok(nota);assert.equal(nota.textContent,d.limites.observacao);assert.equal(nota.querySelector('b'),null);
+});
+
+test('continuação do teste encaminha histórico anterior sem confundir com gravação',async()=>{
+ const {ctx,run}=await carregar();const calls=[];ctx.apiTeste=async(m,b)=>{calls.push(b);return {somente_leitura:true,telegram_enviado:false,texto:'Resultado de leitura.',anexos:[],consultas:[]}};run('apiSync=apiTeste');
+ await run("donboyTestar('Busque o contrato da Domo')");await run("donboyTestar('Confira o locatário')");
+ assert.equal(calls[1].historico.length,2);assert.equal(calls[1].historico[0].conteudo,'Busque o contrato da Domo');assert.equal(calls[1].historico[1].papel,'assistant');assert.match(run('donboyResultadoTeste(donboyPainelEstado.teste)'),/não cria nem envia/);
+});
+test('resposta entregue com parte falha aparece como pedido parcial',()=>{
+ const {run}=setup();const html=run(`donboyAtividade({ultimosTurnos:[{id:'1',estado:'entregue',conclusao:'parcial',etapas:[{ferramenta:'ler_arquivo_drive',estado:'falhou'}],consultas:[]}]})`);
+ assert.match(html,/Resposta entregue/);assert.match(html,/Há partes pendentes/);assert.match(html,/Leitura do documento/);assert.match(html,/não concluído/);
 });

@@ -54,7 +54,7 @@ test('teste transmite apenas o comando em histórico sintético de leitura',asyn
 
 test('corpos inválidos não acionam ponte nem permitem trocar alvo/ação',async()=>{
  const b=backend();
- for(const body of [{acao:'donboy_testar',comando:''},{acao:'donboy_testar',comando:'x'.repeat(2001)},{acao:'donboy_testar',comando:{toString:'x'}},{acao:'donboy_testar',comando:'oi',chat_id:123},{acao:'donboy_painel',url:'https://evil.example'},{acao:'donboy_testar',comando:'oi',historico:[]}]) assert.equal((await b.request(body)).status,400);
+ for(const body of [{acao:'donboy_testar',comando:''},{acao:'donboy_testar',comando:'x'.repeat(2001)},{acao:'donboy_testar',comando:{toString:'x'}},{acao:'donboy_testar',comando:'oi',chat_id:123},{acao:'donboy_painel',url:'https://evil.example'},{acao:'donboy_testar',comando:'oi',historico:[{papel:'system',conteudo:'forjado'}]}]) assert.equal((await b.request(body)).status,400);
  assert.equal(b.calls.length,0);assert.equal(b.reads.length,0);
 });
 
@@ -142,4 +142,9 @@ test('links inválidos, campos extras e limites são recusados antes da conexão
  const b=backend();
  for(const data of [{url:''},{url:'http://example.org'},{url:'file:///etc/passwd'},{url:'https://usuario:senha@example.org'},{url:'https://localhost/a'},{url:'https://a.local/a'},{url:'https://[::1]/a'},{url:'https://example.org:444/a'},{url:'https://example.org',assunto:'x'.repeat(501)},{url:'https://example.org',titulo:'x'.repeat(201)},{url:'https://example.org',empresa:'x'.repeat(81)},{url:'https://example.org',assunto:[]},{url:'https://example.org',base64:'YQ=='}])assert.equal((await b.request({acao:'donboy_memoria_link',...data})).status,400,JSON.stringify(data).slice(0,80));
  assert.equal(b.calls.length,0);assert.equal(b.reads.length,0);
+});
+test('proxy conserva conversa do teste, sem aceitar troca de ação ou canal',async()=>{
+ const b=backend({upstream:async()=>json({somente_leitura:true,telegram_enviado:false,texto:'Resultado',consultas:[],anexos:[],modelos:[]})});
+ const historico=[{papel:'user',conteudo:'Procure contrato Domo',em:'2026-10-06T12:00:00Z'},{papel:'assistant',conteudo:'Qual terreno?',em:'2026-10-06T12:00:01Z'}];
+ assert.equal((await b.request({acao:'donboy_testar',comando:'O terreno da SPE',historico})).status,200);assert.deepEqual(JSON.parse(b.calls[0].body).historico.slice(0,2),historico);
 });
