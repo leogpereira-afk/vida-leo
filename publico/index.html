@@ -12487,7 +12487,7 @@ function vGastos(m){
       filtro.rendEmp='Todas';abreBloco(todos?'rd-dash':'rd-mes');irTela('rendimentos')},
   }));
 
-  m.appendChild(el(`<div class="finance-insight"><b>Pagamentos informados</b><p>${brl(pagamentos.pagos)} marcados como pagos · ${brl(pagamentos.pendentes)} pendentes · ${pagamentos.semSituacao} sem situação informada. A forma de pagamento não confirma quitação. Estes valores não representam saldo bancário nem conciliação de comprovantes.</p></div>`));
+  m.appendChild(el(`<div class="finance-payment-status" style="border:1px solid var(--linha);border-radius:12px;padding:14px 16px;margin-bottom:16px"><b>Pagamentos informados</b><p>${brl(pagamentos.pagos)} marcados como pagos · ${brl(pagamentos.pendentes)} pendentes · ${pagamentos.semSituacao} sem situação informada. A forma de pagamento não confirma quitação. Estes valores não representam saldo bancário nem conciliação de comprovantes.</p></div>`));
   /* ================= PARA ONDE VAI O DINHEIRO (classificação) ================= */
   // as classes dos cadastros fixos entram sempre, mesmo que a config salva seja antiga —
   // senão o valor conta no total e some do detalhamento
