@@ -13,7 +13,7 @@ test('abrir painel só consulta status e não dispara comando de teste ou grava�
  ctx.apiTeste=async(method,body)=>{calls.push({method,body});if(body.acao==='donboy_memoria_listar')return {documentos:[],proximoInicio:null};return {versao:'93',inteligencia:{modelo:'gpt-6-luna',esforco:'max'},capacidades:[],ultimosTurnos:[],pendentes:[],custos:{mes:'2026-10',moeda:'USD',openai:{custoUsd:0.12,chamadas:4},claude:{custoUsd:0.03,chamadas:1}}};};
  run('apiSync=apiTeste'); assert.equal(run('typeof vDonBoy'),'function');
  await run("vDonBoy(document.getElementById('main'))");
- assert.equal(calls.length,2); assert.deepEqual(JSON.parse(JSON.stringify(calls.map(c=>c.body))),[{acao:'donboy_painel'},{acao:'donboy_memoria_listar',inicio:0,limite:20}]);
+ assert.equal(calls.length,1); assert.deepEqual(JSON.parse(JSON.stringify(calls.map(c=>c.body))),[{acao:'donboy_painel'}]);
  assert.match(document.getElementById('main').textContent,/DON BOY/);
  assert.equal(document.querySelector('[data-donboy-teste] button[type=submit]').disabled,false);
 });
@@ -99,4 +99,14 @@ test('continuação do teste encaminha histórico anterior sem confundir com gra
 test('resposta entregue com parte falha aparece como pedido parcial',()=>{
  const {run}=setup();const html=run(`donboyAtividade({ultimosTurnos:[{id:'1',estado:'entregue',conclusao:'parcial',etapas:[{ferramenta:'ler_arquivo_drive',estado:'falhou'}],consultas:[]}]})`);
  assert.match(html,/Resposta entregue/);assert.match(html,/Há partes pendentes/);assert.match(html,/Leitura do documento/);assert.match(html,/não concluído/);
+});
+
+
+test('conexões traduzem os modos de registro e leitura sem expor códigos internos',()=>{
+ const {run}=setup();
+ const html=run("donboyConexoes({capacidades:[{nome:'Central',modo:'previa_e_botao_registrar'},{nome:'Painéis',modo:'somente_leitura_sob_pedido'},{nome:'Comercial',modo:'sem_ferramenta_leitura'}]})");
+ assert.match(html,/Prévia e aprovação para registrar/);
+ assert.match(html,/Somente leitura, quando você pedir/);
+ assert.match(html,/Leitura indisponível neste atendimento/);
+ assert.doesNotMatch(html,/previa_e_botao_registrar|somente_leitura_sob_pedido|sem_ferramenta_leitura/);
 });

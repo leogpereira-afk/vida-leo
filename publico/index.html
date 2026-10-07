@@ -667,7 +667,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
 <link rel="stylesheet" href="./aviao.css?v=44fae810ca9e">
 <link rel="stylesheet" href="./fortemais-previsao.css?v=cdb9222e7265">
-<link rel="stylesheet" href="./donboy-painel.css?v=6fb174b65acf">
+<link rel="stylesheet" href="./donboy-painel.css?v=dbc00ad6f76c">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -1751,7 +1751,7 @@ function vMetodoVOF(m){
 /* ---------------- DON BOY: acompanhamento privado ---------------- */
 // O painel usa a porta autenticada da Central. Nada deste diagnóstico
 // entra no estado E, no armazenamento do navegador ou na sincronização PUT.
-const donboyPainelEstado={dados:null,carregando:false,erro:'',teste:null,testando:false,comando:'',pedido:null};
+const donboyPainelEstado={dados:null,carregando:false,erro:'',teste:null,testando:false,comando:'',pedido:null,aba:'comando'};
 function donboyData(valor){const d=new Date(valor||'');return Number.isFinite(+d)?d.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'Não informado'}
 function donboyUsd(valor){return typeof valor==='number'&&Number.isFinite(valor)&&valor>=0?new Intl.NumberFormat('pt-BR',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:4}).format(valor):'Não informado'}
 function donboyBytes(valor){return typeof valor==='number'&&Number.isFinite(valor)&&valor>=0?(valor>=1048576?(valor/1048576).toFixed(1).replace('.',',')+' MB':Math.max(1,Math.ceil(valor/1024))+' KB'):'Tamanho não informado'}
@@ -1776,7 +1776,7 @@ function donboyConexoes(d){
   return '<div class="db-conexoes">'+itens.map(c=>{
     const conf=({configurada:'Configurada',implementada:'Recurso implementado',pendente:'Configuração pendente',indisponivel:'Indisponível'})[c.configuracao]||'Não verificada';
     const v=c.verificacao;const verifica=v==='nao_testada_nesta_consulta'?'Não testada nesta consulta':typeof v==='string'?v:donboyTexto(v?.detalhe,donboyTexto(v?.status,'Sem teste registrado'));
-    const modo=({previa_e_botao_enviar:'Prévia e aprovação para enviar',busca_e_entrega_sob_pedido:'Busca e entrega quando você pedir',somente_sob_pedido:'Somente quando você pedir',desativada_por_preferencia:'Desativada por sua preferência',somente_leitura:'Somente leitura',leitura_e_gravacao_sob_pedido:'Consulta e registro quando solicitado',comando_spotify:'Comando /spotify',previa_e_confirmacao:'Prévia e confirmação'})[c.modo]||donboyTexto(c.modo);
+    const modo=({previa_e_botao_enviar:'Prévia e aprovação para enviar',previa_e_botao_registrar:'Prévia e aprovação para registrar',somente_leitura_sob_pedido:'Somente leitura, quando você pedir',sem_ferramenta_leitura:'Leitura indisponível neste atendimento',busca_e_entrega_sob_pedido:'Busca e entrega quando você pedir',somente_sob_pedido:'Somente quando você pedir',desativada_por_preferencia:'Desativada por sua preferência',somente_leitura:'Somente leitura',leitura_e_gravacao_sob_pedido:'Consulta e registro quando solicitado',comando_spotify:'Comando /spotify',previa_e_confirmacao:'Prévia e confirmação'})[c.modo]||donboyTexto(c.modo);
     const em=v&&typeof v==='object'?v.em||v.testadoEm:'';
     return `<article class="db-conexao"><div class="db-conexao-topo"><h3>${esc(donboyTexto(c.nome,c.id||'Conexão'))}</h3><span class="db-tag neutro">${esc(conf)}</span></div><p>${esc(donboyTexto(c.faz,''))}</p><dl><div><dt>Modo</dt><dd>${esc(modo)}</dd></div><div><dt>Verificação</dt><dd>${esc(verifica)}${em?' · '+esc(donboyData(em)):''}</dd></div></dl></article>`;
   }).join('')+'</div>';
@@ -1928,34 +1928,96 @@ function donboyMemoriaCard(redesenhar){
   return card;
 }
 
+const DONBOY_ABAS=[['comando','Comando'],['ambientes','Ambientes'],['conexoes','Conexões'],['inteligencia','Inteligência'],['memoria','Memória'],['automacoes','Automações'],['atividade','Atividade']];
+function donboyMetricas(d){
+  if(!d)return {amostra:null,falhas:null,parciais:null,pendentes:null};
+  const turnos=donboyLista(d.ultimosTurnos);
+  return {amostra:turnos.length,falhas:turnos.filter(t=>['falha','falhou','erro','entrega_incerta'].includes(t.estado)).length,parciais:turnos.filter(t=>t.conclusao==='parcial').length,pendentes:Array.isArray(d.pendentes)?d.pendentes.length:null};
+}
+function donboyPendentes(d){
+  if(!d||!Array.isArray(d.pendentes))return '<p class="db-vazio">Situação das aprovações não informada pelo servidor.</p>';
+  return d.pendentes.length?'<ul class="db-pendentes">'+d.pendentes.map(p=>`<li><strong>${esc(donboyTexto(p.tipo,'Pedido'))}</strong><span>${esc(donboyTexto(p.estado))}</span><small>${esc(donboyData(p.criado_em))}</small></li>`).join('')+'</ul><p class="db-micro">Confira a prévia no canal em que o pedido foi preparado. Esta lista acompanha a situação.</p>':'<p class="db-vazio">Nenhuma aprovação pendente foi informada nesta consulta.</p>';
+}
+function donboyPreferencias(d){
+  const itens=donboyLista(d?.preferencias).filter(p=>p&&typeof p==='object');
+  if(!itens.length)return '<p class="db-vazio">'+(d?.preferenciasEstado==='indisponivel'?'Não foi possível consultar as preferências agora.':'Preferências não informadas pelo servidor.')+' O modelo ativo e o consumo abaixo vêm da consulta atual.</p>';
+  return '<dl class="db-inteligencia-dados">'+itens.map(p=>`<div><dt>${esc(donboyTexto(p.rotulo,p.chave||'Preferência'))}</dt><dd>${esc(({padrao:'Padrão do assistente',curta:'Curta',equilibrada:'Equilibrada',detalhada:'Detalhada',direto:'Direto',consultivo:'Consultivo',formal:'Formal',automatico:'Conforme o assunto',paragrafos:'Parágrafos',listas:'Listas'})[p.valor]||donboyTexto(p.valor))}${p.origem?`<small>${esc(({padrao:'Configuração padrão',pedido_confirmado:'Pedido confirmado por você'})[p.origem]||'Origem informada pelo servidor')}</small>`:''}</dd></div>`).join('')+'</dl>';
+}
+function donboyAutomacoes(d){
+  const itens=donboyLista(d?.automacoes).filter(a=>a&&typeof a==='object');
+  if(!Array.isArray(d?.automacoes))return '<div class="db-estado-vazio"><span class="db-estado-icone" aria-hidden="true">◷</span><h3>Situação não informada pelo servidor</h3><p>As rotinas aparecerão aqui quando houver informação sobre sua configuração e execução.</p></div>';
+  if(!itens.length)return '<p class="db-vazio">O servidor não retornou rotinas nesta consulta.</p>';
+  return '<div class="db-conexoes">'+itens.map(a=>{
+    const estados={ativo:'Ativa',ativa:'Ativa',inativo:'Inativa',inativa:'Inativa',pausado:'Pausada',pausada:'Pausada',pendente:'Configuração pendente',erro:'Falha informada',nao_verificado:'Não verificada'};
+    const estado=Object.hasOwn(estados,a.estado)?estados[a.estado]:'Situação não informada';
+    return `<article class="db-conexao"><div class="db-conexao-topo"><h3>${esc(donboyTexto(a.nome,'Rotina'))}</h3><span class="db-tag neutro">${esc(estado)}</span></div><p>${esc(donboyTexto(a.escopo,''))}</p><dl><div><dt>Horário</dt><dd>${esc(donboyTexto(a.horario))}${a.fuso?' · '+esc(donboyTexto(a.fuso)):''}</dd></div><div><dt>Última execução</dt><dd>${esc(donboyData(a.ultimaExecucao))}</dd></div></dl>${a.detalhe?`<p class="db-micro">${esc(donboyTexto(a.detalhe))}</p>`:''}</article>`;
+  }).join('')+'</div><p class="db-micro">Rotina ativa indica configuração; a última execução precisa de confirmação própria.</p>';
+}
+function donboyAmbientes(){
+  const ambientes=[
+    ['Pessoal','Central do Léo','Despesas pessoais, viagens, saúde, documentos e compromissos.','Consulte na Central do Léo minhas despesas pessoais deste mês.'],
+    ['Empresa','Impresilk','Informações do painel empresarial: operação, compras, patrimônio e gestão.','Consulte no painel Impresilk quais áreas estão disponíveis para leitura.'],
+    ['Empreendimento','Diamond','Dados comerciais e arquivos do empreendimento, com unidade e versão identificadas.','Consulte a disponibilidade atual dos apartamentos do Diamond e informe a data da fonte.'],
+    ['Empresa','MinasLab','Cadastros, patrimônio e dados importados, com a data da atualização.','Consulte o patrimônio da MinasLab e informe a cobertura e a data dos dados.'],
+    ['Sistema empresarial','Mubisys','Operações de consulta do ERP, conforme o catálogo e as permissões disponíveis.','Consulte o catálogo da API Mubisys e mostre as consultas financeiras disponíveis.'],
+    ['Arquivos e compromissos','Google','Drive e agenda: localizar documentos e consultar compromissos quando solicitado.','Consulte minha agenda de amanhã e sinalize conflitos de horário.'],
+  ];
+  return '<p class="db-nota-ambientes">Este é um guia para direcionar seus pedidos. Escolher um exemplo não muda permissões nem comprova a conexão.</p><div class="db-ambientes">'+ambientes.map(([tipo,nome,descricao,exemplo])=>`<article class="db-ambiente"><span class="db-sobretitulo">${esc(tipo)}</span><h3>${esc(nome)}</h3><p>${esc(descricao)}</p><button type="button" class="btn ghost" data-donboy-exemplo="${esc(exemplo)}">Preparar consulta <span aria-hidden="true">↗</span></button></article>`).join('')+'</div>';
+}
 async function vDonBoy(m){
   m.classList.add('donboy-layout');
   const desenhar=()=>{
     if(!m.isConnected)return;
-    const s=donboyPainelEstado,d=s.dados,i=d?.inteligencia||{};
-    m.replaceChildren(cab('DON BOY','Acompanhe respostas, arquivos e consumo do seu assistente.'));
+    const s=donboyPainelEstado,d=s.dados,i=d?.inteligencia||{},metricas=donboyMetricas(d);
+    if(!DONBOY_ABAS.some(([id])=>id===s.aba))s.aba='comando';
+    const foco=document.activeElement, focoId=m.contains(foco)?foco.id:'';
+    m.replaceChildren(cab('DON BOY','Seu assistente, com cada assunto no lugar certo.'));
     const topo=m.querySelector('.topo');
-    const bt=acao(s.carregando?'Atualizando…':'Atualizar',async()=>{const p=donboyAtualizar();desenhar();await p;desenhar()},'ghost');bt.disabled=s.carregando;bt.dataset.donboyAtualizar='';topo.appendChild(bt);
+    const bt=acao(s.carregando?'Atualizando…':'Atualizar',async()=>{const p=donboyAtualizar();desenhar();await p;desenhar()},'ghost');bt.disabled=s.carregando;bt.dataset.donboyAtualizar='';bt.id='db-atualizar';topo.appendChild(bt);
     const telegram=donboyTelegram(d?.telegramUrl);if(telegram)topo.appendChild(el(`<a class="btn" href="${esc(telegram)}" target="_blank" rel="noopener noreferrer">Abrir no Telegram ↗</a>`));
     const status=s.erro||s.carregando?'':d?'Consultado em '+donboyData(d.consultadoEm||d.geradoEm):'Aguardando consulta';
     m.appendChild(el(`<p class="db-status ${s.erro?'erro':''}" data-donboy-status role="${s.erro?'alert':'status'}" aria-live="polite">${esc(s.erro||(s.carregando?'Consultando o DON BOY…':status))}${s.erro&&d?'<span>Os dados abaixo são da última consulta bem-sucedida.</span>':''}</p>`));
-    if(d){
-      const recentes=donboyLista(d.ultimosTurnos),falhas=recentes.filter(t=>['falha','falhou','erro','entrega_incerta'].includes(t.estado)).length;
-      m.appendChild(el(`<div class="db-resumo"><div><small>Modelo ativo</small><strong>${esc(donboyTexto(i.modelo))}</strong><span>${esc(donboyTexto(i.provedor))}</span></div><div><small>Raciocínio</small><strong>${esc(i.esforco==='max'?'Máximo':donboyTexto(i.esforco))}</strong><span>${esc(donboyTexto(i.esforco,''))}</span></div><div><small>Versão do assistente</small><strong>${esc(donboyTexto(d.versao))}</strong><span>Informada pelo servidor</span></div><div><small>Atenção nos pedidos recentes</small><strong>${falhas}</strong><span>${recentes.length} registros consultados</span></div></div>`));
-    }
-    m.appendChild(donboyMemoriaCard(desenhar));
-    const grid=el('<div class="db-grade"></div>'),principal=el('<div class="db-coluna"></div>'),lateral=el('<div class="db-coluna"></div>');grid.append(principal,lateral);m.appendChild(grid);
-    if(d){principal.appendChild(el(donboyCard('Conexões e recursos','Confira o que está configurado e o que teve uso verificado.',donboyConexoes(d))));principal.appendChild(el(donboyCard('Respostas e arquivos recentes','O comprovante de anexo aparece somente após confirmação do Telegram.',donboyAtividade(d))));lateral.appendChild(el(donboyCard('Consumo por provedor','OpenAI e Claude, separados.',donboyCustos(d))))}
-    const teste=el(donboyCard('Consultar o DON BOY','Faça um teste aqui antes de repetir o pedido no Telegram.',`<form data-donboy-teste><label for="db-comando">O que você quer consultar?</label><textarea id="db-comando" maxlength="1500" rows="3" placeholder="Ex.: procure o contrato SP LG no meu Google Drive" aria-describedby="db-teste-limite" ${s.testando?'disabled':''}>${esc(s.comando)}</textarea><p class="db-micro" id="db-teste-limite">Somente consulta. Não envia mensagens nem altera seus registros. O teste pode consumir créditos de IA.</p><div class="db-teste-acoes"><button type="submit" class="btn" ${s.testando?'disabled':''}>${s.testando?'Consultando…':'Testar consulta'}</button><span class="db-micro">Até 1.500 caracteres</span></div></form><div class="db-teste-resultado" aria-live="polite">${s.testando?'<p class="db-vazio">Consultando as fontes disponíveis…</p>':donboyResultadoTeste(s.teste)}</div>`,'db-teste'));
-    lateral.appendChild(teste);
+    const abas=el('<div class="db-abas" role="tablist" aria-label="Painel de comando DON BOY"></div>');
+    DONBOY_ABAS.forEach(([id,nome])=>abas.appendChild(el(`<button type="button" role="tab" id="db-aba-${id}" aria-controls="db-painel-${id}" aria-selected="${s.aba===id}" tabindex="${s.aba===id?0:-1}" data-donboy-aba="${id}">${esc(nome)}</button>`)));
+    m.appendChild(abas);
+    const paineis={};
+    DONBOY_ABAS.forEach(([id,nome])=>{const painel=el(`<section id="db-painel-${id}" class="db-aba-painel" role="tabpanel" aria-labelledby="db-aba-${id}" tabindex="0" ${s.aba===id?'':'hidden'}></section>`);paineis[id]=painel;m.appendChild(painel)});
+    const abrir=async(id,focar=true)=>{
+      if(!DONBOY_ABAS.some(([chave])=>chave===id))return;
+      s.aba=id;
+      abas.querySelectorAll('[role=tab]').forEach(b=>{const ativo=b.dataset.donboyAba===id;b.setAttribute('aria-selected',String(ativo));b.tabIndex=ativo?0:-1});
+      DONBOY_ABAS.forEach(([chave])=>{paineis[chave].hidden=chave!==id});
+      if(focar){const b=abas.querySelector('[data-donboy-aba="'+id+'"]');b.focus();b.scrollIntoView({block:'nearest',inline:'nearest'})}
+      if(id==='memoria'&&donboyMemoriaEstado.documentos===null&&!donboyMemoriaEstado.listando&&!donboyMemoriaEstado.erroLista){const p=donboyMemoriaListar();desenhar();await p;desenhar()}
+    };
+    abas.querySelectorAll('[role=tab]').forEach((b,indice)=>{
+      b.onclick=()=>abrir(b.dataset.donboyAba);
+      b.onkeydown=ev=>{let destino;if(ev.key==='ArrowRight')destino=(indice+1)%DONBOY_ABAS.length;else if(ev.key==='ArrowLeft')destino=(indice+DONBOY_ABAS.length-1)%DONBOY_ABAS.length;else if(ev.key==='Home')destino=0;else if(ev.key==='End')destino=DONBOY_ABAS.length-1;else return;ev.preventDefault();const botoes=abas.querySelectorAll('[role=tab]');botoes.forEach((x,n)=>x.tabIndex=n===destino?0:-1);botoes[destino].focus();botoes[destino].scrollIntoView({block:'nearest',inline:'nearest'})};
+    });
+    const comando=paineis.comando;
+    comando.appendChild(el(`<div class="db-comando-intro"><div><span class="db-sobretitulo">Painel de comando</span><h2>O que vamos conferir?</h2><p>Consulte uma informação, acompanhe o resultado e ajuste o próximo pedido.</p></div><div class="db-modelo-compacto"><span>Inteligência em uso</span><strong>${esc(donboyTexto(i.modelo))}</strong><small>${esc(donboyTexto(i.provedor))}${i.esforco?' · '+esc(i.esforco==='max'?'Raciocínio máximo':i.esforco):''}</small></div></div>`));
+    const teste=el(donboyCard('Consultar o DON BOY','Busque nos seus arquivos e sistemas, com a fonte do resultado.',`<form data-donboy-teste><label for="db-comando">Seu pedido</label><textarea id="db-comando" maxlength="1500" rows="3" placeholder="Ex.: procure o contrato de aluguel da SPE Domo e confira o locatário" aria-describedby="db-teste-limite" ${s.testando?'disabled':''}>${esc(s.comando)}</textarea><p class="db-micro" id="db-teste-limite">Somente consulta. Não envia mensagens nem altera seus registros. O teste pode consumir créditos de IA.</p><div class="db-teste-acoes"><button type="submit" class="btn" ${s.testando?'disabled':''}>${s.testando?'Consultando…':'Consultar'}</button><span class="db-micro">Até 1.500 caracteres</span></div></form><div class="db-exemplos" aria-label="Exemplos de consulta"><span>Comece por aqui</span><button type="button" data-donboy-exemplo="Consulte minha agenda de amanhã e sinalize conflitos de horário.">Minha agenda</button><button type="button" data-donboy-exemplo="Procure no Google Drive o contrato de aluguel da SPE Domo e confira quem aparece como locador e locatário.">Buscar contrato</button><button type="button" data-donboy-exemplo="Consulte o patrimônio da MinasLab e informe a cobertura e a data dos dados.">Consultar MinasLab</button></div><div class="db-teste-resultado" aria-live="polite">${s.testando?'<p class="db-vazio">Consultando as fontes disponíveis…</p>':donboyResultadoTeste(s.teste)}</div>`,'db-teste'));
+    comando.appendChild(teste);
     const form=teste.querySelector('form'),campo=teste.querySelector('textarea');campo.oninput=()=>{s.comando=campo.value};form.onsubmit=async ev=>{ev.preventDefault();const p=donboyTestar(campo.value);desenhar();await p;desenhar()};
-    if(d){
-      const pendentes=donboyLista(d.pendentes);
-      lateral.appendChild(el(donboyCard('Aguardando confirmação','Pedidos preparados que ainda dependem da sua decisão.',pendentes.length?'<ul class="db-pendentes">'+pendentes.map(p=>`<li><strong>${esc(donboyTexto(p.tipo,'Pedido'))}</strong><span>${esc(donboyTexto(p.estado))}</span><small>${esc(donboyData(p.criado_em))}</small></li>`).join('')+'</ul>':'<p class="db-vazio">Nenhuma pendência foi informada.</p>')));
-    }
+    const n=v=>v===null?'Não informado':String(v);
+    comando.appendChild(el(`<div class="db-resumo db-metricas"><div><small>Falhas ou entrega incerta</small><strong>${esc(n(metricas.falhas))}</strong><span>Nos pedidos consultados</span></div><div><small>Pedidos com partes pendentes</small><strong>${esc(n(metricas.parciais))}</strong><span>Conforme registro de execução</span></div><div><small>Aguardando aprovação</small><strong>${esc(n(metricas.pendentes))}</strong><span>Prévia ainda não concluída</span></div></div>`));
+    comando.appendChild(el(`<p class="db-micro db-amostra">${metricas.amostra===null?'Amostra ainda não informada.':metricas.amostra+' pedidos recentes consultados. Esta amostra não representa todo o histórico.'}</p>`));
+    const revisar=el('<button type="button" class="btn ghost db-atalho-atividade">Acompanhar pedidos e aprovações <span aria-hidden="true">→</span></button>');revisar.onclick=()=>abrir('atividade');comando.appendChild(revisar);
+    paineis.ambientes.appendChild(el(donboyCard('Cada ambiente tem seu contexto','Use o nome da empresa ou do sistema para direcionar a consulta.',donboyAmbientes())));
+    paineis.conexoes.appendChild(el(donboyCard('Conexões e recursos','Configuração e teste são informações diferentes. Confira o modo de uso de cada recurso.',donboyConexoes(d||{}))));
+    const inteligencia=paineis.inteligencia;
+    inteligencia.appendChild(el(donboyCard('Inteligência atual','Configuração informada pelo servidor.',`<dl class="db-inteligencia-dados"><div><dt>Provedor</dt><dd>${esc(donboyTexto(i.provedor))}</dd></div><div><dt>Modelo</dt><dd>${esc(donboyTexto(i.modelo))}</dd></div><div><dt>Raciocínio</dt><dd>${esc(i.esforco==='max'?'Máximo':donboyTexto(i.esforco))}</dd></div></dl><details class="db-detalhes db-versao"><summary>Detalhes da versão</summary><p>${esc(donboyTexto(d?.versao))}</p><p class="db-micro">Identificação informada pelo servidor nesta consulta.</p></details>`)));
+    inteligencia.appendChild(el(donboyCard('Preferências de atendimento','Preferências informadas pelo servidor. Solicite mudanças na conversa com o DON BOY.',donboyPreferencias(d))));
+    inteligencia.appendChild(el(donboyCard('Consumo por provedor','OpenAI e Claude, separados.',d?donboyCustos(d):'<p class="db-vazio">Consumo ainda não informado pelo servidor.</p>')));
+    paineis.memoria.appendChild(donboyMemoriaCard(desenhar));
+    paineis.automacoes.appendChild(el(donboyCard('Automações','Horários, escopo e última execução informados pelo servidor.',donboyAutomacoes(d))));
+    paineis.atividade.appendChild(el(donboyCard('Aguardando confirmação','Pedidos preparados que ainda dependem da sua decisão.',donboyPendentes(d))));
+    paineis.atividade.appendChild(el(donboyCard('Respostas e arquivos recentes','Acompanhe as etapas do pedido. A entrega da resposta e o envio de um anexo têm confirmações próprias.',donboyAtividade(d||{}))));
+    m.querySelectorAll('[data-donboy-exemplo]').forEach(b=>{b.disabled=s.testando;b.onclick=async()=>{if(s.testando)return;s.comando=b.dataset.donboyExemplo;campo.value=s.comando;await abrir('comando',false);campo.focus()}});
+    if(focoId){const destino=document.getElementById(focoId);if(destino&&!destino.closest('[hidden]')&&!destino.disabled)destino.focus()}
   };
   desenhar();
-  const consultas=[];if(!donboyPainelEstado.dados&&!donboyPainelEstado.erro)consultas.push(donboyAtualizar());if(donboyMemoriaEstado.documentos===null&&!donboyMemoriaEstado.erroLista)consultas.push(donboyMemoriaListar());if(consultas.length){desenhar();await Promise.all(consultas);desenhar()}
+  const consultas=[];if(!donboyPainelEstado.dados&&!donboyPainelEstado.erro)consultas.push(donboyAtualizar());if(donboyPainelEstado.aba==='memoria'&&donboyMemoriaEstado.documentos===null&&!donboyMemoriaEstado.erroLista)consultas.push(donboyMemoriaListar());if(consultas.length){desenhar();await Promise.all(consultas);desenhar()}
 }
 
 /* ---------------- navegação ---------------- */

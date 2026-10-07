@@ -42,6 +42,37 @@ test('painel assina corpo fixo e devolve somente a projeção autorizada',async(
  assert.equal(c.headers.authorization,undefined);assert.equal(c.headers['x-donboy-token'],undefined);
  assert.deepEqual(b.reads,['donboy_ponte']);
 });
+test('painel projeta preferências fechadas sem fatos, IDs, valores anteriores ou segredos',async()=>{
+ const preferencias=[
+  {chave:'tom',rotulo:'SEGREDO',valor:'consultivo',origem:'pedido_confirmado',id:99,anterior:'SEGREDO',conteudo:'SEGREDO',token:'SEGREDO'},
+  {chave:'duracao_reuniao_min',valor:'60',origem:'pedido_confirmado'},
+  {chave:'formato',valor:'padrao',origem:'padrao'},
+  {chave:'senha',valor:'SEGREDO',origem:'pedido_confirmado'},
+  {chave:'extensao',valor:{token:'SEGREDO'},origem:'pedido_confirmado'},
+  {chave:'formato',valor:'listas',origem:'arquivo'},
+  {chave:'tom',valor:'formal',origem:'pedido_confirmado'},
+ ];
+ const b=backend({upstream:async()=>json({...overview,preferencias,preferenciasEstado:'disponivel',fatos:[{conteudo:'SEGREDO'}]})});
+ const r=await b.request({acao:'donboy_painel'});assert.equal(r.status,200);const d=await r.json();
+ assert.equal(d.preferenciasEstado,'disponivel');assert.equal(d.preferencias.length,3);
+ assert.deepEqual(d.preferencias[0],{chave:'tom',rotulo:'Tom da conversa',valor:'consultivo',origem:'pedido_confirmado'});
+ assert.doesNotMatch(JSON.stringify(d),/SEGREDO|anterior|conteudo/);
+ assert.ok(d.preferencias.every(p=>Object.keys(p).sort().join(',')==='chave,origem,rotulo,valor'));
+});
+test('painel aceita agente antigo e falha parcial de preferências sem inventar automações ativas',async()=>{
+ const antigo=backend(),r1=await antigo.request({acao:'donboy_painel'});assert.equal(r1.status,200);
+ const d1=await r1.json();assert.deepEqual(d1.preferencias,[]);assert.equal(d1.preferenciasEstado,'nao_consultado');assert.deepEqual(d1.automacoes,[]);
+ const b=backend({upstream:async()=>json({...overview,preferencias:[],preferenciasEstado:'indisponivel',automacoes:[
+  {id:'briefing',nome:'Resumo',estado:'nao_verificado',horario:'07:00',fuso:'America/Sao_Paulo',escopo:'Pessoal',ultimaExecucao:'2026-10-07T07:00:00Z',detalhe:'Não consultado',token:'SEGREDO'},
+  {id:'email_diario',nome:'E-mail',estado:'inativo',detalhe:{token:'SEGREDO'}},
+  {id:'saude',estado:'ativo',token:'SEGREDO'},
+  {id:'desconhecida',estado:'nao_verificado',token:'SEGREDO'},
+ ]})});
+ const r=await b.request({acao:'donboy_painel'});assert.equal(r.status,200);const d=await r.json();
+ assert.equal(d.preferenciasEstado,'indisponivel');assert.equal(d.automacoes.length,2);
+ assert.ok(d.automacoes.every(a=>a.horario===null&&a.ultimaExecucao===null));assert.equal(d.automacoes[1].detalhe,null);
+ assert.doesNotMatch(JSON.stringify(d),/SEGREDO|07:00/);
+});
 
 test('teste transmite apenas o comando em histórico sintético de leitura',async()=>{
  const b=backend({upstream:async()=>json({somente_leitura:true,telegram_enviado:false,texto:'Localizei o contrato.',consultas:['Drive'],anexos:[{nome:'contrato.pdf',bytes:123}],modelos:['modelo-teste'],base64:'nao-vazar'})});

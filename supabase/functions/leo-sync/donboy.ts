@@ -34,6 +34,31 @@ async function donboyLerResposta(resposta: Response, limite = DONBOY_MAX_RESPOST
   return valor;
 }
 
+function donboyProjetarPreferencias(valor:unknown){
+  const rotulos:Record<string,string>={extensao:'Extensão das respostas',tom:'Tom da conversa',formato:'Formato das respostas',duracao_reuniao_min:'Duração padrão das reuniões (min)'};
+  const escolhas:Record<string,string[]>={extensao:['curta','equilibrada','detalhada'],tom:['direto','consultivo','formal'],formato:['automatico','paragrafos','listas']};
+  if(!Array.isArray(valor))return [];
+  const vistas=new Set<string>();
+  return valor.slice(0,20).flatMap(p=>{
+    if(!donboyObjeto(p)||typeof p.chave!=='string'||!Object.hasOwn(rotulos,p.chave)||vistas.has(p.chave)||typeof p.valor!=='string'||!['pedido_confirmado','padrao'].includes(String(p.origem)))return [];
+    const valido=p.valor==='padrao'||(p.chave==='duracao_reuniao_min'?/^\d+$/.test(p.valor)&&Number(p.valor)>=5&&Number(p.valor)<=480:escolhas[p.chave].includes(p.valor));
+    if(!valido||(p.origem==='padrao')!==(p.valor==='padrao'))return [];
+    vistas.add(p.chave);
+    return [{chave:p.chave,rotulo:rotulos[p.chave],valor:p.valor,origem:p.origem}];
+  });
+}
+function donboyProjetarAutomacoes(valor:unknown){
+  if(!Array.isArray(valor))return [];
+  const vistas=new Set<string>();
+  const texto=(v:unknown,max:number)=>typeof v==='string'?v.slice(0,max):null;
+  return valor.slice(0,20).flatMap(a=>{
+    if(!donboyObjeto(a)||typeof a.id!=='string'||!['email_diario','briefing','acompanhamento','saude'].includes(a.id)||vistas.has(a.id)||!['inativo','nao_verificado'].includes(String(a.estado)))return [];
+    vistas.add(a.id);
+    // Não existe API de verificação do agendador neste contrato. Campos de
+    // horário e execução permanecem vazios, mesmo se um upstream os afirmar.
+    return [{id:a.id,nome:texto(a.nome,120),estado:a.estado,horario:null,fuso:texto(a.fuso,80),escopo:texto(a.escopo,200),ultimaExecucao:null,detalhe:texto(a.detalhe,600)}];
+  });
+}
 function donboyProjetarPainel(d: DonboyObjeto) {
   if (!donboyObjeto(d.inteligencia) || !Array.isArray(d.capacidades) || !Array.isArray(d.ultimosTurnos) ||
       !Array.isArray(d.pendentes) || !donboyObjeto(d.custos)) throw Error("painel inválido");
@@ -41,6 +66,9 @@ function donboyProjetarPainel(d: DonboyObjeto) {
   return {
     ...donboyCampos(d,["versao","geradoEm","consultadoEm"]),
     inteligencia: donboyCampos(d.inteligencia,["provedor","modelo","esforco"]),
+    preferencias:donboyProjetarPreferencias(d.preferencias),
+    preferenciasEstado:Array.isArray(d.preferencias)&&['disponivel','indisponivel','nao_consultado'].includes(String(d.preferenciasEstado))?d.preferenciasEstado:'nao_consultado',
+    automacoes:donboyProjetarAutomacoes(d.automacoes),
     capacidades: d.capacidades.slice(0,50).map(c=>donboyCampos(c,["id","nome","configuracao","modo","faz","verificacao","testadaEm","status","detalhe"])),
     ultimaExecucao: turno(d.ultimaExecucao),
     ultimosTurnos: d.ultimosTurnos.slice(0,50).map(turno),
