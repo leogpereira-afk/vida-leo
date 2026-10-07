@@ -12394,14 +12394,25 @@ function modalItemGasto(x, titulo, sub, ref, dica){
   });
 }
 
+function financeiroValidarGasto(g){
+ if(g.data&&g.data.slice(0,7)!==g.mes)throw Error('A data da despesa deve pertencer ao mês informado.');
+ if(g.pagoEm&&g.situacao!=='Pago')throw Error('Selecione Pago para informar a data de pagamento.');
+ if((+g.valor<0)!==(g.natureza==='Estorno'))throw Error('Use Estorno para um valor negativo e Despesa pessoal para valor positivo.');
+}
+function financeiroPagamentos(itens){return {pagos:itens.filter(g=>g.situacao==='Pago').reduce((s,g)=>s+(+g.valor||0),0),pendentes:itens.filter(g=>g.situacao==='Pendente').reduce((s,g)=>s+(+g.valor||0),0),semSituacao:itens.filter(g=>!g.situacao||g.situacao==='Não informado').length};}
 function modalLancamentoGasto(g,novo=false){
   if(novo)g._ffNovo=true;
   abrirModal(esc(g.oque||'Novo gasto'),'Este lançamento entra nos totais depois de salvar.',(c,fechar)=>{
     financeiroFormulario(c,[{k:'oque',t:'Descrição',full:true,req:true,ph:'Ex.: Copasa, Cemig, escola, compras pessoais'},
       {k:'valor',t:'Valor (R$)',tipo:'moeda',req:true,naoZero:true,ajuda:'Use valor negativo somente para estorno.'},
       {k:'mes',t:'Mês do gasto',tipo:'month',req:true},{k:'classe',t:'Categoria',opcoes:['Sem categoria',...categoriasGasto()],inicial:g.classe||g.categoria||'Sem categoria',req:true},
-      {k:'pago',t:'Forma de pagamento',opcoes:['',...CFG('formasPagto')]},{k:'obs',t:'Observações',tipo:'textarea',full:true}],
-      g,(v,patch)=>financeiroSalvarRegistro(E.gastos,g,v,patch),fechar);
+      {k:'pago',t:'Forma de pagamento',opcoes:['',...CFG('formasPagto')]},
+      {k:'data',t:'Data da despesa',tipo:'date'},{k:'vencimento',t:'Vencimento',tipo:'date'},
+      {k:'situacao',t:'Pagamento',opcoes:['Não informado','Pendente','Pago'],inicial:g.situacao||'Não informado'},
+      {k:'pagoEm',t:'Data do pagamento',tipo:'date'},
+      {k:'natureza',t:'Natureza',opcoes:['Despesa pessoal','Estorno'],inicial:(+g.valor<0?'Estorno':'Despesa pessoal')},
+      {k:'obs',t:'Observações',tipo:'textarea',full:true}],
+      g,(v,patch)=>{financeiroValidarGasto(v);financeiroSalvarRegistro(E.gastos,g,v,patch)},fechar);
     c.appendChild(el('<p class="ff-note">Confira se esta despesa já está em Recorrentes; o resumo soma os dois cadastros.</p>'));
     if(!novo){const arqs=el('<details class="ff-attachments"><summary>Comprovantes</summary></details>');arqs.appendChild(areaArquivos('gasto:'+g.id,'Nota fiscal, recibo, comprovante'));c.appendChild(arqs)}
   });
@@ -12411,7 +12422,7 @@ function financeiroRepetirGastos(itens,mes){
     const escolhidos=new Set(),lista=el('<div class="ff-repeat-list"></div>'),status=el('<p class="ff-note" role="status" aria-live="polite"></p>'),btn=el('<button class="btn" type="button">Adicionar selecionados</button>');
     const atualizar=()=>{const vis=itens.filter(x=>escolhidos.has(x.id));status.textContent=vis.length+' selecionados · '+brl(vis.reduce((a,x)=>a+(+x.valor||0),0));btn.disabled=!vis.length};
     itens.forEach(g=>{const l=el(`<label class="ff-repeat-row"><input type="checkbox"><span>${esc(g.oque||'Sem descrição')}<small>${esc(g.classe||'Sem categoria')}</small></span><b>${brl(+g.valor||0)}</b></label>`);l.querySelector('input').onchange=ev=>{ev.target.checked?escolhidos.add(g.id):escolhidos.delete(g.id);atualizar()};lista.appendChild(l)});
-    btn.onclick=()=>{if(btn.disabled)return;btn.disabled=true;itens.filter(g=>escolhidos.has(g.id)).forEach(g=>E.gastos.push({...g,id:uid(),mes}));salvar();fechar()};c.append(lista,status,btn);atualizar();
+    btn.onclick=()=>{if(btn.disabled)return;btn.disabled=true;itens.filter(g=>escolhidos.has(g.id)).forEach(g=>E.gastos.push({...g,id:uid(),mes,data:'',vencimento:'',pagoEm:'',situacao:'Não informado',origemRef:''}));salvar();fechar()};c.append(lista,status,btn);atualizar();
   });
 }
 function financeiroFiltroTabela(bloco,lista,campos,valor){
@@ -12431,6 +12442,7 @@ function vGastos(m){
   if(!filtro.gastosMes) filtro.gastosMes=mesAtual();
   const mes=filtro.gastosMes, todos=mes==='todos';
   const doMes=todos?E.gastos:E.gastos.filter(g=>g.mes===mes);
+  const pagamentos=financeiroPagamentos(doMes);
   const varTot=doMes.reduce((s,g)=>s+(+g.valor||0),0);
   const fixo=fixoMensal();
   // somando todos os meses, o fixo também se repete mês a mês
@@ -12475,6 +12487,7 @@ function vGastos(m){
       filtro.rendEmp='Todas';abreBloco(todos?'rd-dash':'rd-mes');irTela('rendimentos')},
   }));
 
+  m.appendChild(el(`<div class="finance-insight"><b>Pagamentos informados</b><p>${brl(pagamentos.pagos)} marcados como pagos · ${brl(pagamentos.pendentes)} pendentes · ${pagamentos.semSituacao} sem situação informada. A forma de pagamento não confirma quitação. Estes valores não representam saldo bancário nem conciliação de comprovantes.</p></div>`));
   /* ================= PARA ONDE VAI O DINHEIRO (classificação) ================= */
   // as classes dos cadastros fixos entram sempre, mesmo que a config salva seja antiga —
   // senão o valor conta no total e some do detalhamento
@@ -12634,7 +12647,7 @@ function vGastos(m){
     if(!itens.length)gruposLanc.get(cl).appendChild(el(`<p class="ff-note">${cl==='Casa'?'Adicione Copasa, Cemig, internet e outras contas.':'Adicione as despesas desta categoria.'}</p>`));
   });
   doMes.slice().sort((a,b)=>(+b.valor||0)-(+a.valor||0)).forEach(g=>{
-    const linha=el(`<div class="finance-expense-row" data-ff-gasto="${esc(g.id)}"><button class="finance-expense-open"><span>${esc(g.oque||'Sem descrição')}<small>${esc(g.classe||g.categoria||'Sem categoria')} · ${esc(g.mes||'Sem mês')}</small></span><b>${brl(+g.valor||0)} ›</b></button><button class="btn ghost mini" aria-label="${esc('Excluir '+(g.oque||'gasto'))}">Excluir</button></div>`);
+    const linha=el(`<div class="finance-expense-row" data-ff-gasto="${esc(g.id)}"><button class="finance-expense-open"><span>${esc(g.oque||'Sem descrição')}<small>${esc(g.classe||g.categoria||'Sem categoria')} · ${esc(g.mes||'Sem mês')} · ${esc(g.situacao||'Não informado')}${g.vencimento?' · vence '+esc(fmtDataAno(g.vencimento)):''}${g.parcela?' · parcela '+esc(g.parcela)+'/'+esc(g.parcelas||'?'):''}</small></span><b>${brl(+g.valor||0)} ›</b></button><button class="btn ghost mini" aria-label="${esc('Excluir '+(g.oque||'gasto'))}">Excluir</button></div>`);
     linha.querySelector('.finance-expense-open').onclick=()=>modalLancamentoGasto(g);
     linha.querySelector('.btn').onclick=()=>excluirGasto(g);
     gruposLanc.get(g.classe||g.categoria||'Sem categoria')?.appendChild(linha);
