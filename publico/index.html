@@ -667,6 +667,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
 <link rel="stylesheet" href="./aviao.css?v=44fae810ca9e">
 <link rel="stylesheet" href="./fortemais-previsao.css?v=cdb9222e7265">
+<link rel="stylesheet" href="./fortemais-demandas.css?v=fafdab59a91c">
 <link rel="stylesheet" href="./donboy-painel.css?v=dbc00ad6f76c">
 </head>
 <body>
@@ -704,6 +705,8 @@ tr:hover .lixo{opacity:1}
 <script src="./documentos-revisao.js?v=f54d2ba958f9"></script>
 <script src="./organograma.js?v=3a5db1c22c87"></script>
 <script src="./fortemais-financeiro.js?v=48296dd2f793"></script>
+<script src="./fortemais-demandas-modelo.js?v=e2ba946c28ef"></script>
+<script src="./fortemais-demandas.js?v=be177dcfa8dd"></script>
 <script>
 /* ============================================================
    Central do Léo — painel pessoal, um arquivo só.
@@ -1542,14 +1545,14 @@ function atualizarCamadasModais(){
   if(fundos.length)app?.setAttribute('aria-hidden','true');else app?.removeAttribute('aria-hidden');
   fundos.forEach((f,i)=>{const inativo=i<fundos.length-1;f.toggleAttribute('inert',inativo);if(inativo)f.setAttribute('aria-hidden','true');else f.removeAttribute('aria-hidden')});
 }
-function abrirModal(titulo,sub,montar,aoFechar){
+function abrirModal(titulo,sub,montar,aoFechar,opcoes={}){
   const anterior=document.activeElement, id=uid();
   const nomeAnterior=anterior?.getAttribute('aria-label')||anterior?.textContent?.trim();
   const devolverFoco=()=>{const substituto=nomeAnterior?[...document.querySelectorAll('button,select,[role=button]')].find(x=>x.tagName===anterior?.tagName&&(x.getAttribute('aria-label')||x.textContent.trim())===nomeAnterior):null;(anterior?.isConnected?anterior:substituto||document.querySelector('#modais .fundo:last-child .modal, #main'))?.focus({preventScroll:true})};
   const f=el(`<div class="fundo"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="${id}" aria-describedby="${id}-descricao" tabindex="-1"><header><div><h3 id="${id}">${titulo}</h3><p id="${id}-descricao">${sub||''}</p></div>
     <button class="fechar" aria-label="Fechar janela">✕</button></header><div class="mcorpo"></div></div></div>`);
   let fechado=false;
-  const fechar=()=>{if(fechado)return;fechado=true;if(f.contains(document.activeElement))document.activeElement.blur();document.removeEventListener('keydown',teclas);f.remove();atualizarCamadasModais();aoFechar&&aoFechar();if(!document.querySelector('#modais .fundo'))tela();devolverFoco()};
+  const fechar=()=>{if(fechado||opcoes.antesFechar?.()===false)return;fechado=true;if(f.contains(document.activeElement))document.activeElement.blur();document.removeEventListener('keydown',teclas);f.remove();atualizarCamadasModais();aoFechar&&aoFechar();if(opcoes.recarregar!==false&&!document.querySelector('#modais .fundo'))tela();devolverFoco()};
   const teclas=ev=>{
     if(!f.isConnected){document.removeEventListener('keydown',teclas);return}
     if(f!==document.querySelector('#modais .fundo:last-child'))return;
@@ -6090,15 +6093,20 @@ const fmExclusoes=new Set();
 async function fmObraExcluir(o,concluir=()=>tela()){
   if(fmExclusoes.has(o.id))return;
   if(!E.obras.includes(o)){alert('Este projeto foi atualizado. Abra a lista novamente.');return}
-  if(!confirm('Excluir o projeto “'+(o.nome||'Sem nome')+'”?\n\nSerão removidos o cadastro, as previsões, os sócios da previsão, os fluxos previstos, os custos, os aportes e os anexos deste projeto. Esta ação não pode ser desfeita.'))return;
-  fmExclusoes.add(o.id);const estado=E;
+  if(!confirm('Excluir o projeto “'+(o.nome||'Sem nome')+'”?\n\nSerão removidos o cadastro, as previsões, os sócios da previsão, os fluxos previstos, os custos, os aportes, as demandas, seu histórico e os anexos deste projeto. Esta ação não pode ser desfeita.'))return;
+  fmExclusoes.add(o.id);const estado=E, demandasAntes=JSON.stringify(o.fmDemandas);
+  const demandasMudaram=()=>JSON.stringify(o.fmDemandas)!==demandasAntes;
   try{
     if(!await apagarAnexosDe('obra:'+o.id))return;
-    if(E!==estado||!E.obras.includes(o)){alert('Os dados mudaram durante a exclusão. O cadastro foi preservado; confira os anexos antes de tentar novamente.');return}
+    for(const demanda of FortemaisDemandasModelo.dados(o).itens){
+      if(E!==estado||!E.obras.includes(o)||demandasMudaram())throw Error('os dados da obra mudaram durante a exclusão');
+      if(!await apagarAnexosDe('obra:'+o.id+':demanda:'+demanda.id))return;
+    }
+    if(E!==estado||!E.obras.includes(o)||demandasMudaram()){alert('Os dados mudaram durante a exclusão. O cadastro foi preservado; confira os anexos antes de tentar novamente.');return}
     const resposta=await apiSync('POST',{acao:'obraCustosApagar',obra:o.id});
     if(!resposta?.ok)throw Error(resposta?.erro||'o servidor não confirmou a exclusão dos custos');
     fmEsquecer();
-    if(E!==estado||!E.obras.includes(o)){alert('Os custos e anexos foram removidos, mas os dados do cadastro mudaram. Atualize a lista antes de continuar.');return}
+    if(E!==estado||!E.obras.includes(o)||demandasMudaram()){alert('Os custos e anexos foram removidos, mas os dados do cadastro mudaram. Atualize a lista antes de continuar.');return}
     const obras=E.obras,aportes=E.obraAportes,mt=E._mt,tinhaMt=Object.hasOwn(E,'_mt');
     E.obras=obras.filter(x=>x.id!==o.id);E.obraAportes=aportes.filter(x=>x.obra!==o.id);
     try{salvar()}catch(e){E.obras=obras;E.obraAportes=aportes;if(tinhaMt)E._mt=mt;else delete E._mt;alert('Os custos e anexos foram removidos, mas não foi possível salvar a exclusão do cadastro. O projeto continua na lista. Tente novamente.');return}
@@ -6298,11 +6306,11 @@ async function fmPrevPdf(o){
 }
 function fmPrevAbas(c,o){
   const existente=el('<div class="fm-conteudo" data-fm-pagina="realizado"></div>');while(c.firstChild)existente.appendChild(c.firstChild);
-  const prev=fmPrevPainel(o),roi=fmRetornoPainel(o,'roi'),tir=fmRetornoPainel(o,'tir');
-  for(const [id,p] of [['previsao',prev],['roi',roi],['tir',tir]]){p.classList.add('fm-conteudo');p.dataset.fmPagina=id}
-  const nav=el('<nav class="fm-tabs" aria-label="Dados da obra"></nav>'),paginas=[prev,roi,tir,existente];
+  const prev=fmPrevPainel(o),roi=fmRetornoPainel(o,'roi'),tir=fmRetornoPainel(o,'tir'),demandas=fmDemandasPainel(o);
+  for(const [id,p] of [['previsao',prev],['roi',roi],['tir',tir],['demandas',demandas]]){p.classList.add('fm-conteudo');p.dataset.fmPagina=id}
+  const nav=el('<nav class="fm-tabs" aria-label="Dados da obra"></nav>'),paginas=[prev,roi,tir,existente,demandas];
   filtro.fmAbas=filtro.fmAbas||{};const ativar=id=>{const sujo=paginas.find(p=>!p.hidden&&p._fmDirty);if(sujo&&sujo.dataset.fmPagina!==id){alert('Salve ou cancele as alterações antes de trocar de aba.');return}filtro.fmAbas[o.id]=id;paginas.forEach(p=>p.hidden=p.dataset.fmPagina!==id);nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.pagina===id)))};
-  for(const [id,nome] of [['previsao','Previsão de lucro'],['roi','ROI'],['tir','TIR'],['realizado','Realizado e histórico']]){const b=acao(nome,()=>ativar(id),'ghost');b.dataset.pagina=id;nav.appendChild(b)}c.append(fmObraResumo(o),nav,...paginas);const id=filtro.fmAbas[o.id];ativar(id==='retorno'?'roi':['previsao','roi','tir','realizado'].includes(id)?id:'previsao');
+  for(const [id,nome] of [['previsao','Previsão de lucro'],['roi','ROI'],['tir','TIR'],['demandas','Demandas e etapas'],['realizado','Realizado e histórico']]){const b=acao(nome,()=>ativar(id),'ghost');b.dataset.pagina=id;nav.appendChild(b)}c.append(fmObraResumo(o),nav,...paginas);const id=filtro.fmAbas[o.id];ativar(id==='retorno'?'roi':['previsao','roi','tir','realizado','demandas'].includes(id)?id:'previsao');
 }
 
 /* ---------------- a tela ---------------- */
@@ -6363,6 +6371,7 @@ async function vFortemais(m){
     linha.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();linha.click()}};
     linha.onclick=()=>{filtro.fmAberta=aberta?null:o.id;r()};
     cont.appendChild(linha);
+    cont.appendChild(fmDemandasResumo(o));
     if(aberta){
       const det=el('<div class="fm-projeto-detalhe"></div>');
       det.appendChild(el('<div class="vazio" style="padding:14px">Abrindo…</div>'));
@@ -16381,6 +16390,22 @@ function validarBackup(j){
   if(j.aviao)for(const k of ['aportes','mensalidades','despesas'])
     if(j.aviao[k]!==undefined&&(!Array.isArray(j.aviao[k])||j.aviao[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))
       throw new Error('Lista inválida: aviao.'+k);
+  for(const obra of j.obras||[]){
+    const d=obra.fmDemandas;if(d===undefined)continue;
+    if(!d||typeof d!=='object'||Array.isArray(d))throw Error('Demandas da obra inválidas.');
+    for(const k of ['etapas','itens'])if(!Array.isArray(d[k])||d[k].some(x=>!x||typeof x!=='object'||Array.isArray(x)||!x.id))throw Error('Lista inválida: demandas da obra.'+k);
+    for(const item of d.itens)for(const k of ['historico','checklist','links'])if(item[k]!==undefined&&(!Array.isArray(item[k])||item[k].some(x=>!x||typeof x!=='object'||Array.isArray(x))))throw Error('Lista inválida: demanda.'+k);
+    const validarTextos=(obj,campos)=>{for(const k of campos)if(obj[k]!==undefined&&obj[k]!==null&&typeof obj[k]!=='string')throw Error('Campo inválido na demanda: '+k)};
+    for(const etapa of d.etapas)validarTextos(etapa,['id','nome']);
+    for(const item of d.itens){
+      validarTextos(item,['id','titulo','descricao','etapaId','responsavel','envolvidos','prazo','prioridade','situacao','proximaAcao','motivoBloqueio','aguardandoQuem','retornoPendente','criadoEm','atualizadoEm','concluidoEm']);
+      if(item.situacao&&!FortemaisDemandasModelo.SITUACOES.includes(item.situacao))throw Error('Situação inválida na demanda.');
+      if(item.prazo&&!dataISOValida(item.prazo))throw Error('Prazo inválido na demanda.');
+      for(const x of item.checklist||[])validarTextos(x,['id','texto']);
+      for(const x of item.links||[])validarTextos(x,['id','nome','url']);
+      for(const x of item.historico||[])validarTextos(x,['id','em','autor','tipo','texto','de','para']);
+    }
+  }
   validarBackupEmpresas(j);
   if(j.organogramas?.length){if(typeof LeoOrganograma==='undefined')throw Error('Atualize a página para validar os organogramas antes de restaurar.');LeoOrganograma.validar(j.organogramas);}
   if(j.desenvolvimento)for(const k of ['fontes','leituras','revisoes','reflexoes','validacoes','resultados'])if(j.desenvolvimento[k]!==undefined&&(!Array.isArray(j.desenvolvimento[k])||j.desenvolvimento[k].some(x=>!x||typeof x!=='object'||Array.isArray(x))))throw new Error('Lista inválida: desenvolvimento.'+k);
