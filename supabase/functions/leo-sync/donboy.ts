@@ -184,6 +184,7 @@ function donboyPrepararLink(corpo:DonboyObjeto):{dados:DonboyObjeto}|{erro:strin
 }
 
 export async function donboyAcao(acao: string, corpo: unknown, sb: DonboyBanco, buscar: typeof fetch = fetch): Promise<Response> {
+  if(acao.startsWith("donboy_email_"))return donboyEmailAcao(acao,corpo,sb,buscar);
   if (!donboyObjeto(corpo) || !["donboy_painel","donboy_testar","donboy_memoria_listar","donboy_memoria_adicionar","donboy_memoria_link"].includes(acao)) return donboyJson({erro:"Ação inválida."},400);
   const teste = acao === "donboy_testar";
   const link = acao === "donboy_memoria_link";
@@ -238,4 +239,25 @@ export async function donboyAcao(acao: string, corpo: unknown, sb: DonboyBanco, 
     if (adicionar) return donboyJson({ok:false,erro:"Não foi possível confirmar o processamento. Atualize a lista de fontes; reenviar o mesmo arquivo permite consultar o resultado sem duplicar a fonte."},502);
     return donboyJson({erro:"Não consegui concluir a consulta ao DON BOY. Nenhuma mensagem foi enviada ao Telegram; tente consultar novamente."},502);
   }
+}
+
+
+async function donboyEmailAcao(acao:string,corpo:unknown,sb:DonboyBanco,buscar:typeof fetch){
+ const destinos:Record<string,string>={donboy_email_status:'email-status',donboy_email_config:'email-config',donboy_email_decidir:'email-decidir'};
+ const destino=destinos[acao];
+ if(!destino||!donboyObjeto(corpo))return donboyJson({erro:'Ação inválida.'},400);
+ const permitidos=destino==='email-status'?['acao']:destino==='email-config'?['acao','ativa']:['acao','id','decisao','dados','aceitarConflitos'];
+ if(Object.keys(corpo).some(k=>!permitidos.includes(k))||JSON.stringify(corpo).length>8000)return donboyJson({erro:'Pedido inválido.'},400);
+ const dados=Object.fromEntries(Object.entries(corpo).filter(([k])=>k!=='acao'));
+ try{
+  const {data,error}=await sb.from('donboy_ponte').select('hash').limit(2);
+  if(error||data?.length!==1||!/^[a-f0-9]{64}$/.test(data[0].hash))throw Error('ponte');
+  const raw=JSON.stringify(dados),ts=String(Math.floor(Date.now()/1000)),encoder=new TextEncoder();
+  const k=await crypto.subtle.importKey('raw',encoder.encode(data[0].hash),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const sig=[...new Uint8Array(await crypto.subtle.sign('HMAC',k,encoder.encode(ts+'\n'+destino+'\n'+raw)))].map(x=>x.toString(16).padStart(2,'0')).join('');
+  const r=await buscar('https://reoghclxripktzpdwhiy.supabase.co/functions/v1/donboy-email-diario?acao='+destino,{method:'POST',redirect:'error',headers:{'content-type':'application/json','x-donboy-painel-ts':ts,'x-donboy-painel-signature':sig},body:raw,signal:AbortSignal.timeout(destino==='email-decidir'?120000:25000)});
+  if(!r.ok){await r.body?.cancel();return donboyJson({erro:r.status===409?'Confira a data, possíveis conflitos e o estado da sugestão antes de repetir.':r.status===400?'Confira título, data futura e horário.':'Não foi possível conferir a rotina. Atualize a fila antes de repetir.'},r.status===400||r.status===409?r.status:503)}
+  const d=await donboyLerResposta(r,512*1024);
+  return donboyJson(donboyCampos(d,['ok','versao','horario','fuso','aprovacaoObrigatoria','caixas','sugestoes','fila','falhas','limiteExibicao','ativa','estado','recibo','erro','conflitos']));
+ }catch{return donboyJson({erro:'Resultado não confirmado. Atualize a fila; uma aprovação pode ter sido recebida. Não crie outro evento sem conferir.'},503)}
 }

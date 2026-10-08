@@ -262,7 +262,7 @@ Deno.serve(async (req: Request) => {
 
     // O concierge contém histórico pessoal. Além da sessão Central válida,
     // esta porta exige o próprio dono e jamais aceita crachá de OAuth.
-    if (["donboy_painel","donboy_testar","donboy_memoria_listar","donboy_memoria_adicionar","donboy_memoria_link"].includes(acao)) {
+    if (["donboy_painel","donboy_testar","donboy_memoria_listar","donboy_memoria_adicionar","donboy_memoria_link","donboy_email_status","donboy_email_config","donboy_email_decidir"].includes(acao)) {
       const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
       const p = await crachaPayload(t);
       if (!p || p.uso !== "" || p.sub.toLowerCase() !== DONO || p.papel !== "dono") return json({erro:"Não autorizado"},401);

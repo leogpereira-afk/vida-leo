@@ -669,6 +669,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-previsao.css?v=cdb9222e7265">
 <link rel="stylesheet" href="./fortemais-demandas.css?v=fafdab59a91c">
 <link rel="stylesheet" href="./donboy-painel.css?v=dbc00ad6f76c">
+<link rel="stylesheet" href="donboy-email.css?v=ed0e5b4334e2">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -707,6 +708,7 @@ tr:hover .lixo{opacity:1}
 <script src="./fortemais-financeiro.js?v=48296dd2f793"></script>
 <script src="./fortemais-demandas-modelo.js?v=e2ba946c28ef"></script>
 <script src="./fortemais-demandas.js?v=be177dcfa8dd"></script>
+<script src="donboy-email.js?v=6a1ba6d316f6"></script>
 <script>
 /* ============================================================
    Central do Léo — painel pessoal, um arquivo só.
@@ -1991,6 +1993,7 @@ async function vDonBoy(m){
       abas.querySelectorAll('[role=tab]').forEach(b=>{const ativo=b.dataset.donboyAba===id;b.setAttribute('aria-selected',String(ativo));b.tabIndex=ativo?0:-1});
       DONBOY_ABAS.forEach(([chave])=>{paineis[chave].hidden=chave!==id});
       if(focar){const b=abas.querySelector('[data-donboy-aba="'+id+'"]');b.focus();b.scrollIntoView({block:'nearest',inline:'nearest'})}
+      if(id==='automacoes'){desenhar();return;}
       if(id==='memoria'&&donboyMemoriaEstado.documentos===null&&!donboyMemoriaEstado.listando&&!donboyMemoriaEstado.erroLista){const p=donboyMemoriaListar();desenhar();await p;desenhar()}
     };
     abas.querySelectorAll('[role=tab]').forEach((b,indice)=>{
@@ -2013,6 +2016,7 @@ async function vDonBoy(m){
     inteligencia.appendChild(el(donboyCard('Preferências de atendimento','Preferências informadas pelo servidor. Solicite mudanças na conversa com o DON BOY.',donboyPreferencias(d))));
     inteligencia.appendChild(el(donboyCard('Consumo por provedor','OpenAI e Claude, separados.',d?donboyCustos(d):'<p class="db-vazio">Consumo ainda não informado pelo servidor.</p>')));
     paineis.memoria.appendChild(donboyMemoriaCard(desenhar));
+    if(s.aba==='automacoes')paineis.automacoes.appendChild(donboyEmailCard(desenhar));
     paineis.automacoes.appendChild(el(donboyCard('Automações','Horários, escopo e última execução informados pelo servidor.',donboyAutomacoes(d))));
     paineis.atividade.appendChild(el(donboyCard('Aguardando confirmação','Pedidos preparados que ainda dependem da sua decisão.',donboyPendentes(d))));
     paineis.atividade.appendChild(el(donboyCard('Respostas e arquivos recentes','Acompanhe as etapas do pedido. A entrega da resposta e o envio de um anexo têm confirmações próprias.',donboyAtividade(d||{}))));
@@ -8920,7 +8924,8 @@ function htmlPlanoApresentacao(emp,plano){
   narrativas('Balanço do ano',[['Resultados',p.balanco],['Aprendizados e próximos passos',p.aprendizados]]);
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(titulo)}</title><style>
   *{box-sizing:border-box}body{margin:0;background:#e8eaf0;font:16px Arial,sans-serif;color:#222631}.tools{position:sticky;top:0;background:#fff;padding:14px 24px;display:flex;gap:16px;align-items:center;z-index:1;border-bottom:1px solid #ccc}.tools button{border:0;background:#4640ed;color:white;padding:12px 20px;border-radius:8px;font:inherit;cursor:pointer}.tools p{margin:0;font-size:14px}.slide{position:relative;background:white;max-width:1123px;min-height:740px;margin:28px auto;padding:40px 64px 78px;break-after:page;overflow-wrap:anywhere}.slide header{display:flex;justify-content:space-between;gap:20px;font-size:12px;letter-spacing:.05em;border-bottom:3px solid #4640ed;padding-bottom:16px;color:#4f5470}.slide h2{font-size:32px;margin:34px 0;color:#323050}.slide h3{font-size:22px;color:#4640ed}.story{font-size:21px;line-height:1.55;white-space:normal}.story p{margin:12px 0}.slide footer{position:absolute;bottom:24px;left:64px;right:64px;border-top:1px solid #dce0e7;padding-top:14px;font-size:11px;color:#5a6070;display:flex;justify-content:space-between}.cover .year{font-size:72px;line-height:1;font-weight:bold;color:#4640ed;margin:18px 0}.cover h1{font-size:44px;margin:18px 0}.cover>p{font-size:21px}.metrics{display:flex;gap:52px;margin:42px 0}.metrics b{display:block;font-size:34px;color:#4640ed}.muted{color:#5a6070;font-size:14px!important}@media(max-width:700px){.slide{padding:24px 24px 76px;min-height:650px;margin:16px}.slide footer{left:24px;right:24px}.tools{flex-wrap:wrap}.metrics{gap:24px}.cover h1{font-size:32px}.story{font-size:18px}}@page{size:A4 landscape;margin:0}@media print{body{background:white}.tools{display:none}.slide{width:297mm;min-height:210mm;max-width:none;margin:0;padding:12mm 17mm 22mm}.slide:last-child{break-after:auto}.slide header{font-size:9pt}.slide h2{font-size:25pt;margin:8mm 0}.slide h3{font-size:18pt}.story{font-size:15pt;line-height:1.5}.slide footer{left:17mm;right:17mm;bottom:7mm}.metrics{margin:9mm 0}*{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
-  </style></head><body><div class="tools"><button type="button" id="salvar">Salvar como PDF</button><p>Na janela de impressão, escolha “Salvar como PDF”. Orientação paisagem.</p></div>${paginas.join('')}</body></html>`;
+  </style><link rel="stylesheet" href="donboy-email.css?v=ed0e5b4334e2">
+</head><body><div class="tools"><button type="button" id="salvar">Salvar como PDF</button><p>Na janela de impressão, escolha “Salvar como PDF”. Orientação paisagem.</p></div>${paginas.join('')}</body></html>`;
 }
 function exportarPlanoPDF(emp,plano){
   const w=window.open('','_blank');if(!w){alert('Permita abrir a apresentação nesta janela para exportar o PDF.');return}

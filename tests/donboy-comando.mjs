@@ -19,7 +19,7 @@ test('Comando abre primeiro e só um dos sete painéis fica visível',async()=>{
 test('chips só navegam: não executam consulta de IA nem escrita e preservam rascunhos',async()=>{
  const a=await carregar();const campo=a.document.getElementById('db-comando');campo.value='Meu pedido incompleto';campo.oninput();
  for(const aba of ['ambientes','conexoes','inteligencia','automacoes','atividade','comando'])await abrir(a,aba);
- assert.deepEqual(a.calls.map(c=>c.acao),['donboy_painel']);assert.equal(a.document.getElementById('db-comando').value,'Meu pedido incompleto');
+ assert.deepEqual(a.calls.map(c=>c.acao),['donboy_painel','donboy_email_status']);assert.equal(a.document.getElementById('db-comando').value,'Meu pedido incompleto');
  assert.equal(a.run('donboyPainelEstado.comando'),'Meu pedido incompleto');assert.equal(a.document.querySelectorAll('[aria-selected=true]').length,1);
 });
 

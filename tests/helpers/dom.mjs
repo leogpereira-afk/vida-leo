@@ -10,6 +10,7 @@ export function setup({hostname='localhost'}={}){const {document,HTMLElement}=pa
 const storage={getItem:()=>null,setItem(){},removeItem(){}};
 const ctx=vm.createContext({LeoGoogleDatas:globalThis.LeoGoogleDatas,FortemaisFinance:globalThis.FortemaisFinance,FortemaisDemandasModelo:globalThis.FortemaisDemandasModelo,ICAL,atob,btoa,document,window:{addEventListener(){},scrollTo(){},matchMedia:()=>({matches:false})},location:{hostname,hash:''},history:{pushState(){}},localStorage:storage,sessionStorage:storage,console,structuredClone,Date,URL,URLSearchParams,Blob,TextEncoder,TextDecoder,setTimeout:()=>0,clearTimeout(){},alert(){},confirm:()=>false});
 vm.runInContext(readFileSync(new URL('../../publico/fortemais-demandas.js',import.meta.url),'utf8'),ctx);
+vm.runInContext(readFileSync(new URL('../../publico/donboy-email.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(source,ctx);
 vm.runInContext("fmResumo=async()=>({});arqTotal=async()=>({n:0,b:0,fila:0});arqPor=async()=>[];apiEquipe=async()=>({usuarios:[],historico:[]});",ctx);
 return {ctx,document,run:s=>vm.runInContext(s,ctx)};}
