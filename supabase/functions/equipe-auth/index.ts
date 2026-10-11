@@ -132,7 +132,7 @@ const MODULOS_PAINEL = ["gestao", "contas-atrasadas", "orcamentos",
   // certidoes da empresa, o contrato social, as apolices com a importancia
   // segurada e a ficha dos carros e maquinas. A tela de conceder acesso
   // prometia o contrario, com todas as letras.
-  "documentos",
+  "documentos", "documentos-pessoais",
   "patrimonio", "inventario-valores", "seguranca",
   // 15/09/2026 -- "planilhas": as planilhas do Google que a casa mexe (a
   // Caixinha, os servicos de terceiro), abertas DENTRO do Painel, no molde da
