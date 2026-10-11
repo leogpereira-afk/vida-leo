@@ -669,7 +669,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-previsao.css?v=cdb9222e7265">
 <link rel="stylesheet" href="./fortemais-demandas.css?v=fafdab59a91c">
 <link rel="stylesheet" href="./fortemais-compacto.css?v=6899567e34c1">
-<link rel="stylesheet" href="./donboy-painel.css?v=dbc00ad6f76c">
+<link rel="stylesheet" href="./donboy-painel.css?v=b86c29ff84dd">
 <link rel="stylesheet" href="donboy-email.css?v=ed0e5b4334e2">
 </head>
 <body>
@@ -2028,13 +2028,77 @@ async function vDonBoy(m){
   const consultas=[];if(!donboyPainelEstado.dados&&!donboyPainelEstado.erro)consultas.push(donboyAtualizar());if(donboyPainelEstado.aba==='memoria'&&donboyMemoriaEstado.documentos===null&&!donboyMemoriaEstado.erroLista)consultas.push(donboyMemoriaListar());if(consultas.length){desenhar();await Promise.all(consultas);desenhar()}
 }
 
+/* Catálogo privado: cadastro não significa conexão ou execução verificada. */
+const agentesUI={selecionado:null,editando:null,aba:'comando',aviso:''};
+const AGENTES_BASE=[{id:'donboy-supabase',nome:'DON BOY · Supabase',ambiente:'Supabase',descricao:'Assistente original, com acompanhamento pelo servidor.'},{id:'donboy-openclaw',nome:'DON BOY · OpenClaw',ambiente:'OpenClaw',descricao:'Assistente local, acessível pelo Maestri e pelos canais configurados.'}];
+function agentesURL(valor){
+  if(!valor)return '';
+  try{const u=new URL(String(valor));if(u.username||u.password||u.search||u.hash)return '';
+    if(u.protocol!=='https:'&&!(u.protocol==='http:'&&['localhost','127.0.0.1'].includes(u.hostname)))return '';
+    return u.href;
+  }catch{return ''}
+}
+function agentesLista(){
+  const salvos=Array.isArray(E.agentes)?E.agentes.filter(a=>a&&typeof a.id==='string'):[];
+  const bases=AGENTES_BASE.map(b=>({...b,...salvos.find(a=>a.id===b.id),id:b.id,ambiente:b.ambiente}));
+  return [...bases,...salvos.filter((a,i)=>!AGENTES_BASE.some(b=>b.id===a.id)&&salvos.findIndex(b=>b.id===a.id)===i)];
+}
+function agentesSalvar(dados,id){
+  const nome=String(dados.nome||'').trim(),ambiente=String(dados.ambiente||'').trim();
+  if(!nome||nome.length>80||!ambiente||ambiente.length>60)throw Error('Informe nome e ambiente válidos.');
+  for(const campo of ['url','telegram'])if(dados[campo]&&!agentesURL(dados[campo]))throw Error('Use links HTTPS ou um endereço local, sem senha, parâmetros ou chaves.');
+  if(dados.telegram&&!donboyTelegram(dados.telegram))throw Error('Informe o link público do bot no Telegram, como https://t.me/NomeDoBot.');
+  if(agentesLista().some(a=>a.id!==id&&String(a.nome).toLocaleLowerCase()===nome.toLocaleLowerCase()))throw Error('Já existe um agente com esse nome.');
+  const base=AGENTES_BASE.find(a=>a.id===id);
+  const registro={id:id||uid(),nome,ambiente:base?.ambiente||ambiente,descricao:String(dados.descricao||'').trim().slice(0,300),url:agentesURL(dados.url),telegram:donboyTelegram(dados.telegram),atualizadoEm:new Date().toISOString()};
+  const anterior=E.agentes;E.agentes=[...(Array.isArray(anterior)?anterior:[]).filter(a=>a?.id!==registro.id),registro];
+  try{salvar()}catch(e){E.agentes=anterior;throw Error('Não foi possível salvar o cadastro neste navegador. Tente novamente.')}
+  return registro;
+}
+async function vAgentes(m){
+  m.classList.add('donboy-layout');
+  m.replaceChildren(cab('Agentes','Escolha seu assistente. Cada um tem suas próprias conexões e histórico.'));
+  m.querySelector('.topo').appendChild(acao('＋ Adicionar agente',()=>{agentesUI.editando='novo';agentesUI.aviso='';vAgentes(m)}));
+  if(agentesUI.aviso)m.appendChild(el(`<p class="db-status" role="status">${esc(agentesUI.aviso)}</p>`));
+  const lista=agentesLista();
+  const faixa=el('<div class="ag-catalogo" aria-label="Seus agentes"></div>');
+  lista.forEach(a=>{
+    const cartao=el(`<button type="button" class="ag-cartao ${agentesUI.selecionado===a.id?'selecionado':''}" aria-pressed="${agentesUI.selecionado===a.id}" data-agente="${esc(a.id)}"><span class="db-sobretitulo">${esc(a.ambiente||'Outro ambiente')}</span><strong>${esc(a.nome)}</strong><span>${esc(a.descricao||'Assistente cadastrado na Central.')}</span><small>${a.id==='donboy-supabase'?'Painel integrado · consulte o status ao abrir':'Cadastrado · sem monitoramento nesta Central'}</small></button>`);
+    cartao.onclick=()=>{agentesUI.selecionado=a.id;agentesUI.editando=null;agentesUI.aba='comando';agentesUI.aviso='';return vAgentes(m)};faixa.appendChild(cartao);
+  });m.appendChild(faixa);
+  if(agentesUI.editando){
+    const a=lista.find(a=>a.id===agentesUI.editando)||{};
+    const form=el(`<form class="ag-form db-card-corpo" aria-label="Cadastro de agente"><h2>${a.id?'Editar agente':'Adicionar agente'}</h2><p>Este cadastro organiza seus acessos. Não instala, publica ou conecta automaticamente um agente. Não cole chaves ou senhas.</p><div class="ag-campos"><label>Nome<input name="nome" required maxlength="80" value="${esc(a.nome||'')}"></label><label>Ambiente<input name="ambiente" required maxlength="60" placeholder="Ex.: OpenClaw, Supabase" value="${esc(a.ambiente||'')}" ${AGENTES_BASE.some(b=>b.id===a.id)?'readonly':''}></label><label>Link do painel<input name="url" type="url" placeholder="https://…" value="${esc(a.url||'')}"></label><label>Link do Telegram<input name="telegram" type="url" placeholder="https://t.me/NomeDoBot" value="${esc(a.telegram||'')}"></label><label class="ag-largo">Finalidade<textarea name="descricao" maxlength="300" rows="2">${esc(a.descricao||'')}</textarea></label></div><p class="db-micro">Cadastro salvo nos dados privados da Central, com a sincronização existente. Links locais só abrem no computador em que o agente está instalado.</p><p class="db-falha" role="alert" data-ag-erro></p><div class="ag-acoes"><button class="btn" type="submit">Salvar cadastro</button><button class="btn ghost" type="button" data-ag-cancelar>Cancelar</button></div></form>`);
+    form.querySelector('[data-ag-cancelar]').onclick=()=>{agentesUI.editando=null;vAgentes(m)};
+    form.onsubmit=ev=>{ev.preventDefault();const dados={};for(const campo of ['nome','ambiente','url','telegram','descricao'])dados[campo]=form.querySelector('[name="'+campo+'"]').value;try{const r=agentesSalvar(dados,a.id);agentesUI.selecionado=r.id;agentesUI.editando=null;agentesUI.aviso='Cadastro salvo neste navegador. Acompanhe a sincronização da Central.';vAgentes(m)}catch(e){form.querySelector('[data-ag-erro]').textContent=e.message}};
+    m.appendChild(form);return;
+  }
+  const a=lista.find(a=>a.id===agentesUI.selecionado);
+  if(!a){m.appendChild(el('<p class="db-vazio">Selecione um agente para abrir seu painel. Os dados de um assistente não são usados para indicar a situação de outro.</p>'));return}
+  const acoes=el(`<div class="ag-acoes"><h2>${esc(a.nome)}</h2><button class="btn ghost" type="button" data-ag-editar>Editar cadastro</button></div>`);acoes.querySelector('button').onclick=()=>{agentesUI.editando=a.id;vAgentes(m)};m.appendChild(acoes);
+  if(a.id==='donboy-supabase'){
+    const painel=el('<div class="ag-painel-integrado"></div>');m.appendChild(painel);await vDonBoy(painel);return;
+  }
+  const abas=el('<div class="db-abas" role="tablist" aria-label="Áreas do agente"></div>');m.appendChild(abas);
+  const conteudo=el('<section class="db-card-corpo ag-detalhe" role="tabpanel" id="ag-detalhe" tabindex="0"></section>');m.appendChild(conteudo);
+  const desenhar=id=>{
+    agentesUI.aba=id;abas.querySelectorAll('button').forEach(b=>{b.setAttribute('aria-selected',String(b.dataset.aba===id));b.tabIndex=b.dataset.aba===id?0:-1});conteudo.setAttribute('aria-labelledby','ag-aba-'+id);
+    const local=a.id==='donboy-openclaw';
+    const link=agentesURL(a.url)||(local?'http://127.0.0.1:18789/':'');const telegram=donboyTelegram(a.telegram);
+    const acessos=`<div class="ag-acoes">${link?`<a class="btn" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Abrir painel ↗</a>`:''}${telegram?`<a class="btn ghost" href="${esc(telegram)}" target="_blank" rel="noopener noreferrer">Abrir Telegram ↗</a>`:''}</div>`;
+    const textos={comando:`<h3>Converse no ambiente do agente</h3><p>${esc(a.descricao||'Abra o painel ou o canal cadastrado para fazer seu pedido.')}</p>${acessos}<p>${local?'O painel local abre no Mac com o OpenClaw ligado. No Maestri, use o terminal DON BOY.':'O acesso depende do ambiente e das permissões do agente.'}</p>`,ambientes:`<h3>${esc(a.ambiente||'Ambiente não informado')}</h3><p>${local?'OpenClaw é o ambiente de execução; Maestri é outra interface para o mesmo assistente, não um terceiro agente.':'Ambiente informado no cadastro.'}</p>`,conexoes:'<h3>Conexões deste agente</h3><p>A Central ainda não recebe o inventário de conexões deste agente. Confira no painel de origem. As conexões do DON BOY Supabase não comprovam acesso aqui.</p>'+acessos,inteligencia:'<h3>Inteligência e consumo</h3><p>Modelo, raciocínio e custos não são consultados automaticamente neste cadastro. Confira a configuração atual no ambiente do agente.</p>'+acessos,memoria:'<h3>Memória separada</h3><p>Este cadastro não envia arquivos nem replica memórias. Adicione referências no ambiente deste agente. A memória do DON BOY Supabase permanece no painel dele.</p>'+acessos,automacoes:'<h3>Automações próprias</h3><p>Não há sincronização das rotinas deste agente com esta tela. Cadastros não criam rotinas nem transferem as existentes.</p>'+acessos,atividade:'<h3>Verificação pendente</h3><p>Não há monitoramento ao vivo deste agente na Central. Abrir um link não comprova conexão ou resposta. Consulte o histórico no ambiente de origem.</p>'+acessos};
+    conteudo.innerHTML=textos[id]||textos.comando;
+  };
+  DONBOY_ABAS.forEach(([id,nome],i)=>{const b=el(`<button type="button" role="tab" id="ag-aba-${id}" data-aba="${id}" aria-controls="ag-detalhe">${esc(nome)}</button>`);b.onclick=()=>desenhar(id);b.onkeydown=e=>{const teclas={ArrowRight:(i+1)%7,ArrowLeft:(i+6)%7,Home:0,End:6};if(!(e.key in teclas))return;e.preventDefault();const destino=abas.querySelectorAll('button')[teclas[e.key]];destino.focus();destino.click()};abas.appendChild(b)});desenhar(agentesUI.aba);
+}
+
 /* ---------------- navegação ---------------- */
 // logos de verdade na lateral (o emoji não faz jus)
 const LOGO_DRIVE='<svg viewBox="0 0 87.3 78" aria-hidden="true"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>';
 const LOGO_STRAVA='<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#FC4C02" d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>';
 const MODS=[
   {id:'inicio',ic:'🏠',nome:'Início',grupo:'',render:vInicio},
-  {id:'donboy',ic:'◈',nome:'DON BOY',grupo:'',render:vDonBoy},
+  {id:'donboy',ic:'◈',nome:'Agentes',grupo:'',render:vAgentes},
   {id:'agenda',ic:'📅',nome:'Agenda',grupo:'',render:vAgenda},
   {id:'planilhas',ic:'📊',nome:'Planilhas',grupo:'',render:vPlanilhas},
   {id:'rendimentos',ic:'📈',nome:'Rendimentos',grupo:'Dinheiro',render:vRendimentos},
