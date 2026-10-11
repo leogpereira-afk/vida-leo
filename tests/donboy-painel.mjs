@@ -14,7 +14,7 @@ test('abrir painel só consulta status e não dispara comando de teste ou grava�
  run('apiSync=apiTeste'); assert.equal(run('typeof vDonBoy'),'function');
  await run("vDonBoy(document.getElementById('main'))");
  assert.equal(calls.length,1); assert.deepEqual(JSON.parse(JSON.stringify(calls.map(c=>c.body))),[{acao:'donboy_painel'}]);
- assert.match(document.getElementById('main').textContent,/DON BOY/);
+ assert.match(document.getElementById('main').textContent,/BotImpresilk/);
  assert.equal(document.querySelector('[data-donboy-teste] button[type=submit]').disabled,false);
 });
 
