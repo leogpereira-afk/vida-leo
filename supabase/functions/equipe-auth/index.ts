@@ -133,7 +133,7 @@ const MODULOS_PAINEL = ["gestao", "contas-atrasadas", "orcamentos",
   // segurada e a ficha dos carros e maquinas. A tela de conceder acesso
   // prometia o contrario, com todas as letras.
   "documentos",
-  "patrimonio",
+  "patrimonio", "inventario-valores", "seguranca",
   // 15/09/2026 -- "planilhas": as planilhas do Google que a casa mexe (a
   // Caixinha, os servicos de terceiro), abertas DENTRO do Painel, no molde da
   // aba Planilhas da Central do Leo. Duas coisas que quem mexer aqui precisa
