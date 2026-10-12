@@ -1,5 +1,5 @@
 // Fila efêmera: dados pessoais não são copiados para localStorage nem backups.
-const ocFila={dados:null,erro:'',ocupado:false};
+const ocFila={dados:null,erro:'',ocupado:false,filtro:'todos'};
 async function openclawFilaAtualizar(){
  try{const d=await apiSync('POST',{acao:'openclaw_propostas_listar'});if(d?.ok!==true||!Array.isArray(d.propostas))throw Error();ocFila.dados=d;ocFila.erro=''}
  catch{ocFila.erro='Não consegui consultar as propostas do OpenClaw. Isso não significa que a fila está vazia.'}
@@ -10,7 +10,16 @@ function openclawFilaCard(redesenhar){
  const desenhar=()=>{if(c.isConnected)redesenhar()};
  c.querySelector('[data-oc-atualizar]').onclick=async()=>{if(s.ocupado)return;s.ocupado=true;await openclawFilaAtualizar();s.ocupado=false;desenhar()};
  const lista=c.querySelector('[data-oc-lista]');
- for(const q of s.dados?.propostas||[]){
+ const grupos={todos:()=>true,pendentes:q=>q.estado==='pendente',concluidos:q=>['confirmado','reprovado'].includes(q.estado),atencao:q=>['incerto','executando'].includes(q.estado)};
+ const filtros=el('<div class="oc-filtros" role="group" aria-label="Filtrar propostas"></div>');
+ for(const [id,nome] of [['todos','Todas'],['pendentes','Pendentes'],['atencao','Conferir'],['concluidos','Concluídas']]){
+  const n=s.dados?s.dados.propostas.filter(grupos[id]).length:'—';
+  const b=el(`<button type="button" class="ac-chip" aria-pressed="${s.filtro===id}" data-oc-filtro="${id}">${nome} <strong>${n}</strong></button>`);
+  b.onclick=()=>{s.filtro=id;desenhar()};filtros.appendChild(b);
+ }
+ lista.before(filtros);
+ const visiveis=(s.dados?.propostas||[]).filter(grupos[s.filtro]||grupos.todos);
+ for(const q of visiveis){
   const card=el(`<article class="oc-proposta"><div class="ag-acoes"><strong>${esc(labels[q.estado]||'Estado a conferir')}</strong><small>${esc(donboyData(q.criadoEm))}</small></div><p class="oc-previa">${esc(q.previa||'Prévia não informada')}</p>${q.expirada?'<p class="db-aviso">Prévia expirada. Peça uma nova conferência no chat.</p>':''}${q.erro?'<p class="db-aviso">'+esc(q.erro)+'</p>':''}<small>Referência: ${esc(q.id)}</small><div class="ag-acoes" data-oc-acoes></div>${q.estado==='confirmado'?'<p>Registro confirmado na Central. Atualize a área correspondente para conferir os dados.</p>':''}</article>`);
   const acoes=card.querySelector('[data-oc-acoes]');
   const agir=async decisao=>{
@@ -24,6 +33,6 @@ function openclawFilaCard(redesenhar){
   if(['incerto','executando'].includes(q.estado))botao('Conferir resultado','conferir');
   lista.appendChild(card);
  }
- if(s.dados&&!s.dados.propostas.length)lista.appendChild(el('<p class="db-vazio">Nenhuma proposta nesta consulta.</p>'));
+ if(s.dados&&!visiveis.length)lista.appendChild(el('<p class="db-vazio">Nenhuma proposta neste filtro.</p>'));
  return c;
 }

@@ -669,7 +669,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-previsao.css?v=cdb9222e7265">
 <link rel="stylesheet" href="./fortemais-demandas.css?v=fafdab59a91c">
 <link rel="stylesheet" href="./fortemais-compacto.css?v=6899567e34c1">
-<link rel="stylesheet" href="./donboy-painel.css?v=a08217e065ab">
+<link rel="stylesheet" href="./donboy-painel.css?v=05a4255f7b34">
 <link rel="stylesheet" href="donboy-email.css?v=ed0e5b4334e2">
 </head>
 <body>
@@ -709,7 +709,7 @@ tr:hover .lixo{opacity:1}
 <script src="./fortemais-financeiro.js?v=48296dd2f793"></script>
 <script src="./fortemais-demandas-modelo.js?v=e2ba946c28ef"></script>
 <script src="./fortemais-demandas.js?v=be177dcfa8dd"></script>
-<script src="openclaw-fila.js?v=f3d036f837d2"></script>
+<script src="openclaw-fila.js?v=066cb079a2b5"></script>
 <script src="donboy-email.js?v=6a1ba6d316f6"></script>
 <script>
 /* ============================================================
@@ -2053,14 +2053,14 @@ function agentesSalvar(dados,id){
   return registro;
 }
 async function vAgentes(m){
-  m.classList.add('donboy-layout');
+  m.classList.add('donboy-layout','ag-central');
   m.replaceChildren(cab('Agentes','Escolha seu assistente. Cada um tem suas próprias conexões e histórico.'));
   m.querySelector('.topo').appendChild(acao('＋ Adicionar agente',()=>{agentesUI.editando='novo';agentesUI.aviso='';vAgentes(m)}));
   if(agentesUI.aviso)m.appendChild(el(`<p class="db-status" role="status">${esc(agentesUI.aviso)}</p>`));
   const lista=agentesLista();
   const faixa=el('<div class="ag-catalogo" aria-label="Seus agentes"></div>');
   lista.forEach(a=>{
-    const cartao=el(`<button type="button" class="ag-cartao ${agentesUI.selecionado===a.id?'selecionado':''}" aria-pressed="${agentesUI.selecionado===a.id}" data-agente="${esc(a.id)}"><span class="db-sobretitulo">${esc(a.ambiente||'Outro ambiente')}</span><strong>${esc(a.nome)}</strong><span>${esc(a.descricao||'Assistente cadastrado na Central.')}</span><small>${a.id==='donboy-supabase'?'Painel integrado · consulte o status ao abrir':'Cadastrado · sem monitoramento nesta Central'}</small></button>`);
+    const cartao=el(`<button type="button" class="ag-cartao ${agentesUI.selecionado===a.id?'selecionado':''}" aria-pressed="${agentesUI.selecionado===a.id}" data-agente="${esc(a.id)}"><span class="db-sobretitulo">${esc(a.ambiente||'Outro ambiente')}</span><strong>${esc(a.nome)}</strong><small>${a.id==='donboy-supabase'?'Impresilk · Mubisys':a.id==='donboy-openclaw'?'Pessoal · Consulta às empresas':'Assistente cadastrado'}</small><span class="ac-chip">${a.id==='donboy-supabase'?'Painel integrado':'Sem status ao vivo'}</span></button>`);
     cartao.onclick=()=>{agentesUI.selecionado=a.id;agentesUI.editando=null;agentesUI.aba='comando';agentesUI.aviso='';return vAgentes(m)};faixa.appendChild(cartao);
   });m.appendChild(faixa);
   if(agentesUI.editando){
@@ -2084,6 +2084,13 @@ async function vAgentes(m){
     const link=agentesURL(a.url)||(local?'http://127.0.0.1:18789/':'');const telegram=donboyTelegram(a.telegram);
     const acessos=`<div class="ag-acoes">${link?`<a class="btn" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Abrir painel ↗</a>`:''}${telegram?`<a class="btn ghost" href="${esc(telegram)}" target="_blank" rel="noopener noreferrer">Abrir Telegram ↗</a>`:''}</div>`;
     const textos={comando:`<h3>Converse no ambiente do agente</h3><p>${esc(a.descricao||'Abra o painel ou o canal cadastrado para fazer seu pedido.')}</p>${acessos}<p>${local?'O painel local abre no Mac com o OpenClaw ligado. No Maestri, use o terminal DON BOY.':'O acesso depende do ambiente e das permissões do agente.'}</p>`,ambientes:`<h3>${esc(a.ambiente||'Ambiente não informado')}</h3><p>${local?'OpenClaw é o ambiente de execução; Maestri é outra interface para o mesmo assistente, não um terceiro agente.':'Ambiente informado no cadastro.'}</p>`,conexoes:'<h3>Conexões deste agente</h3><p>A Central ainda não recebe o inventário de conexões deste agente. Confira no painel de origem. As conexões do BotImpresilk não comprovam acesso aqui.</p>'+acessos,inteligencia:'<h3>Inteligência e consumo</h3><p>Modelo, raciocínio e custos não são consultados automaticamente neste cadastro. Confira a configuração atual no ambiente do agente.</p>'+acessos,memoria:'<h3>Memória separada</h3><p>Este cadastro não envia arquivos nem replica memórias. Adicione referências no ambiente deste agente. A memória do BotImpresilk permanece no painel dele.</p>'+acessos,automacoes:'<h3>Automações próprias</h3><p>Não há sincronização das rotinas deste agente com esta tela. Cadastros não criam rotinas nem transferem as existentes.</p>'+acessos,atividade:'<h3>Verificação pendente</h3><p>Não há monitoramento ao vivo deste agente na Central. Abrir um link não comprova conexão ou resposta. Consulte o histórico no ambiente de origem.</p>'+acessos};
+    const escopo='<div class="ag-escopos"><article><span class="ac-chip">Pessoal</span><h3>Central do Léo</h3><p>Finanças, viagens e saúde. Preparar, conferir e aprovar registros pelo mesmo ID.</p><strong>Escrita após aprovação</strong></article><article><span class="ac-chip">Empresas</span><h3>Consulta e análise</h3><p>Impresilk, Mubisys, Domo, MinasLab, Diamond e Bosques.</p><strong>Somente leitura</strong></article></div>';
+    if(local){
+      textos.comando=`<div class="ag-atalhos"><div><h3>Seu assistente pessoal</h3><span class="ac-chip">Central: prévia e aprovação</span> <span class="ac-chip">Empresas: leitura</span></div>${acessos}</div><details class="ag-contexto"><summary>Como usar e limites</summary><p>${esc(a.descricao||'Assistente pessoal')}</p><p>Converse pelo Telegram ou Maestri. O OpenClaw precisa do Mac ligado. Nenhum status de execução é consultado por esta tela.</p></details>`;
+      textos.conexoes='<h3>Escopo das conexões</h3><p class="db-micro">Mapa de uso definido para este agente. Não é uma checagem de autenticação ou disponibilidade ao vivo.</p>'+escopo+'<details class="ag-contexto"><summary>Agenda, arquivos e canais</summary><p>Google Agenda e Drive usam os conectores do agente. Consulte o ambiente de origem para conferir autenticação e operações disponíveis. BotImpresilk mantém suas próprias conexões.</p>'+acessos+'</details>';
+      textos.ambientes='<h3>Onde cada parte funciona</h3><div class="ag-escopos"><article><h3>OpenClaw no Mac</h3><p>Executa os pedidos do DON BOY. Telegram e Maestri são interfaces do mesmo assistente.</p><span class="ac-chip">Depende do Mac ligado</span></article><article><h3>Central do Léo</h3><p>Reúne propostas pessoais e decisões. Uma proposta preparada ainda não é um registro confirmado.</p><span class="ac-chip">Fila privada</span></article></div>'+acessos;
+      textos.atividade='<h3>Decisões e resultados pessoais</h3><p class="db-micro">Histórico da fila compartilhada. Não há monitoramento ao vivo de toda a atividade do agente nesta Central.</p>';
+    }
     conteudo.innerHTML=textos[id]||textos.comando;
     if(local&&['comando','atividade'].includes(id))conteudo.appendChild(openclawFilaCard(()=>desenhar(id)));
   };

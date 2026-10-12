@@ -3,3 +3,10 @@ function prepare(estado='pendente'){const a=setup();a.ctx.propostas=[{id:'111111
 test('abrir fila não aprova e não interpreta HTML da proposta',()=>{const a=prepare();assert.equal(a.document.querySelectorAll('.oc-fila img').length,0);assert.match(a.document.querySelector('.oc-previa').textContent,/<img/);assert.equal(a.document.querySelectorAll('.oc-proposta button').length,2)});
 test('incerto mostra conferir e não nova aprovação',()=>{const a=prepare('incerto');assert.equal(a.document.querySelectorAll('.oc-proposta button').length,1);assert.equal(a.document.querySelector('.oc-proposta button').textContent,'Conferir resultado')});
 test('decisão leva apenas ID e ação, sem editar conteúdo aprovado',async()=>{const a=prepare();a.ctx.calls=[];a.run('apiSync=async(_m,p)=>{calls.push(p);return p.acao==="openclaw_propostas_listar"?{ok:true,propostas:[]}:{ok:true,proposta:{estado:"confirmado"}}}');await a.document.querySelector('.oc-proposta button').onclick();assert.equal(a.ctx.calls[0].decisao,'aprovar');assert.deepEqual(Object.keys(a.ctx.calls[0]).sort(),['acao','decisao','id'])});
+test('filtros separam pendentes de confirmados sem executar decisões',()=>{
+ const a=setup();a.run(`ocFila.dados={propostas:[{id:'1',estado:'pendente',previa:'Pendente'},{id:'2',estado:'confirmado',previa:'Concluído'},{id:'3',estado:'incerto',previa:'Conferir'}]};function render(){document.getElementById('main').replaceChildren(openclawFilaCard(render))};render()`);
+ a.document.querySelector('[data-oc-filtro="pendentes"]').onclick();
+ assert.equal(a.document.querySelectorAll('.oc-proposta').length,1);assert.match(a.document.querySelector('.oc-previa').textContent,/Pendente/);
+ a.document.querySelector('[data-oc-filtro="atencao"]').onclick();assert.match(a.document.querySelector('.oc-previa').textContent,/Conferir/);assert.equal(a.document.querySelectorAll('.oc-proposta button').length,1);
+ a.document.querySelector('[data-oc-filtro="concluidos"]').onclick();assert.match(a.document.querySelector('.oc-previa').textContent,/Concluído/);assert.equal(a.document.querySelectorAll('.oc-proposta button').length,0);
+});
