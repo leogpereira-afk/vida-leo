@@ -1,3 +1,4 @@
+// Publicação inclui módulos transitivos da fila e do catálogo pessoal.
 import {validarLancamentoCentral,validarRegistroCentral,previaRegistroCentral} from './openclaw-central.ts';
 import {executarCentralMake} from './openclaw-make.ts';
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;

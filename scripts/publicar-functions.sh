@@ -106,14 +106,12 @@ for fn in "${FUNCOES[@]}"; do
   done < <(grep -oE 'from "\.\./_shared/[A-Za-z0-9_.-]+\.ts"' "$fn/index.ts" \
              | sed -E 's|.*_shared/||; s|"$||' | sort -u)
 
-  # Módulo IRMÃO da function (ex.: leo-sync/strava.ts, importado como
-  # "./strava.ts") sobe junto, com o nome relativo que o import usa. Sem isto o
-  # bundle não resolve o import e a function sobe morta -- deploy por lista
-  # nominal deixa arquivo novo de fora (14/09/2026, o Strava na Central).
-  while read -r dep; do
-    [ -f "$fn/$dep" ] && args+=(-F "file=@$fn/$dep;filename=$dep;type=application/typescript")
-  done < <(grep -oE 'from "\./[A-Za-z0-9_.-]+\.ts"' "$fn/index.ts" \
-             | sed -E 's|.*from "\./||; s|"$||' | sort -u)
+  # Inclui todos os módulos TypeScript da function, também dependências
+  # transitivas. Inspecionar apenas imports do index deixava módulos de fora.
+  while IFS= read -r arquivo; do
+    dep="${arquivo#"$fn/"}"
+    args+=(-F "file=@$arquivo;filename=$dep;type=application/typescript")
+  done < <(find "$fn" -type f -name '*.ts' ! -path "$fn/index.ts" | sort)
 
   # POST /functions/deploy com uma parte `metadata` em JSON. O caminho antigo
   # (PATCH /functions/<slug> com os campos na query string) responde

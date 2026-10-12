@@ -51,3 +51,14 @@ test('mudança em dependência compartilhada exige seleção explícita sem publ
 test('execução manual sem argumentos mantém publicação completa explícita',t=>{
  const r=repo(t),p=r.rodar();assert.equal(p.status,0,p.stderr+p.stdout);assert.equal(r.chamadas().length,2);assert.match(r.chamadas().join('\n'),/slug=equipe-auth/);assert.match(r.chamadas().join('\n'),/slug=leo-sync/);
 });
+
+test('inclui módulos transitivos mesmo com aspas simples',t=>{
+ const r=repo(t);
+ r.mudar('supabase/functions/leo-sync/base.ts','export const base=1;');
+ r.mudar('supabase/functions/leo-sync/fila.ts',"import {base} from './base.ts'; export {base};");
+ const head=r.mudar('supabase/functions/leo-sync/index.ts','import {base} from "./fila.ts"; export {base};');
+ const p=r.rodar('--changed',r.base,head);
+ assert.equal(p.status,0,p.stderr+p.stdout);
+ assert.match(r.chamadas()[0],/filename=base.ts/);
+ assert.match(r.chamadas()[0],/filename=fila.ts/);
+});
