@@ -65,10 +65,11 @@ function donboyProjetarPainel(d: DonboyObjeto) {
   const turno = (v: unknown) => donboyCampos(v,["id","estado","iniciado_em","finalizado_em","modelo","duracao_ms","custo_usd","erro","consultas","etapas","conclusao","entregaResposta"]);
   return {
     ...donboyCampos(d,["versao","geradoEm","consultadoEm"]),
+    ...(d.atendimento==='empresarial_por_perfis'?{atendimento:'empresarial_por_perfis',acompanhamentoEstado:'nao_disponivel'}:{}),
     inteligencia: donboyCampos(d.inteligencia,["provedor","modelo","esforco"]),
     preferencias:donboyProjetarPreferencias(d.preferencias),
     preferenciasEstado:Array.isArray(d.preferencias)&&['disponivel','indisponivel','nao_consultado'].includes(String(d.preferenciasEstado))?d.preferenciasEstado:'nao_consultado',
-    automacoes:donboyProjetarAutomacoes(d.automacoes),
+    automacoes:d.atendimento==='empresarial_por_perfis'?null:donboyProjetarAutomacoes(d.automacoes),
     capacidades: d.capacidades.slice(0,50).map(c=>donboyCampos(c,["id","nome","configuracao","modo","faz","verificacao","testadaEm","status","detalhe"])),
     ultimaExecucao: turno(d.ultimaExecucao),
     ultimosTurnos: d.ultimosTurnos.slice(0,50).map(turno),
@@ -216,7 +217,7 @@ export async function donboyAcao(acao: string, corpo: unknown, sb: DonboyBanco, 
     if (error || !Array.isArray(data) || data.length !== 1 || !/^[a-f0-9]{64}$/.test(String(data[0]?.hash ?? ""))) throw Error("ponte indisponível");
     hash = data[0].hash;
   } catch { return donboyJson({erro:"A ligação privada com o DON BOY precisa ser conferida. Nenhum comando foi enviado."},503); }
-  const destino = memoria ? (link ? "memoria-link" : adicionar ? "memoria-adicionar" : "memoria-listar") : teste ? "testar-conversa" : "painel";
+  const destino = memoria ? (link ? "memoria-link" : adicionar ? "memoria-adicionar" : "memoria-listar") : teste ? "testar-conversa" : "painel-equipe";
   const agora = new Date();
   const corpoRaw = JSON.stringify(memoria ? memoriaDados : teste ? {historico:[...historicoTeste,{papel:"user",conteudo:String(corpo.comando).trim(),em:agora.toISOString()}]} : {});
   const timestamp = String(Math.floor(agora.getTime()/1000));

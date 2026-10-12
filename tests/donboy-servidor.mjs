@@ -36,10 +36,10 @@ test('painel assina corpo fixo e devolve somente a projeção autorizada',async(
  const d=await r.json();assert.equal(d.versao,'teste');assert.equal(d.token,undefined);assert.equal(d.payload,undefined);
  assert.equal(r.headers.get('cache-control'),'no-store');
  assert.equal(b.calls.length,1);const c=b.calls[0];
- assert.equal(c.url,'https://reoghclxripktzpdwhiy.supabase.co/functions/v1/badboy-telegram?acao=painel');
+ assert.equal(c.url,'https://reoghclxripktzpdwhiy.supabase.co/functions/v1/badboy-telegram?acao=painel-equipe');
  assert.equal(c.method,'POST');assert.equal(c.redirect,'error');assert.equal(c.body,'{}');
  const ts=c.headers['x-donboy-painel-ts'];assert.match(ts,/^\d{10}$/);
- assert.equal(c.headers['x-donboy-painel-signature'],createHmac('sha256',hash).update(ts+'\npainel\n{}').digest('hex'));
+ assert.equal(c.headers['x-donboy-painel-signature'],createHmac('sha256',hash).update(ts+'\npainel-equipe\n{}').digest('hex'));
  assert.equal(c.headers.authorization,undefined);assert.equal(c.headers['x-donboy-token'],undefined);
  assert.deepEqual(b.reads,['donboy_ponte']);
 });
@@ -187,4 +187,10 @@ test('fila pessoal: só dono ou assinatura própria; sessão de outra pessoa/OAu
   assert.equal((await b.request({acao:'openclaw_propostas_listar'},auth)).status,401);
  }
  assert.equal(b.calls.length,0);assert.equal(b.reads.length,0);
+});
+
+test('painel empresarial informa acompanhamento ausente sem rotinas pessoais',async()=>{
+ const b=backend({upstream:async()=>json({...overview,atendimento:'empresarial_por_perfis',custos:{},automacoes:[{id:'email_diario',estado:'inativo'}]})});
+ const r=await b.request({acao:'donboy_painel'});assert.equal(r.status,200);const d=await r.json();
+ assert.equal(d.atendimento,'empresarial_por_perfis');assert.equal(d.acompanhamentoEstado,'nao_disponivel');assert.equal(d.automacoes,null);assert.equal(d.custos.openai,null);
 });

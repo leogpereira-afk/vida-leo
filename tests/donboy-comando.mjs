@@ -70,3 +70,20 @@ test('preferências vêm do servidor, são somente leitura e escapam conteúdo',
  const a=await carregar(d);const p=a.document.getElementById('db-painel-inteligencia');assert.match(p.textContent,/Curta/);assert.match(p.textContent,/Pedido confirmado por você/);assert.match(p.textContent,/Padrão do assistente/);assert.equal(p.querySelectorAll('input,select,textarea').length,0);assert.equal(p.querySelectorAll('img').length,0);
  assert.match(a.run("donboyPreferencias({preferencias:[],preferenciasEstado:'indisponivel'})"),/Não foi possível consultar/);
 });
+
+test('painel por perfis não aciona memória ou e-mail pessoais e não inventa zero de falhas',async()=>{
+ const d={...painel(),atendimento:'empresarial_por_perfis',acompanhamentoEstado:'nao_disponivel',custos:{},automacoes:null};
+ const a=await carregar(d);
+ for(const aba of ['memoria','automacoes','atividade','conexoes','inteligencia','comando'])await abrir(a,aba);
+ assert.deepEqual(a.calls.map(c=>c.acao),['donboy_painel']);
+ assert.equal(a.document.querySelector('[data-donboy-teste]'),null);
+ assert.equal(a.document.querySelector('[data-donboy-memoria]'),null);
+ assert.ok([...a.document.querySelectorAll('.db-metricas strong')].every(x=>x.textContent==='Não informado'));
+ assert.match(a.document.getElementById('db-painel-atividade').textContent,/histórico empresarial ainda não/);
+ assert.match(a.document.getElementById('db-painel-memoria').textContent,/Nenhuma memória pessoal/);
+});
+test('entrada direta em Memória consulta contrato antes de pedir fontes legadas',async()=>{
+ const a=setup(),calls=[];a.ctx.apiTeste=async(_m,b)=>{calls.push(b);return {...painel(),atendimento:'empresarial_por_perfis',acompanhamentoEstado:'nao_disponivel'}};
+ a.run("apiSync=apiTeste;donboyPainelEstado.aba='memoria'");await a.run("vDonBoy(document.getElementById('main'))");
+ assert.deepEqual(calls.map(c=>c.acao),['donboy_painel']);
+});

@@ -1789,6 +1789,7 @@ function donboyConexoes(d){
   }).join('')+'</div>';
 }
 function donboyAtividade(d){
+  if(d.acompanhamentoEstado==='nao_disponivel')return '<p class="db-vazio">O histórico empresarial ainda não é disponibilizado nesta consulta.</p>';
   const turnos=donboyLista(d.ultimosTurnos).slice(0,20);
   if(!turnos.length)return '<p class="db-vazio">Nenhum pedido recente foi informado pelo servidor.</p>';
   return '<ol class="db-atividade">'+turnos.map(t=>{
@@ -1937,17 +1938,17 @@ function donboyMemoriaCard(redesenhar){
 
 const DONBOY_ABAS=[['comando','Comando'],['ambientes','Ambientes'],['conexoes','Conexões'],['inteligencia','Inteligência'],['memoria','Memória'],['automacoes','Automações'],['atividade','Atividade']];
 function donboyMetricas(d){
-  if(!d)return {amostra:null,falhas:null,parciais:null,pendentes:null};
+  if(!d||d.acompanhamentoEstado==='nao_disponivel')return {amostra:null,falhas:null,parciais:null,pendentes:null};
   const turnos=donboyLista(d.ultimosTurnos);
   return {amostra:turnos.length,falhas:turnos.filter(t=>['falha','falhou','erro','entrega_incerta'].includes(t.estado)).length,parciais:turnos.filter(t=>t.conclusao==='parcial').length,pendentes:Array.isArray(d.pendentes)?d.pendentes.length:null};
 }
 function donboyPendentes(d){
-  if(!d||!Array.isArray(d.pendentes))return '<p class="db-vazio">Situação das aprovações não informada pelo servidor.</p>';
+  if(!d||d.acompanhamentoEstado==='nao_disponivel'||!Array.isArray(d.pendentes))return '<p class="db-vazio">Situação das aprovações não informada pelo servidor.</p>';
   return d.pendentes.length?'<ul class="db-pendentes">'+d.pendentes.map(p=>`<li><strong>${esc(donboyTexto(p.tipo,'Pedido'))}</strong><span>${esc(donboyTexto(p.estado))}</span><small>${esc(donboyData(p.criado_em))}</small></li>`).join('')+'</ul><p class="db-micro">Confira a prévia no canal em que o pedido foi preparado. Esta lista acompanha a situação.</p>':'<p class="db-vazio">Nenhuma aprovação pendente foi informada nesta consulta.</p>';
 }
 function donboyPreferencias(d){
   const itens=donboyLista(d?.preferencias).filter(p=>p&&typeof p==='object');
-  if(!itens.length)return '<p class="db-vazio">'+(d?.preferenciasEstado==='indisponivel'?'Não foi possível consultar as preferências agora.':'Preferências não informadas pelo servidor.')+' O modelo ativo e o consumo abaixo vêm da consulta atual.</p>';
+  if(!itens.length)return '<p class="db-vazio">'+(d?.preferenciasEstado==='indisponivel'?'Não foi possível consultar as preferências agora.':'Preferências não informadas pelo servidor.')+' Os dados disponíveis aparecem abaixo.</p>';
   return '<dl class="db-inteligencia-dados">'+itens.map(p=>`<div><dt>${esc(donboyTexto(p.rotulo,p.chave||'Preferência'))}</dt><dd>${esc(({padrao:'Padrão do assistente',curta:'Curta',equilibrada:'Equilibrada',detalhada:'Detalhada',direto:'Direto',consultivo:'Consultivo',formal:'Formal',automatico:'Conforme o assunto',paragrafos:'Parágrafos',listas:'Listas'})[p.valor]||donboyTexto(p.valor))}${p.origem?`<small>${esc(({padrao:'Configuração padrão',pedido_confirmado:'Pedido confirmado por você'})[p.origem]||'Origem informada pelo servidor')}</small>`:''}</dd></div>`).join('')+'</dl>';
 }
 function donboyAutomacoes(d){
@@ -1992,7 +1993,7 @@ async function vDonBoy(m){
       DONBOY_ABAS.forEach(([chave])=>{paineis[chave].hidden=chave!==id});
       if(focar){const b=abas.querySelector('[data-donboy-aba="'+id+'"]');b.focus();b.scrollIntoView({block:'nearest',inline:'nearest'})}
       if(id==='automacoes'){desenhar();return;}
-      if(id==='memoria'&&donboyMemoriaEstado.documentos===null&&!donboyMemoriaEstado.listando&&!donboyMemoriaEstado.erroLista){const p=donboyMemoriaListar();desenhar();await p;desenhar()}
+      if(id==='memoria'&&d?.atendimento!=='empresarial_por_perfis'&&donboyMemoriaEstado.documentos===null&&!donboyMemoriaEstado.listando&&!donboyMemoriaEstado.erroLista){const p=donboyMemoriaListar();desenhar();await p;desenhar()}
     };
     abas.querySelectorAll('[role=tab]').forEach((b,indice)=>{
       b.onclick=()=>abrir(b.dataset.donboyAba);
@@ -2003,6 +2004,7 @@ async function vDonBoy(m){
     const teste=el(donboyCard('Consultar o BotImpresilk','Busque nos seus arquivos e sistemas, com a fonte do resultado.',`<form data-donboy-teste><label for="db-comando">Seu pedido</label><textarea id="db-comando" maxlength="1500" rows="3" placeholder="Ex.: consulte as compras da Impresilk e informe pendências" aria-describedby="db-teste-limite" ${s.testando?'disabled':''}>${esc(s.comando)}</textarea><p class="db-micro" id="db-teste-limite">Somente consulta. Não envia mensagens nem altera seus registros. O teste pode consumir créditos de IA.</p><div class="db-teste-acoes"><button type="submit" class="btn" ${s.testando?'disabled':''}>${s.testando?'Consultando…':'Consultar'}</button><span class="db-micro">Até 1.500 caracteres</span></div></form><div class="db-exemplos" aria-label="Exemplos de consulta"><span>Comece por aqui</span><button type="button" data-donboy-exemplo="Consulte no painel Impresilk a agenda empresarial e informe a data dos dados.">Agenda empresarial</button><button type="button" data-donboy-exemplo="Consulte o acervo Impresilk e encontre o Caderno de Instalação Externa.">Manuais Impresilk</button><button type="button" data-donboy-exemplo="Consulte o catálogo Mubisys e mostre as operações de consulta disponíveis.">Catálogo Mubisys</button></div><div class="db-teste-resultado" aria-live="polite">${s.testando?'<p class="db-vazio">Consultando as fontes disponíveis…</p>':donboyResultadoTeste(s.teste)}</div>`,'db-teste'));
     comando.appendChild(teste);
     const form=teste.querySelector('form'),campo=teste.querySelector('textarea');campo.oninput=()=>{s.comando=campo.value};form.onsubmit=async ev=>{ev.preventDefault();const p=donboyTestar(campo.value);desenhar();await p;desenhar()};
+    if(d?.atendimento==='empresarial_por_perfis')teste.replaceChildren(el('<p class="db-vazio">O atendimento empresarial por perfis está disponível no Telegram. A consulta de comandos pela Central ainda não está integrada a esse atendimento.</p>'));
     const n=v=>v===null?'Não informado':String(v);
     comando.appendChild(el(`<div class="db-resumo db-metricas"><div><small>Falhas ou entrega incerta</small><strong>${esc(n(metricas.falhas))}</strong><span>Nos pedidos consultados</span></div><div><small>Pedidos com partes pendentes</small><strong>${esc(n(metricas.parciais))}</strong><span>Conforme registro de execução</span></div><div><small>Aguardando aprovação</small><strong>${esc(n(metricas.pendentes))}</strong><span>Prévia ainda não concluída</span></div></div>`));
     comando.appendChild(el(`<p class="db-micro db-amostra">${metricas.amostra===null?'Amostra ainda não informada.':metricas.amostra+' pedidos recentes consultados. Esta amostra não representa todo o histórico.'}</p>`));
@@ -2013,16 +2015,16 @@ async function vDonBoy(m){
     inteligencia.appendChild(el(donboyCard('Inteligência atual','Configuração informada pelo servidor.',`<dl class="db-inteligencia-dados"><div><dt>Provedor</dt><dd>${esc(donboyTexto(i.provedor))}</dd></div><div><dt>Modelo</dt><dd>${esc(donboyTexto(i.modelo))}</dd></div><div><dt>Raciocínio</dt><dd>${esc(i.esforco==='max'?'Máximo':donboyTexto(i.esforco))}</dd></div></dl><details class="db-detalhes db-versao"><summary>Detalhes da versão</summary><p>${esc(donboyTexto(d?.versao))}</p><p class="db-micro">Identificação informada pelo servidor nesta consulta.</p></details>`)));
     inteligencia.appendChild(el(donboyCard('Preferências de atendimento','Preferências informadas pelo servidor. Solicite mudanças na conversa com o BotImpresilk.',donboyPreferencias(d))));
     inteligencia.appendChild(el(donboyCard('Consumo por provedor','OpenAI e Claude, separados.',d?donboyCustos(d):'<p class="db-vazio">Consumo ainda não informado pelo servidor.</p>')));
-    paineis.memoria.appendChild(donboyMemoriaCard(desenhar));
-    if(s.aba==='automacoes')paineis.automacoes.appendChild(donboyEmailCard(desenhar));
+    paineis.memoria.appendChild(d?.atendimento==='empresarial_por_perfis'?el(donboyCard('Memória empresarial','Separada do acervo pessoal.','<p class="db-vazio">O envio de fontes por esta Central não está disponível na versão empresarial por perfis. Nenhuma memória pessoal é compartilhada.</p>')):donboyMemoriaCard(desenhar));
+    if(s.aba==='automacoes'&&d?.atendimento!=='empresarial_por_perfis')paineis.automacoes.appendChild(donboyEmailCard(desenhar));
     paineis.automacoes.appendChild(el(donboyCard('Automações','Horários, escopo e última execução informados pelo servidor.',donboyAutomacoes(d))));
     paineis.atividade.appendChild(el(donboyCard('Aguardando confirmação','Pedidos preparados que ainda dependem da sua decisão.',donboyPendentes(d))));
     paineis.atividade.appendChild(el(donboyCard('Respostas e arquivos recentes','Acompanhe as etapas do pedido. A entrega da resposta e o envio de um anexo têm confirmações próprias.',donboyAtividade(d||{}))));
-    m.querySelectorAll('[data-donboy-exemplo]').forEach(b=>{b.disabled=s.testando;b.onclick=async()=>{if(s.testando)return;s.comando=b.dataset.donboyExemplo;campo.value=s.comando;await abrir('comando',false);campo.focus()}});
+    m.querySelectorAll('[data-donboy-exemplo]').forEach(b=>{b.disabled=s.testando||d?.atendimento==='empresarial_por_perfis';b.onclick=async()=>{if(s.testando)return;s.comando=b.dataset.donboyExemplo;campo.value=s.comando;await abrir('comando',false);campo.focus()}});
     if(focoId){const destino=document.getElementById(focoId);if(destino&&!destino.closest('[hidden]')&&!destino.disabled)destino.focus()}
   };
   desenhar();
-  const consultas=[];if(!donboyPainelEstado.dados&&!donboyPainelEstado.erro)consultas.push(donboyAtualizar());if(donboyPainelEstado.aba==='memoria'&&donboyMemoriaEstado.documentos===null&&!donboyMemoriaEstado.erroLista)consultas.push(donboyMemoriaListar());if(consultas.length){desenhar();await Promise.all(consultas);desenhar()}
+  const consultas=[];if(!donboyPainelEstado.dados&&!donboyPainelEstado.erro){await donboyAtualizar();desenhar();}if(donboyPainelEstado.dados?.atendimento!=='empresarial_por_perfis'&&donboyPainelEstado.aba==='memoria'&&donboyMemoriaEstado.documentos===null&&!donboyMemoriaEstado.erroLista)consultas.push(donboyMemoriaListar());if(consultas.length){desenhar();await Promise.all(consultas);desenhar()}
 }
 
 /* Catálogo privado: cadastro não significa conexão ou execução verificada. */
