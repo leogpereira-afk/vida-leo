@@ -1,3 +1,4 @@
+import {ACOES_FILA,autenticarOpenclaw,bancoFila,operarFila} from '../supabase/functions/leo-sync/openclaw-fila.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
@@ -13,7 +14,7 @@ const hash='a'.repeat(64);
 function backend({upstream=async()=>json(overview),rows=[{hash}],erroBanco=null}={}){
  let handler;const calls=[],reads=[];
  const mock={from(table){const q={select(){return q},limit(){return q},then(ok,bad){reads.push(table);return Promise.resolve({data:rows,error:erroBanco}).then(ok,bad)}};return q}};
- const context={createClient:()=>mock,Deno:{env:{get:n=>n==='EQUIPE_JWT_SECRET'?'jwt-teste':n==='LEO_USUARIO'?'leonardo':'configurado'},serve:h=>handler=h},crypto:webcrypto,TextEncoder,TextDecoder,atob,btoa,Response,URL,AbortSignal,Date,setTimeout,Uint8Array,fetch:async(u,p)=>{calls.push({url:u,...p});return upstream(u,p)}};
+ const context={ACOES_FILA,autenticarOpenclaw,bancoFila,operarFila,createClient:()=>mock,Deno:{env:{get:n=>n==='EQUIPE_JWT_SECRET'?'jwt-teste':n==='LEO_USUARIO'?'leonardo':'configurado'},serve:h=>handler=h},crypto:webcrypto,TextEncoder,TextDecoder,atob,btoa,Response,URL,AbortSignal,Date,setTimeout,Uint8Array,fetch:async(u,p)=>{calls.push({url:u,...p});return upstream(u,p)}};
  vm.createContext(context);
  if(existsSync(new URL('donboy.ts',base)))vm.runInContext(ts('donboy.ts'),context);
  vm.runInContext(ts('index.ts'),context);
@@ -178,4 +179,12 @@ test('proxy conserva conversa do teste, sem aceitar troca de ação ou canal',as
  const b=backend({upstream:async()=>json({somente_leitura:true,telegram_enviado:false,texto:'Resultado',consultas:[],anexos:[],modelos:[]})});
  const historico=[{papel:'user',conteudo:'Procure contrato Domo',em:'2026-10-06T12:00:00Z'},{papel:'assistant',conteudo:'Qual terreno?',em:'2026-10-06T12:00:01Z'}];
  assert.equal((await b.request({acao:'donboy_testar',comando:'O terreno da SPE',historico})).status,200);assert.deepEqual(JSON.parse(b.calls[0].body).historico.slice(0,2),historico);
+});
+
+test('fila pessoal: só dono ou assinatura própria; sessão de outra pessoa/OAuth recusada',async()=>{
+ const b=backend();
+ for(const auth of ['', 'forjado',b.token({sis:'rh'}),b.token({sub:'jessica'}),b.token({papel:'admin'}),b.token({uso:'google-state'}),b.token({exp:1})]){
+  assert.equal((await b.request({acao:'openclaw_propostas_listar'},auth)).status,401);
+ }
+ assert.equal(b.calls.length,0);assert.equal(b.reads.length,0);
 });

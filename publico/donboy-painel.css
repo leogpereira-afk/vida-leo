@@ -111,3 +111,8 @@
 .ag-cartao{display:flex;flex-direction:column;gap:9px;text-align:left;background:var(--card,#fff);color:inherit;border:1px solid var(--line,#dedee5);border-radius:16px;padding:20px;cursor:pointer;font:inherit}
 .ag-cartao strong{font-size:18px}.ag-cartao span:not(.db-sobretitulo),.ag-cartao small{color:var(--muted,#666);font-size:13px;line-height:1.5}.ag-cartao.selecionado{border-color:#4540ed;box-shadow:inset 0 0 0 1px #4540ed}.ag-cartao:focus-visible{outline:3px solid #4540ed;outline-offset:3px}
 .ag-acoes{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:14px 0}.ag-acoes h2{flex:1;font-size:20px;margin:0}.ag-campos{display:grid;grid-template-columns:1fr 1fr;gap:16px}.ag-campos label{display:flex;flex-direction:column;gap:7px}.ag-largo{grid-column:1/-1}.ag-form,.ag-detalhe{background:var(--card,#fff);border:1px solid var(--line,#dedee5);border-radius:16px}.ag-form p,.ag-detalhe p{line-height:1.65}.ag-painel-integrado>.topo h1{font-size:22px}.ag-painel-integrado>.topo p{font-size:14px}.ag-detalhe{margin-top:16px}.ag-detalhe h3{margin-top:0}@media(max-width:640px){.ag-campos{grid-template-columns:1fr}.ag-form{padding:16px}.ag-cartao{padding:16px}}
+
+/* Fila pessoal: informações legíveis e ações próximas da prévia. */
+.oc-proposta{border:1px solid var(--borda,#dedede);border-radius:14px;padding:16px;margin-top:12px;background:var(--card,#fff)}
+.oc-previa{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5}.oc-fila [role=status]{font-size:.85rem;color:var(--muted,#666)}
+.oc-proposta>small{display:block;overflow-wrap:anywhere;margin:10px 0}.oc-fila .ag-acoes{flex-wrap:wrap;gap:8px}

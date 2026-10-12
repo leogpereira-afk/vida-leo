@@ -669,7 +669,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-previsao.css?v=cdb9222e7265">
 <link rel="stylesheet" href="./fortemais-demandas.css?v=fafdab59a91c">
 <link rel="stylesheet" href="./fortemais-compacto.css?v=6899567e34c1">
-<link rel="stylesheet" href="./donboy-painel.css?v=b86c29ff84dd">
+<link rel="stylesheet" href="./donboy-painel.css?v=a08217e065ab">
 <link rel="stylesheet" href="donboy-email.css?v=ed0e5b4334e2">
 </head>
 <body>
@@ -709,6 +709,7 @@ tr:hover .lixo{opacity:1}
 <script src="./fortemais-financeiro.js?v=48296dd2f793"></script>
 <script src="./fortemais-demandas-modelo.js?v=e2ba946c28ef"></script>
 <script src="./fortemais-demandas.js?v=be177dcfa8dd"></script>
+<script src="openclaw-fila.js?v=f3d036f837d2"></script>
 <script src="donboy-email.js?v=6a1ba6d316f6"></script>
 <script>
 /* ============================================================
@@ -2084,6 +2085,7 @@ async function vAgentes(m){
     const acessos=`<div class="ag-acoes">${link?`<a class="btn" href="${esc(link)}" target="_blank" rel="noopener noreferrer">Abrir painel ↗</a>`:''}${telegram?`<a class="btn ghost" href="${esc(telegram)}" target="_blank" rel="noopener noreferrer">Abrir Telegram ↗</a>`:''}</div>`;
     const textos={comando:`<h3>Converse no ambiente do agente</h3><p>${esc(a.descricao||'Abra o painel ou o canal cadastrado para fazer seu pedido.')}</p>${acessos}<p>${local?'O painel local abre no Mac com o OpenClaw ligado. No Maestri, use o terminal DON BOY.':'O acesso depende do ambiente e das permissões do agente.'}</p>`,ambientes:`<h3>${esc(a.ambiente||'Ambiente não informado')}</h3><p>${local?'OpenClaw é o ambiente de execução; Maestri é outra interface para o mesmo assistente, não um terceiro agente.':'Ambiente informado no cadastro.'}</p>`,conexoes:'<h3>Conexões deste agente</h3><p>A Central ainda não recebe o inventário de conexões deste agente. Confira no painel de origem. As conexões do BotImpresilk não comprovam acesso aqui.</p>'+acessos,inteligencia:'<h3>Inteligência e consumo</h3><p>Modelo, raciocínio e custos não são consultados automaticamente neste cadastro. Confira a configuração atual no ambiente do agente.</p>'+acessos,memoria:'<h3>Memória separada</h3><p>Este cadastro não envia arquivos nem replica memórias. Adicione referências no ambiente deste agente. A memória do BotImpresilk permanece no painel dele.</p>'+acessos,automacoes:'<h3>Automações próprias</h3><p>Não há sincronização das rotinas deste agente com esta tela. Cadastros não criam rotinas nem transferem as existentes.</p>'+acessos,atividade:'<h3>Verificação pendente</h3><p>Não há monitoramento ao vivo deste agente na Central. Abrir um link não comprova conexão ou resposta. Consulte o histórico no ambiente de origem.</p>'+acessos};
     conteudo.innerHTML=textos[id]||textos.comando;
+    if(local&&['comando','atividade'].includes(id))conteudo.appendChild(openclawFilaCard(()=>desenhar(id)));
   };
   DONBOY_ABAS.forEach(([id,nome],i)=>{const b=el(`<button type="button" role="tab" id="ag-aba-${id}" data-aba="${id}" aria-controls="ag-detalhe">${esc(nome)}</button>`);b.onclick=()=>desenhar(id);b.onkeydown=e=>{const teclas={ArrowRight:(i+1)%7,ArrowLeft:(i+6)%7,Home:0,End:6};if(!(e.key in teclas))return;e.preventDefault();const destino=abas.querySelectorAll('button')[teclas[e.key]];destino.focus();destino.click()};abas.appendChild(b)});desenhar(agentesUI.aba);
 }

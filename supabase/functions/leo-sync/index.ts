@@ -32,6 +32,7 @@ import { googleAcao } from "./google.ts";
 import { empresaAcao } from "./empresa.ts";
 import { lerBancosGestao } from "./bancos.ts";
 import { donboyAcao } from "./donboy.ts";
+import {ACOES_FILA,autenticarOpenclaw,bancoFila,operarFila} from "./openclaw-fila.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -259,6 +260,17 @@ Deno.serve(async (req: Request) => {
   if (req.method === "POST") {
     const corpo = await req.json().catch(() => ({}));
     const { acao, senha, senhaAtual, senhaNova, id: corpoId } = corpo;
+
+    // Porta exclusiva da fila pessoal: sessão do dono OU assinatura privada do
+    // OpenClaw, vinculada a esta ação/corpo e válida por até dois minutos.
+    if (ACOES_FILA.includes(acao)) {
+      const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+      const p = await crachaPayload(t);
+      const dono = p && p.uso === "" && p.sub.toLowerCase() === DONO && p.papel === "dono";
+      if (!dono && !await autenticarOpenclaw(req,corpo,sb)) return json({erro:"Não autorizado"},401);
+      try { return new Response(JSON.stringify(await operarFila(corpo,bancoFila(sb))),{headers:{...CORS,"content-type":"application/json","Cache-Control":"no-store"}}); }
+      catch(e) { return new Response(JSON.stringify({erro:(e as Error).message}),{status:409,headers:{...CORS,"content-type":"application/json","Cache-Control":"no-store"}}); }
+    }
 
     // O concierge contém histórico pessoal. Além da sessão Central válida,
     // esta porta exige o próprio dono e jamais aceita crachá de OAuth.
