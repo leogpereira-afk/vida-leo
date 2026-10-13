@@ -671,6 +671,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-compacto.css?v=6899567e34c1">
 <link rel="stylesheet" href="./donboy-painel.css?v=05a4255f7b34">
 <link rel="stylesheet" href="donboy-email.css?v=ed0e5b4334e2">
+<link rel="stylesheet" href="./marketing.css?v=e416522376d5">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -704,6 +705,7 @@ tr:hover .lixo{opacity:1}
 
 <script src="./vendor/ical-2.2.1.min.js"></script>
 <script src="./google-datas.js?v=85c5d36986f3"></script>
+<script src="./marketing.js?v=9d2e7d64056b"></script>
 <script src="./documentos-revisao.js?v=f54d2ba958f9"></script>
 <script src="./organograma.js?v=3a5db1c22c87"></script>
 <script src="./fortemais-financeiro.js?v=48296dd2f793"></script>
@@ -2111,6 +2113,7 @@ const MODS=[
   {id:'rendimentos',ic:'📈',nome:'Rendimentos',grupo:'Dinheiro',render:vRendimentos},
   {id:'gastos',ic:'💸',nome:'Gastos',grupo:'',render:vGastos},
   {id:'empresas',ic:'🏢',nome:'Empresas',grupo:'',render:vEmpresas},
+  {id:'marketing',ic:'◎',nome:'Marketing',grupo:'',render:vMarketing},
   {id:'bancos',ic:'🏦',nome:'Gestão',grupo:'',render:vBancos},
   {id:'patrimonio',ic:'🏠',nome:'Patrimônio',grupo:'',render:vPatrimonio},
   {id:'caixavgv',ic:'💰',nome:'Caixa e VGV',grupo:'',render:vCaixaVGV},
@@ -6390,10 +6393,15 @@ function fmPrevAbas(c,o){
 }
 
 /* ---------------- a tela ---------------- */
+function vMarketing(m){
+  LeoMarketing.montar(m,{api:apiSync,empresa:filtro.marketingEmpresa||'fortemais'});
+}
 async function vFortemais(m){
   m.classList.add('fortemais-fluida');const r=rr('fortemais');
   m.appendChild(el('<header class="fm-marca-topo"><div class="fm-marca-logo"><img src="fortemais-logo.png" width="220" height="49" alt="Fortemais Construtora"></div><div><h1>Obras e investimentos</h1><p>Planeje cada imóvel, seus custos e a participação dos sócios.</p></div></header>'));
   m.appendChild(fmPainelLinks());
+  const marketing=el('<div class="fm-marketing-atalho"><div><b>◎ Marketing da Fortemais</b><p>Site, Google Meu Negócio e Instagram no mesmo lugar.</p></div><button type="button" class="btn">Ver indicadores →</button></div>');
+  marketing.querySelector('button').onclick=()=>{filtro.marketingEmpresa='fortemais';irTela('marketing')};m.appendChild(marketing);
 
   const resumo=await fmResumo();
   if(resumo===null){

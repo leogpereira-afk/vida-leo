@@ -31,6 +31,7 @@ import { googleAcao } from "./google.ts";
 // a porta do Painel exige crachá do Painel, e crachá é por sistema.
 import { empresaAcao } from "./empresa.ts";
 import { lerBancosGestao } from "./bancos.ts";
+import { lerMarketing } from "./marketing.mjs";
 import { donboyAcao } from "./donboy.ts";
 import {ACOES_FILA,autenticarOpenclaw,bancoFila,operarFila} from "./openclaw-fila.ts";
 
@@ -331,6 +332,19 @@ Deno.serve(async (req: Request) => {
     if (acao === CRON_ACAO && req.headers.has("x-leo-cron")) {
       if (!(await cronOk(req))) return json({ erro: "Não autorizado" }, 401);
       return await stravaAcao(CRON_ACAO, {}, sb, req, new URL(req.url));
+    }
+
+    if (acao === "marketingPainel") {
+      const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+      const p = await crachaPayload(t);
+      if (!p || p.uso !== "" || p.sub.toLowerCase() !== DONO || p.papel !== "dono") return json({erro:"Não autorizado"},401);
+      try {
+        const resposta = json(await lerMarketing(sb, corpo.empresa));
+        resposta.headers.set("Cache-Control", "no-store");
+        return resposta;
+      } catch {
+        return json({erro:"Não foi possível consultar os indicadores desta empresa."},503);
+      }
     }
 
     if (acao === "bancosGestao") {
