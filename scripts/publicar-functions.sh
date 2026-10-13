@@ -106,12 +106,12 @@ for fn in "${FUNCOES[@]}"; do
   done < <(grep -oE 'from "\.\./_shared/[A-Za-z0-9_.-]+\.ts"' "$fn/index.ts" \
              | sed -E 's|.*_shared/||; s|"$||' | sort -u)
 
-  # Inclui todos os módulos TypeScript da function, também dependências
+  # Inclui os módulos TypeScript e JavaScript da function, também dependências
   # transitivas. Inspecionar apenas imports do index deixava módulos de fora.
   while IFS= read -r arquivo; do
     dep="${arquivo#"$fn/"}"
     args+=(-F "file=@$arquivo;filename=$dep;type=application/typescript")
-  done < <(find "$fn" -type f -name '*.ts' ! -path "$fn/index.ts" | sort)
+  done < <(find "$fn" -type f \( -name '*.ts' -o -name '*.mjs' -o -name '*.js' \) ! -path "$fn/index.ts" | sort)
 
   # POST /functions/deploy com uma parte `metadata` em JSON. O caminho antigo
   # (PATCH /functions/<slug> com os campos na query string) responde

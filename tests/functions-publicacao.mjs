@@ -62,3 +62,15 @@ test('inclui módulos transitivos mesmo com aspas simples',t=>{
  assert.match(r.chamadas()[0],/filename=base.ts/);
  assert.match(r.chamadas()[0],/filename=fila.ts/);
 });
+
+test('inclui módulos JavaScript na publicação da função de Marketing',t=>{
+ const r=repo(t);
+ r.mudar('supabase/functions/leo-sync/marketing.mjs','export const leitura=()=>({ok:true});');
+ r.mudar('supabase/functions/leo-sync/util.js','export const n=1;');
+ const head=r.mudar('supabase/functions/leo-sync/index.ts','import {leitura} from "./marketing.mjs"; export {leitura};');
+ const p=r.rodar('--changed',r.base,head);
+ assert.equal(p.status,0,p.stderr+p.stdout);
+ assert.equal(r.chamadas().length,1);
+ assert.match(r.chamadas()[0],/filename=marketing.mjs/);
+ assert.match(r.chamadas()[0],/filename=util.js/);
+});
