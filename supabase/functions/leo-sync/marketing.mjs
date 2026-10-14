@@ -1,3 +1,4 @@
+import {CHAVE_FORTEMAIS, CHAVE_ADMIN, detalharFortemais} from './marketing-fortemais.mjs';
 // Resumo de leitura para o dono da Central. Nunca retorna tokens, público,
 // comentários, contatos nem o cache bruto. A origem tem vínculo fixo por empresa.
 export const EMPRESAS = Object.freeze([
@@ -67,13 +68,14 @@ export function resumirMarketing(empresa,linhas,agora=Date.now()){
   // Os conectores atuais são exclusivos da Impresilk. Outras empresas nunca
   // herdam seu cache. A configuração e autorização delas são uma etapa separada.
   return {ok:true,empresa:marca,empresas:EMPRESAS,lidoEm:new Date(agora).toISOString(),
-    fontes:['site','google','instagram'].map(tipo=>fonte(tipo,porChave.get(tipo==='instagram'?config.meta:config.google),config,agora))};
+    fontes:['site','google','instagram'].map(tipo=>fonte(tipo,porChave.get(tipo==='instagram'?config.meta:config.google),config,agora)),
+    ...(empresa==='fortemais'?{detalhe:detalharFortemais(linhas,agora)}:{})};
 }
 
 export async function lerMarketing(sb,empresa,agora=Date.now()){
   if(!EMPRESAS.some(x=>x.id===empresa))throw Error('Empresa inválida.');
   const config=CONFIG[empresa]||{};
-  const chaves=[config.google,config.meta].filter(Boolean);
+  const chaves=empresa==='fortemais'?[CHAVE_FORTEMAIS,CHAVE_ADMIN]:[config.google,config.meta].filter(Boolean);
   if(!chaves.length)return resumirMarketing(empresa,[],agora);
   const {data,error}=await sb.from('painel_cache').select('chave,valor').in('chave',chaves);
   if(error)throw Error('Não foi possível consultar os indicadores. Tente novamente.');

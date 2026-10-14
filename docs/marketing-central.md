@@ -53,3 +53,56 @@ Publicação requer autorização do dono. Implantar `leo-sync` com
 `marketing.mjs` antes da tela. Verificar a rota com sessão válida do dono e
 com sessão recusada; depois conferir Marketing e Fortemais no site publicado.
 Uma suíte local ou prévia não confirma implantação.
+
+## Ampliação exclusiva da Fortemais (preparação local)
+
+A Fortemais ganhou sete áreas: visão geral, site, busca orgânica, Perfil da
+Empresa, Instagram, anúncios e administração. O catálogo prepara 53 métricas,
+com tabelas por página, canal, cidade, dispositivo, termo, conteúdo, campanha e
+anúncio. Disponibilidade do catálogo **não prova coleta**: cada provedor pode
+não entregar determinadas métricas. Valores ausentes ficam nulos.
+
+`marketing-fortemais.mjs` projeta somente as chaves privadas
+`leo_marketing_fortemais` e `leo_marketing_fortemais_admin` de `painel_cache`.
+Não usa nenhuma chave dos coletores da Impresilk. Cada fonte exige empresa
+exata e identidade conferida. Google/site/perfil usam o domínio; Instagram
+usa o perfil; contas de anúncios requerem vínculo explícito confirmado.
+A função de leitura não faz coleta nem concede autorização.
+
+`POST leo-sync {acao:"marketingAdministracao", empresa:"fortemais",
+administracao:{fontes:{...}}}` exige o mesmo dono da leitura. Aceita apenas
+responsável, conta, identificação do ativo, observação e situação cadastral.
+Não altera métricas, tokens, permissões, contas ou anúncios. A situação é
+preenchida pela pessoa; o estado da coleta vem separadamente do servidor.
+O formulário mantém os campos após falha e impede troca que descarte edição.
+
+### Contrato do coletor a conectar
+
+O cache tem `{empresa:"fortemais",fontes:{ga4,search,perfil,instagram,
+google_ads,meta_ads}}`. Cada fonte contém `empresa`, `estado`, `coletadoEm`,
+`identidade`, `moeda` (somente mídia) e `periodos`. Cada período tem `inicio`,
+`fim`, `completo`, `metricas`, `tabelas` e `serie`. A projeção ignora campos
+extras, limita linhas e descarta datas inválidas/duplicadas. Nenhum dado real,
+ID privado, e-mail administrador ou credencial fica neste repositório público.
+
+As taxas são frações (0.05 = 5%), tempo em segundos, custos na moeda informada
+pelo provedor. Sem moeda, não se presume BRL. Usuários/alcance totais devem vir
+do relatório do intervalo, nunca da soma diária. Somente resultados com data
+confirmada aparecem; mais de 48 horas sinaliza leitura antiga. Cada fonte tem
+seu próprio período explícito. A tela não soma canais ou períodos incompatíveis.
+
+### Limites desta etapa
+
+A descoberta confirmou no navegador a propriedade Analytics e Search Console
+da Fortemais. As conexões de leitura correspondentes no Make ainda requerem
+autorização; foram preparados pedidos no Make. A configuração e validação do
+coletor que alimentará esse novo contrato ainda dependem dessas autorizações.
+O cadastro identificado está em arquivo privado fora do repositório para a
+prévia; não foi gravado em produção. Instagram, Perfil da Empresa e contas de
+mídia ainda exigem autorização e validação de identidade e métricas.
+
+Não há rotina de marketing ativada, anúncios publicados ou expansão de
+permissões dos coletores da Impresilk. Publicar a tela sozinha não torna as
+fontes conectadas. Próxima sequência: concluir OAuth, validar identidades,
+implementar e testar a coleta isolada, conferir o recorte, autorizar publicação,
+implantar servidor antes da tela e verificar os dados no painel real.

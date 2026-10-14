@@ -12,6 +12,7 @@ const ctx=vm.createContext({LeoGoogleDatas:globalThis.LeoGoogleDatas,FortemaisFi
 vm.runInContext(readFileSync(new URL('../../publico/fortemais-demandas.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/donboy-email.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/openclaw-fila.js',import.meta.url),'utf8'),ctx);
+vm.runInContext(readFileSync(new URL('../../publico/marketing-fortemais.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/marketing.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(source,ctx);
 vm.runInContext("fmResumo=async()=>({});arqTotal=async()=>({n:0,b:0,fila:0});arqPor=async()=>[];apiEquipe=async()=>({usuarios:[],historico:[]});",ctx);

@@ -40,7 +40,7 @@ test('marketing: datas inválidas são descartadas e duplicidade falha sem infla
 });
 test('marketing: leitura consulta apenas cache permitido; erro não vira fonte vazia',async()=>{
  let consulta;const sb={from:t=>{assert.equal(t,'painel_cache');return {select:campos=>{assert.equal(campos,'chave,valor');return {in:async(k,v)=>{consulta=v;return {data:retrato(),error:null}}}}}}};
- await lerMarketing(sb,'fortemais');assert.equal(consulta,undefined);
+ await lerMarketing(sb,'fortemais');assert.deepEqual(consulta,['leo_marketing_fortemais','leo_marketing_fortemais_admin']);
  await lerMarketing(sb,'impresilk',agora);assert.deepEqual(consulta,['mkt_fonte_google','mkt_fonte_meta']);
  const falha={from:()=>({select:()=>({in:async()=>({error:{message:'token-privado'}})})})};
  await assert.rejects(lerMarketing(falha,'impresilk'),/Não foi possível consultar/);

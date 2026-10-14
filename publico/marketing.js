@@ -46,11 +46,18 @@
   }
   function tabela(titulo,linhas,coluna){return `<section class="mkt-fonte"><h2>${titulo}</h2>${linhas.length?`<table><thead><tr><th>Origem</th><th>${coluna}</th></tr></thead><tbody>${linhas.map(x=>`<tr><td>${esc(x.nome)}</td><td>${num(x.valor)}</td></tr>`).join('')}</tbody></table>`:'<p class="mkt-vazio">Sem dados confirmados para este recorte.</p>'}</section>`}
   function montar(container,{api,empresa='fortemais'}={}){
-    let marca=EMPRESAS.some(e=>e[0]===empresa)?empresa:'fortemais',semana='',resposta=null,erro='',ocupado=false,sequencia=0;
+    let marca=EMPRESAS.some(e=>e[0]===empresa)?empresa:'fortemais',semana='',resposta=null,erro='',ocupado=false,sequencia=0,controleForte=null;
     const doc=container.ownerDocument;
     container.innerHTML='<section class="mkt-painel"></section>';const area=container.firstElementChild;
     function desenhar(){
       const ss=semanas(resposta);if(!ss.includes(semana))semana=ss[0]||'';
+      if(marca==='fortemais'&&resposta?.detalhe&&root.LeoFortemaisMarketing){
+        area.innerHTML=`<header class="mkt-cab"><div><span class="mkt-sobre">FORTEMAIS · MARKETING E ADMINISTRAÇÃO</span><h1>Presença digital</h1><p>Indicadores, contas e oportunidades das casas prontas da Fortemais.</p></div><button type="button" data-atualizar ${ocupado?'disabled':''}>${ocupado?'Consultando…':'Atualizar leitura'}</button></header><div class="mkt-filtros"><label>Empresa<select data-empresa>${EMPRESAS.map(([id,nome])=>`<option value="${id}" ${id===marca?'selected':''}>${nome}</option>`).join('')}</select></label><span class="mkt-chip">Indicadores somente leitura</span></div><div role="status" aria-live="polite">${erro?esc(erro):ocupado?'Consultando fontes…':''}</div><div data-forte></div><p class="mkt-nota">Consulta à Central: ${esc(hora(resposta.lidoEm))}. Atualizar leitura relê os dados recebidos; não inicia coleta nos provedores.</p>`;
+        controleForte=root.LeoFortemaisMarketing.montar(area.querySelector('[data-forte]'),{detalhe:resposta.detalhe,api});
+        area.querySelector('[data-empresa]').onchange=e=>{if(controleForte&&!controleForte.podeAtualizar()){e.target.value=marca;area.querySelector('[role=status]').textContent='Salve ou cancele o cadastro antes de trocar de empresa.';return}marca=e.target.value;semana='';resposta=null;controleForte=null;carregar()};
+        area.querySelector('[data-atualizar]').onclick=()=>{if(controleForte&&!controleForte.podeAtualizar()){area.querySelector('[role=status]').textContent='Salve ou cancele o cadastro antes de atualizar.';return}carregar()};
+        return;
+      }
       area.innerHTML=`<header class="mkt-cab"><div><span class="mkt-sobre">PRESENÇA DIGITAL</span><h1>Marketing</h1><p>Entenda como encontram e interagem com cada empresa.</p></div><button type="button" data-atualizar ${ocupado?'disabled':''}>${ocupado?'Consultando…':'Atualizar leitura'}</button></header>
       <div class="mkt-filtros"><label>Empresa<select data-empresa>${EMPRESAS.map(([id,nome])=>`<option value="${id}" ${id===marca?'selected':''}>${nome}</option>`).join('')}</select></label><label>Semana<select data-semana ${ss.length?'':'disabled'}>${ss.length?ss.map(s=>`<option value="${s}" ${s===semana?'selected':''}>${data(s)} a ${data(mais(s,6))}</option>`).join(''):'<option>Aguardando indicadores</option>'}</select></label><span class="mkt-chip">Somente leitura</span></div>
       <div role="status" aria-live="polite">${ocupado?'<p>Consultando as fontes desta empresa…</p>':''}${erro?`<p class="mkt-alerta" role="alert">${esc(erro)}</p>`:''}</div>
