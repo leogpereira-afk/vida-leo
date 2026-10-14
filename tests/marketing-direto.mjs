@@ -1,8 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {criarDireto,digest,CALLBACK} from '../supabase/functions/leo-sync/marketing-direto.mjs';
-import {validarAtivo,coletarFonte,janela} from '../supabase/functions/leo-sync/marketing-direto-fontes.mjs';
+import {criarDireto,digest,CALLBACK,diagnosticoProvedor} from '../supabase/functions/leo-sync/marketing-direto.mjs';
+import {validarAtivo,coletarFonte,janela,descobrirAtivos} from '../supabase/functions/leo-sync/marketing-direto-fontes.mjs';
 const tempo=Date.parse('2026-06-17T12:00:00Z');
 function setup(fetcher=async()=>new Response(JSON.stringify({access_token:'PRIVADO',refresh_token:'RENOVAR',expires_in:3600,scope:'teste'}))){let now=tempo;const dados=new Map(),cache=new Map(),banco={ler:async k=>dados.get(k)||null,gravar:async(k,v)=>dados.set(k,v),consumir:async(k,p)=>{const v=dados.get(k);if(p&&v?.prova!==p)return null;dados.delete(k);return v||null},salvarFonte:async(k,v)=>cache.set(k,v)};return {d:criarDireto({banco,fetcher,env:n=>n.endsWith('_ID')?'APP':'SEGREDO',agora:()=>now}),dados,cache,avancar:()=>now+=700000}}
 const prova='a'.repeat(64);
@@ -67,4 +67,20 @@ test('Google Ads: micros, moeda, conta e período preservados; total vem do agre
 test('Google Ads: paginação sem fim falha e ausência de linhas não inventa zero',async()=>{
  await assert.rejects(pesquisarAds(async()=>({results:[],nextPageToken:'mais'}),'customers/0000000001','SELECT'),/coleta/);
  const r=await coletarFonte('google_ads',{id:'customers/0000000001'},async(u,b)=>b.query.includes('customer.currency_code')?{results:[{customer:{id:'0000000001',currencyCode:'BRL'}}]}:{},tempo);assert.deepEqual(r.periodos[0].metricas,{});
+});
+
+test('Diagnóstico do provedor não registra tokens, URL completa, mensagens ou identificadores',()=>{
+ const d=diagnosticoProvedor('https://googleads.googleapis.com/v25/customers/123?access_token=SEGREDO',403,{error:{status:'PERMISSION_DENIED',message:'DADO_PRIVADO',details:[{reason:'SERVICE_DISABLED',metadata:{consumer:'projeto-privado'},errors:[{errorCode:{authenticationError:'DEVELOPER_TOKEN_HEADER_MISSING'},message:'TOKEN_PRIVADO',trigger:{stringValue:'SEGREDO'}}]}]}});
+ assert.equal(d.servico,'googleads.googleapis.com');assert.deepEqual(d.codigos,['authenticationError:DEVELOPER_TOKEN_HEADER_MISSING']);assert.doesNotMatch(JSON.stringify(d),/SEGREDO|PRIVADO|123|projeto|access_token/);
+ assert.equal(diagnosticoProvedor('https://outro.test',403,{error:{status:'token secreto'}}).status,'NAO_CLASSIFICADO');
+});
+
+test('Instagram sem ativo: diagnóstico distingue páginas ausentes e permissões sem expor dados',async()=>{
+ const registros=[],original=console.warn;console.warn=(...x)=>registros.push(x.join(' '));
+ try{
+  const r=await descobrirAtivos('instagram',async u=>u.endsWith('/me/permissions')?{data:[{permission:'instagram_basic',status:'granted'},{permission:'campo_PRIVADO',status:'granted'}]}:{data:[{id:'id_PRIVADO',name:'nome_PRIVADO',instagram_business_account:{id:'ig_PRIVADO',username:'outra_marca'}}]});
+  assert.deepEqual(r.ativos,[]);assert.equal(registros.length,1);assert.doesNotMatch(registros[0],/PRIVADO|outra_marca/);
+  const d=JSON.parse(registros[0].slice(registros[0].indexOf('{')));assert.equal(d.paginas,1);assert.equal(d.comInstagram,1);assert.equal(d.permissoes.instagram_basic,true);assert.equal(d.permissoes.business_management,false);
+  const vazio=await descobrirAtivos('instagram',async u=>{if(u.endsWith('/me/permissions'))throw Error('falha privada');return {data:[]}});assert.deepEqual(vazio.ativos,[]);assert.doesNotMatch(registros[1],/falha privada/);
+ }finally{console.warn=original}
 });

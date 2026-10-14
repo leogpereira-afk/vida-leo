@@ -10,7 +10,15 @@ export async function descobrirAtivos(f,api){if(f==='google_ads')return descobri
  if(f==='ga4'){const contas=await paginas(api,'https://analyticsadmin.googleapis.com/v1beta/accountSummaries','accountSummaries',{pageSize:'200'});ativos=contas.flatMap(c=>(c.propertySummaries||[]).map(p=>({id:p.property,nome:p.displayName||p.property})));}
  if(f==='search'){const r=await api('https://www.googleapis.com/webmasters/v3/sites');ativos=(r.siteEntry||[]).filter(p=>host(p.siteUrl)==='fortemais.net'||p.siteUrl==='sc-domain:fortemais.net').map(p=>({id:p.siteUrl,nome:p.siteUrl}));}
  if(f==='perfil'){const contas=await paginas(api,'https://mybusinessaccountmanagement.googleapis.com/v1/accounts','accounts',{pageSize:'20'});for(const c of contas){if(!/^accounts\/\d+$/.test(c.name))continue;const ls=await paginas(api,'https://mybusinessbusinessinformation.googleapis.com/v1/'+c.name+'/locations','locations',{pageSize:'100',readMask:'name,title,websiteUri'});ativos.push(...ls.filter(p=>host(p.websiteUri)==='fortemais.net').map(p=>({id:p.name,nome:p.title||p.name,site:p.websiteUri})));}}
- if(f==='instagram'){const ps=await paginas(api,GRAPH+'/me/accounts','data',{fields:'id,name,instagram_business_account{id,username}',limit:'100'});ativos=ps.filter(p=>p.instagram_business_account?.username?.toLowerCase()==='fortemais').map(p=>({id:p.instagram_business_account.id,nome:'@'+p.instagram_business_account.username}));}
+ if(f==='instagram'){
+  const ps=await paginas(api,GRAPH+'/me/accounts','data',{fields:'id,name,instagram_business_account{id,username}',limit:'100'});
+  ativos=ps.filter(p=>p.instagram_business_account?.username?.toLowerCase()==='fortemais').map(p=>({id:p.instagram_business_account.id,nome:'@'+p.instagram_business_account.username}));
+  if(!ativos.length){
+   let permissoes=null;
+   try{const r=await api(GRAPH+'/me/permissions');permissoes=Object.fromEntries(['pages_show_list','pages_read_engagement','instagram_basic','instagram_manage_insights','business_management'].map(k=>[k,(r.data||[]).some(x=>x.permission===k&&x.status==='granted')]))}catch{}
+   console.warn('marketing_instagram_descoberta',JSON.stringify({paginas:ps.length,comInstagram:ps.filter(p=>p.instagram_business_account?.id).length,correspondencias:ativos.length,permissoes}));
+  }
+ }
  if(f==='meta_ads'){const as=await paginas(api,GRAPH+'/me/adaccounts','data',{fields:'id,name',limit:'100'});ativos=as.map(a=>({id:a.id,nome:a.name||a.id}));}
  return {ativos:ativos.slice(0,200).map(a=>({...a,nome:String(a.nome).slice(0,160)})),limitado:ativos.length>200};
 }
