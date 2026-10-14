@@ -84,3 +84,15 @@ test('Instagram sem ativo: diagnóstico distingue páginas ausentes e permissõe
   const vazio=await descobrirAtivos('instagram',async u=>{if(u.endsWith('/me/permissions'))throw Error('falha privada');return {data:[]}});assert.deepEqual(vazio.ativos,[]);assert.doesNotMatch(registros[1],/falha privada/);
  }finally{console.warn=original}
 });
+
+test('Instagram: página selecionada permite descoberta direta sem ampliar permissões',async()=>{
+ const chamadas=[];const api=async u=>{chamadas.push(u);return u.includes('/me/accounts')?{data:[]}:{instagram_business_account:{id:'1234567',username:'fortemais'}}};
+ const r=await descobrirAtivos('instagram',api,{paginaInstagram:'12345678'});
+ assert.deepEqual(r.ativos,[{id:'1234567',nome:'@fortemais'}]);assert.equal(chamadas.length,2);assert.match(chamadas[1],/\/12345678\?fields=/);
+ await assert.rejects(descobrirAtivos('instagram',api,{paginaInstagram:'../me'}),/vinculo/);
+ const original=console.warn;console.warn=()=>{};
+ try{const outra=await descobrirAtivos('instagram',async u=>u.includes('/me/')?{data:[]}:{instagram_business_account:{id:'1234567',username:'outra'}},{paginaInstagram:'12345678'});assert.deepEqual(outra.ativos,[])}finally{console.warn=original}
+ const s=setup(async u=>new Response(JSON.stringify(u.includes('/me/accounts')?{data:[]}:{instagram_business_account:{id:'1234567',username:'fortemais'},username:'fortemais'})));
+ s.dados.set('token_meta',{access_token:'PRIVADO',exp:tempo+999999});s.dados.set('pagina_instagram',{id:'12345678'});
+ assert.equal((await s.d.listar('instagram')).ativos[0].nome,'@fortemais');assert.equal((await s.d.vincular('instagram','1234567')).ok,true);
+});

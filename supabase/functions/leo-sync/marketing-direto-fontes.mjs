@@ -6,13 +6,19 @@ const falha=c=>{throw new FalhaDireta(c)};
 const num=x=>x!==null&&x!==undefined&&x!==''&&Number.isFinite(Number(x))?Number(x):null;
 const url=(base,p)=>{const u=new URL(base);for(const [k,v]of Object.entries(p))if(v!==undefined)u.searchParams.set(k,v);return u.href};
 async function paginas(api,base,key,params={}){let token,rows=[];for(let i=0;i<10;i++){const r=await api(url(base,{...params,...(base.startsWith(GRAPH)?{after:token}:{pageToken:token})}));rows.push(...(r[key]||[]));token=r.nextPageToken||(r.paging?.next?r.paging?.cursors?.after:null);if(!token)return rows}falha('coleta')}
-export async function descobrirAtivos(f,api){if(f==='google_ads')return descobrirAds(api);let ativos=[];
+export async function descobrirAtivos(f,api,{paginaInstagram}={}){if(f==='google_ads')return descobrirAds(api);let ativos=[];
  if(f==='ga4'){const contas=await paginas(api,'https://analyticsadmin.googleapis.com/v1beta/accountSummaries','accountSummaries',{pageSize:'200'});ativos=contas.flatMap(c=>(c.propertySummaries||[]).map(p=>({id:p.property,nome:p.displayName||p.property})));}
  if(f==='search'){const r=await api('https://www.googleapis.com/webmasters/v3/sites');ativos=(r.siteEntry||[]).filter(p=>host(p.siteUrl)==='fortemais.net'||p.siteUrl==='sc-domain:fortemais.net').map(p=>({id:p.siteUrl,nome:p.siteUrl}));}
  if(f==='perfil'){const contas=await paginas(api,'https://mybusinessaccountmanagement.googleapis.com/v1/accounts','accounts',{pageSize:'20'});for(const c of contas){if(!/^accounts\/\d+$/.test(c.name))continue;const ls=await paginas(api,'https://mybusinessbusinessinformation.googleapis.com/v1/'+c.name+'/locations','locations',{pageSize:'100',readMask:'name,title,websiteUri'});ativos.push(...ls.filter(p=>host(p.websiteUri)==='fortemais.net').map(p=>({id:p.name,nome:p.title||p.name,site:p.websiteUri})));}}
  if(f==='instagram'){
   const ps=await paginas(api,GRAPH+'/me/accounts','data',{fields:'id,name,instagram_business_account{id,username}',limit:'100'});
   ativos=ps.filter(p=>p.instagram_business_account?.username?.toLowerCase()==='fortemais').map(p=>({id:p.instagram_business_account.id,nome:'@'+p.instagram_business_account.username}));
+  if(!ativos.length&&paginaInstagram){
+   if(!/^\d{5,30}$/.test(paginaInstagram))falha('vinculo');
+   const p=await api(url(GRAPH+'/'+paginaInstagram,{fields:'instagram_business_account{id,username}'}));
+   const ig=p.instagram_business_account;
+   if(ig?.username?.toLowerCase()==='fortemais'&&/^\d+$/.test(String(ig.id)))ativos=[{id:String(ig.id),nome:'@'+ig.username}];
+  }
   if(!ativos.length){
    let permissoes=null;
    try{const r=await api(GRAPH+'/me/permissions');permissoes=Object.fromEntries(['pages_show_list','pages_read_engagement','instagram_basic','instagram_manage_insights','business_management'].map(k=>[k,(r.data||[]).some(x=>x.permission===k&&x.status==='granted')]))}catch{}
