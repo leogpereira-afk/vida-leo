@@ -1,6 +1,7 @@
 import '../../publico/google-datas.js';
 import '../../publico/fortemais-financeiro.js';
 import '../../publico/fortemais-demandas-modelo.js';
+import '../../publico/fortemais-inovacoes-modelo.js';
 import ICAL from 'ical.js';
 import {parseHTML} from 'linkedom';
 import vm from 'node:vm';import {readFileSync} from 'node:fs';
@@ -8,8 +9,9 @@ const html=readFileSync(new URL('../../publico/index.html',import.meta.url),'utf
 const source=html.slice(html.indexOf('<script>')+8,html.lastIndexOf('</script>')).replace(/if\(temSessao\(\)\)\{menu\(\);tela\(\);puxarNuvem[\s\S]*$/,'');
 export function setup({hostname='localhost'}={}){const {document,HTMLElement}=parseHTML(html);HTMLElement.prototype.scrollIntoView=function(){};HTMLElement.prototype.focus=function(){};
 const storage={getItem:()=>null,setItem(){},removeItem(){}};
-const ctx=vm.createContext({LeoGoogleDatas:globalThis.LeoGoogleDatas,FortemaisFinance:globalThis.FortemaisFinance,FortemaisDemandasModelo:globalThis.FortemaisDemandasModelo,ICAL,atob,btoa,document,window:{addEventListener(){},scrollTo(){},matchMedia:()=>({matches:false})},location:{hostname,hash:''},history:{pushState(){}},localStorage:storage,sessionStorage:storage,console,structuredClone,Date,URL,URLSearchParams,Blob,TextEncoder,TextDecoder,setTimeout:()=>0,clearTimeout(){},alert(){},confirm:()=>false});
+const ctx=vm.createContext({LeoGoogleDatas:globalThis.LeoGoogleDatas,FortemaisFinance:globalThis.FortemaisFinance,FortemaisDemandasModelo:globalThis.FortemaisDemandasModelo,FortemaisInovacoesModelo:globalThis.FortemaisInovacoesModelo,ICAL,atob,btoa,document,window:{addEventListener(){},scrollTo(){},matchMedia:()=>({matches:false})},location:{hostname,hash:''},history:{pushState(){}},localStorage:storage,sessionStorage:storage,console,structuredClone,Date,URL,URLSearchParams,Blob,TextEncoder,TextDecoder,setTimeout:()=>0,clearTimeout(){},alert(){},confirm:()=>false});
 vm.runInContext(readFileSync(new URL('../../publico/fortemais-demandas.js',import.meta.url),'utf8'),ctx);
+vm.runInContext(readFileSync(new URL('../../publico/fortemais-inovacoes.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/donboy-email.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/openclaw-fila.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/marketing-fortemais.js',import.meta.url),'utf8'),ctx);

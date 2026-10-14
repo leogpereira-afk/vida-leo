@@ -669,6 +669,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-previsao.css?v=cdb9222e7265">
 <link rel="stylesheet" href="./fortemais-demandas.css?v=fafdab59a91c">
 <link rel="stylesheet" href="./fortemais-compacto.css?v=6899567e34c1">
+<link rel="stylesheet" href="./fortemais-inovacoes.css?v=be85f228f8ae">
 <link rel="stylesheet" href="./donboy-painel.css?v=05a4255f7b34">
 <link rel="stylesheet" href="donboy-email.css?v=ed0e5b4334e2">
 <link rel="stylesheet" href="./marketing.css?v=d1c1ddb3271f">
@@ -713,6 +714,8 @@ tr:hover .lixo{opacity:1}
 <script src="./fortemais-financeiro.js?v=48296dd2f793"></script>
 <script src="./fortemais-demandas-modelo.js?v=e2ba946c28ef"></script>
 <script src="./fortemais-demandas.js?v=be177dcfa8dd"></script>
+<script src="./fortemais-inovacoes-modelo.js?v=365393461781"></script>
+<script src="./fortemais-inovacoes.js?v=1d4c94e102a3"></script>
 <script src="openclaw-fila.js?v=066cb079a2b5"></script>
 <script src="donboy-email.js?v=6a1ba6d316f6"></script>
 <script>
@@ -1083,7 +1086,7 @@ const SEED={
      BOMBEIRO = Hidráulica" uma vez, os 21 pagamentos dele viram mão de obra
      hidráulica -- de uma vez, para trás e para a frente. É a diferença entre
      classificar 90 fornecedores e classificar 824 lançamentos. */
-  obras:[],obraAportes:[],obraFornecedores:{},fortemaisLinks:[],
+  obras:[],obraAportes:[],obraFornecedores:{},fortemaisLinks:[],fortemaisInovacoes:[],
   /* Caixa e VGV — o modelo patrimonial que morava na planilha "Patrimonial".
      São poucas dezenas de linhas em cada lista: cabem no estado, ao contrário
      do livro-caixa das obras. Quatro listas independentes, como na planilha:
@@ -1175,6 +1178,7 @@ function carregar(){
   const d=(s&&s.viagens)?{...base,...s}:base;
   if(!Array.isArray(d.fortemaisLinks))d.fortemaisLinks=[];
   d.fortemaisLinks.forEach(x=>{if(!x.id)x.id=uid()});
+  if(d.fortemaisInovacoes===undefined)d.fortemaisInovacoes=[];
   // migração: todo registro precisa de id estável (arquivos são ligados por ele)
   for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','queixas','consultas','fisio','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','contabilidades','empresasPJ','patrimonio','oportunidades','obras','obraAportes','contas','empreend','casas','reservas'])
     (d[k]||[]).forEach(x=>{if(!x.id)x.id=uid()});
@@ -6400,12 +6404,17 @@ function vMarketing(m){
 }
 async function vFortemais(m){
   m.classList.add('fortemais-fluida');const r=rr('fortemais');
+  const vista=Symbol('fortemais');m._fmVista=vista;
   m.appendChild(el('<header class="fm-marca-topo"><div class="fm-marca-logo"><img src="fortemais-logo.png" width="220" height="49" alt="Fortemais Construtora"></div><div><h1>Obras e investimentos</h1><p>Planeje cada imóvel, seus custos e a participação dos sócios.</p></div></header>'));
+  const visao=filtro.fmVisao==='inovacoes'?'inovacoes':'obras';
+  m.appendChild(fmInovacoesNavegacao(m,visao,r));
+  if(visao==='inovacoes'){m.appendChild(fmInovacoesPainel());return}
   m.appendChild(fmPainelLinks());
   const marketing=el('<div class="fm-marketing-atalho"><div><b>◎ Marketing da Fortemais</b><p>Site, Google Meu Negócio e Instagram no mesmo lugar.</p></div><button type="button" class="btn">Ver indicadores →</button></div>');
   marketing.querySelector('button').onclick=()=>{filtro.marketingEmpresa='fortemais';irTela('marketing')};m.appendChild(marketing);
 
   const resumo=await fmResumo();
+  if(m._fmVista!==vista||!m.querySelector('.fm-visoes'))return;
   if(resumo===null){
     m.appendChild(el('<div class="aviso">Não consegui falar com o servidor agora. As fichas aparecem, os custos não.</div>'));
   }
@@ -16492,6 +16501,10 @@ function validarBackup(j){
       for(const x of item.links||[])validarTextos(x,['id','nome','url']);
       for(const x of item.historico||[])validarTextos(x,['id','em','autor','tipo','texto','de','para']);
     }
+  }
+  if(j.fortemaisInovacoes?.length){
+    if(typeof FortemaisInovacoesModelo==='undefined')throw Error('Atualize a página para validar as inovações antes de restaurar.');
+    FortemaisInovacoesModelo.validar(j.fortemaisInovacoes);
   }
   validarBackupEmpresas(j);
   if(j.organogramas?.length){if(typeof LeoOrganograma==='undefined')throw Error('Atualize a página para validar os organogramas antes de restaurar.');LeoOrganograma.validar(j.organogramas);}
