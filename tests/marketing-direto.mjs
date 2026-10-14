@@ -50,3 +50,21 @@ test('UI OAuth: retorno recusado mantém botão para reconectar',async()=>{
  ctx.LeoMarketingDireto.montar(document.querySelector('main'),{api});await new Promise(r=>setImmediate(r));
  assert.match(document.querySelector('main').textContent,/não concluiu a autorização/);assert.equal(document.querySelector('[data-conectar="google"]').hasAttribute('disabled'),false);
 });
+import {descobrirAds,metricasAds,pesquisarAds} from '../supabase/functions/leo-sync/marketing-direto-google-ads.mjs';
+test('Google Ads: autorização isolada, PKCE, refresh e confirmação não substituem Analytics',async()=>{
+ const x=setup();x.dados.set('token_google',{access_token:'ANALYTICS'});
+ const u=new URL((await x.d.inicio('google_ads',prova,'dono')).url);assert.equal(u.searchParams.get('scope'),'https://www.googleapis.com/auth/adwords');assert.equal(u.searchParams.get('code_challenge_method'),'S256');
+ const state=u.searchParams.get('state');assert.match(await x.d.callback(new URL(CALLBACK+'?state='+state+'&code=X')),/resultado=ok/);await x.d.confirmar(state.slice(3),prova,'dono');assert.equal(x.dados.get('token_google').access_token,'ANALYTICS');assert.equal(x.dados.get('token_google_ads').access_token,'PRIVADO');
+});
+test('Google Ads: contas gerenciadoras não viram contas de campanha e IDs estranhos são recusados',async()=>{
+ const r=await descobrirAds(async(u,b)=>!b?{resourceNames:['customers/0000000001','customers/0000000002']}:{results:[{customer:{id:u.includes('0000000001')?'0000000001':'0000000002',manager:u.includes('0000000001'),descriptiveName:'Conta de teste'}}]});assert.equal(r.ativos.length,1);assert.equal(r.limitado,true);
+ await assert.rejects(pesquisarAds(()=>assert.fail(), 'customers/1/../2','SELECT'),/vinculo/);
+});
+test('Google Ads: micros, moeda, conta e período preservados; total vem do agregado',async()=>{
+ const calls=[];const r=await coletarFonte('google_ads',{id:'customers/0000000002'},async(u,b)=>{calls.push([u,b]);if(b.query.includes('customer.currency_code'))return {results:[{customer:{id:'0000000002',currencyCode:'USD',manager:false}}]};return {results:[{metrics:{costMicros:'2500000',clicks:'5',impressions:'100',conversions:2},segments:{date:'2026-06-01'},campaign:{name:'Teste'}}]};},tempo);
+ assert.equal(r.moeda,'USD');assert.deepEqual(r.identidade,{conta:'0000000002',vinculo_confirmado:true});assert.equal(r.periodos[0].metricas.gasto,2.5);assert.equal(r.periodos[0].metricas.ctr,.05);assert.ok(calls.every(([u])=>u.endsWith('/googleAds:search')));assert.ok(calls.filter(([,b])=>!b.query.includes('customer.currency_code')).every(([,b])=>b.query.includes("'2026-05-18' AND '2026-06-14'")));assert.equal(metricasAds({}).gasto,null);
+});
+test('Google Ads: paginação sem fim falha e ausência de linhas não inventa zero',async()=>{
+ await assert.rejects(pesquisarAds(async()=>({results:[],nextPageToken:'mais'}),'customers/0000000001','SELECT'),/coleta/);
+ const r=await coletarFonte('google_ads',{id:'customers/0000000001'},async(u,b)=>b.query.includes('customer.currency_code')?{results:[{customer:{id:'0000000001',currencyCode:'BRL'}}]}:{},tempo);assert.deepEqual(r.periodos[0].metricas,{});
+});

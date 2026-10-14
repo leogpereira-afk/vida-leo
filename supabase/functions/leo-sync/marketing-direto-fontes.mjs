@@ -1,3 +1,4 @@
+import {descobrirAds,contaAds,coletarAds} from './marketing-direto-google-ads.mjs';
 import {FalhaDireta} from './marketing-direto.mjs';
 const GRAPH='https://graph.facebook.com/v26.0';
 const host=s=>{try{return new URL(s).hostname.replace(/^www\./,'').toLowerCase()}catch{return ''}};
@@ -5,7 +6,7 @@ const falha=c=>{throw new FalhaDireta(c)};
 const num=x=>x!==null&&x!==undefined&&x!==''&&Number.isFinite(Number(x))?Number(x):null;
 const url=(base,p)=>{const u=new URL(base);for(const [k,v]of Object.entries(p))if(v!==undefined)u.searchParams.set(k,v);return u.href};
 async function paginas(api,base,key,params={}){let token,rows=[];for(let i=0;i<10;i++){const r=await api(url(base,{...params,...(base.startsWith(GRAPH)?{after:token}:{pageToken:token})}));rows.push(...(r[key]||[]));token=r.nextPageToken||(r.paging?.next?r.paging?.cursors?.after:null);if(!token)return rows}falha('coleta')}
-export async function descobrirAtivos(f,api){let ativos=[];
+export async function descobrirAtivos(f,api){if(f==='google_ads')return descobrirAds(api);let ativos=[];
  if(f==='ga4'){const contas=await paginas(api,'https://analyticsadmin.googleapis.com/v1beta/accountSummaries','accountSummaries',{pageSize:'200'});ativos=contas.flatMap(c=>(c.propertySummaries||[]).map(p=>({id:p.property,nome:p.displayName||p.property})));}
  if(f==='search'){const r=await api('https://www.googleapis.com/webmasters/v3/sites');ativos=(r.siteEntry||[]).filter(p=>host(p.siteUrl)==='fortemais.net'||p.siteUrl==='sc-domain:fortemais.net').map(p=>({id:p.siteUrl,nome:p.siteUrl}));}
  if(f==='perfil'){const contas=await paginas(api,'https://mybusinessaccountmanagement.googleapis.com/v1/accounts','accounts',{pageSize:'20'});for(const c of contas){if(!/^accounts\/\d+$/.test(c.name))continue;const ls=await paginas(api,'https://mybusinessbusinessinformation.googleapis.com/v1/'+c.name+'/locations','locations',{pageSize:'100',readMask:'name,title,websiteUri'});ativos.push(...ls.filter(p=>host(p.websiteUri)==='fortemais.net').map(p=>({id:p.name,nome:p.title||p.name,site:p.websiteUri})));}}
@@ -18,14 +19,16 @@ export async function validarAtivo(f,a,api){if(!a?.id)falha('ativo');
  else if(f==='search'){if(host(a.id)!=='fortemais.net'&&a.id!=='sc-domain:fortemais.net')falha('vinculo');}
  else if(f==='perfil'){if(!/^locations\/\d+$/.test(a.id))falha('vinculo');const l=await api(url('https://mybusinessbusinessinformation.googleapis.com/v1/'+a.id,{readMask:'name,title,websiteUri'}));if(host(l.websiteUri)!=='fortemais.net')falha('vinculo');}
  else if(f==='instagram'){if(!/^\d+$/.test(a.id))falha('vinculo');const u=await api(url(GRAPH+'/'+a.id,{fields:'username'}));if(u.username?.toLowerCase()!=='fortemais')falha('vinculo');}
+ else if(f==='google_ads'){const c=await contaAds(api,a.id);if(c.manager)falha('vinculo');}
  else if(f==='meta_ads'){if(!/^act_\d+$/.test(a.id))falha('vinculo');await api(url(GRAPH+'/'+a.id,{fields:'id,name'}));}
  else falha('invalido');
 }
 export function janela(agora){const hoje=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(agora));const d=new Date(hoje+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-3);const fim=d.toISOString().slice(0,10);d.setUTCDate(d.getUTCDate()-27);return {inicio:d.toISOString().slice(0,10),fim}}
 const proximo=s=>{const d=new Date(s+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+1);return d.toISOString().slice(0,10)};
 const GA={usuarios:'activeUsers',novos_usuarios:'newUsers',sessoes:'sessions',sessoes_engajadas:'engagedSessions',taxa_engajamento:'engagementRate',visualizacoes:'screenPageViews',eventos:'eventCount',eventos_chave:'keyEvents'};
-export async function coletarFonte(f,a,api,agora){const j=janela(agora),p={...j,completo:true,metricas:{},tabelas:{},serie:[]};const saida={empresa:'fortemais',estado:'ok',identidade:f==='instagram'?{usuario:'fortemais'}:f==='meta_ads'?{conta:a.id.replace('act_',''),vinculo_confirmado:true}:{site:'https://fortemais.net'},coletadoEm:new Date(agora).toISOString(),periodos:[p],qualidade:{}};
+export async function coletarFonte(f,a,api,agora){const j=janela(agora),p={...j,completo:true,metricas:{},tabelas:{},serie:[]};const saida={empresa:'fortemais',estado:'ok',identidade:f==='instagram'?{usuario:'fortemais'}:f.endsWith('_ads')?{conta:a.id.replace('act_','').replace('customers/',''),vinculo_confirmado:true}:{site:'https://fortemais.net'},coletadoEm:new Date(agora).toISOString(),periodos:[p],qualidade:{}};
  async function opcional(fn){try{await fn()}catch{saida.estado='parcial';saida.qualidade.limitado=true}}
+ if(f==='google_ads'){return {...saida,...await coletarAds(api,a,j)}}
  if(f==='ga4'){
   const rel=async (keys,dim)=>{const r=await api('https://analyticsdata.googleapis.com/v1beta/'+a.id+':runReport',{dateRanges:[{startDate:j.inicio,endDate:j.fim}],metrics:keys.map(k=>({name:GA[k]||k})),...(dim?{dimensions:[{name:dim}]}:{}),dimensionFilter:{filter:{fieldName:'hostName',inListFilter:{values:['fortemais.net','www.fortemais.net'],caseSensitive:false}}},limit:'100',keepEmptyRows:true});if(r.metadata?.subjectToThresholding)saida.qualidade.limiar_privacidade=true;if(r.metadata?.samplingMetadatas?.length)saida.qualidade.amostragem=true;if((r.rowCount||0)>100)saida.qualidade.limitado=true;return (r.rows||[]).map(row=>({...Object.fromEntries(keys.map((k,i)=>[k,num(row.metricValues?.[i]?.value)])),...(dim?{nome:row.dimensionValues?.[0]?.value||''}:{})}));};
   const keys=Object.keys(GA),tot=await rel(keys);p.metricas=tot[0]||Object.fromEntries(keys.map(k=>[k,null]));
