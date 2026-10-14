@@ -670,6 +670,8 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-demandas.css?v=fafdab59a91c">
 <link rel="stylesheet" href="./fortemais-compacto.css?v=6899567e34c1">
 <link rel="stylesheet" href="./fortemais-inovacoes.css?v=be85f228f8ae">
+<link rel="stylesheet" href="./fortemais-documentos.css?v=dac3ec0db7f9">
+<link rel="stylesheet" href="./fortemais-obras-moderno.css?v=2fbc3e7b4e73">
 <link rel="stylesheet" href="./donboy-painel.css?v=05a4255f7b34">
 <link rel="stylesheet" href="donboy-email.css?v=ed0e5b4334e2">
 <link rel="stylesheet" href="./marketing.css?v=d1c1ddb3271f">
@@ -716,6 +718,9 @@ tr:hover .lixo{opacity:1}
 <script src="./fortemais-demandas.js?v=be177dcfa8dd"></script>
 <script src="./fortemais-inovacoes-modelo.js?v=365393461781"></script>
 <script src="./fortemais-inovacoes.js?v=1d4c94e102a3"></script>
+<script src="./fortemais-documentos-modelo.js?v=e1839cfeccdb"></script>
+<script src="./fortemais-documentos.js?v=fc5f80ca53c6"></script>
+<script src="./fortemais-pdf.js?v=27455f7f3e11"></script>
 <script src="openclaw-fila.js?v=066cb079a2b5"></script>
 <script src="donboy-email.js?v=6a1ba6d316f6"></script>
 <script>
@@ -918,7 +923,7 @@ async function arqTotal(){
    antes e os que ficaram na fila por falta de sinal — sobe e sai daqui. Roda
    sozinho ao abrir, quieto; e tem botão em Configurações para ver o resultado. */
 let _subindo=false;
-async function arqSubirPendentes(avisar){
+async function arqSubirPendentes(avisar,refEscopo=null){
   if(_subindo){if(avisar)alert('Já estou enviando — aguarde.');return{subiu:0,falhou:0}}
   if(!naNuvem()){if(avisar)alert('Sem conexão com o servidor agora.');return{subiu:0,falhou:0}}
   _subindo=true;
@@ -934,6 +939,7 @@ async function arqSubirPendentes(avisar){
     if(idx)for(const l of idx.values())for(const x of l)laDentro.add(x.id);
     let subiu=0,falhou=0;
     for(const r of todos){
+      if(refEscopo&&r.ref!==refEscopo&&!String(r.ref||'').startsWith(refEscopo+':'))continue;
       if(laDentro.has(r.id)){await arqApagarLocal(r.id);continue}  // já estava lá: só a cópia sai
       try{ await arqSubir({id:r.id,ref:r.ref,nome:r.nome,tipo:r.tipo,tam:r.tam,em:r.em||hoje()},r.blob);
            await arqApagarLocal(r.id);subiu++ }
@@ -953,9 +959,11 @@ async function arqSubirPendentes(avisar){
    ============================================================ */
 async function todosArquivos() {
   const d = await db();
-  return new Promise(ok => {
+  return new Promise((ok, err) => {
     const out = [], t = d.transaction('arq'), c = t.objectStore('arq').openCursor();
     c.onsuccess = e => { const cur = e.target.result; if (cur) { out.push(cur.value); cur.continue() } else ok(out) };
+    const falhar = () => err(new Error('Não foi possível ler os anexos deste aparelho.'));
+    c.onerror = falhar; t.onerror = falhar; t.onabort = falhar;
   });
 }
 
@@ -963,7 +971,9 @@ async function exportarArquivos() {
   // Antes isto lia só o IndexedDB. Com os anexos no servidor, ler só o aparelho
   // devolveria um zip vazio e diria "não há anexo" — mentira. Agora baixa o que
   // está no servidor e junta com o que ainda não subiu daqui.
-  const locais = await todosArquivos();
+  let locais;
+  try { locais = await todosArquivos(); }
+  catch (e) { alert('Não foi possível ler os anexos deste aparelho. O ZIP não foi gerado. Tente novamente.'); return }
   const regs = locais.slice();
   const vistos = new Set(locais.map(x => x.id));
   const idx = await arqIndice();
@@ -1558,6 +1568,7 @@ function atualizarCamadasModais(){
   fundos.forEach((f,i)=>{const inativo=i<fundos.length-1;f.toggleAttribute('inert',inativo);if(inativo)f.setAttribute('aria-hidden','true');else f.removeAttribute('aria-hidden')});
 }
 function abrirModal(titulo,sub,montar,aoFechar,opcoes={}){
+  if(atual==='fortemais'&&!fmPodeNavegar())return;
   const anterior=document.activeElement, id=uid();
   const nomeAnterior=anterior?.getAttribute('aria-label')||anterior?.textContent?.trim();
   const devolverFoco=()=>{const substituto=nomeAnterior?[...document.querySelectorAll('button,select,[role=button]')].find(x=>x.tagName===anterior?.tagName&&(x.getAttribute('aria-label')||x.textContent.trim())===nomeAnterior):null;(anterior?.isConnected?anterior:substituto||document.querySelector('#modais .fundo:last-child .modal, #main'))?.focus({preventScroll:true})};
@@ -2321,7 +2332,8 @@ function organizarPainelCompacto(pagina,secao){
 
 }
 
-function tela(){
+function tela(opcoes={}){
+  if(atual==='fortemais'&&opcoes.baseRemota!==true&&!fmPodeNavegar())return false;
   aplicarFonteInterface();
   const m=document.getElementById('main'),pagina=el('<div class="pagina"></div>');m.replaceChildren(pagina);
   const alvo=_alvoBloco;_alvoBloco=null;
@@ -2333,8 +2345,8 @@ function tela(){
 }
 const rr=id=>()=>{if(atual===id||(id==='estrategia'&&atual==='empresas'&&filtro.empresaAba==='planejamento')||(id==='empresas'&&atual==='estrategia'))tela()};
 // trocar de tela: sobe ao topo, a não ser que alguém tenha pedido um bloco
-function irTela(id){if(id==='guia'&&_alvoBloco==='gu-bancos'){id='bancos';_alvoBloco=null}if(id==='guia'&&_alvoBloco==='gu-empresas'){id='empresas';_alvoBloco=null}if(!MODS.some(m=>m.id===id&&!m.url))return;atual=id;if(location.hash!=='#'+id)history.pushState(null,'','#'+id);alternarMenu(false);menu();if(!tela())window.scrollTo(0,0);document.getElementById('main').focus({preventScroll:true})}
-window.addEventListener('popstate',()=>{const id=location.hash.slice(1)||'inicio';if(MODS.some(m=>m.id===id&&!m.url)){atual=id;menu();tela()}});
+function irTela(id){if(atual==='fortemais'&&!fmPodeNavegar())return;if(id==='guia'&&_alvoBloco==='gu-bancos'){id='bancos';_alvoBloco=null}if(id==='guia'&&_alvoBloco==='gu-empresas'){id='empresas';_alvoBloco=null}if(!MODS.some(m=>m.id===id&&!m.url))return;atual=id;if(location.hash!=='#'+id)history.pushState(null,'','#'+id);alternarMenu(false);menu();if(!tela())window.scrollTo(0,0);document.getElementById('main').focus({preventScroll:true})}
+window.addEventListener('popstate',()=>{if(atual==='fortemais'&&!fmPodeNavegar()){history.pushState(null,'','#'+atual);return}const id=location.hash.slice(1)||'inicio';if(MODS.some(m=>m.id===id&&!m.url)){atual=id;menu();tela()}});
 const cab=(t,s)=>el(`<div class="topo"><div><h1>${t}</h1><p>${s||''}</p></div><span class="cresce"></span></div>`);
 const kpi=(rot,val,sub,cl,ir)=>`<div class="kpi ${cl||''}${ir?' clic':''}"${ir?` data-kpi="${ir}" role="button" tabindex="0" title="Abrir detalhes"`:''}><div class="rot">${rot}</div><div class="val">${val}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
 /* Cada card leva ao bloco que explica o número. Quase sempre é preciso
@@ -5992,111 +6004,7 @@ function contasObra(o,r){
    guarda ou se mostra ao sócio, não um recorte de tela. O retorno dos
    aportes sai de retornoAportes(), a MESMA função da tela: régua única. */
 function imprimirObra(o,rr2,custos){
-  const w=window.open('','_blank');
-  if(!w){alert('Libere o pop-up para gerar o PDF.');return}
-  const c=contasObra(o,rr2);
-  const fim=o.recebidoEm||o.vendaData||'';
-  const linhaKV=(k,v)=>v?`<div><span class="rot">${k}</span> ${v}</div>`:'';
-  const cents=rr2?Object.entries(rr2.centros).sort((x,y)=>y[1].total-x[1].total):[];
-
-  // especialidades: a mesma conta da tela
-  const esp={};
-  (custos||[]).forEach(l=>{
-    const e2=especDe(l);if(!e2)return;
-    const nat=naturezaCentro(l.centro);
-    const r3=esp[especLimpa(e2)]??={mat:0,mao:0,outros:0};
-    if(nat==='Material')r3.mat+=(+l.valor||0);
-    else if(nat==='Mão de obra')r3.mao+=(+l.valor||0);
-    else r3.outros+=(+l.valor||0);
-  });
-  const espLin=Object.entries(esp).map(([k,v])=>({k,...v,tot:v.mat+v.mao+v.outros})).sort((x,y)=>y.tot-x.tot);
-
-  const meus=E.obraAportes.filter(x=>x.obra===o.id);
-  const ret=retornoAportes(o,rr2);
-  const blocoRet=meus.length?`<h2>Aportes</h2><table>
-    <thead><tr><th>Data</th><th>Quem</th><th class="n">Valor</th><th>Obs</th></tr></thead><tbody>
-    ${meus.slice().sort((x,y)=>(x.data||'').localeCompare(y.data||'')).map(x=>`<tr>
-      <td>${x.data?fmtDataAno(x.data):'—'}</td><td>${esc(x.quem||'')}</td>
-      <td class="n">${brl(+x.valor||0)}</td><td>${esc(x.obs||'')}</td></tr>`).join('')}
-    <tr><td colspan="2"><b>Total</b></td><td class="n"><b>${brl(c.aporte)}</b></td><td></td></tr></tbody></table>
-
-  <h2>Retorno dos aportes ${ret.vendida?'':'(obra ainda em aberto)'}</h2>
-  <table><thead><tr><th>Quem</th><th class="n">Aportou</th><th class="n">% do lucro</th>
-    ${ret.vendida?'<th class="n">Lucro que lhe cabe</th><th class="n">ROI</th><th class="n">TIR</th>':''}</tr></thead><tbody>
-    ${ret.linhas.map(li=>{
-      const pct=(li.fatia*100).toFixed(1)+'%';
-      if(!ret.vendida)return `<tr><td>${esc(li.quem)}</td><td class="n">${brl(li.total)}</td>
-        <td class="n">${pct}</td></tr>`;
-      return `<tr><td>${esc(li.quem)}</td><td class="n">${brl(li.total)}</td>
-        <td class="n">${pct}</td>
-        <td class="n ${li.parte>=0?'verd':'verm'}">${brl(li.parte)}</td>
-        <td class="n"><b>${li.roi==null?'—':li.roi.toFixed(1)+'%'}</b></td>
-        <td class="n"><b>${li.tir==null?'—':li.tir.toFixed(1)+'% a.a.'}</b></td></tr>`;
-    }).join('')}</tbody></table>
-  ${ret.usaManual&&Math.abs(ret.somaManual-100)>0.01?`<p style="font-size:11px;color:#a33">⚠️ As porcentagens somam ${ret.somaManual.toFixed(1)}%, não 100%.</p>`:''}
-  <p style="font-size:11px;color:#777">${ret.usaManual?'Divisão pela % combinada entre as partes.':'Divisão pelo tempo que o dinheiro de cada um ficou na obra (nenhuma % foi definida).'} ROI é o rendimento total; TIR é o rendimento por ano, pelas datas dos aportes${ret.fim?' até '+fmtDataAno(ret.fim):''}.</p>`:'';
-
-  w.document.write(`<!doctype html><meta charset="utf-8"><title>${esc(o.nome||'Obra')} — Fortemais</title>
-  <style>
-    body{font:12.5px/1.55 -apple-system,Helvetica,sans-serif;padding:26px;color:#1a1a1a;max-width:860px}
-    h1{font-size:21px;margin:0 0 2px}h2{font-size:14px;margin:22px 0 8px;border-bottom:1px solid #ccc;padding-bottom:4px}
-    .sub{color:#777;margin:0 0 14px}
-    .rot{display:inline-block;min-width:150px;color:#777}
-    table{border-collapse:collapse;width:100%;font-size:12px}
-    th{text-align:left;border-bottom:1.5px solid #333;padding:5px 8px}
-    td{border-bottom:1px solid #e2e2e2;padding:5px 8px}
-    .n{text-align:right;font-variant-numeric:tabular-nums}
-    .verm{color:#a33}.verd{color:#2a7a44}
-    .kpis{display:flex;gap:22px;flex-wrap:wrap;margin:12px 0 4px}
-    .kpis div{min-width:150px}.kpis b{display:block;font-size:17px}
-    @media print{body{padding:0}h2{page-break-after:avoid}tr{page-break-inside:avoid}}
-  </style>
-  <h1>${esc(o.nome||'Obra')}</h1>
-  <p class="sub">Fortemais · ${esc([o.tipo,o.endereco].filter(Boolean).join(' · '))} · gerado em ${fmtDataAno(hoje())}</p>
-
-  <div class="kpis">
-    <div><span class="rot">Custo total</span><b class="verm">${brl(c.custo)}</b></div>
-    <div><span class="rot">Aportes</span><b>${brl(c.aporte)}</b></div>
-    ${c.venda?`<div><span class="rot">Venda líquida</span><b>${brl(c.liquido)}</b></div>
-    <div><span class="rot">Lucro</span><b class="${c.lucro>=0?'verd':'verm'}">${c.podeLucro?brl(c.lucro)+' · '+c.margem.toFixed(1)+'%':'—'}</b></div>`:''}
-    ${c.area?`<div><span class="rot">Custo/m² ${(E.obraM2Fora||[]).length?'(grupos escolhidos)':'(com tudo)'}</span><b>${brl(c.porM2)}</b></div>`:''}
-  </div>
-
-  <h2>Ficha</h2>
-  ${linhaKV('Área construída',c.area?c.area+' m²':'')}
-  ${linhaKV('Área do terreno',+o.areaTerreno?o.areaTerreno+' m²':'')}
-  ${linhaKV('Período',rr2&&rr2.de?fmtDataAno(rr2.de)+' → '+(rr2.ate?fmtDataAno(rr2.ate):'')+(c.meses?' ('+c.meses+' meses)':''):'')}
-  ${linhaKV('Comprador',esc(o.comprador||''))}
-  ${linhaKV('Venda',c.venda?brl(c.venda)+(o.vendaData?' em '+fmtDataAno(o.vendaData):''):'')}
-  ${linhaKV('Imposto pago',c.imposto?brl(c.imposto):'')}
-  ${linhaKV('Comissão paga',c.comissao?brl(c.comissao):'')}
-  ${linhaKV('Outras deduções',c.outras?brl(c.outras):'')}
-  ${linhaKV('Recebimento concluído',fim?fmtDataAno(fim):'')}
-  ${linhaKV('Observações',esc(o.obs||''))}
-
-  ${cents.length?`<h2>Para onde foi o dinheiro</h2><table>
-    <thead><tr><th>Plano de contas</th><th class="n">Valor</th><th class="n">%</th><th class="n">Lanç.</th></tr></thead><tbody>
-    ${cents.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${brl(v.total)}</td>
-      <td class="n">${(v.total/rr2.total*100).toFixed(1)}%</td><td class="n">${v.n}</td></tr>`).join('')}
-    <tr><td><b>Total</b></td><td class="n"><b>${brl(rr2.total)}</b></td><td></td><td class="n"><b>${rr2.n}</b></td></tr></tbody></table>`:''}
-
-  ${espLin.length?`<h2>Por especialidade — material × mão de obra</h2><table>
-    <thead><tr><th>Especialidade</th><th class="n">Material</th><th class="n">Mão de obra</th><th class="n">Outros</th><th class="n">Total</th></tr></thead><tbody>
-    ${espLin.map(l=>`<tr><td>${esc(l.k)}</td><td class="n">${l.mat?brl(l.mat):'—'}</td>
-      <td class="n">${l.mao?brl(l.mao):'—'}</td><td class="n">${l.outros?brl(l.outros):'—'}</td>
-      <td class="n"><b>${brl(l.tot)}</b></td></tr>`).join('')}</tbody></table>`:''}
-
-  ${blocoRet}
-
-  ${(custos&&custos.length)?`<h2>Livro-caixa — todos os lançamentos (${custos.length})</h2><table>
-    <thead><tr><th>Data</th><th>O que</th><th>Plano</th><th>Fornecedor</th><th class="n">Valor</th></tr></thead><tbody>
-    ${custos.slice().sort((x,y)=>(x.data||'').localeCompare(y.data||'')).map(l=>`<tr>
-      <td>${l.data?fmtDataAno(l.data):'—'}</td><td>${esc(l.nome||'')}</td>
-      <td>${esc(l.centro||'')}</td><td>${esc(l.fornecedor||'')}</td>
-      <td class="n">${brl(l.valor)}</td></tr>`).join('')}</tbody></table>`:''}
-  `);
-  w.document.close();
-  setTimeout(()=>w.print(),400);
+  return fmPdfRealizado(o,rr2,custos);
 }
 
 /* Atalhos independentes das obras; seguem o mesmo backup e sincronização. */
@@ -6207,9 +6115,9 @@ function fmBotaoExcluir(o,concluir){
 }
 const fmMetros=v=>+v>0?Number(v).toLocaleString('pt-BR',{maximumFractionDigits:2})+' m²':'Não informado';
 function fmObraResumo(o){
-  const socios=fmPrevDados(o).investidores||[],c=el(`<section class="fm-identidade" aria-label="Cadastro da obra"><div class="fm-identidade-cab"><div><span class="fm-eyebrow">⌂ DADOS DA OBRA</span><p>${esc(o.endereco||'Complete a localização e as medidas do imóvel.')}</p></div><div class="fm-acoes"></div></div><dl class="fm-medidas"><div><dt>Lote</dt><dd>${esc(o.lote||'Não informado')}</dd></div><div><dt>Quadra</dt><dd>${esc(o.quadra||'Não informada')}</dd></div><div><dt>Terreno</dt><dd>${fmMetros(o.areaTerreno)}</dd></div><div><dt>Área construída</dt><dd>${fmMetros(o.area)}</dd></div></dl><div class="fm-socios-resumo"><span class="fm-eyebrow">♧ SÓCIOS E INVESTIDORES</span><div class="fm-socios-chips"></div></div></section>`);
-  c.querySelector('.fm-acoes').append(acao('Editar obra',()=>fmObraEditar(o),'ghost'),acao('+ Sócio',()=>fmPrevInvestidor(o)),fmBotaoExcluir(o));
-  const chips=c.querySelector('.fm-socios-chips');for(const i of socios){const b=acao(i.nome+' · '+fmPrevPct(i.pct)+' do lucro',()=>fmPrevInvestidor(o,i),'ghost');b.classList.add('fm-socio-chip');chips.appendChild(b)}
+  const socios=fmPrevDados(o).investidores||[],c=el(`<details class="fm-identidade" aria-label="Cadastro da obra"><summary>Cadastro e sócios <span class="fm-nota">${socios.length} participante(s)</span></summary><div class="fm-identidade-cab"><div><span class="fm-eyebrow">DADOS DA OBRA</span><p>${esc(o.endereco||'Complete a localização e as medidas do imóvel.')}</p></div><div class="fm-acoes"></div></div><dl class="fm-medidas"><div><dt>Lote</dt><dd>${esc(o.lote||'Não informado')}</dd></div><div><dt>Quadra</dt><dd>${esc(o.quadra||'Não informada')}</dd></div><div><dt>Terreno</dt><dd>${fmMetros(o.areaTerreno)}</dd></div><div><dt>Área construída</dt><dd>${fmMetros(o.area)}</dd></div></dl><div class="fm-socios-resumo"><span class="fm-eyebrow">SÓCIOS E INVESTIDORES</span><div class="fm-socios-chips"></div></div></details>`);
+  c.querySelector('.fm-acoes').append(acao('Editar obra',()=>fmObraEditar(o),'ghost'),acao('+ Sócio',()=>fmPrevInvestidor(o)));
+  const chips=c.querySelector('.fm-socios-chips');for(const i of socios){const b=acao(i.nome+' · '+fmPrevPct(i.pct)+' do lucro',()=>fmPrevInvestidor(o,i),'ghost');b.setAttribute('aria-label','Editar sócio: '+i.nome);b.classList.add('fm-socio-chip');chips.appendChild(b)}
   if(!socios.length)chips.appendChild(el('<span class="fm-nota">Adicione os participantes e defina a divisão do lucro.</span>'));return c;
 }
 function fmObraDescricao(o){return [o.endereco,o.lote?'Lote '+o.lote:'',o.quadra?'Quadra '+o.quadra:'',+o.areaTerreno>0?'Terreno '+fmMetros(o.areaTerreno):'',+o.area>0?'Construção '+fmMetros(o.area):''].filter(Boolean).join(' · ')}
@@ -6300,7 +6208,7 @@ function fmPrevTabelaRetorno(o){
 }
 function fmPrevPainel(o){
   const {p,prev:v,linhas,pct,rateioOk}=fmPrevContas(o),c=el('<section class="fm-previsao"><header><div><h3>Previsão de lucro do imóvel</h3><p class="fm-nota">Orçamento e divisão do lucro esperado. Valores previstos, separados do realizado.</p></div><div class="fm-acoes"></div></header></section>');
-  c.querySelector('.fm-acoes').append(acao(v.ok?'Editar previsão':'Preencher previsão',()=>fmPrevEditar(o)),acao('Baixar PDF',()=>fmPrevPdf(o),'ghost'));
+  c.querySelector('.fm-acoes').append(acao(v.ok?'Editar previsão':'Preencher previsão',()=>fmPrevEditar(o)),acao('Exportar previsão',()=>fmPrevPdf(o),'ghost'));
   if(!v.ok){const vazio=el('<div class="fm-comece"><span class="fm-comece-icone" aria-hidden="true">▥</span><div><b>Qual é o resultado esperado desta obra?</b><p>Preencha a venda, terreno e construção. O lucro e a divisão entre os sócios serão calculados aqui.</p><small>Você também pode importar os valores da sua planilha.</small></div></div>');c.appendChild(vazio)}
   else{
     c.appendChild(el(`<div class="fm-kpis"><div class="fm-kpi fm-venda"><small>Venda prevista</small><b>${brl(v.venda)}</b></div><div class="fm-kpi fm-custo"><small>Custo total previsto</small><b>${brl(v.custo)}</b></div><div class="fm-kpi fm-lucro"><small>Lucro esperado</small><b class="${v.lucro<0?'fm-negativo':''}">${brl(v.lucro)}</b></div></div>`));
@@ -6349,7 +6257,7 @@ function fmRetornoPainel(o,modo){
   const {p,linhas}=fmPrevContas(o),anterior=o.fmPrevisao,roi=modo==='roi';
   const c=el(`<section class="fm-previsao fm-planilha"><header><div><h3>${roi?'ROI':'TIR'} <span class="fm-prev-tag">Previsão</span></h3><p class="fm-nota">${roi?'Quanto investe e quanto espera receber, incluindo o capital de volta.':'Lance as saídas e entradas nas datas previstas.'}</p></div><div class="fm-acoes"></div></header><div class="fm-retorno-resultado" aria-live="polite"></div></section>`);
   c._fmDirty=false;const dados=[],resultado=c.querySelector('.fm-retorno-resultado');
-  c.querySelector('.fm-acoes').appendChild(acao('Baixar PDF',()=>{if(c._fmDirty){alert('Salve as alterações antes de baixar o PDF.');return}fmPrevPdf(o)},'ghost'));
+  const exportar=acao('Exportar previsão',()=>{if(c._fmDirty){alert('Salve as alterações antes de exportar o PDF.');return}fmPrevPdf(o)},'ghost');exportar.dataset.fmExportacao='previsao';c.querySelector('.fm-acoes').appendChild(exportar);
   if(!linhas.length){c.appendChild(el('<p class="fm-nota">Adicione um sócio para começar.</p>'));c.appendChild(acao('+ Sócio',()=>fmPrevInvestidor(o)));return c}
   const wrap=el('<div class="fm-grade-wrap"><table class="fm-grade"><thead><tr>'+ (roi?'<th>Sócio</th><th>Investido (R$)</th><th>A receber (R$)</th><th>Lucro</th><th>ROI</th>':'<th>Data</th><th>Sócio</th><th>Movimento</th><th>Valor (R$)</th><th><span class="sr-only">Ações</span></th>')+'</tr></thead><tbody></tbody></table></div>'),tbody=wrap.querySelector('tbody');c.appendChild(wrap);
   const erro=el('<p class="fm-grade-erro" role="alert" hidden></p>'),status=el('<span class="fm-nota" role="status">Tudo salvo</span>');
@@ -6380,22 +6288,43 @@ function fmRetornoPainel(o,modo){
   c.appendChild(el('<details class="fm-como-calcula"><summary>Como é calculado</summary><p>'+ (roi?'ROI = (valor a receber − valor investido) ÷ valor investido. Alterar esta tabela não muda o orçamento nem as datas da TIR.':'TIR anual com base de 365 dias. Entrada inclui capital devolvido e lucro. Estes lançamentos não mudam o orçamento nem os valores manuais da ROI.')+'</p></details>'));atualizar();return c;
 }
 async function fmPrevPdf(o){
-  const w=window.open('','_blank');if(!w){alert('Libere o pop-up para salvar a previsão em PDF.');return}
-  const {prev:v,linhas,pct,rateioOk,p}=fmPrevContas(o);
-  let logo;try{const resposta=await fetch(new URL('fortemais-logo.png',window.location.href));if(!resposta.ok)throw Error('Logo indisponível');const arquivo=await resposta.blob();logo=await new Promise((ok,erro)=>{const leitor=new FileReader();leitor.onload=()=>ok(leitor.result);leitor.onerror=erro;leitor.readAsDataURL(arquivo)})}catch(e){w.close();alert('Não foi possível preparar a logo do PDF. Confira sua conexão e tente novamente.');return}if(w.closed)return;
-  w.document.write(`<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Previsão ${esc(o.nome||'Fortemais')}</title><style>body{font:11px/1.4 Arial,sans-serif;color:#202332;margin:30px;-webkit-print-color-adjust:exact;print-color-adjust:exact}h1{font-size:23px;margin:0}.fm-pdf-marca{display:flex;align-items:center;gap:22px;border-bottom:3px solid #c72731;padding-bottom:10px}.fm-pdf-logo{background:#242424;padding:10px;border-radius:6px}.fm-pdf-logo img{display:block;width:155px;height:auto}.fm-pdf-ajuda{padding:12px;background:#f0f1ff;margin-bottom:20px}.fm-pdf-ajuda button{padding:8px 12px;margin-right:12px;cursor:pointer}.fm-linha-venda{background:#edf3fb}.fm-linha-custo{background:#fff4e4}.fm-linha-lucro{background:#e7f4ee}h2{font-size:17px;color:#3e45ee;margin-top:15px}table{width:100%;border-collapse:collapse;font-size:11px}td,th{padding:4px;border-bottom:1px solid #ddd;text-align:left}td:not(:first-child),th:not(:first-child){text-align:right}th,.fm-total{background:#f0f1ff}small{display:block;color:#656978;font-size:10px}tr{break-inside:avoid}h2{break-after:avoid}.fm-linha-custo td{background:#fff4e4}.fm-linha-lucro td{background:#e7f4ee;font-weight:bold}.fm-pdf-retorno{break-before:page}thead{display:table-header-group}@page{size:A4 landscape;margin:15mm}@media print{body{margin:0}.fm-pdf-ajuda{display:none}}</style><div class="fm-pdf-ajuda"><button onclick="window.print()">Salvar em PDF</button>Na janela de impressão, selecione <b>Salvar como PDF</b>. <span id="fm-pdf-estado" role="status"></span></div><header class="fm-pdf-marca"><div class="fm-pdf-logo"><img src="${esc(logo)}" alt="Fortemais Construtora"></div><h1>${esc(o.nome||'Obra')}</h1></header><p>Previsão financeira · ${esc(fmtDataAno(hoje()))}. Valores estimados, sem representar resultado realizado.</p><p>${esc(fmObraDescricao(o))}</p><h2>Previsão de lucro do imóvel</h2>${fmPrevTabelaLucro(o)}<h2>Distribuição do lucro previsto</h2><p>${rateioOk?'Participações: 100%.':'Participações a conferir: '+fmPrevPct(pct)+'.'}</p><table><thead><tr><th>Investidor</th><th>Aporte previsto</th><th>Participação</th><th>Lucro previsto</th></tr></thead><tbody>${linhas.map(i=>`<tr><td><b>${esc(i.nome)}</b><small>${esc(i.papel||'Investidor')}</small></td><td>${brl(i.aporte)}</td><td>${fmPrevPct(i.pct)}</td><td>${i.lucro==null?'—':brl(i.lucro)}</td></tr>`).join('')}</tbody></table><h2 class="fm-pdf-retorno">ROI e TIR previstos</h2><p>ROI por sócio, conforme os valores da tabela ROI.</p>${fmRoiTabelaPdf(o)}<h2>TIR dos lançamentos previstos</h2>${fmPrevTabelaRetorno(o)}<p>TIR anual, base de 365 dias, conforme datas dos fluxos abaixo. Os fluxos são independentes do orçamento e devem ser revisados quando as estimativas mudarem.</p><table><thead><tr><th>Data prevista</th><th>Investidor</th><th>Movimento</th><th>Valor</th><th>Observações</th></tr></thead><tbody>${[...(p.fluxos||[])].sort((a,b)=>a.data.localeCompare(b.data)).map(x=>`<tr><td>${esc(fmtDataAno(x.data))}</td><td>${esc(linhas.find(i=>i.id===x.investidorId)?.nome||'Não encontrado')}</td><td>${esc(x.tipo)}</td><td>${brl(x.valor)}</td><td>${esc(x.obs||'')}</td></tr>`).join('')}</tbody></table></html>`);w.document.close();
-  const imagem=w.document.querySelector('.fm-pdf-logo img');
-  const imprimir=()=>setTimeout(()=>{if(!w.closed){w.focus();w.print()}},150);
-  const falha=()=>{const aviso=w.document.getElementById('fm-pdf-estado');if(aviso)aviso.textContent='A logo não carregou. Confira sua conexão e tente novamente.'};
-  if(imagem.complete){if(imagem.naturalWidth)imprimir();else falha()}else{imagem.addEventListener('load',imprimir,{once:true});imagem.addEventListener('error',falha,{once:true})}
+  return fmPdfPrevisao(o);
 }
-function fmPrevAbas(c,o){
+
+function fmPodeNavegar(c=document.getElementById('main')){
+  if([...c.querySelectorAll('[data-fm-pagina]')].some(p=>p._fmDirty)){
+    alert('Salve ou cancele as alterações antes de sair desta obra.');return false;
+  }
+  return true;
+}
+function fmObraToolbar(o,paginas,documentos,opcoes={}){
+  const socios=fmPrevDados(o).investidores||[],c=el('<div class="fm-obra-toolbar"><div class="fm-obra-toolbar-info"></div><div class="fm-obra-toolbar-acoes"></div></div>');
+  const info=c.querySelector('.fm-obra-toolbar-info');
+  for(const texto of [o.status||'Em planejamento',+o.area>0?'Construção '+fmMetros(o.area):'Área a informar',socios.length+' participante(s)']){const s=el('<span></span>');s.textContent=texto;info.appendChild(s)}
+  const acoes=c.querySelector('.fm-obra-toolbar-acoes');
+  const exportar=el('<details class="fm-exportar"><summary>Exportar PDF</summary><div class="fm-obra-menu"></div></details>');
+  const menu=exportar.querySelector('.fm-obra-menu');
+  const segura=fn=>()=>{if(!fmPodeNavegar(c.parentElement))return;exportar.open=false;fn()};
+  const previsao=acao('Previsão financeira',segura(()=>fmPrevPdf(o)),'ghost');previsao.dataset.fmExportacao='previsao';menu.appendChild(previsao);
+  const realizado=acao('Realizado e histórico',segura(()=>opcoes.exportarRealizado?.()),'ghost');realizado.dataset.fmExportacao='realizado';realizado.disabled=!opcoes.realizadoDisponivel;realizado.title=realizado.disabled?'Aguarde a consulta dos lançamentos realizados':'';menu.appendChild(realizado);
+  const indice=acao('Projetos e documentos',segura(()=>{
+    const pane=paginas.find(p=>p.dataset.fmPagina==='documentos');
+    if(pane){const nav=c.parentElement.querySelector('[data-pagina=documentos]');nav?.click();documentos.exportar?.()}
+  }),'ghost');indice.dataset.fmExportacao='documentos';menu.appendChild(indice);
+  const mais=el('<details class="fm-mais-acoes"><summary>Mais ações</summary><div class="fm-obra-menu"></div></details>');
+  mais.querySelector('.fm-obra-menu').appendChild(fmBotaoExcluir(o));
+  acoes.append(exportar,mais);return c;
+}
+function fmPrevAbas(c,o,opcoes={}){
   const existente=el('<div class="fm-conteudo" data-fm-pagina="realizado"></div>');while(c.firstChild)existente.appendChild(c.firstChild);
-  const prev=fmPrevPainel(o),roi=fmRetornoPainel(o,'roi'),tir=fmRetornoPainel(o,'tir'),demandas=fmDemandasPainel(o);
-  for(const [id,p] of [['previsao',prev],['roi',roi],['tir',tir],['demandas',demandas]]){p.classList.add('fm-conteudo');p.dataset.fmPagina=id}
-  const nav=el('<nav class="fm-tabs" aria-label="Dados da obra"></nav>'),paginas=[prev,roi,tir,existente,demandas];
+  const prev=fmPrevPainel(o),roi=fmRetornoPainel(o,'roi'),tir=fmRetornoPainel(o,'tir'),demandas=fmDemandasPainel(o),documentos=fmDocumentosPainel(o);
+  for(const [id,p] of [['previsao',prev],['roi',roi],['tir',tir],['demandas',demandas],['documentos',documentos]]){p.classList.add('fm-conteudo');p.dataset.fmPagina=id}
+  const nav=el('<nav class="fm-tabs" aria-label="Dados da obra"></nav>'),paginas=[prev,roi,tir,existente,demandas,documentos];
   filtro.fmAbas=filtro.fmAbas||{};const ativar=id=>{const sujo=paginas.find(p=>!p.hidden&&p._fmDirty);if(sujo&&sujo.dataset.fmPagina!==id){alert('Salve ou cancele as alterações antes de trocar de aba.');return}filtro.fmAbas[o.id]=id;paginas.forEach(p=>p.hidden=p.dataset.fmPagina!==id);nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.pagina===id)))};
-  for(const [id,nome] of [['previsao','Previsão de lucro'],['roi','ROI'],['tir','TIR'],['demandas','Demandas e etapas'],['realizado','Realizado e histórico']]){const b=acao(nome,()=>ativar(id),'ghost');b.dataset.pagina=id;nav.appendChild(b)}c.append(fmObraResumo(o),nav,...paginas);const id=filtro.fmAbas[o.id];ativar(id==='retorno'?'roi':['previsao','roi','tir','realizado','demandas'].includes(id)?id:'previsao');
+  for(const [id,nome] of [['previsao','Previsão de lucro'],['roi','ROI'],['tir','TIR'],['demandas','Demandas e etapas'],['documentos','Projetos e documentos'],['realizado','Realizado e histórico']]){const b=acao(nome,()=>ativar(id),'ghost');b.dataset.pagina=id;nav.appendChild(b)}
+  c.append(fmObraToolbar(o,paginas,documentos,opcoes),fmObraResumo(o),nav,...paginas);const id=filtro.fmAbas[o.id];ativar(id==='retorno'?'roi':['previsao','roi','tir','realizado','demandas','documentos'].includes(id)?id:'previsao');
+  prepararTabelas(c);
+  return {paginas,realizado:existente,documentos};
 }
 
 /* ---------------- a tela ---------------- */
@@ -6409,16 +6338,12 @@ async function vFortemais(m){
   const visao=filtro.fmVisao==='inovacoes'?'inovacoes':'obras';
   m.appendChild(fmInovacoesNavegacao(m,visao,r));
   if(visao==='inovacoes'){m.appendChild(fmInovacoesPainel());return}
-  m.appendChild(fmPainelLinks());
+  const apoio=el('<details class="fm-apoio"><summary>Links rápidos e marketing</summary></details>');
+  apoio.appendChild(fmPainelLinks());
   const marketing=el('<div class="fm-marketing-atalho"><div><b>◎ Marketing da Fortemais</b><p>Site, Google Meu Negócio e Instagram no mesmo lugar.</p></div><button type="button" class="btn">Ver indicadores →</button></div>');
-  marketing.querySelector('button').onclick=()=>{filtro.marketingEmpresa='fortemais';irTela('marketing')};m.appendChild(marketing);
+  marketing.querySelector('button').onclick=()=>{filtro.marketingEmpresa='fortemais';irTela('marketing')};apoio.appendChild(marketing);m.appendChild(apoio);
 
-  const resumo=await fmResumo();
-  if(m._fmVista!==vista||!m.querySelector('.fm-visoes'))return;
-  if(resumo===null){
-    m.appendChild(el('<div class="aviso">Não consegui falar com o servidor agora. As fichas aparecem, os custos não.</div>'));
-  }
-  const R=resumo||{};
+  const consultaResumo=fmResumo(),R=_fmResumo||{};
   const contas=E.obras.map(o=>({o,r:R[o.id]||null,c:contasObra(o,R[o.id])}));
 
   /* O ANO da obra é o ano em que o dinheiro TERMINOU de entrar — regra do dono
@@ -6432,10 +6357,10 @@ async function vFortemais(m){
 
   const novaObra=()=>fmObraEditar();
 
-  const busca=el('<input type="search" aria-label="Buscar obra" placeholder="Buscar obra ou endereço">');busca.value=filtro.fmBusca||'';busca.onchange=()=>{filtro.fmBusca=busca.value;r()};
+  const busca=el('<input type="search" aria-label="Buscar obra" placeholder="Buscar obra ou endereço">');busca.value=filtro.fmBusca||'';busca.onchange=()=>{if(!fmPodeNavegar(m)){busca.value=filtro.fmBusca||'';return}filtro.fmBusca=busca.value;r()};
   m.appendChild(painel(busca,'Ano',
     seletor(filtro.fmAno,[['todas','Todas'],...(temAberta?[['aberto','Em aberto']]:[]),...anos.map(a2=>[a2,a2])],
-      v=>{filtro.fmAno=v;r()},'Ano das obras'),
+      v=>{if(!fmPodeNavegar(m)){m.querySelector('select[aria-label="Ano das obras"]').value=filtro.fmAno;return}filtro.fmAno=v;r()},'Ano das obras'),
     acao('+ Nova obra',novaObra),'|'));
 
   const visiveis=contas.filter(x=>{
@@ -6455,7 +6380,7 @@ async function vFortemais(m){
     const aberta=filtro.fmAberta===o.id;
     const an=anoDe(o);
     const v=FortemaisFinance.previsao(fmPrevDados(o));
-    const cont=el('<div class="fm-projeto"></div>');
+    const cont=el('<div class="fm-projeto"></div>');cont.dataset.obraId=o.id;
     const linha=el(`<div class="fm-projeto-abre">
       <div><small>${esc(o.empresa||'Fortemais')} · ${esc(o.status||'Em planejamento')}${an?' · '+esc(an):''}</small><strong>${esc(o.nome||'Obra sem nome')}</strong>${(o.lote||o.quadra||+o.area)?'<small class="fm-local">'+esc([o.lote?'Lote '+o.lote:'',o.quadra?'Quadra '+o.quadra:'',+o.area?fmMetros(o.area):''].filter(Boolean).join(' · '))+'</small>':''}</div>
       <div><small>Venda prevista</small><b>${v.ok?brl(v.venda):'Não definida'}</b></div>
@@ -6464,7 +6389,8 @@ async function vFortemais(m){
     </div>`);
     linha.setAttribute('role','button');linha.tabIndex=0;linha.setAttribute('aria-expanded',String(aberta));
     linha.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();linha.click()}};
-    linha.onclick=()=>{filtro.fmAberta=aberta?null:o.id;r()};
+    linha.setAttribute('aria-label',(aberta?'Recolher':'Abrir')+' obra '+(o.nome||'Sem nome'));
+    linha.onclick=()=>{if(!fmPodeNavegar(m))return;filtro.fmAberta=aberta?null:o.id;r();const nova=[...document.querySelectorAll('.fm-projeto')].find(x=>x.dataset.obraId===o.id)?.querySelector('.fm-projeto-abre');nova?.focus({preventScroll:true});nova?.scrollIntoView({block:'nearest'})};
     cont.appendChild(linha);
     cont.appendChild(fmDemandasResumo(o));
     if(aberta){
@@ -6481,11 +6407,21 @@ async function vFortemais(m){
   }
   m.appendChild(bloco('fm-obras','🏗️ Obras','abra o projeto para planejar custos e retornos',oc));
 
-  /* ---- comparar obras: é onde o dinheiro vaza ---- */
-  if(visiveis.filter(x=>x.c.custo>0).length>1){
+  const comparativos=el('<div class="fm-comparativos"><p class="fm-nota" role="status">Consultando custos realizados…</p></div>');m.appendChild(comparativos);
+  const importar=bloco('fm-importar','📥 Importar custos do ERP','lançamentos realizados do sistema de obras',blocoImportarObra());
+  if(E.colapso['fm-importar']==null){importar.classList.add('fechado');importar.querySelector('header').setAttribute('aria-expanded','false')}
+  m.appendChild(importar);
+
+  const resumo=await consultaResumo;
+  if(m._fmVista!==vista||!m.querySelector('.fm-visoes'))return;
+  comparativos.replaceChildren();
+  if(resumo===null){comparativos.appendChild(el('<p class="aviso" role="status">Não foi possível consultar os custos realizados. Cadastro, previsão e documentos continuam disponíveis.</p>'));return}
+  const realizadas=visiveis.map(x=>({...x,c:contasObra(x.o,resumo[x.o.id]||null)}));
+  /* Comparativos usam apenas as mesmas obras e custos efetivamente consultados. */
+  if(realizadas.filter(x=>x.c.custo>0).length>1){
     const cp=el('<div class="corpo"></div>');
     cp.appendChild(el('<p style="font-size:12.5px;color:var(--suave);margin:0 0 11px">Mesma conta, obras diferentes. É aqui que aparece o que saiu do lugar — se a hidráulica de uma foi 4% e a de outra 9%, tem motivo.</p>'));
-    const comp=visiveis.filter(x=>x.c.custo>0);
+    const comp=realizadas.filter(x=>x.c.custo>0);
     const rol=el('<div class="rolagem"></div>');
     const t=document.createElement('table');
     t.innerHTML='<thead><tr><th>Obra</th><th style="text-align:right">Custo</th><th style="text-align:right">R$/m² (grupos escolhidos)</th>'
@@ -6506,27 +6442,30 @@ async function vFortemais(m){
     if(comM2.length>1) cp.appendChild(el(`<div style="margin-top:14px">
       <div style="font-size:12.5px;color:var(--suave);margin-bottom:6px">Custo por m²</div>
       ${gBarras(comM2.map(x=>({r:x.o.nome||'—',v:x.c.porM2})))}</div>`));
-    m.appendChild(bloco('fm-comparar','📐 Comparar obras','o mesmo número, obra a obra',cp));
+    comparativos.appendChild(bloco('fm-comparar','📐 Comparar obras','o mesmo número, obra a obra',cp));
   }
 
-  const importar=bloco('fm-importar','📥 Importar custos do ERP','lançamentos realizados do sistema de obras',blocoImportarObra());
-  if(E.colapso['fm-importar']==null){importar.classList.add('fechado');importar.querySelector('header').setAttribute('aria-expanded','false')}
-  m.appendChild(importar);
 }
 
 
 /* ---------------- a ficha de uma obra ---------------- */
 /* A ficha desenha DENTRO da linha expandida — o dono pediu lista enxuta,
    não modal: "na obra essa ser só uma linha que quando eu abrir ela expandir". */
-async function fichaObraEm(c,o,fechar){
+async function fichaObraEm(raiz,o,fechar){
+    const ciclo=Symbol('ficha');raiz._fmFicha=ciclo;
+    const c=el('<div class="fm-realizado-corpo"><p class="fm-nota" role="status">Consultando os lançamentos realizados…</p></div>');raiz.replaceChildren(c);
+    let rr2=null,custos=[],custosIndisponiveis=false;
+    fmPrevAbas(raiz,o,{realizadoDisponivel:false,exportarRealizado:()=>imprimirObra(o,rr2,custosIndisponiveis?null:custos)});
     // depois de lançar ou apagar um custo, a ficha se redesenha com dados frescos
-    const recarregar=()=>{fmEsquecer();c.innerHTML='<div class="vazio">Atualizando…</div>';fichaObraEm(c,o,fechar)};
+    const recarregar=()=>{fmEsquecer();fichaObraEm(raiz,o,fechar)};
     let planoAberto=null;      // qual plano de contas está expandido (sobrevive ao repintar)
     let corrigindo=null;       // id do lançamento em correção
     const R=(await fmResumo())||{};
-    const rr2=R[o.id]||null;
+    rr2=R[o.id]||null;
     const cx=contasObra(o,rr2);
-    const custos=rr2?await fmCustos(o.id):[];
+    try{custos=rr2?await fmCustos(o.id):[]}catch(e){custosIndisponiveis=true;custos=[]}
+    if(raiz._fmFicha!==ciclo||!raiz.isConnected||!E.obras.includes(o))return;
+    const exportar=raiz.querySelector('[data-fm-exportacao=realizado]');exportar.disabled=false;exportar.title='';
 
     const pinta=()=>{c.innerHTML='';montar()};
     /* Os subtítulos da ficha abrem e fecham no toque. O estado mora em
@@ -6557,6 +6496,7 @@ async function fichaObraEm(c,o,fechar){
     };
     const montar=()=>{
     const cc=contasObra(o,(_fmResumo||{})[o.id]||rr2);
+    if(custosIndisponiveis)c.appendChild(el('<p class="aviso" role="status">O resumo de custos foi consultado, mas não foi possível carregar o livro-caixa. Abra a obra novamente para tentar a consulta.</p>'));
 
     /* --- o resultado, sempre à vista --- */
     /* A conta escrita embaixo do número tem de FECHAR com o número. Antes
@@ -7097,16 +7037,14 @@ async function fichaObraEm(c,o,fechar){
     c.appendChild(s7);
 
     const s9=el('<div class="secao" style="display:flex;gap:9px"></div>');
-    const del=fmBotaoExcluir(o,fechar);
-    s9.appendChild(del);s9.appendChild(el('<span class="cresce"></span>'));
-    const pdf=el('<button class="btn ghost">🖨 Salvar em PDF</button>');
-    pdf.onclick=()=>imprimirObra(o,(_fmResumo||{})[o.id]||rr2,custos);
+    s9.appendChild(el('<span class="cresce"></span>'));
+    const pdf=el('<button class="btn ghost">Exportar realizado</button>');
+    pdf.onclick=()=>imprimirObra(o,(_fmResumo||{})[o.id]||rr2,custosIndisponiveis?null:custos);
     s9.appendChild(pdf);
     const okb=el('<button class="btn">Pronto</button>');okb.onclick=fechar;s9.appendChild(okb);
     c.appendChild(s9);
-    fmPrevAbas(c,o);
     };
-    c.replaceChildren();montar();
+    c.replaceChildren();montar();prepararTabelas(c);
 }
 
 
@@ -16487,6 +16425,10 @@ function validarBackup(j){
     if(j.aviao[k]!==undefined&&(!Array.isArray(j.aviao[k])||j.aviao[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))
       throw new Error('Lista inválida: aviao.'+k);
   for(const obra of j.obras||[]){
+    if(obra.fmArquivosMetadados!==undefined){
+      if(typeof FortemaisDocumentosModelo==='undefined')throw Error('Atualize a página para conferir a classificação dos documentos antes de restaurar.');
+      FortemaisDocumentosModelo.validar(obra.fmArquivosMetadados);
+    }
     const d=obra.fmDemandas;if(d===undefined)continue;
     if(!d||typeof d!=='object'||Array.isArray(d))throw Error('Demandas da obra inválidas.');
     for(const k of ['etapas','itens'])if(!Array.isArray(d[k])||d[k].some(x=>!x||typeof x!=='object'||Array.isArray(x)||!x.id))throw Error('Lista inválida: demandas da obra.'+k);
@@ -16584,7 +16526,9 @@ function lerRascunhoSync(){
 }
 function guardarRascunhoSync(){
   const formularios=[];
-  document.querySelectorAll('#modais .fundo').forEach(f=>{
+  const fontes=[...document.querySelectorAll('#modais .fundo'),
+    ...[...document.querySelectorAll('#main [data-fm-pagina]')].filter(p=>p._fmDirty===true)];
+  fontes.forEach(f=>{
     if(f.querySelector('[data-recuperacao-sync]'))return;
     const campos=[];
     f.querySelectorAll('input,textarea,select').forEach(inp=>{
@@ -16596,7 +16540,9 @@ function guardarRascunhoSync(){
       const valor=['checkbox','radio'].includes(tipo)?'Marcado':String(inp.value??'');
       if(valor.trim())campos.push({campo:String(label).trim(),valor});
     });
-    if(campos.length)formularios.push({titulo:f.querySelector('h3')?.textContent||'Formulário',campos});
+    const aba=f.querySelector('h3')?.textContent||f.dataset.fmPagina||'Formulário';
+    const obra=f.closest('.fm-projeto')?.querySelector('.fm-projeto-abre strong')?.textContent||'Obra';
+    if(campos.length)formularios.push({titulo:f.hasAttribute('data-fm-pagina')?aba+' · '+obra:aba,campos});
   });
   if(!formularios.length)return false;
   const anterior=lerRascunhoSync();
@@ -16635,7 +16581,7 @@ function adotaNuvem(r,avisar){
   guardaDescartado();
   // modal aberto sobre o estado antigo viraria órfão e comeria o que fosse digitado
   const mo=document.getElementById('modais');if(mo)mo.innerHTML='';atualizarCamadasModais();
-  localStorage.setItem(CHAVE,JSON.stringify(r.dados));marcaBase(r.mt);E=carregar();tela();mostrarRascunhoSync();
+  localStorage.setItem(CHAVE,JSON.stringify(r.dados));marcaBase(r.mt);E=carregar();tela({baseRemota:true});mostrarRascunhoSync();
   pintaSync('atualizado de outro acesso');
   if(avisar)alert('Outro acesso atualizou os dados. Esta aba adotou a versão do servidor para preservar o que foi salvo lá.\n\n'+(preservou?'Os textos dos formulários foram preservados nesta aba. Use Recuperar textos preservados para conferir e copiar o que precisar.':'A versão local anterior ficou em Configurações → Versão descartada.'));
 }

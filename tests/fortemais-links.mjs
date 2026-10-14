@@ -39,7 +39,9 @@ test('Fortemais: backup antigo inicia links vazios e backup novo mantém a cole�
  const {run,ctx}=app();ctx.localStorage.setItem('centralLeo.v1',JSON.stringify({viagens:[],obras:[{id:'o',nome:'Existente'}]}));run('E=carregar()');assert.equal(run('E.fortemaisLinks.length'),0);run('fmSalvarLink({titulo:"Meu sistema",url:"https://example.com"});validarBackup(JSON.parse(JSON.stringify(E)))');assert.equal(run('E.obras[0].nome'),'Existente');assert.throws(()=>run('validarBackup({viagens:[],fortemaisLinks:"inválido"})'),/Lista inválida/);
 });
 test('Fortemais: atalhos aparecem antes de aguardar custos e obras continuam acessíveis',async()=>{
- const {run,document}=app();run('E.obras=[{id:"o",nome:"Obra preservada"}];fmResumo=()=>new Promise(r=>window.resumoPronto=r);var telaPendente=vFortemais(document.getElementById("main"))');assert.ok(document.querySelector('.fm-links'));assert.equal(document.querySelector('[data-bid=fm-obras]'),null);await run('window.resumoPronto({});telaPendente');assert.match(document.querySelector('[data-bid=fm-obras]').textContent,/Obra preservada/);
+ const {run,document}=app();run('E.obras=[{id:"o",nome:"Obra preservada"}];fmResumo=()=>new Promise(r=>window.resumoPronto=r);var telaPendente=vFortemais(document.getElementById("main"))');
+ try{assert.ok(document.querySelector('.fm-links'));assert.match(document.querySelector('[data-bid=fm-obras]')?.textContent||'',/Obra preservada/)}finally{await run('window.resumoPronto({});telaPendente')}
+ assert.match(document.querySelector('[data-bid=fm-obras]').textContent,/Obra preservada/);
 });
 test('Fortemais: edição antiga não sobrescreve um link alterado',()=>{
  const {run}=app();run('var primeiro=fmSalvarLink({titulo:"Inicial",url:"https://example.com"});fmSalvarLink({titulo:"Novo",url:"https://example.com/novo"},primeiro)');assert.throws(()=>run('fmSalvarLink({titulo:"Antigo",url:"https://example.com/antigo"},primeiro)'),/link mudou/);assert.equal(run('E.fortemaisLinks[0].titulo'),'Novo');
