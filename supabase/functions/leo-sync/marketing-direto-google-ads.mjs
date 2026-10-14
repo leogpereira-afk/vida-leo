@@ -22,7 +22,8 @@ export async function descobrirAds(api){
  const r=await api(BASE+'/customers:listAccessibleCustomers');const ativos=[];let limitado=false;
  const ids=[...new Set(r.resourceNames||[])];
  for(const id of ids.slice(0,50)){
-  const c=await contaAds(api,id);
+  let c;
+  try{c=await contaAds(api,id)}catch(e){if(e instanceof FalhaDireta&&e.codigo==='conta_ads_inativa'){limitado=true;continue}throw e}
   if(c.manager){limitado=true;continue}
   ativos.push({id,nome:c.descriptiveName||id});
  }

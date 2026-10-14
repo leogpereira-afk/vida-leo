@@ -96,3 +96,18 @@ test('Instagram: página selecionada permite descoberta direta sem ampliar permi
  s.dados.set('token_meta',{access_token:'PRIVADO',exp:tempo+999999});s.dados.set('pagina_instagram',{id:'12345678'});
  assert.equal((await s.d.listar('instagram')).ativos[0].nome,'@fortemais');assert.equal((await s.d.vincular('instagram','1234567')).ok,true);
 });
+
+
+test('Google Ads: conta não habilitada não bloqueia as demais; erros globais continuam visíveis',async()=>{
+ const montar=codigo=>setup(async(u,b)=>{
+  if(u.includes('listAccessibleCustomers'))return new Response(JSON.stringify({resourceNames:['customers/0000000001','customers/0000000002']}));
+  if(u.includes('0000000001'))return new Response(JSON.stringify({error:{message:'PRIVADO',details:[{errors:[{errorCode:{authorizationError:codigo}}]}]}}),{status:403});
+  return new Response(JSON.stringify({results:[{customer:{id:'0000000002',descriptiveName:'Conta de teste',manager:false}}]}));
+ });
+ const x=montar('CUSTOMER_NOT_ENABLED');x.dados.set('token_google_ads',{access_token:'PRIVADO',exp:tempo+999999});
+ const r=await x.d.listar('google_ads');assert.deepEqual(r.ativos,[{id:'customers/0000000002',nome:'Conta de teste'}]);assert.equal(r.limitado,true);
+ for(const codigo of ['CLOUD_PROJECT_NOT_APPROVED_FOR_PRODUCTION','USER_PERMISSION_DENIED']){
+  const y=montar(codigo);y.dados.set('token_google_ads',{access_token:'PRIVADO',exp:tempo+999999});
+  await assert.rejects(y.d.listar('google_ads'),e=>e.codigo===(codigo.startsWith('CLOUD')?'projeto_ads':'permissao'));
+ }
+});
