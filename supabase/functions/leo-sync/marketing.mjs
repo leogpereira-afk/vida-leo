@@ -75,7 +75,7 @@ export function resumirMarketing(empresa,linhas,agora=Date.now()){
 export async function lerMarketing(sb,empresa,agora=Date.now()){
   if(!EMPRESAS.some(x=>x.id===empresa))throw Error('Empresa inválida.');
   const config=CONFIG[empresa]||{};
-  const chaves=empresa==='fortemais'?[CHAVE_FORTEMAIS,CHAVE_ADMIN]:[config.google,config.meta].filter(Boolean);
+  const chaves=empresa==='fortemais'?[CHAVE_FORTEMAIS,CHAVE_ADMIN,...["ga4","search","perfil","instagram","meta_ads"].map(f=>"leo_marketing_fortemais_direto_"+f)]:[config.google,config.meta].filter(Boolean);
   if(!chaves.length)return resumirMarketing(empresa,[],agora);
   const {data,error}=await sb.from('painel_cache').select('chave,valor').in('chave',chaves);
   if(error)throw Error('Não foi possível consultar os indicadores. Tente novamente.');

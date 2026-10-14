@@ -705,7 +705,8 @@ tr:hover .lixo{opacity:1}
 
 <script src="./vendor/ical-2.2.1.min.js"></script>
 <script src="./google-datas.js?v=85c5d36986f3"></script>
-<script src="./marketing-fortemais.js?v=827c3983de3d"></script>
+<script src="./marketing-direto.js?v=f78ad27a854f"></script>
+<script src="./marketing-fortemais.js?v=5e7549fdda55"></script>
 <script src="./marketing.js?v=ec90c75cd5cf"></script>
 <script src="./documentos-revisao.js?v=f54d2ba958f9"></script>
 <script src="./organograma.js?v=3a5db1c22c87"></script>
@@ -16543,7 +16544,7 @@ async function apiSync(metodo,corpo){
     headers:{'content-type':'application/json',authorization:'Bearer '+pegaToken()},
     body:corpo?JSON.stringify(corpo):undefined});
   if(r.status===401){limparRascunhoSync();localStorage.removeItem(T_CHAVE);sessionStorage.removeItem(T_CHAVE);location.reload();throw new Error('sessão expirou')}
-  if(!r.ok)throw new Error('HTTP '+r.status);
+  if(!r.ok){if(corpo?.acao?.startsWith('marketingDireto')){const d=await r.json().catch(()=>({}));throw new Error(typeof d.erro==='string'?d.erro:'Não foi possível concluir a conexão.')}throw new Error('HTTP '+r.status)}
   return r.json();
 }
 let syncTimer=null;

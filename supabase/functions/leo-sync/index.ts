@@ -32,6 +32,7 @@ import { googleAcao } from "./google.ts";
 import { empresaAcao } from "./empresa.ts";
 import { lerBancosGestao } from "./bancos.ts";
 import { lerMarketing } from "./marketing.mjs";
+import {criarDireto,bancoDireto,FalhaDireta,MENSAGENS} from "./marketing-direto.mjs";
 import { salvarAdminFortemais } from "./marketing-fortemais.mjs";
 import { donboyAcao } from "./donboy.ts";
 import {ACOES_FILA,autenticarOpenclaw,bancoFila,operarFila} from "./openclaw-fila.ts";
@@ -335,6 +336,25 @@ Deno.serve(async (req: Request) => {
       return await stravaAcao(CRON_ACAO, {}, sb, req, new URL(req.url));
     }
 
+    if (["marketingDiretoStatus","marketingDiretoInicio","marketingDiretoConfirmar","marketingDiretoListar","marketingDiretoVincular","marketingDiretoColetar"].includes(acao)) {
+      const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
+      const p = await crachaPayload(t);
+      if (!p || p.uso !== "" || p.sub.toLowerCase() !== DONO || p.papel !== "dono") return json({erro:"Não autorizado"},401);
+      if (corpo.empresa !== "fortemais") return json({erro:"Empresa inválida"},400);
+      const direto=criarDireto({banco:bancoDireto(sb),env:(n:string)=>Deno.env.get(n)});
+      try {
+        const r = acao === "marketingDiretoStatus" ? await direto.status() :
+          acao === "marketingDiretoInicio" ? await direto.inicio(corpo.provedor,corpo.prova,p.sub) :
+          acao === "marketingDiretoConfirmar" ? await direto.confirmar(corpo.nonce,corpo.prova,p.sub) :
+          acao === "marketingDiretoListar" ? await direto.listar(corpo.fonte) :
+          acao === "marketingDiretoVincular" ? await direto.vincular(corpo.fonte,corpo.ativo) : await direto.coletar(corpo.fonte);
+        return new Response(JSON.stringify(r),{headers:{...CORS,"Content-Type":"application/json","Cache-Control":"no-store"}});
+      } catch(e) {
+        const codigo=e instanceof FalhaDireta ? e.codigo : "coleta";
+        return new Response(JSON.stringify({ok:false,codigo,erro:MENSAGENS[codigo]||MENSAGENS.coleta}),{status:409,headers:{...CORS,"Content-Type":"application/json","Cache-Control":"no-store"}});
+      }
+    }
+
     if (acao === "marketingAdministracao") {
       const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
       const p = await crachaPayload(t);
@@ -633,6 +653,13 @@ Deno.serve(async (req: Request) => {
      ?state=&code=&scope=). */
   // a conferência barata primeiro: só quem cheira a volta do Strava vira URL
   // volta do Google: mesmo desenho do Strava — o `state` é o crachá curto
+  if (req.method === "GET" && new URL(req.url).pathname.endsWith("/googleCallback") && (new URL(req.url).searchParams.get("state")||"").startsWith("fm.")) {
+    try {
+      const direto=criarDireto({banco:bancoDireto(sb),env:(n:string)=>Deno.env.get(n)});
+      return new Response(null,{status:302,headers:{Location:await direto.callback(new URL(req.url)),"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
+    } catch { return new Response("Autorização inválida ou vencida. Volte à Central e conecte novamente.",{status:400,headers:{"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}}); }
+  }
+
   if (req.method === "GET" && req.url.includes("googleCallback")) {
     const url = new URL(req.url);
     if (!(await stateOk(url.searchParams.get("state")))) {

@@ -106,3 +106,42 @@ permissões dos coletores da Impresilk. Publicar a tela sozinha não torna as
 fontes conectadas. Próxima sequência: concluir OAuth, validar identidades,
 implementar e testar a coleta isolada, conferir o recorte, autorizar publicação,
 implantar servidor antes da tela e verificar os dados no painel real.
+
+### Fortemais: conexão direta (14/10/2026)
+
+A Fortemais pode autorizar Google e Meta diretamente na Central, sem Make.
+A administração oferece conexão, seleção de ativo e coleta sob demanda. Não
+foi criada rotina recorrente. O cadastro manual não comprova autorização.
+
+- Google usa o app web `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` e o retorno
+  já usado pela Central: `/functions/v1/leo-sync/googleCallback`. O state `fm.`
+  separa este fluxo do Drive/Agenda. Tokens pessoais não são reutilizados.
+- Meta exige um app próprio configurado em `LEO_MKT_META_CLIENT_ID` e
+  `LEO_MKT_META_CLIENT_SECRET`, com o mesmo retorno permitido. Não usa o
+  `META_TOKEN` da Impresilk. Instagram precisa de conta profissional ligada
+  à Página e permissões aprovadas pelo provedor.
+- Google pede analytics.readonly, webmasters.readonly e business.manage
+  (escopo exigido pelo Perfil; o coletor somente lê). Meta pede insights e
+  ads_read. Não cria anúncios nem altera site, perfil ou campanhas.
+- OAuth: nonce aleatório consumido uma vez, validade de 10 minutos, PKCE no
+  Google. O callback guarda autorização pendente; só o dono autenticado,
+  com prova guardada no navegador que iniciou, confirma a instalação.
+- Cofre lógico: `leo_config`, prefixo `marketing_fortemais_direto_`, RLS sem
+  políticas públicas. A API nunca devolve tokens. A autorização da Meta é
+  trocada por token de longa duração; no vencimento é necessário reconectar.
+- Caches por fonte: `leo_marketing_fortemais_direto_<fonte>`. Fontes são
+  gravadas independentemente, sem sobrescrever coleta concorrente de outro
+  canal. Falhas preservam os dados anteriores e registram o impedimento.
+- GA4 confere o domínio no fluxo e filtra relatórios por host; Instagram
+  confere @fortemais; Perfil e Busca conferem fortemais.net. A conta de
+  anúncios é selecionada e vinculada explicitamente pelo dono.
+- Janela inicial: 28 dias terminando três dias antes da consulta. Usuários e
+  alcance vêm do total do período, nunca da soma de dias. Listagens limitadas
+  ou relatórios recusados sinalizam coleta parcial. Campos não coletados
+  permanecem ausentes; seguidores atuais não são apresentados como históricos.
+- Google Ads ainda exige implementação/configuração própria de token de
+  desenvolvedor e conta. Não é marcado como conectado por herdar o Google.
+
+Os testes usam respostas simuladas. Só a autorização e uma coleta bem-sucedida
+na conta real confirmam operação de ponta a ponta. Configurar o app não resolve
+automaticamente bloqueios ou aprovações pendentes no Google/Meta.

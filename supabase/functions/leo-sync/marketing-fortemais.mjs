@@ -57,7 +57,7 @@ export function limparAdmin(entrada){
 }
 export function detalharFortemais(linhas,agora=Date.now()){
  const map=new Map(arr(linhas).map(r=>[r.chave,r.valor]));const dados=map.get(CHAVE_FORTEMAIS);
- return {versao:1,fontes:Object.keys(CATALOGO).map(id=>projetarFonte(id,dados?.empresa==='fortemais'?dados.fontes?.[id]:null,agora)),administracao:limparAdmin(map.get(CHAVE_ADMIN))};
+ return {versao:1,fontes:Object.keys(CATALOGO).map(id=>projetarFonte(id,map.get('leo_marketing_fortemais_direto_'+id)||(dados?.empresa==='fortemais'?dados.fontes?.[id]:null),agora)),administracao:limparAdmin(map.get(CHAVE_ADMIN))};
 }
 export async function salvarAdminFortemais(sb,entrada){
  const admin=limparAdmin(entrada);const {error}=await sb.from('painel_cache').upsert({chave:CHAVE_ADMIN,valor:admin,atualizado_em:new Date().toISOString()},{onConflict:'chave'});
