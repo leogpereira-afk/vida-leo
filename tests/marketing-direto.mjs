@@ -19,3 +19,34 @@ test('Portas diretas exigem dono, empresa e sessão normal; callback separado do
 import vm from 'node:vm';
 import {parseHTML} from 'linkedom';
 test('UI direta: configuração ausente bloqueia conexão; vincular e coletar exigem a fonte selecionada',async()=>{const {document}=parseHTML('<main></main>');const calls=[];let ativo=null;const api=async(m,b)=>{calls.push(b);if(b.acao==='marketingDiretoStatus')return {ok:true,provedores:{google:{configurado:true,autorizado:true},meta:{configurado:false,autorizado:false}},fontes:Object.fromEntries(['ga4','search','perfil','instagram','meta_ads'].map(f=>[f,{ativo:f==='ga4'?ativo:null}]))};if(b.acao==='marketingDiretoListar')return {ok:true,ativos:[{id:'properties/123',nome:'Site de teste'}]};if(b.acao==='marketingDiretoVincular'){ativo={id:b.ativo,nome:'Site de teste'};return {ok:true}}if(b.acao==='marketingDiretoColetar')return {ok:true,estado:'parcial'};throw Error('inesperado')};const ctx=vm.createContext({document,console,Date});vm.runInContext(readFileSync(new URL('../publico/marketing-direto.js',import.meta.url),'utf8'),ctx);ctx.LeoMarketingDireto.montar(document.querySelector('main'),{api});const flush=()=>new Promise(r=>setImmediate(r));await flush();assert.ok(document.querySelector('[data-conectar="meta"]').hasAttribute('disabled'));document.querySelector('[data-listar="ga4"]').click();await flush();const form=document.querySelector('form');form.querySelector('select').querySelector('option').setAttribute('selected','');form.onsubmit({preventDefault(){}});await flush();assert.equal(calls.find(x=>x.acao==='marketingDiretoVincular').ativo,'properties/123');document.querySelector('[data-coletar="ga4"]').click();await flush();assert.match(document.querySelector('main').textContent,/Coleta parcial recebida/);assert.ok(calls.every(x=>x.empresa==='fortemais'))});
+test('UI OAuth: remontagem aguarda a mesma confirmação antes de consultar status',async()=>{
+ const {document}=parseHTML('<main id="a"></main><main id="b"></main>');
+ let liberar,confirmado=false;const calls=[];
+ const location={search:'?fm='+('a'.repeat(64))+'&resultado=ok',href:'https://teste.test/?fm='+('a'.repeat(64))+'&resultado=ok',pathname:'/'};
+ const ctx=vm.createContext({document,console,Date,URL,URLSearchParams,location,history:{replaceState(){location.search=''}},sessionStorage:{getItem:()=>prova,removeItem(){}}});
+ vm.runInContext(readFileSync(new URL('../publico/marketing-direto.js',import.meta.url),'utf8'),ctx);
+ const api=async(m,b)=>{calls.push(b.acao);if(b.acao==='marketingDiretoConfirmar'){await new Promise(r=>liberar=r);confirmado=true;return {ok:true}}
+ assert.equal(confirmado,true,'não consultar estado antes da confirmação');
+ return {ok:true,provedores:{google:{configurado:true,autorizado:true},meta:{}},fontes:Object.fromEntries(['ga4','search','perfil','instagram','meta_ads'].map(f=>[f,{}]))};};
+ ctx.LeoMarketingDireto.montar(document.querySelector('#a'),{api});
+ ctx.LeoMarketingDireto.montar(document.querySelector('#b'),{api});
+ assert.deepEqual(calls,['marketingDiretoConfirmar']);liberar();await new Promise(r=>setImmediate(r));
+ assert.equal(calls.filter(c=>c==='marketingDiretoConfirmar').length,1);
+ assert.equal(calls.filter(c=>c==='marketingDiretoStatus').length,2);
+ assert.match(document.querySelector('#b').textContent,/Autorização direta concluída/);
+});
+test('Diagnóstico Google distingue serviço desativado de escopo e não revela texto remoto',async()=>{
+ for(const [reason,codigo] of [['SERVICE_DISABLED','api_desativada'],['ACCESS_TOKEN_SCOPE_INSUFFICIENT','escopo'],['DESCONHECIDO','permissao']]){
+ const x=setup(async()=>new Response(JSON.stringify({error:{message:'DADO_PRIVADO',details:[{reason}]}}),{status:403}));
+ x.dados.set('token_google',{access_token:'PRIVADO',exp:tempo+999999});
+ await assert.rejects(x.d.listar('ga4'),e=>e.codigo===codigo&&!e.message.includes('DADO_PRIVADO'));
+ }
+});
+test('UI OAuth: retorno recusado mantém botão para reconectar',async()=>{
+ const {document}=parseHTML('<main></main>');
+ const ctx=vm.createContext({document,console,Date,URLSearchParams,location:{search:'?fm=nonce&resultado=negado',pathname:'/'},history:{replaceState(){}},sessionStorage:{getItem:()=>prova}});
+ vm.runInContext(readFileSync(new URL('../publico/marketing-direto.js',import.meta.url),'utf8'),ctx);
+ const api=async()=>({ok:true,provedores:{google:{configurado:true,autorizado:false},meta:{}},fontes:Object.fromEntries(['ga4','search','perfil','instagram','meta_ads'].map(f=>[f,{}]))});
+ ctx.LeoMarketingDireto.montar(document.querySelector('main'),{api});await new Promise(r=>setImmediate(r));
+ assert.match(document.querySelector('main').textContent,/não concluiu a autorização/);assert.equal(document.querySelector('[data-conectar="google"]').hasAttribute('disabled'),false);
+});

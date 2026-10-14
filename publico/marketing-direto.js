@@ -2,7 +2,20 @@
 'use strict';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const NOMES={ga4:'Site · Analytics',search:'Busca Google',perfil:'Perfil da Empresa',instagram:'Instagram',meta_ads:'Meta Ads'};
-const RESULTADOS={ok:'Leitura concluída',parcial:'Leitura parcial',permissao:'Permissão insuficiente',temporario:'Serviço indisponível',coleta:'Falha na leitura',renovar:'Reconectar autorização',vinculo:'Revisar vínculo'};
+const RESULTADOS={ok:'Leitura concluída',parcial:'Leitura parcial',api_desativada:'API ainda não ativada',escopo:'Revisar autorização',permissao:'Permissão insuficiente',temporario:'Serviço indisponível',coleta:'Falha na leitura',renovar:'Reconectar autorização',vinculo:'Revisar vínculo'};
+// Uma única conclusão por retorno: a sincronização inicial pode remontar a tela.
+let retornoEmAndamento=null;
+function concluirRetorno(chamar){
+ if(retornoEmAndamento)return retornoEmAndamento;
+ if(!root.location||!root.sessionStorage)return Promise.resolve(false);
+ const q=new URLSearchParams(root.location.search),nonce=q.get('fm');if(!nonce)return Promise.resolve(false);
+ const prova=root.sessionStorage.getItem('fm-direto-prova');
+ retornoEmAndamento=(async()=>{
+  root.history.replaceState(null,'',root.location.pathname+'#marketing');
+  if(q.get('resultado')!=='ok')throw Error('O provedor não concluiu a autorização. Revise o aplicativo e conecte novamente.');
+  await chamar('marketingDiretoConfirmar',{nonce,prova});root.sessionStorage.removeItem('fm-direto-prova');return true;
+ })();return retornoEmAndamento;
+}
 function montar(el,{api,atualizar}){
  let status=null,aviso='',ocupado=false,lista=null;
  const chamar=async (acao,extra={})=>{const r=await api('POST',{acao,empresa:'fortemais',...extra});if(r?.ok!==true)throw Error(r?.erro||'Não foi possível concluir a conexão.');return r};
@@ -13,7 +26,7 @@ function montar(el,{api,atualizar}){
  const form=el.querySelector('[data-vincular]');if(form)form.onsubmit=e=>{e.preventDefault();executar(async()=>{await chamar('marketingDiretoVincular',{fonte:lista.fonte,ativo:form.querySelector('select').value});lista=null;status=await chamar('marketingDiretoStatus');aviso='Ativo vinculado. Agora você pode coletar os indicadores.'})};
  }
  async function executar(fn){if(ocupado)return;ocupado=true;aviso='';desenhar();try{await fn()}catch(e){aviso=e.message||'Não foi possível concluir.'}finally{ocupado=false;desenhar()}}
- desenhar();executar(async()=>{status=await chamar('marketingDiretoStatus');if(root.location&&root.sessionStorage){const q=new URLSearchParams(root.location.search),nonce=q.get('fm');if(nonce){const prova=root.sessionStorage.getItem('fm-direto-prova');root.history.replaceState(null,'',root.location.pathname+'#marketing');if(q.get('resultado')!=='ok')throw Error('O provedor não concluiu a autorização. Revise o aplicativo e conecte novamente.');await chamar('marketingDiretoConfirmar',{nonce,prova});root.sessionStorage.removeItem('fm-direto-prova');status=await chamar('marketingDiretoStatus');aviso='Autorização direta concluída. Selecione os ativos da Fortemais para coletar.'}}});
+ desenhar();executar(async()=>{let confirmou=false,falha;try{confirmou=await concluirRetorno(chamar)}catch(e){falha=e}status=await chamar('marketingDiretoStatus');if(falha)throw falha;if(confirmou)aviso='Autorização direta concluída. Selecione os ativos da Fortemais para coletar.'});
  return {ocupado:()=>ocupado};
 }
 root.LeoMarketingDireto={montar};
