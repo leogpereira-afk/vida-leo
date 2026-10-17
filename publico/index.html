@@ -676,6 +676,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="donboy-email.css?v=ed0e5b4334e2">
 <link rel="stylesheet" href="./marketing.css?v=d1c1ddb3271f">
 <link rel="stylesheet" href="./leonardo-design.css?v=a4da4058b660">
+<link rel="stylesheet" href="./rendimentos-avancado.css?v=7683f9d7168b">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -725,6 +726,8 @@ tr:hover .lixo{opacity:1}
 <script src="openclaw-fila.js?v=066cb079a2b5"></script>
 <script src="./saude-comparacao.js?v=e1e154463ba3"></script>
 <script src="./leonardo-design.js?v=e7e72ac5ec0c"></script>
+<script src="./rendimentos-modelo.js?v=b475576bfebc"></script>
+<script src="./rendimentos-avancado.js?v=9720c74654ef"></script>
 <script src="./saude-tratamentos.js?v=8d600378a8b8"></script>
 <script src="donboy-email.js?v=6a1ba6d316f6"></script>
 <script>
@@ -2131,7 +2134,7 @@ const MODS=[
   {id:'donboy',ic:'◈',nome:'Agentes',grupo:'',render:vAgentes},
   {id:'agenda',ic:'📅',nome:'Agenda',grupo:'',render:vAgenda},
   {id:'planilhas',ic:'📊',nome:'Planilhas',grupo:'',render:vPlanilhas},
-  {id:'rendimentos',ic:'📈',nome:'Rendimentos',grupo:'Dinheiro',render:vRendimentos},
+  {id:'rendimentos',ic:'📈',nome:'Rendimentos',grupo:'Dinheiro',render:m=>typeof RendimentosUI!=='undefined'?RendimentosUI.render(m):vRendimentos(m)},
   {id:'gastos',ic:'💸',nome:'Gastos',grupo:'',render:vGastos},
   {id:'empresas',ic:'🏢',nome:'Empresas',grupo:'',render:vEmpresas},
   {id:'marketing',ic:'◎',nome:'Marketing',grupo:'',render:vMarketing},
@@ -2198,6 +2201,7 @@ function abaDoBlocoFinanceiro(id,secao){
   return 'resumo';
 }
 function organizarFinanceiro(pagina,secao,alvo){
+  if(pagina.classList.contains('ra-app'))return;
   pagina.classList.add('financeiro');
   const opcoes=secao==='rendimentos'
     ?[['resumo','Resumo'],['graficos','Gráficos'],['lancamentos','Lançamentos'],['historico','Histórico']]
@@ -2342,10 +2346,11 @@ function tela(opcoes={}){
   const m=document.getElementById('main'),pagina=el('<div class="pagina"></div>');m.replaceChildren(pagina);
   if(typeof LeonardoDesign!=='undefined')LeonardoDesign.aplicar(atual,pagina);
   const alvo=_alvoBloco;_alvoBloco=null;
+  if(atual==='rendimentos'&&typeof RendimentosUI!=='undefined')RendimentosUI.destino(alvo);
   const mod=MODS.find(x=>x.id===atual&&!x.url);document.title=mod.nome+' · Central do Léo';
   const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else if(atual==='caixavgv')organizarCaixaVGV(pagina,alvo);else if(atual==='config')organizarConfig(pagina,alvo);else if(atual==='demandas')organizarDemandasTopo(pagina);else indiceDaTela(pagina);prepararTabelas(pagina);if(typeof docIntegrarTela==='function')docIntegrarTela(pagina,atual);organizarPainelCompacto(pagina,atual);if(alvo)rolaAlvo(pagina,alvo)};
   const falhou=()=>{if(pagina.isConnected)pagina.appendChild(el('<p class="aviso" role="alert">Não foi possível concluir o carregamento. Abra esta seção novamente.</p>'))};
-  try{const resultado=mod.render(pagina);if(resultado?.then)resultado.then(finalizar).catch(falhou);else finalizar()}catch(erro){falhou()}
+  try{const resultado=mod.render(pagina);if(resultado?.then)resultado.then(finalizar).catch(falhou);else finalizar()}catch(erro){if(atual==='rendimentos')console.error('Falha ao renderizar Rendimentos',erro);falhou()}
   return !!alvo;
 }
 const rr=id=>()=>{if(atual===id||(id==='estrategia'&&atual==='empresas'&&filtro.empresaAba==='planejamento')||(id==='empresas'&&atual==='estrategia'))tela()};
@@ -10587,6 +10592,7 @@ function vRendimentos(m){
 }
 
 function modalRendimento(x,novo){
+  const duplicado=!!x._raDuplicado;delete x._raDuplicado;let confirmouDuplicado=false;
   if(novo)x._ffNovo=true;
   abrirModal(novo?'Novo rendimento':esc(x.empresa||'Rendimento'),'Confira os dados e salve para atualizar os totais.',(c,fechar)=>{
     const {form}=financeiroFormulario(c,[
@@ -10596,8 +10602,9 @@ function modalRendimento(x,novo){
       {k:'tipo',t:'Tipo',ph:'Pró-labore, lucro, rendimento…',sugestoes:maisUsados(E.rendimentos,'tipo')},
       {k:'instituicao',t:'Instituição',ph:'Banco ou corretora',sugestoes:maisUsados(E.rendimentos,'instituicao',CFG('instituicoes')),ajuda:'Em Aplicação, este campo organiza os rendimentos por banco.'},
       {k:'obs',t:'Observações',tipo:'textarea',full:true},
-    ],x,(v,patch)=>{financeiroSalvarRegistro(E.rendimentos,x,v,patch);const q=v.instituicao;
+    ],x,(v,patch)=>{if(duplicado&&!confirmouDuplicado&&E.rendimentos.some(y=>y.id!==x.id&&y.data===v.data&&y.empresa===v.empresa&&+y.valor===+v.valor))throw new Error('Já existe um lançamento com esta empresa, data e valor. Altere os dados ou confirme a duplicação abaixo.');financeiroSalvarRegistro(E.rendimentos,x,v,patch);const q=v.instituicao;
       if(q&&!CFG('instituicoes').some(o=>normaliza(o)===normaliza(q))){E.config.instituicoes=[...CFG('instituicoes'),q].sort((a,b)=>a.localeCompare(b));salvar()}},fechar);
+    if(duplicado){const aviso=el('<label class="ff-note"><input type="checkbox"> Confirmo criar outro lançamento com a mesma empresa, data e valor.</label>');aviso.querySelector('input').onchange=e=>confirmouDuplicado=e.target.checked;c.insertBefore(aviso,form)}
     if(!novo){const arquivos=el('<details class="ff-attachments"><summary>Comprovantes e documentos</summary></details>');arquivos.appendChild(areaArquivos('rendimento:'+x.id,'Recibo, extrato, contrato, nota'));c.insertBefore(arquivos,form);
       const acoes=el('<div class="ff-secondary"></div>');
       const dup=el('<button class="btn ghost" type="button">↻ Preparar mês seguinte</button>');dup.onclick=()=>{const y={...x,id:uid(),data:mesSeguinte(x.data||hoje()),obs:''};fechar();modalRendimento(y,true)};

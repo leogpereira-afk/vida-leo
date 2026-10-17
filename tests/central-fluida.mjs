@@ -49,8 +49,10 @@ test('busca encontra indicador, resultado histórico e habilidade pessoal',()=>{
  const {run}=setup();run("E.planejamentoEmpresas=[{id:'p',empresaNome:'Teste',empresaId:'pj',ano:2027,objetivos:[{id:'o',titulo:'Melhorar entregas',indicador:'Pontualidade singular',meta:'Noventa por cento',resultado:'Entrega consistente',historicoResultados:[{resultado:'Referência anterior',resultadoEm:'2027-01-01'}],acoes:[]}]}];E.pdi=[{id:'d',habilidade:'Escuta atenta singular'}]");
  for(const termo of ['pontualidade singular','noventa por cento','referência anterior','escuta atenta singular'])assert.equal(run(`buscarEmTudo(${JSON.stringify(termo)}).length`),1,termo);
 });
-test('Rendimentos separa histórico do resumo e identifica os três filtros',()=>{
+test('Rendimentos separa histórico e identifica filtros de período, anos e empresas',()=>{
  const {run,document}=setup();run("E.rendimentos=[{id:'r',empresa:'Teste',data:hoje(),valor:100}];atual='rendimentos';tela()");
- const filtros=[...document.querySelectorAll('.painel select')];assert.equal(filtros.length,3);assert.ok(filtros.every(x=>x.getAttribute('aria-label')));
- for(const bid of ['rd-acum','rd-emp','rd-hist','rd-conf']){const b=document.querySelector('[data-bid='+bid+']');if(b)assert.equal(b.closest('.finance-pane').id,'finance-historico',bid)}
+ const reg=document.querySelector('[aria-label="Filtros de rendimentos"]');assert.ok(reg);assert.match(reg.querySelector('label').textContent,/Período/);assert.equal(reg.querySelectorAll('.ra-picks').length,2);
+ assert.equal(document.querySelector('.ra-card h2').textContent,'Por empresa, mês a mês');
+ [...document.querySelectorAll('.finance-tabs button')].find(b=>b.textContent.includes('Histórico')).onclick();
+ assert.match(document.querySelector('.pagina').textContent,/Histórico e cobertura/);assert.equal(document.querySelector('.ra-kpis'),null);
 });
