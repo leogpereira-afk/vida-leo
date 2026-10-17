@@ -105,7 +105,7 @@ const ADMINISTRAVEIS = new Set(["painel", "rh"]);
 // resposta: id que nao existir volta na resposta e a tela reclama. Modulo novo
 // entra nos TRES lugares.
 // fluxo-caixa e produtos sairam: as telas nao existem mais no painel.
-const MODULOS_PAINEL = ["gestao", "contas-atrasadas", "orcamentos",
+const MODULOS_PAINEL = ["ferramenta-ia", "gestao", "contas-atrasadas", "orcamentos",
   "bancos", "marketing", "licitacoes", "glossario", "compromissos", "manutencoes",
   // `permutas` faltava aqui, e aconteceu exatamente o que o aviso acima
   // descreve: em 19/08/2026 a direcao marcou Permutas para duas pessoas, viu a
