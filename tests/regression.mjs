@@ -75,7 +75,7 @@ test('saúde: cadastro vazio recente não apaga última pressão completa',()=>a
 test('saúde: batimento e pressão podem ter datas diferentes',()=>assert.equal(app()("ultimoRegistroSaude([{data:'2026-09-01',sis:120,dia:80},{data:'2026-09-05',fc:70}],['fc']).fc"),70));
 test('saúde: medida futura não vira última medida realizada',()=>assert.equal(app()("ultimoRegistroSaude([{data:'2026-09-10',peso:80}],['peso'])"),null));
 test('saúde: falta de exame é Sem registro, não Nunca feito',()=>assert.equal(app()("E.perfil={nascimento:'1986-01-01'};E.exames=[];E.vitais=[];rastreiosPendentes(true).every(x=>x.situacao==='Sem registro')"),true));
-test('saúde: atalhos levam à área que contém o cadastro',()=>assert.equal(app()("['sa-ex','sa-peso','sa-trat','sa-dash'].map(abaDoBlocoSaude).join(',')"),'exames,medidas,cuidados,resumo'));
+test('saúde: atalhos levam à área que contém o cadastro',()=>assert.equal(app()("['sa-ex','sa-peso','sa-trat','sa-dash'].map(abaDoBlocoSaude).join(',')"),'exames,medidas,tratamentos,resumo'));
 
 test('conferência: identifica duplicação e data invertida sem modificar dados',()=>{const run=app();assert.equal(run("var dadosConf={viagens:[{id:'v',ida:'2026-09-10',volta:'2026-09-01'},{id:'v'}]};var antesConf=JSON.stringify(dadosConf);conferirCadastros(dadosConf).length"),2);assert.equal(run('JSON.stringify(dadosConf)===antesConf'),true)});
 test('conferência: rejeita dia inexistente e valor não numérico',()=>assert.equal(app()("conferirCadastros({gastos:[{data:'2026-02-30',valor:'abc'}]}).length"),2));

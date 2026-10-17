@@ -663,7 +663,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./central-fluida.css?v=25438d2d9ef6">
 <link rel="stylesheet" href="./documentos-revisao.css?v=90d5f0ab4afe">
 <link rel="stylesheet" href="./painel-compacto.css?v=4baf1a7c4d03">
-<link rel="stylesheet" href="./saude-visual.css?v=c2264793fee0">
+<link rel="stylesheet" href="./saude-visual.css?v=f4268c15e5d5">
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
 <link rel="stylesheet" href="./aviao.css?v=44fae810ca9e">
 <link rel="stylesheet" href="./fortemais-previsao.css?v=cdb9222e7265">
@@ -722,6 +722,8 @@ tr:hover .lixo{opacity:1}
 <script src="./fortemais-documentos.js?v=fc5f80ca53c6"></script>
 <script src="./fortemais-pdf.js?v=27455f7f3e11"></script>
 <script src="openclaw-fila.js?v=066cb079a2b5"></script>
+<script src="./saude-comparacao.js?v=e1e154463ba3"></script>
+<script src="./saude-tratamentos.js?v=8d600378a8b8"></script>
 <script src="donboy-email.js?v=6a1ba6d316f6"></script>
 <script>
 /* ============================================================
@@ -4265,6 +4267,9 @@ function eventosDoEcossistema(){
       data:t.fim,hora:'',titulo:(t.oque||'Tratamento')+' · término previsto',
       sub:[t.motivo,t.medico].filter(Boolean).join(' · '),
       fonte:'saude',ic:'💊',ir:'saude',col:'sa-trat',ref:t})});
+    (E.tratamentos||[]).forEach(t=>{if(SaudeTratamentos.ativo(t)&&dataISOValida(t.proximaData))ev.push({
+      data:t.proximaData,hora:t.horario||'',titulo:(t.oque||'Tratamento')+' · próximo cuidado',
+      sub:t.medico||'',fonte:'saude',ic:'💊',ir:'saude',col:'sa-trat',ref:t})});
     (E.exames||[]).forEach(x=>{
       if(!dataISOValida(x.data))return;
       const aguardando=String(x.resultado||'').trim()==='Aguardando';
@@ -4760,7 +4765,7 @@ const MARCADORES = [
   ['Ferritina', 'ng/mL', '30 a 400', '50 a 150', v => v > 400 || v < 30, v => v < 50 || v > 150],
 ];
 function faixaDoExameHTML(g){
-  if(g.ult.origemDocumental)return esc(g.ult.referenciaLaudo||'Consultar laudo original');
+  if(referenciaDocumentalSaude(g.ult))return esc(g.ult.referenciaLaudo||'Consultar laudo original');
   if(g.mk&&mesmaUnidade(unidadeSaude(g.ult),g.mk[1]))return esc(g.mk[3]);
   const r=referenciaExtra(g.ult);
   /* A ORIGEM DA RÉGUA VAI JUNTO. Saber que a faixa é do laudo, e não uma
@@ -4879,9 +4884,10 @@ function numeroResultadoSaude(valor){
   const n=Number(texto.replace(',','.'));return Number.isFinite(n)?n:NaN;
 }
 // semáforo de um exame: 'ok' | 'atencao' | 'ruim' | ''
+function referenciaDocumentalSaude(x){return Boolean(x.origemDocumental||String(x.referenciaLaudo||'').trim())}
 function semaforo(x) {
   // Resultados documentais conservam a leitura do laudo; não recebem alvos genéricos.
-  if(x.origemDocumental)return x.resultado==='Alterado'?'ruim':x.resultado==='Normal'?'ok':x.resultado==='Atenção'?'atencao':'';
+  if(referenciaDocumentalSaude(x))return x.resultado==='Alterado'?'ruim':x.resultado==='Normal'?'ok':x.resultado==='Atenção'?'atencao':'';
   const m = MARCADORES.find(y => y[0] === x.exame);
   const v = numeroResultadoSaude(x.valor);
   if(x.resultado==='Aguardando')return '';
@@ -4899,7 +4905,7 @@ function semaforo(x) {
 // As faixas do painel são referências cadastradas; o laudo e a avaliação clínica são independentes.
 const CHIP_SEM = { ok: ['var(--verde-cl)', 'var(--verde)', 'No alvo'], atencao: ['var(--areia-cl)', 'var(--areia)', 'Fora do alvo'], ruim: ['var(--vermelho-cl)', 'var(--vermelho)', 'Alterado'] };
 
-function unidadeSaude(x){if(x.origemDocumental)return x.unidade||'';return x.unidade||MARCADORES.find(m=>m[0]===x.exame)?.[1]||''}
+function unidadeSaude(x){if(referenciaDocumentalSaude(x))return x.unidade||'';return x.unidade||MARCADORES.find(m=>m[0]===x.exame)?.[1]||''}
 function resultadoSaudeRegistrado(x){return dataISOValida(x.data)&&x.data<=hoje()&&x.resultado!=='Aguardando'&&(String(x.valor??'').trim()!==''||['Normal','Atenção','Alterado'].includes(x.resultado))}
 function registrosResultadoSaude(lista){return lista.filter(resultadoSaudeRegistrado).slice().sort((a,b)=>a.data.localeCompare(b.data))}
 /* IMPORTAR UM LAUDO INTEIRO.
@@ -4930,6 +4936,7 @@ function lerLaudoImportado(texto){
     bons.push({data,exame:nome,
       valor:r.valor==null?'':String(r.valor).trim(),
       unidade:String(r.unidade||'').trim(),
+      referenciaLaudo:String(r.referenciaLaudo||'').trim(),
       medico:String(r.medico||'').trim(),
       resultado:['','Aguardando','Normal','Atenção','Alterado'].includes(r.resultado)?r.resultado:'',
       proximo:dataISOValida(String(r.proximo||''))?String(r.proximo):'',
@@ -5014,8 +5021,10 @@ function importarExamesRotina(){
 function novoExameRotina(nome=''){novoRegistroRotina('Novo exame',E.exames,{data:hoje(),exame:nome,valor:'',medico:'',resultado:'',proximo:'',obs:''},[
   {k:'exame',t:'Exame / marcador',obrigatorio:true,ph:'Ex.: Hemograma, LDL ou consulta'},
   {k:'data',t:'Data da coleta / atendimento',tipo:'date',obrigatorio:true},{k:'valor',t:'Resultado (se disponível)'},
+  {k:'unidade',t:'Unidade conforme o laudo',ph:'Ex.: mg/dL, ng/mL'}, {k:'referenciaLaudo',t:'Referência do laboratório',ph:'Transcreva o intervalo ou texto do laudo'},
   {k:'resultado',t:'Situação no laudo',opcoes:['','Aguardando','Normal','Atenção','Alterado']},{k:'medico',t:'Médico / laboratório'}],modalExame)}
 function novoCuidadoRotina(tipo){
+  if(tipo==='tratamentos'){editarPlanoTratamento();return}
   const opcoes={
     peso:['Nova pesagem',E.peso,{data:hoje(),altura:ultimoRegistroSaude(E.peso,['altura'])?.altura||'',obs:''},[{k:'data',t:'Data',tipo:'date',obrigatorio:true},{k:'peso',t:'Peso (kg)',tipo:'number',min:'0.1',obrigatorio:true},{k:'altura',t:'Altura (m ou cm)',tipo:'number'},{k:'cintura',t:'Cintura (cm)',tipo:'number'},{k:'obs',t:'Como me senti'}],'sa-peso'],
     vitais:['Novos sinais vitais',E.vitais,{data:hoje(),obs:''},[{k:'data',t:'Data',tipo:'date',obrigatorio:true},{k:'sis',t:'Pressão sistólica (mmHg)',tipo:'number'},{k:'dia',t:'Pressão diastólica (mmHg)',tipo:'number'},{k:'fc',t:'Batimentos (bpm)',tipo:'number'},{k:'obs',t:'Observação'}],'sa-vit'],
@@ -5032,20 +5041,23 @@ let abaSaude='resumo';
    NÃO some da tela -- ele cai no Resumo, no meio dos KPIs e dos gráficos, e o
    defeito não parece defeito: parece uma tela mal organizada. Por isso os três
    quadros de 15/09 entram nomeados, na aba deles. */
-function abaDoBlocoSaude(id){return ['sa-ex','sa-rast','sa-pend'].includes(id)?'exames':['sa-vit','sa-peso'].includes(id)?'medidas':['sa-quei','sa-cons','sa-fisio'].includes(id)?'queixas':['sa-trat','sa-vac','sa-fam'].includes(id)?'cuidados':'resumo'}
+function abaDoBlocoSaude(id){return ['sa-ex','sa-ex-dash','sa-rast','sa-pend'].includes(id)?'exames':['sa-vit','sa-peso'].includes(id)?'medidas':['sa-quei','sa-cons','sa-fisio'].includes(id)?'queixas':id==='sa-trat'?'tratamentos':['sa-vac','sa-fam'].includes(id)?'cuidados':'resumo'}
 function ultimoRegistroSaude(lista,campos){
   return lista.filter(x=>dataISOValida(x.data)&&x.data<=hoje()&&campos.every(k=>Number.isFinite(+x[k])&&+x[k]>0)).slice().sort((a,b)=>b.data.localeCompare(a.data))[0]||null;
 }
 function organizarSaude(pagina,alvo){
   pagina.classList.add('saude-layout');
   Object.entries({'sa-peso':'peso','sa-vit':'vitais','sa-trat':'tratamentos','sa-vac':'vacinas','sa-quei':'queixas','sa-cons':'consultas','sa-fisio':'fisio'}).forEach(([id,tipo])=>{const bt=pagina.querySelector('[data-bid="'+id+'"] .mais');if(bt)bt.onclick=()=>novoCuidadoRotina(tipo)});
-  const opcoes=[['resumo','Resumo'],['exames','Exames'],['medidas','Medidas'],['queixas','Queixas e consultas'],['cuidados','Cuidados']];
+  const opcoes=[['resumo','Resumo'],['exames','Exames'],['medidas','Medidas'],['queixas','Queixas e consultas'],['tratamentos','💊 Tratamentos'],['cuidados','Cuidados']];
   const paineis=Object.fromEntries(opcoes.map(([id])=>[id,el('<div class="saude-pane"></div>')]));
   const nav=el('<nav class="finance-tabs saude-tabs" aria-label="Áreas de saúde"></nav>');
   [...pagina.children].forEach(no=>{if(no.classList.contains('topo')||no.classList.contains('painel'))return;paineis[abaDoBlocoSaude(no.dataset.bid)].appendChild(no)});
   pagina.appendChild(nav);
   function selecionar(id){abaSaude=id;opcoes.forEach(([k])=>{paineis[k].hidden=k!==id;paineis[k].setAttribute('aria-hidden',String(k!==id));nav.querySelector('[data-area="'+k+'"]').setAttribute('aria-pressed',String(k===id))})}
   opcoes.forEach(([id,nome])=>{const bt=el('<button type="button"></button>');bt.textContent=nome;bt.dataset.area=id;bt.setAttribute('aria-controls','saude-'+id);paineis[id].id='saude-'+id;bt.onclick=()=>selecionar(id);nav.appendChild(bt);pagina.appendChild(paineis[id])});
+  const cabecalhos={medidas:['📏','Medidas e sinais vitais','Acompanhe suas avaliações e os registros por data.'],queixas:['🩺','Consultas e acompanhamento','Queixas, consultas, retornos e sessões reunidos.'],cuidados:['💚','Cuidados e prevenção','Vacinas e histórico familiar em um só lugar.']};
+  Object.entries(cabecalhos).forEach(([k,[ic,t,sub]])=>paineis[k].prepend(el('<header class="saude-area-hero"><span>'+ic+'</span><div><small>SEU HISTÓRICO DE SAÚDE</small><h2>'+t+'</h2><p>'+sub+'</p></div></header>')));
+  const revisar=acao('🔎 Qualidade dos dados',auditoriaSaude,'ghost mini');pagina.querySelector('.topo')?.append(revisar);
   const resumo=paineis.resumo.querySelector('.saude-resumo');if(resumo)paineis.resumo.prepend(resumo);
   const datas=paineis.resumo.querySelector('.saude-lembretes');
   const graficos=[...paineis.resumo.querySelectorAll('[data-bid="sa-dash"], [data-bid="sa-pa"]')];
@@ -5080,7 +5092,7 @@ function vSaude(m) {
   const alturaMetros=ult&&+ult.altura>0?(+ult.altura>3?+ult.altura/100:+ult.altura):0;
   const imc = (ult && alturaMetros) ? (+ult.peso / Math.pow(alturaMetros, 2)) : 0;
   const cintAlt = (ult && alturaMetros && +ult.cintura>0) ? (+ult.cintura / (alturaMetros * 100)) : 0;
-  const emTrat = E.tratamentos.filter(t => t.status !== 'Encerrado'&&String(t.oque||'').trim()).length;
+  const emTrat = gruposTratamento().filter(g => SaudeTratamentos.ativo(g.plano)&&String(g.plano.oque||'').trim()).length;
   const vit = E.vitais.filter(x=>dataISOValida(x.data)&&x.data<=hoje()).sort((a, b) => (a.data || '').localeCompare(b.data || ''));
   const uv = vit[vit.length - 1];
   const idade = idadeLeo();
@@ -5104,6 +5116,7 @@ function vSaude(m) {
     acao('+ Sessão de fisio',()=>novoCuidadoRotina('fisio'),'ghost'),
     acao('🆘 Ficha de emergência', () => modalSOS(), 'ghost'), '|'));
 
+  m.appendChild(dashboardExamesSaude());
   const pend = rastreiosPendentes();
   // Os lembretes por idade ficam em Exames, separados das datas cadastradas.
   /* ---- 1. exames: um por marcador, com a evolução dentro ---- */
@@ -5123,7 +5136,7 @@ function vSaude(m) {
       else if (g.sem === 'atencao') tr.style.boxShadow = 'inset 3px 0 0 var(--areia)';
       else if (g.sem === 'ok') tr.style.boxShadow = 'inset 3px 0 0 var(--verde)';
       const td = g.tend;
-      const corT = !td || g.ult.origemDocumental || g.itens.some(x=>x.origemDocumental) ? 'var(--suave)' : td.rumo > 0 ? 'var(--verde)' : td.rumo < 0 ? 'var(--vermelho)' : 'var(--suave)';
+      const corT = !td || referenciaDocumentalSaude(g.ult) || g.itens.some(referenciaDocumentalSaude) ? 'var(--suave)' : td.rumo > 0 ? 'var(--verde)' : td.rumo < 0 ? 'var(--vermelho)' : 'var(--suave)';
       tr.innerHTML = `<td style="padding:10px"><b style="font-size:14px">${esc(g.nome)}</b>${g.pendentes?'<small class="rotina-nota">'+g.pendentes+' registro(s) a completar</small>':''}</td>
         <td style="padding:10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:14px">${
           g.ult.valor !== '' && g.ult.valor != null ? esc(g.ult.valor) + (unidadeSaude(g.ult) ? ' <span style="font-weight:400;font-size:11.5px;color:var(--suave)">' + esc(unidadeSaude(g.ult)) + '</span>' : '') : '—'}</td>
@@ -5205,14 +5218,7 @@ function vSaude(m) {
   ], () => ({ data: hoje(), peso: '', altura: ult?.altura || '', cintura: '', obs: '' }), r,null,E.peso));
 
   /* ---- 5. tratamentos ---- */
-  m.appendChild(tabelaBloco('sa-trat', 'Tratamentos e remédios', 'o que está em curso', E.tratamentos, [
-    { k: 'oque', t: 'Tratamento / remédio', ph: 'ex.: Fisioterapia ombro' },
-    { k: 'motivo', t: 'Para quê', ph: '—' },
-    { k: 'inicio', t: 'Início', tipo: 'date' }, { k: 'fim', t: 'Até', tipo: 'date' },
-    { k: 'frequencia', t: 'Frequência / dose', ph: 'ex.: 2x por semana' },
-    { k: 'medico', t: 'Médico', ph: '—' },
-    { k: 'status', t: 'Status', tipo: 'select', opcoes: ['Em andamento', 'Contínuo', 'Encerrado'] },
-  ], () => ({ oque: '', motivo: '', inicio: hoje(), fim: '', frequencia: '', medico: '', status: 'Em andamento' }), r));
+  m.appendChild(quadroTratamentos());
 
   /* ---- 6. vacinas ---- */
   m.appendChild(tabelaBloco('sa-vac', 'Vacinas', 'histórico de doses e próximos reforços registrados', E.vacinas, [
@@ -5307,7 +5313,7 @@ function vSaude(m) {
     ${kpi('Cintura / altura',cintAlt?esc(n2(cintAlt)):'—',cintAlt?fmtDataAno(ult.data)+' · '+esc(cintAlt<0.5?'abaixo de 0,50':'acima de 0,50')+' · referência usual':'Informe cintura e altura')}
     ${kpi('Pressão',pressaoRecente?esc(pressaoRecente.sis)+' / '+esc(pressaoRecente.dia):'—',pressaoRecente?fmtDataAno(pressaoRecente.data)+' · mmHg':'Sem medida completa')}
     ${kpi('Batimentos',pulsoRecente?esc(pulsoRecente.fc)+' bpm':'—',pulsoRecente?fmtDataAno(pulsoRecente.data):'Sem medida registrada')}
-    ${kpi('Tratamentos',emTrat,'Em andamento ou contínuos')}
+    ${kpi('Tratamentos',emTrat,'Em andamento ou contínuos'+(gruposTratamento().some(g=>g.plano.status==='A confirmar')?' · '+gruposTratamento().filter(g=>g.plano.status==='A confirmar').length+' a confirmar':''))}
   </div></section>`);
   ['sa-peso','sa-peso','sa-peso','sa-vit','sa-vit','sa-trat'].forEach((id,i)=>{const item=resumo.querySelectorAll('.kpi')[i];if(!item)return;item.classList.add('rotina-saude-atalho');item.tabIndex=0;item.setAttribute('role','button');item.setAttribute('aria-label','Abrir '+(['pesagens','IMC','cintura','pressão arterial','batimentos','tratamentos'][i]));item.onclick=()=>{abreBloco(id);r()};item.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();item.click()}}});
   m.appendChild(resumo);
@@ -5317,10 +5323,11 @@ function vSaude(m) {
      que se perde. */
   const datas=[...E.exames.filter(x=>x.proximo).map(x=>({data:x.proximo,nome:x.exame||'Exame',tipo:'Exame',abrir:()=>modalExame(x)})),
     ...E.vacinas.filter(x=>x.proxima).map(x=>({data:x.proxima,nome:x.vacina||'Vacina',tipo:'Vacina',abrir:()=>{abreBloco('sa-vac');r()}})),
-    ...E.consultas.filter(x=>dataISOValida(x.retorno)).map(x=>({data:x.retorno,nome:x.especialidade||x.profissional||'Consulta',tipo:'Retorno de consulta',abrir:()=>{abreBloco('sa-cons');r()}})),
+    ...E.consultas.filter(x=>x.situacao!=='Cancelada'&&dataISOValida(x.retorno)).map(x=>({data:x.retorno,nome:x.especialidade||x.profissional||'Consulta',tipo:'Retorno de consulta',abrir:()=>{abreBloco('sa-cons');r()}})),
     /* A coluna "Até" do tratamento existia e NINGUÉM a consultava: o tratamento
        vencia e ninguém ficava sabendo. É a mesma pergunta das outras linhas
        daqui — "o que vem aí na minha saúde". Encerrado não cobra nada. */
+    ...E.tratamentos.filter(x=>SaudeTratamentos.ativo(x)&&dataISOValida(x.proximaData)).map(x=>({data:x.proximaData,nome:x.oque||'Tratamento',tipo:'Próximo cuidado'+(x.horario?' · '+x.horario:''),abrir:()=>{tratamentoSelecionado=x.id;abreBloco('sa-trat');r()}})),
     ...E.tratamentos.filter(x=>x.status!=='Encerrado'&&dataISOValida(x.fim)).map(x=>({data:x.fim,nome:x.oque||'Tratamento',tipo:'Fim de tratamento',abrir:()=>{abreBloco('sa-trat');r()}}))
   ].sort((a,b)=>a.data.localeCompare(b.data));
   const lembretes=el(`<section class="saude-lembretes"><div class="saude-card-cab"><div><h2>Datas para acompanhar</h2><p>Exames, vacinas, retornos e tratamentos com data informada.</p></div><span class="saude-contagem">${datas.length} ${datas.length===1?'data':'datas'}</span></div></section>`);
@@ -5432,7 +5439,7 @@ function imprimirExames(){
   const rotulo={ruim:'Alterado',atencao:'Fora do alvo',ok:'No alvo','':'Sem régua cadastrada'};
   const conta=s=>grupos.filter(g=>g.sem===s).length;
   const faixa=g=>{
-    if(g.ult.origemDocumental)return esc(g.ult.referenciaLaudo||'consultar laudo original');
+    if(referenciaDocumentalSaude(g.ult))return esc(g.ult.referenciaLaudo||'consultar laudo original');
     if(g.mk&&mesmaUnidade(unidadeSaude(g.ult),g.mk[1]))return esc(g.mk[3]);
     const r=referenciaExtra(g.ult);
     return r?esc(r[2])+(r[5]==='geral'?' (referência geral)':''):'—';
@@ -5449,10 +5456,10 @@ function imprimirExames(){
   const comHistorico=grupos.filter(g=>g.resultados>1);
   const historico=comHistorico.map(g=>{
     const regs=registrosResultadoSaude(g.itens);
-    const pts=regs.map(x=>({v:numeroResultadoSaude(x.valor),r:fmtData(x.data)})).filter(x=>!isNaN(x.v));
+    const pts=regs.filter(x=>SaudeComparacao.unidade(x)&&SaudeComparacao.unidade(x)===SaudeComparacao.unidade(g.ult)&&regs.filter(r=>r.data===x.data).length===1).map(x=>({v:numeroResultadoSaude(x.valor),r:fmtData(x.data)})).filter(x=>!isNaN(x.v));
     const u=unidadeSaude(g.ult);
     return `<section class="hist"><h3>${esc(g.nome)} <span class="u">${esc(u||'')}</span></h3>
-      <div class="linhas">${regs.map(x=>`<span><b>${esc(fmtDataAno(x.data))}</b> ${esc(x.valor!==''&&x.valor!=null?x.valor:'—')}</span>`).join('')}</div>
+      <div class="linhas">${regs.map(x=>`<span><b>${esc(fmtDataAno(x.data))}</b> ${esc(x.valor!==''&&x.valor!=null?x.valor:'—')} ${esc(x.unidade||'unidade não informada')}</span>`).join('')}</div>
       ${pts.length>1?gLinha(pts,{fmt:v=>String(v)}):''}
     </section>`;
   }).join('');
@@ -5507,7 +5514,7 @@ function modalMarcador(nome) {
   const itens = E.exames.filter(x => (x.exame || '').trim() === nome)
     .sort((a, b) => (a.data || '').localeCompare(b.data || ''));
   const ult = registrosResultadoSaude(itens).at(-1);
-  abrirModal(esc(nome), ult?.origemDocumental ? 'Referência do laudo: ' + esc(ult.referenciaLaudo||'Consultar documento original') : mk && (!ult||mesmaUnidade(unidadeSaude(ult),mk[1])) ? 'Alvo cadastrado: ' + esc(mk[3]) + ' · referência: ' + esc(mk[2]) : itens.length + ' medição(ões)', (c, fechar) => {
+  abrirModal(esc(nome), ult&&referenciaDocumentalSaude(ult) ? 'Referência do laudo: ' + esc(ult.referenciaLaudo||'Consultar documento original') : mk && (!ult||mesmaUnidade(unidadeSaude(ult),mk[1])) ? 'Alvo cadastrado: ' + esc(mk[3]) + ' · referência: ' + esc(mk[2]) : itens.length + ' medição(ões)', (c, fechar) => {
     const pts = registrosResultadoSaude(itens).filter(x => !isNaN(numeroResultadoSaude(x.valor))&&mesmaUnidade(unidadeSaude(x),unidadeSaude(ult||{})))
       .map(x => ({ r: fmtDataAno(x.data).slice(0, 5) + '/' + (x.data || '').slice(2, 4), v: numeroResultadoSaude(x.valor) }));
     if (pts.length > 1) {
@@ -5520,7 +5527,7 @@ function modalMarcador(nome) {
       c.appendChild(el(`<div class="aviso" style="margin:0 0 12px;background:${sem === 'ruim' ? 'var(--vermelho-cl)' : sem === 'atencao' ? 'var(--areia-cl)' : sem==='ok'?'var(--verde-cl)':'var(--bg)'};
         border-color:${sem === 'ruim' ? 'var(--vermelho)' : sem === 'atencao' ? 'var(--areia)' : sem==='ok'?'var(--verde)':'var(--linha)'}">
         <b>${ch ? ch[2] : '—'}</b> — último: ${esc(ult.valor)}${unidadeSaude(ult) ? ' ' + esc(unidadeSaude(ult)) : ''} em ${fmtDataAno(ult.data)}.
-        ${ult.origemDocumental ? 'Referência do laudo: <b>'+esc(ult.referenciaLaudo||'Consultar documento original')+'</b>. '+(devURL(ult.origemDocumental.url)?'<a href="'+esc(devURL(ult.origemDocumental.url))+'" target="_blank" rel="noopener noreferrer">Abrir fonte'+(ult.origemDocumental.pagina?' · p. '+esc(ult.origemDocumental.pagina):'')+'</a>':'') : mk&&mesmaUnidade(unidadeSaude(ult),mk[1]) ? 'Alvo cadastrado: <b>' + esc(mk[3]) + '</b>. Referência cadastrada: ' + esc(mk[2]) + '.' : ''}</div>`));
+        ${referenciaDocumentalSaude(ult) ? 'Referência do laudo: <b>'+esc(ult.referenciaLaudo||'Consultar documento original')+'</b>. '+(devURL(ult.origemDocumental?.url)?'<a href="'+esc(devURL(ult.origemDocumental?.url))+'" target="_blank" rel="noopener noreferrer">Abrir fonte'+(ult.origemDocumental?.pagina?' · p. '+esc(ult.origemDocumental?.pagina):'')+'</a>':'') : mk&&mesmaUnidade(unidadeSaude(ult),mk[1]) ? 'Alvo cadastrado: <b>' + esc(mk[3]) + '</b>. Referência cadastrada: ' + esc(mk[2]) + '.' : ''}</div>`));
     }
     const s2 = el('<div class="secao"><h4>Todas as medições</h4></div>');
     const rl = el('<div class="rolagem"></div>');
@@ -5567,13 +5574,14 @@ function modalExame(x) {
     const pintaAlvo = () => {
       const mk = MARCADORES.find(y => y[0] === x.exame);
       const sem = semaforo(x), cc = CHIP_SEM[sem];
-      alvo.innerHTML = mk
+      alvo.innerHTML = mk&&!referenciaDocumentalSaude(x)
         ? `<h4>Referência</h4><div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px">
              <div><div style="color:var(--suave);font-size:11.5px">Referência cadastrada</div><b>${esc(mk[2])} ${esc(mk[1])}</b></div>
              <div><div style="color:var(--suave);font-size:11.5px">Alvo cadastrado</div><b style="color:var(--verde)">${esc(mk[3])} ${esc(mk[1])}</b></div>
              ${cc ? `<div><div style="color:var(--suave);font-size:11.5px">Sua situação</div><span class="chip" style="background:${cc[0]};color:${cc[1]}">${cc[2]}</span></div>` : ''}
            </div>`
         : `<h4>Referência</h4><p style="font-size:12.5px;color:var(--suave)">Selecione um marcador para consultar as referências e os alvos cadastrados.</p>`;
+      if(referenciaDocumentalSaude(x))alvo.innerHTML='<h4>Referência do próprio laudo</h4><p>'+esc(x.referenciaLaudo||'Consultar documento original')+'</p><p>Avaliação registrada: '+esc(x.resultado||'Não informada')+'</p>';
       // histórico do mesmo exame
       const hist = registrosResultadoSaude(E.exames.filter(y=>y.exame===x.exame)).filter(y=>Number.isFinite(numeroResultadoSaude(y.valor))&&mesmaUnidade(unidadeSaude(y),unidadeSaude(x)));
       if (hist.length > 1) alvo.innerHTML += `<div style="margin-top:12px">${gLinha(
@@ -5581,7 +5589,6 @@ function modalExame(x) {
     };
     pintaAlvo();
     c.appendChild(alvo);
-    if(x.referenciaLaudo)alvo.appendChild(el('<p class="rotina-nota"><b>Referência transcrita do laudo:</b> '+esc(x.referenciaLaudo)+'</p>'));
     const s2 = el('<div class="secao"><h4>Laudo em arquivo</h4></div>');
     s2.appendChild(areaArquivos('exame:' + x.id, 'PDF do laudo, foto do resultado'));
     c.appendChild(s2);
@@ -5628,7 +5635,7 @@ function modalSOS() {
     // histórico familiar é a primeira coisa que um médico pergunta
     if ((E.histFamiliar || []).length) c.appendChild(el(`<div class="secao"><h4>Histórico familiar</h4>
       <div style="font-size:13px">${E.histFamiliar.map(f => `<b>${esc(f.parente || '')}</b>: ${esc(f.doenca || '')}${f.idade ? ' aos ' + esc(f.idade) : ''}${f.situacao === 'Faleceu' ? ' (faleceu)' : ''}`).join('<br>')}</div></div>`));
-    const cont = E.tratamentos.filter(t => t.status !== 'Encerrado');
+    const cont = E.tratamentos.filter(t => SaudeTratamentos.ativo(t)&&(!t.tipo||['Medicamento','Suplemento'].includes(t.tipo)));
     if (cont.length) c.appendChild(el(`<div class="secao"><h4>Remédios em uso (vem dos tratamentos)</h4>
       <div style="font-size:13px">${cont.map(t => `${esc(t.oque)}${t.frequencia ? ' — ' + esc(t.frequencia) : ''}`).join('<br>')}</div></div>`));
     const s3 = el('<div class="secao" style="display:flex;gap:9px"></div>');
@@ -5640,7 +5647,7 @@ function modalSOS() {
   });
 }
 function imprimirSOS() {
-  const S = E.sos, cont = E.tratamentos.filter(t => t.status !== 'Encerrado');
+  const S = E.sos, cont = E.tratamentos.filter(t => SaudeTratamentos.ativo(t)&&(!t.tipo||['Medicamento','Suplemento'].includes(t.tipo)));
   const w = window.open('', '_blank');
   if (!w) { alert('Libere o pop-up para imprimir.'); return }
   w.document.write(`<!doctype html><meta charset="utf-8"><title>Ficha de emergência</title>
@@ -8078,6 +8085,7 @@ function googleConectado(servico){return !!googleSessao[servico]?.token&&googleS
 const GOOGLE_ESCOPO_DE={gmail:'gmail.readonly',agenda:'calendar.readonly',agendaEnviar:'calendar.app.created',drive:'drive.readonly'};
 let googleCrachaPedido=null;
 async function googleCrachaDoServidor(){
+  if(DEV)return false; // Prévia local não solicita credenciais do servidor.
   if(googleCrachaPedido)return googleCrachaPedido;
   googleCrachaPedido=apiSync('POST',{acao:'googleToken'}).then(r=>{
     if(!r||!r.token)return false;

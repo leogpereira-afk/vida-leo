@@ -19,6 +19,8 @@ vm.runInContext(readFileSync(new URL('../../publico/donboy-email.js',import.meta
 vm.runInContext(readFileSync(new URL('../../publico/openclaw-fila.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/marketing-fortemais.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/marketing.js',import.meta.url),'utf8'),ctx);
+vm.runInContext(readFileSync(new URL('../../publico/saude-comparacao.js',import.meta.url),'utf8'),ctx);
+vm.runInContext(readFileSync(new URL('../../publico/saude-tratamentos.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(source,ctx);
 vm.runInContext("fmResumo=async()=>({});arqTotal=async()=>({n:0,b:0,fila:0});arqPor=async()=>[];apiEquipe=async()=>({usuarios:[],historico:[]});",ctx);
 return {ctx,document,run:s=>vm.runInContext(s,ctx)};}

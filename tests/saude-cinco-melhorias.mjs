@@ -49,8 +49,8 @@ test('3. o rastreio mais urgente fica em cima', () => {
 
 test('4. recolher um quadro gruda: a tela não força mais tudo aberto', () => {
   const {run, document} = setup();
-  run("E.colapso['sa-trat']=true;E.perfil=Object.assign({},E.perfil,{nascimento:'1980-01-01'});vSaude(document.getElementById('main'));organizarSaude(document.getElementById('main'))");
-  const b = document.querySelector('[data-bid="sa-trat"]');
+  run("E.colapso['sa-vac']=true;E.perfil=Object.assign({},E.perfil,{nascimento:'1980-01-01'});vSaude(document.getElementById('main'));organizarSaude(document.getElementById('main'))");
+  const b = document.querySelector('[data-bid="sa-vac"]');
   assert.ok(b, 'quadro sumiu');
   assert.ok(b.classList.contains('fechado'), 'a escolha de recolher foi ignorada de novo');
 });

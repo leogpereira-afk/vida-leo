@@ -13,7 +13,7 @@ test('resumo de saúde mantém indicadores, documentos, abas e registros acessí
   assert.ok(document.querySelector('.topo.saude-hero'), 'o cabeçalho usado por Revisar documentos precisa continuar na tela');
   assert.equal(document.querySelectorAll('.saude-resumo .kpi').length, 6);
   assert.match(document.querySelector('.saude-resumo .kpi:nth-child(2)').textContent, /23\/07\/2026/);
-  assert.equal(document.querySelectorAll('.saude-tabs button').length, 5);
+  assert.equal(document.querySelectorAll('.saude-tabs button').length, 6);
   assert.ok(document.querySelector('.saude-acoes select option[value=""]'));
   assert.ok(document.querySelector('.saude-sos'));
   document.querySelector('.saude-tabs [data-area="exames"]').click();

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import {setup} from './helpers/dom.mjs';
 
 const app = (resposta) => {
-  const {run} = setup();
+  const {run} = setup({hostname:'central.example.test'});
   run("window.__n=0;apiSync=async(m,c)=>{if(c&&c.acao==='googleToken'){window.__n++;return " + JSON.stringify(resposta) + "}return{}}");
   run("for(const k in googleSessao)googleSessao[k]=null;googleCrachaPedido=null;_gmailToken=''");
   return run;
@@ -58,9 +58,14 @@ test('pedidos ao mesmo tempo não viram dois pedidos', async () => {
 });
 
 test('a volta do Google diz QUAL permissão faltou', () => {
-  const {run} = setup();
+  const {run} = setup({hostname:'central.example.test'});
   const txt = run("driveTextoVolta('escopo-gmail.readonly,calendar.app.created')");
   assert.match(txt, /Gmail/);
   assert.match(txt, /Agenda/);
   assert.match(txt, /continua valendo/);
+});
+
+test('prévia local não consulta token nem provoca recarga por sessão ausente', async()=>{
+ const {run}=setup();run("apiSync=async()=>{throw Error('não deveria consultar servidor')}");
+ assert.equal(await run('googleCrachaDoServidor()'),false);
 });
