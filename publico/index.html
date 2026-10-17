@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="Central">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 html[data-fonte-interface] body,html[data-fonte-interface] body *{font-family:var(--fonte-interface)!important}
 
@@ -675,6 +675,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./donboy-painel.css?v=05a4255f7b34">
 <link rel="stylesheet" href="donboy-email.css?v=ed0e5b4334e2">
 <link rel="stylesheet" href="./marketing.css?v=d1c1ddb3271f">
+<link rel="stylesheet" href="./leonardo-design.css?v=a4da4058b660">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -723,6 +724,7 @@ tr:hover .lixo{opacity:1}
 <script src="./fortemais-pdf.js?v=27455f7f3e11"></script>
 <script src="openclaw-fila.js?v=066cb079a2b5"></script>
 <script src="./saude-comparacao.js?v=e1e154463ba3"></script>
+<script src="./leonardo-design.js?v=e7e72ac5ec0c"></script>
 <script src="./saude-tratamentos.js?v=8d600378a8b8"></script>
 <script src="donboy-email.js?v=6a1ba6d316f6"></script>
 <script>
@@ -2338,6 +2340,7 @@ function tela(opcoes={}){
   if(atual==='fortemais'&&opcoes.baseRemota!==true&&!fmPodeNavegar())return false;
   aplicarFonteInterface();
   const m=document.getElementById('main'),pagina=el('<div class="pagina"></div>');m.replaceChildren(pagina);
+  if(typeof LeonardoDesign!=='undefined')LeonardoDesign.aplicar(atual,pagina);
   const alvo=_alvoBloco;_alvoBloco=null;
   const mod=MODS.find(x=>x.id===atual&&!x.url);document.title=mod.nome+' · Central do Léo';
   const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else if(atual==='caixavgv')organizarCaixaVGV(pagina,alvo);else if(atual==='config')organizarConfig(pagina,alvo);else if(atual==='demandas')organizarDemandasTopo(pagina);else indiceDaTela(pagina);prepararTabelas(pagina);if(typeof docIntegrarTela==='function')docIntegrarTela(pagina,atual);organizarPainelCompacto(pagina,atual);if(alvo)rolaAlvo(pagina,alvo)};

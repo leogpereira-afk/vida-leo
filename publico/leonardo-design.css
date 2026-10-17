@@ -1,0 +1,68 @@
+/* Leonardo · identidade comum; o acento pertence à área, o status pertence ao dado. */
+@media screen {
+ :root{--bg:#f4f4f7;--card:#fff;--linha:#e6e6ee;--tinta:#1a1a2e;--suave:#4a5468}
+ body[data-leo-area]{--leo-ui:var(--leo-accent);--leo-tint:color-mix(in srgb,var(--leo-accent) 8%,var(--card));font-family:Arial,system-ui,sans-serif}
+ body[data-leo-area] :is(h1,h2,h3){font-family:Poppins,Arial,sans-serif;letter-spacing:-.025em}
+ .pagina[data-leo-area]>.topo,.pagina[data-leo-area]>.stv-hero,.pagina[data-leo-area] .mkt-cab{
+  display:flex;align-items:center;flex-wrap:wrap;gap:14px;padding:20px 22px;margin:0 0 16px;
+  min-height:104px;border:1px solid transparent;border-radius:18px;background:var(--leo-hero);color:#fff;box-shadow:none;
+ }
+ .pagina[data-leo-area]>.topo::before,.pagina[data-leo-area] .mkt-cab::before{
+  content:"";flex:none;width:48px;height:48px;border-radius:14px;border:1px solid #ffffff2e;
+  background:var(--leo-icon) center/27px 27px no-repeat,#ffffff0c;
+ }
+ .pagina[data-leo-area]>.topo>div:first-of-type,.pagina[data-leo-area] .mkt-cab>div:first-of-type{flex:1;min-width:min(220px,100%)}
+ .pagina[data-leo-area]>.topo .cresce{display:none}
+ .pagina[data-leo-area] :is(.topo,.stv-hero,.mkt-cab) h1{font-family:Poppins,Arial,sans-serif;font-size:clamp(23px,2vw,29px);font-weight:600;line-height:1.25;color:#fff;margin:0 0 5px}
+ .pagina[data-leo-area] :is(.topo,.stv-hero,.mkt-cab) p{font-size:13px;line-height:1.5;color:#ffffffd9;margin:0;max-width:85ch}
+ .pagina[data-leo-area] :is(.topo,.stv-hero,.mkt-cab) :is(.rot,.saude-hero-sobre){color:#ffffffb8;font-size:10px;letter-spacing:.1em;margin-bottom:5px}
+ .pagina[data-leo-area]>.topo .saude-hero-icone{display:none}
+ .pagina[data-leo-area]>.topo h1>svg{display:none}
+ .pagina[data-leo-area] :is(.topo,.mkt-cab) .btn{color:#fff;background:#ffffff10;border:1px solid #ffffff70;box-shadow:none}
+ .pagina[data-leo-area] :is(.topo,.mkt-cab) .btn:hover{background:#ffffff25}
+ .pagina[data-leo-area] .btn:not(.ghost):not(.danger):not(.vermelho){background:var(--leo-accent);border-color:var(--leo-accent);color:#fff}
+ .pagina[data-leo-area] :is(.topo,.mkt-cab) .btn:not(.ghost){background:#fff;border-color:#fff;color:var(--leo-hero)}
+ .pagina[data-leo-area] .btn{border-radius:10px}
+ .pagina[data-leo-area] :is(.bloco,.workspace-card,.workspace-empty,.kpi){border-color:var(--linha);box-shadow:0 2px 6px #17213b03}
+ .pagina[data-leo-area] .bloco{border-radius:14px}
+ .pagina[data-leo-area] .bloco>header h2{font-family:Poppins,Arial,sans-serif;font-size:14px;font-weight:600}
+ .pagina[data-leo-area] .kpi .val{font-family:Poppins,Arial,sans-serif;font-weight:600;font-variant-numeric:tabular-nums}
+ .pagina[data-leo-area] .kpi.clic:hover{border-color:var(--leo-ui);background:var(--leo-tint)}
+ .pagina[data-leo-area].financeiro .finance-metrics .kpi:first-child{background:var(--leo-hero)}
+ .pagina[data-leo-area] :is(.finance-tabs,.workspace-tabs,.agenda-abas,.caixa-abas,.painel-chips,.trat-subtabs,.trat-grupos,.dev-nav,.db-abas,.stv-abas,.saude-tabs) button[aria-pressed=true],
+ .pagina[data-leo-area] :is(.finance-tabs,.workspace-tabs,.agenda-abas,.caixa-abas,.painel-chips,.trat-subtabs,.dev-nav,.db-abas) button.on{
+  color:var(--leo-ui);border-color:var(--leo-ui);background:var(--leo-tint);box-shadow:none;
+ }
+ body[data-leo-area] .side .nav button.on{background:var(--leo-tint);color:var(--leo-ui);box-shadow:inset 3px 0 var(--leo-ui);border-radius:10px}
+ body[data-leo-area] .side .nav .ic{display:inline-grid;place-items:center;flex:none;width:26px;height:26px;border-radius:8px;font-size:18px}
+ body[data-leo-area] .side .nav button.on .ic{background:var(--card)}
+ body[data-leo-area] :is(button,a,input,select,textarea,summary,[tabindex]):focus-visible{outline:3px solid var(--leo-ui);outline-offset:3px}
+ body[data-leo-area] .modal :is(input,select,textarea):focus{border-color:var(--leo-ui)}
+ body[data-leo-area] .modal .btn:not(.ghost):not(.danger):not(.vermelho){background:var(--leo-accent);border-color:var(--leo-accent);color:#fff}
+ .pagina[data-leo-area] :is(.topo,.mkt-cab) :focus-visible{outline-color:#fff}
+ .pagina[data-leo-area]>.topo .agenda-topo-acoes{width:100%;justify-content:space-between;align-items:flex-start;gap:10px}
+ .pagina[data-leo-area]>.topo .agenda-google{flex:1;gap:6px 8px}
+ .pagina[data-leo-area]>.topo .agenda-google-nota{flex-basis:100%;color:#ffffffcf}
+ .pagina[data-leo-area]>.topo .agenda-google-selo.off{color:#ffffffd9;border-color:#ffffff70}
+ .pagina[data-leo-area]>.topo .agenda-topo-acoes>.btn:not(.ghost){background:#fff;color:var(--leo-hero);border-color:#fff}
+ .pagina[data-leo-area] .mkt-cab .mkt-sobre{color:#ffffffc9}
+ .pagina[data-leo-area] .mkt-cab>button{min-height:36px;padding:8px 12px;border:1px solid #ffffff70;border-radius:10px;background:#ffffff10;color:#fff;font:600 12px Arial,sans-serif;cursor:pointer}
+ .pagina[data-leo-area] .mkt-cab>button:disabled{opacity:.7;cursor:wait}
+ /* Marcas parceiras conservam sua assinatura e proporções. */
+ .pagina[data-leo-area] .fm-marca-topo{border-radius:18px;border:1px solid var(--linha);border-top:3px solid var(--leo-ui);padding:18px 20px;background:var(--card)}
+ .pagina[data-leo-area] .fm-marca-topo h1{font-family:Poppins,Arial,sans-serif}
+ @media(prefers-color-scheme:dark){
+  :root{--bg:#0e1324;--card:#161c33;--linha:#303a54;--tinta:#eef0f6;--suave:#a5abc2}
+  body[data-leo-area]{--leo-ui:var(--leo-light);--leo-tint:color-mix(in srgb,var(--leo-light) 12%,var(--card))}
+  .pagina[data-leo-area]>.topo,.pagina[data-leo-area]>.stv-hero,.pagina[data-leo-area] .mkt-cab{border-color:#ffffff20}
+ }
+ @media(max-width:600px){
+  .pagina[data-leo-area]>.topo,.pagina[data-leo-area]>.stv-hero,.pagina[data-leo-area] .mkt-cab{display:flex;min-height:0;padding:16px;gap:12px;border-radius:14px}
+  .pagina[data-leo-area]>.topo::before,.pagina[data-leo-area] .mkt-cab::before{width:40px;height:40px;background-size:24px}
+  .pagina[data-leo-area]>.topo>div:first-of-type,.pagina[data-leo-area] .mkt-cab>div:first-of-type{min-width:0;flex:1 1 calc(100% - 60px)}
+  .pagina[data-leo-area] :is(.topo,.stv-hero,.mkt-cab) h1{font-size:23px;overflow-wrap:anywhere}
+  .pagina[data-leo-area]>.topo>.btn{min-height:44px;margin:0;max-width:100%;white-space:normal}
+  .pagina[data-leo-area] .mkt-cab>button{width:auto;min-height:44px}
+ }
+ @media(prefers-reduced-motion:reduce){body[data-leo-area] *{scroll-behavior:auto!important}}
+}
