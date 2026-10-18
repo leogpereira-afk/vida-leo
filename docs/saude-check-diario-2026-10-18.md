@@ -25,3 +25,7 @@ A conferência de documentos e registros reais está exclusivamente fora do repo
 ## Atalho junto às ações principais
 
 A pedido do dono, Registrar uso voltou à barra superior da ficha, entre Compra e Evolução. O botão coloca o foco na quantidade do formulário direto, sem abrir janela nem gravar um uso automaticamente. Verificação desta alteração: 45 testes relacionados passaram, sintaxe e diff sem erros; clique conferido no navegador e em 390 px, com foco na quantidade, sem rolagem lateral ou erro JavaScript. Continua local, sem publicação.
+
+## Posição final solicitada: ao lado de Visão geral
+
+O atalho Registrar uso foi movido da barra da ficha para a navegação do tratamento, imediatamente depois de Visão geral. Ele abre Itens prescritos e foca a quantidade do item selecionado ou de um medicamento disponível. Remove filtros que poderiam ocultar o formulário e não grava uso ao clicar. Tratamentos sem item apropriado mostram o botão desabilitado. Verificação: 89 testes de Saúde passaram; sintaxe e diff conferidos; clique partindo da Visão geral e foco no campo testados no navegador e em 390 px, sem rolagem lateral. Continua sem publicação.
