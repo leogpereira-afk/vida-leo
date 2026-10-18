@@ -1,6 +1,6 @@
 # Cópia mensal dos investimentos
 
-Implementação autorizada pelo dono em 18/10/2026, incluindo a alteração deste repositório sem AGENTS.md. Publicação ainda não solicitada para esta mudança.
+Implementação autorizada pelo dono em 18/10/2026, incluindo a alteração deste repositório sem AGENTS.md. Publicação autorizada pelo dono em 18/10/2026 com “subir”. Suíte completa repetida antes do envio: 1.271 testes aprovados, zero falhas.
 
 Na visão Lançamentos de Rendimentos, agrupada por Mês, cada mês com registros do tipo Investimento ou Investimentos oferece o botão Copiar investimentos para o mês seguinte. Respeita o recorte visível e inclui todas as páginas dele. A janela apresenta empresa, instituição, tipo, observações e data ajustada; somente valores são editáveis. Campos obrigatórios e não nulos seguem a validação financeira existente.
 
