@@ -19,6 +19,7 @@
  const objeto=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
  const meta=id=>tem(E.saudeDocumentos,id)&&objeto(E.saudeDocumentos[id])?E.saudeDocumentos[id]:{};
  const itensDe=m=>Array.isArray(m.itens)?m.itens.filter(objeto):[];
+ function resumoConferencia(m){const itens=itensDe(m),pendentes=itens.filter(i=>i.estado!=='confirmado').length,ilegivel=!!String(m.naoReconhecidos||'').trim();const cobertura=m.cobertura==='completa'?pendentes||ilegivel?'Parcial (há pendências)':'Completa':m.cobertura==='parcial'?'Parcial':'Não iniciada';return cobertura+' · '+pendentes+' pendente(s), '+(itens.length-pendentes)+' confirmado(s)'+(ilegivel?' · Há trechos não reconhecidos':'')}
  const dia=v=>{const s=String(v||'').slice(0,10);return SaudePainelModelo.data(s)?s:''};
  const dataBR=v=>{const d=dia(v);return d?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):'Data não informada'};
  const pdfBase=new URL('vendor/pdfjs-6.4.299/',document.currentScript?.src||document.baseURI).href;
@@ -145,7 +146,7 @@
     try{
      const novo={...rascunho,titulo:titulo.value.trim(),dataDocumento:data.value,textoOriginal:texto.value,paginasRevisadas:paginas.value.trim(),cobertura:coberturaInput.value,naoReconhecidos:naoReconhecidos.value,itens,atualizadoEm:new Date().toISOString()};
      E.saudeDocumentos={...(antes||{}),[anexo.id]:novo};await salvar();Object.assign(rascunho,copia(novo));
-     status.textContent='Revisão salva. '+itens.filter(i=>i.estado==='pendente').length+' item(ns) pendente(s), '+itens.filter(i=>i.estado==='confirmado').length+' confirmado(s). O envio do anexo é conferido separadamente.';
+     status.textContent='Revisão salva. '+resumoConferencia(novo)+'. O envio do anexo é conferido separadamente.';
     }catch(e){if(antes===undefined)delete E.saudeDocumentos;else E.saudeDocumentos=antes;if(tinhaMt)E._mt=mt;else delete E._mt;erro.textContent='Não foi possível salvar a revisão: '+(e.message||e)}
     finally{ocupado=false;salvarBotao.disabled=false}
    });c.appendChild(salvarBotao);c.appendChild(acao('Fechar revisão',fechar));
@@ -158,8 +159,8 @@
   let arquivos=[],falhas=[],geracao=0;
   const pintar=()=>{
    lista.replaceChildren();const vistos=arquivos.filter(a=>{const m=meta(a.id),data=dia(m.dataDocumento||a.em||a.origem.data);return(!filtroRef.value||a.ref===filtroRef.value)&&(!tipo.value||tipoArquivo(a)===tipo.value)&&(!de.value||!!data&&data>=de.value)&&(!ate.value||!!data&&data<=ate.value)&&(!busca.value||normal([a.nome,a.origem.titulo,m.titulo,m.textoOriginal].join(' ')).includes(normal(busca.value)))});
-   for(const a of vistos){const m=meta(a.id),itens=itensDe(m),pendentes=itens.filter(i=>i.estado!=='confirmado').length,confirmados=itens.length-pendentes;
-    const card=el('<article class="sdoc-card"><h4>'+esc(m.titulo||a.nome)+'</h4><p>'+esc(a.origem.titulo)+' · '+esc(dataBR(m.dataDocumento||a.em||a.origem.data))+'</p><p class="sdoc-nota">Arquivo: '+(a.nuvem?'na nuvem':a.pendente?'neste aparelho · envio pendente':'situação a conferir')+' · Revisão: '+(objeto(E.saudeDocumentos?.[a.id])?pendentes+' pendente(s), '+confirmados+' confirmado(s)':'não iniciada')+'</p><div class="sdoc-acoes"></div></article>');
+   for(const a of vistos){const m=meta(a.id);
+    const card=el('<article class="sdoc-card"><h4>'+esc(m.titulo||a.nome)+'</h4><p>'+esc(a.origem.titulo)+' · '+esc(dataBR(m.dataDocumento||a.em||a.origem.data))+'</p><p class="sdoc-nota">Arquivo: '+(a.nuvem?'na nuvem':a.pendente?'neste aparelho · envio pendente':'situação a conferir')+' · Revisão: '+(objeto(E.saudeDocumentos?.[a.id])?resumoConferencia(m):'Não iniciada')+'</p><div class="sdoc-acoes"></div></article>');
     const buttons=card.querySelector('.sdoc-acoes');buttons.append(acao('Ler original',()=>abrir(a)),acao('Conferir documento',()=>revisar(a,a.ref)));lista.appendChild(card);
    }
    if(!vistos.length)lista.appendChild(el('<p class="sdoc-nota">Nenhum documento encontrado para estes filtros.</p>'));
