@@ -24,8 +24,11 @@ vm.runInContext(readFileSync(new URL('../../publico/saude-tratamentos.js',import
 vm.runInContext(readFileSync(new URL('../../publico/leonardo-design.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/rendimentos-modelo.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/rendimentos-dashboards-modelo.js',import.meta.url),'utf8'),ctx);
+vm.runInContext(readFileSync(new URL('../../publico/financeiro-graficos.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/rendimentos-dashboards.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/rendimentos-avancado.js',import.meta.url),'utf8'),ctx);
+vm.runInContext(readFileSync(new URL('../../publico/gastos-modelo.js',import.meta.url),'utf8'),ctx);
+vm.runInContext(readFileSync(new URL('../../publico/gastos-painel.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(source,ctx);
 vm.runInContext("fmResumo=async()=>({});arqTotal=async()=>({n:0,b:0,fila:0});arqPor=async()=>[];apiEquipe=async()=>({usuarios:[],historico:[]});",ctx);
 return {ctx,document,run:s=>vm.runInContext(s,ctx)};}

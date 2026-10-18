@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {setup} from './helpers/dom.mjs';
 const luminance=hex=>hex.slice(1).match(/../g).map(x=>parseInt(x,16)/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4).reduce((s,x,i)=>s+x*[.2126,.7152,.0722][i],0);
 const contrast=(a,b)=>{const x=luminance(a),y=luminance(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
-test('Identidade: áreas mantêm contraste AA e Rendimentos usa o azul da marca do Léo',()=>{
+test('Identidade: áreas mantêm contraste AA e Rendimentos usa azul e Gastos usa roxo',()=>{
  const {run}=setup();const mods=JSON.parse(run('JSON.stringify(MODS.filter(m=>!m.url).map(m=>m.id))'));const areas=JSON.parse(run('JSON.stringify(LeonardoDesign.areas)'));
- assert.deepEqual(Object.keys(areas).sort(),mods.sort());assert.equal(new Set(Object.entries(areas).filter(([id])=>id!=='rendimentos').map(([,a])=>a[0])).size,mods.length-1);assert.deepEqual(areas.rendimentos.slice(0,2),areas.inicio.slice(0,2));assert.equal(areas.rendimentos[2],areas.inicio[0]);
+ assert.deepEqual(Object.keys(areas).sort(),mods.sort());assert.equal(new Set(Object.entries(areas).filter(([id])=>id!=='rendimentos').map(([,a])=>a[0])).size,mods.length-1);assert.deepEqual(areas.rendimentos.slice(0,2),areas.inicio.slice(0,2));assert.equal(areas.rendimentos[2],areas.inicio[0]);assert.equal(areas.gastos[0],'#6d3bb8');assert.equal(areas.gastos[2],'#6d3bb8');
  for(const [id,[accent,light,hero]] of Object.entries(areas)){
   assert.ok(contrast(accent,'#ffffff')>=4.5,id+' botão');
   assert.ok(contrast(hero,'#ffffff')>=(id==='rendimentos'?4.5:7),id+' cabeçalho');

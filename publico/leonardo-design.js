@@ -6,7 +6,7 @@ const LeonardoDesign = (() => {
     agenda: ['#2563a6','#94c5ff','#203e61','calendar'],
     planilhas: ['#2c7059','#8fd6b7','#244a3e','table'],
     rendimentos: ['#3840e8','#9298ff','#3840e8','trend'],
-    gastos: ['#9a4b25','#ffb68d','#5c3528','wallet'],
+    gastos: ['#6d3bb8','#c9aff4','#6d3bb8','wallet'],
     empresas: ['#4656ac','#acb8ff','#2e365f','building'],
     marketing: ['#a23d76','#f6a3d2','#602f4c','megaphone'],
     bancos: ['#476184','#a8c8ef','#2a3c55','bank'],

@@ -679,6 +679,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./leonardo-design.css?v=a4da4058b660">
 <link rel="stylesheet" href="./rendimentos-avancado.css?v=886adb93fed7">
 <link rel="stylesheet" href="./rendimentos-dashboards.css?v=1ed1b0637c9e">
+<link rel="stylesheet" href="./gastos-painel.css?v=5715594d8373">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -727,11 +728,14 @@ tr:hover .lixo{opacity:1}
 <script src="./fortemais-pdf.js?v=27455f7f3e11"></script>
 <script src="openclaw-fila.js?v=066cb079a2b5"></script>
 <script src="./saude-comparacao.js?v=330f2aaf9f21"></script>
-<script src="./leonardo-design.js?v=0afbf7c665e0"></script>
+<script src="./leonardo-design.js?v=7b814ac89101"></script>
 <script src="./rendimentos-modelo.js?v=a2faa87ce0bd"></script>
 <script src="./rendimentos-dashboards-modelo.js?v=0987eb11dd63"></script>
-<script src="./rendimentos-dashboards.js?v=4bc4468bc07e"></script>
+<script src="./financeiro-graficos.js?v=493dcd6ca9b6"></script>
+<script src="./rendimentos-dashboards.js?v=defdf1766d9f"></script>
 <script src="./rendimentos-avancado.js?v=aaf868370b35"></script>
+<script src="./gastos-modelo.js?v=363d272a4e23"></script>
+<script src="./gastos-painel.js?v=f343dab93ace"></script>
 <script src="./saude-modelo.js?v=8762a3cca785"></script>
 <script src="./saude-documentos.js?v=53ba39d8cf01"></script>
 <script src="./saude-painel.js?v=d5167ff189e4"></script>
@@ -2354,6 +2358,7 @@ function tela(opcoes={}){
   if(typeof LeonardoDesign!=='undefined')LeonardoDesign.aplicar(atual,pagina);
   const alvo=_alvoBloco;_alvoBloco=null;
   if(atual==='rendimentos'&&typeof RendimentosUI!=='undefined')RendimentosUI.destino(alvo);
+  if(atual==='gastos'&&typeof GastosUI!=='undefined')GastosUI.destino(alvo);
   const mod=MODS.find(x=>x.id===atual&&!x.url);document.title=mod.nome+' · Central do Léo';
   const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else if(atual==='caixavgv')organizarCaixaVGV(pagina,alvo);else if(atual==='config')organizarConfig(pagina,alvo);else if(atual==='demandas')organizarDemandasTopo(pagina);else indiceDaTela(pagina);prepararTabelas(pagina);if(typeof docIntegrarTela==='function')docIntegrarTela(pagina,atual);organizarPainelCompacto(pagina,atual);if(alvo)rolaAlvo(pagina,alvo)};
   const falhou=()=>{if(pagina.isConnected)pagina.appendChild(el('<p class="aviso" role="alert">Não foi possível concluir o carregamento. Abra esta seção novamente.</p>'))};
@@ -12533,19 +12538,22 @@ function financeiroValidarGasto(g){
 }
 function financeiroPagamentos(itens){return {pagos:itens.filter(g=>g.situacao==='Pago').reduce((s,g)=>s+(+g.valor||0),0),pendentes:itens.filter(g=>g.situacao==='Pendente').reduce((s,g)=>s+(+g.valor||0),0),semSituacao:itens.filter(g=>!g.situacao||g.situacao==='Não informado').length};}
 function modalLancamentoGasto(g,novo=false){
+  const empresaAnterior=g.empresa,empresaNomeAnterior=g.empresaNome;
   if(novo)g._ffNovo=true;
   abrirModal(esc(g.oque||'Novo gasto'),'Este lançamento entra nos totais depois de salvar.',(c,fechar)=>{
-    financeiroFormulario(c,[{k:'oque',t:'Descrição',full:true,req:true,ph:'Ex.: Copasa, Cemig, escola, compras pessoais'},
+    const camposGasto=financeiroFormulario(c,[{k:'oque',t:'Descrição',full:true,req:true,ph:'Ex.: Copasa, Cemig, escola, compras pessoais'},
       {k:'valor',t:'Valor (R$)',tipo:'moeda',req:true,naoZero:true,ajuda:'Use valor negativo somente para estorno.'},
       {k:'mes',t:'Mês do gasto',tipo:'month',req:true},{k:'classe',t:'Categoria',opcoes:['Sem categoria',...categoriasGasto()],inicial:g.classe||g.categoria||'Sem categoria',req:true},
+      {k:'empresaId',t:'Empresa (opcional)',opcoes:['','__sem_empresa__',...(E.empresasPJ||[]).filter(e=>e.id).map(e=>String(e.id))],ajuda:'Use a empresa do cadastro existente. Vazio mantém o gasto sem vínculo empresarial.'},
       {k:'pago',t:'Forma de pagamento',opcoes:['',...CFG('formasPagto')]},
       {k:'data',t:'Data da despesa',tipo:'date'},{k:'vencimento',t:'Vencimento',tipo:'date'},
       {k:'situacao',t:'Pagamento',opcoes:['Não informado','Pendente','Pago'],inicial:g.situacao||'Não informado'},
       {k:'pagoEm',t:'Data do pagamento',tipo:'date'},
       {k:'natureza',t:'Natureza',opcoes:['Despesa pessoal','Estorno'],inicial:(+g.valor<0?'Estorno':'Despesa pessoal')},
       {k:'obs',t:'Observações',tipo:'textarea',full:true}],
-      g,(v,patch)=>{financeiroValidarGasto(v);financeiroSalvarRegistro(E.gastos,g,v,patch)},fechar);
-    c.appendChild(el('<p class="ff-note">Confira se esta despesa já está em Recorrentes; o resumo soma os dois cadastros.</p>'));
+      g,(v,patch)=>{financeiroValidarGasto(v);if(Object.hasOwn(patch,'empresaId')){if(v.empresaId==='__sem_empresa__')patch.empresaId=v.empresaId='';const empresa=(E.empresasPJ||[]).find(e=>String(e.id)===v.empresaId);if(v.empresaId&&!empresa)throw Error('A empresa não está mais no cadastro. Confira o vínculo.');if(g.empresa!==empresaAnterior||g.empresaNome!==empresaNomeAnterior)throw Error('O vínculo mudou em outra sessão. Reabra a ficha.');patch.empresa=v.empresa=empresa?.nome||'';if(g.empresaNome!==undefined)patch.empresaNome=v.empresaNome=empresa?.nome||'';}financeiroSalvarRegistro(E.gastos,g,v,patch)},fechar);
+    for(const o of camposGasto.controles.empresaId.options)o.textContent=o.value==='__sem_empresa__'?'Despesa pessoal (remover vínculo)':o.value?(E.empresasPJ||[]).find(e=>String(e.id)===o.value)?.nome||'Vínculo a conferir: '+o.value:'Sem empresa / pessoal';
+    c.appendChild(el('<p class="ff-note">Confira se este lançamento já existe. Os gráficos usam os lançamentos; recorrentes atuais são estimativas apresentadas separadamente. Evite duplicar a mesma despesa.</p>'));
     if(!novo){const arqs=el('<details class="ff-attachments"><summary>Comprovantes</summary></details>');arqs.appendChild(areaArquivos('gasto:'+g.id,'Nota fiscal, recibo, comprovante'));c.appendChild(arqs)}
   });
 }
@@ -12567,13 +12575,14 @@ function financeiroFiltroTabela(bloco,lista,campos,valor){
     bloco.querySelectorAll('[data-ff-gasto]').forEach(el=>el.hidden=!vis.some(x=>x.id===el.dataset.ffGasto));};inp.oninput=pintar;alvo.prepend(filtros);pintar();
 }
 
-function vGastos(m){
+function vGastos(m){GastosUI.render(m,vGastosBase)}
+function vGastosBase(m,opcoes={}){
   m.classList.add('ff-gastos');
   const r=rr('gastos');
   const meses=[...new Set([...E.gastos.map(g=>g.mes),...E.rendimentos.map(x=>(x.data||'').slice(0,7))])].filter(Boolean).sort();
   if(!filtro.gastosMes) filtro.gastosMes=mesAtual();
   const mes=filtro.gastosMes, todos=mes==='todos';
-  const doMes=todos?E.gastos:E.gastos.filter(g=>g.mes===mes);
+  const doMes=opcoes.itens??(todos?E.gastos:E.gastos.filter(g=>g.mes===mes));
   const pagamentos=financeiroPagamentos(doMes);
   const varTot=doMes.reduce((s,g)=>s+(+g.valor||0),0);
   const fixo=fixoMensal();
