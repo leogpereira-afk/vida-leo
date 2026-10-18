@@ -129,7 +129,7 @@
    };
    rascunho.itens.forEach(adicionarItem);c.appendChild(acao('Adicionar item',()=>adicionarItem()));
    if(typeof saudeEditarRegistro==='function'&&refOriginal!=='saude:documentos')c.appendChild(acao('Abrir registro de origem',()=>{
-    const p=refOriginal.indexOf(':'),tipo={exame:'exames',tratamento:'tratamentos',consulta:'consultas',queixa:'queixas',vacina:'vacinas',peso:'peso',vitais:'vitais',fisio:'fisio'}[refOriginal.slice(0,p)],id=refOriginal.slice(p+1),registro=tipo&&Array.isArray(E[tipo])?E[tipo].find(r=>r.id===id):null;
+    const origem=refs().find(r=>r.ref===refOriginal),tipo=origem?.tipo,id=origem?.registroId,registro=tipo&&Array.isArray(E[tipo])?E[tipo].find(r=>r.id===id):null;
     if(!registro){erro.textContent='O registro de origem não está mais disponível.';return}saudeEditarRegistro(tipo,registro);
    }));
    const erro=el('<p class="sdoc-erro" role="alert"></p>'),status=el('<p class="sdoc-status" role="status" aria-live="polite"></p>');c.append(erro,status);

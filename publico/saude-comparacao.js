@@ -1,4 +1,5 @@
 /* Comparação documental: valores e unidades, sem inferir melhora clínica. */
+function abrirExameComparacao(x){return typeof saudeEditarRegistro==='function'?saudeEditarRegistro('exames',x):modalExame(x)}
 const SaudeComparacao=(()=>{
   const unidade=x=>String(x.unidade||'').trim().replace(/\s+/g,' ');
   const metodo=x=>String(x.metodo||'').trim().toLocaleLowerCase('pt-BR');
@@ -25,12 +26,12 @@ const SaudeComparacao=(()=>{
     const avisos=[],add=(tipo,descricao,registro,acao)=>avisos.push({tipo,descricao,registro,acao});
     const vistos=new Set();
     for(const x of E.exames){
-      if(!String(x.exame||'').trim())add('Exames','Nome do marcador ausente',x,()=>modalExame(x));
-      if(!dataISOValida(x.data)||x.data>hoje())add('Exames','Data ausente, inválida ou futura',x,()=>modalExame(x));
-      if(!resultadoSaudeRegistrado(x))add('Exames','Resultado ainda não disponível',x,()=>modalExame(x));
-      if(!unidade(x)&&Number.isFinite(numeroResultadoSaude(x.valor)))add('Exames','Unidade do resultado não registrada no laudo',x,()=>modalExame(x));
-      if(!x.referenciaLaudo)add('Exames','Referência do próprio laudo não transcrita',x,()=>modalExame(x));
-      const k=chave(x)+'|'+x.data+'|'+unidade(x);if(vistos.has(k))add('Exames','Possível repetição de marcador, data e unidade',x,()=>modalExame(x));vistos.add(k);
+      if(!String(x.exame||'').trim())add('Exames','Nome do marcador ausente',x,()=>abrirExameComparacao(x));
+      if(!dataISOValida(x.data)||x.data>hoje())add('Exames','Data ausente, inválida ou futura',x,()=>abrirExameComparacao(x));
+      if(!resultadoSaudeRegistrado(x))add('Exames','Resultado ainda não disponível',x,()=>abrirExameComparacao(x));
+      if(!unidade(x)&&Number.isFinite(numeroResultadoSaude(x.valor)))add('Exames','Unidade do resultado não registrada no laudo',x,()=>abrirExameComparacao(x));
+      if(!x.referenciaLaudo)add('Exames','Referência do próprio laudo não transcrita',x,()=>abrirExameComparacao(x));
+      const k=chave(x)+'|'+x.data+'|'+unidade(x);if(vistos.has(k))add('Exames','Possível repetição de marcador, data e unidade',x,()=>abrirExameComparacao(x));vistos.add(k);
     }
     for(const m of E.peso){
       const grupo=E.tratamentos.find(t=>t.id===m.tratamentoId),acao=grupo?()=>editarMedidaTratamento(grupo,m):null;
@@ -77,8 +78,8 @@ function dashboardExamesSaude(opcoes={}){
     quadro.append(el('<p class="trat-muted">Último resultado disponível até cada data, com a coleta indicada em cada linha. A variação numérica não determina melhora ou piora clínica.</p>'));
     if(!linhas.length){quadro.append(el('<div class="trat-baseline"><span>🧪</span><div><b>'+(!datas.length?'Seus exames, lado a lado':'Nenhum marcador neste filtro')+'</b><p>'+(!datas.length?'Adicione resultados de pelo menos duas coletas para comparar. Fotos e PDFs podem ser anexados à ficha do exame.':'Revise a busca e as datas selecionadas.')+'</p></div></div>'));box.querySelector('.exames-tendencia').innerHTML='';return}
     const rol=el('<div class="saude-matriz-scroll" tabindex="0" role="region" aria-label="Comparativo de exames"><table class="saude-matriz"><thead><tr><th>Exame / unidade</th><th>Anterior</th><th>Atual</th><th>Variação</th><th>Referência do laudo</th><th>Detalhes</th></tr></thead><tbody></tbody></table></div>');
-    linhas.forEach(x=>{const tr=document.createElement('tr'),valor=r=>r?esc(r.valor==null||r.valor===''?'—':r.valor)+'<small>'+fmtDataAno(r.data)+'</small>':'Não informado';tr.innerHTML='<th scope="row">'+esc(x.nome)+'<small>'+esc(SaudeComparacao.unidade(x.atual)||'Unidade a conferir')+'</small></th><td>'+valor(x.anterior)+'</td><td>'+valor(x.atual)+'</td><td>'+esc(x.diferenca===null?x.motivo:(x.diferenca>0?'↑ +':x.diferenca<0?'↓ ':'= ')+x.diferenca.toLocaleString('pt-BR',{maximumFractionDigits:3})+' '+SaudeComparacao.unidade(x.atual))+(x.percentual!==null?'<small>'+esc((x.percentual>0?'+':'')+x.percentual.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%')+'</small>':'')+'</td><td>'+esc(x.atual.referenciaLaudo||'Consultar laudo original')+'<small>'+esc(x.atual.resultado||'Sem avaliação registrada')+'</small></td><td></td>';tr.lastElementChild.append(acao('Ver gráfico',()=>{examesComparacaoMarcador=x.nome;grafico(todos)},'ghost mini'),acao('Abrir exame',()=>modalExame(x.atual),'ghost mini'));rol.querySelector('tbody').append(tr)});quadro.append(rol);
-    const cards=el('<div class="exames-cards-mobile"></div>');linhas.forEach(x=>{const c=el('<article class="sui-card"><h3>'+esc(x.nome)+'</h3><p>Atual: <b>'+esc(x.atual.valor)+' '+esc(SaudeComparacao.unidade(x.atual))+'</b> · '+fmtDataAno(x.atual.data)+'</p><p>Anterior: '+esc(x.anterior?x.anterior.valor:'Não informado')+(x.anterior?' · '+fmtDataAno(x.anterior.data):'')+'</p><p>'+esc(x.diferenca===null?x.motivo:'Variação: '+x.diferenca.toLocaleString('pt-BR')+' '+SaudeComparacao.unidade(x.atual))+'</p></article>');c.append(acao('Abrir exame',()=>typeof saudeEditarRegistro==='function'?saudeEditarRegistro('exames',x.atual):modalExame(x.atual),'ghost'));cards.append(c)});quadro.append(cards);
+    linhas.forEach(x=>{const tr=document.createElement('tr'),valor=r=>r?esc(r.valor==null||r.valor===''?'—':r.valor)+'<small>'+fmtDataAno(r.data)+'</small>':'Não informado';tr.innerHTML='<th scope="row">'+esc(x.nome)+'<small>'+esc(SaudeComparacao.unidade(x.atual)||'Unidade a conferir')+'</small></th><td>'+valor(x.anterior)+'</td><td>'+valor(x.atual)+'</td><td>'+esc(x.diferenca===null?x.motivo:(x.diferenca>0?'↑ +':x.diferenca<0?'↓ ':'= ')+x.diferenca.toLocaleString('pt-BR',{maximumFractionDigits:3})+' '+SaudeComparacao.unidade(x.atual))+(x.percentual!==null?'<small>'+esc((x.percentual>0?'+':'')+x.percentual.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%')+'</small>':'')+'</td><td>'+esc(x.atual.referenciaLaudo||'Consultar laudo original')+'<small>'+esc(x.atual.resultado||'Sem avaliação registrada')+'</small></td><td></td>';tr.lastElementChild.append(acao('Ver gráfico',()=>{examesComparacaoMarcador=x.nome;grafico(todos)},'ghost mini'),acao('Abrir exame',()=>abrirExameComparacao(x.atual),'ghost mini'));rol.querySelector('tbody').append(tr)});quadro.append(rol);
+    const cards=el('<div class="exames-cards-mobile"></div>');linhas.forEach(x=>{const c=el('<article class="sui-card"><h3>'+esc(x.nome)+'</h3><p>Atual: <b>'+esc(x.atual.valor)+' '+esc(SaudeComparacao.unidade(x.atual))+'</b> · '+fmtDataAno(x.atual.data)+'</p><p>Anterior: '+esc(x.anterior?x.anterior.valor:'Não informado')+(x.anterior?' · '+fmtDataAno(x.anterior.data):'')+'</p><p>'+esc(x.diferenca===null?x.motivo:'Variação: '+x.diferenca.toLocaleString('pt-BR')+' '+SaudeComparacao.unidade(x.atual))+'</p></article>');c.append(acao('Abrir exame',()=>abrirExameComparacao(x.atual),'ghost'));cards.append(c)});quadro.append(cards);
     grafico(todos);
   }
   function grafico(linhas){const area=box.querySelector('.exames-tendencia');area.innerHTML='';const x=linhas.find(x=>x.nome===examesComparacaoMarcador)||linhas.find(x=>x.diferenca!==null)||linhas[0];if(!x)return;
@@ -109,8 +110,15 @@ function previsaoEstoqueTratamento(t){
   if(!(q>0)||!(dias>=1)||!Number.isInteger(dias))return nao('Informe o consumo e o intervalo confirmados');
   if(!dataISOValida(t.proximaData)||t.proximaData<hoje())return nao('Atualize a próxima data confirmada');
   if((t.usos||[]).some(u=>!u.desfeitoEm&&u.data>=t.proximaData))return nao('Há uso registrado nesta data; confirme a próxima ocorrência');
+  if(t.inicio&&(!dataISOValida(t.inicio)||t.inicio>t.proximaData))return nao('Confirme a próxima data em relação ao início do tratamento');
+  if((t.ocorrencias||[]).some(o=>!o.desfeitoEm&&o.data>=t.proximaData))return nao('Há situação registrada no planejamento; confirme a próxima ocorrência');
+  if(t.horariosUso!=null&&!Array.isArray(t.horariosUso))return nao('Confira os horários das tomadas antes de estimar');
   const n=Math.floor(saldo/q);if(n<1)return nao('Estoque insuficiente para o próximo uso');
-  const data=new Date(t.proximaData+'T12:00:00Z');data.setUTCDate(data.getUTCDate()+(n-1)*dias);if(!Number.isFinite(data.getTime()))return nao('Revise os valores do consumo');const fim=data.toISOString().slice(0,10);
+  const configurados=Array.isArray(t.horariosUso)?t.horariosUso:[];
+  if(configurados.some(h=>!/^([01]\d|2[0-3]):[0-5]\d$/.test(h)))return nao('Confira os horários das tomadas antes de estimar');
+  const tomadas=new Set(configurados).size||1;
+  if(SaudeTratamentos.diario(t)&&dias!==1)return nao('Confirme o intervalo e o planejamento diário antes de estimar');
+  const data=new Date(t.proximaData+'T12:00:00Z');data.setUTCDate(data.getUTCDate()+Math.floor((n-1)/tomadas)*dias);if(!Number.isFinite(data.getTime()))return nao('Revise os valores do consumo');const fim=data.toISOString().slice(0,10);
   if(t.fim&&dataISOValida(t.fim)&&t.fim<fim)return nao('Término do tratamento anterior ao fim estimado do estoque');
-  return {data:fim,motivo:'Último uso estimado com o saldo atual; depende do consumo registrado.',usos:n};
+  return {data:fim,motivo:'Último uso estimado com o saldo atual; '+tomadas+' tomada(s) por data planejada, '+q+' '+t.unidade+' por tomada, intervalo de '+dias+' dia(s). Depende do consumo registrado.',usos:n};
 }

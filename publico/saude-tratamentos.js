@@ -26,6 +26,16 @@ const SaudeTratamentos = (() => {
     if(!String(t.unidade||'').trim())throw Error('Defina a unidade do estoque antes de registrar o uso.');
     if((t.usos||[]).some(u=>!u.desfeitoEm&&u.data===uso.data&&u.hora===uso.hora))throw Error('Já existe um uso nesse horário. Confira o histórico.');
     const n=saldo(t);if(n!==null&&uso.quantidade>n)throw Error('Quantidade maior que o estoque informado. Registre a compra ou corrija o estoque.');
+    // Uma única ocorrência diária representa o mesmo uso no check, em Hoje
+    // e no formulário avulso. O callback já traz o vínculo e não entra de novo.
+    if(!uso.ocorrenciaId&&typeof SaudePainelModelo!=='undefined'){
+      const ocorrencias=SaudePainelModelo.ocorrencias(t,uso.data);
+      if(ocorrencias.length===1){
+        const o=ocorrencias[0];
+        if(o.estado==='Não utilizado')throw Error('Desfaça a situação Não utilizado no histórico antes de registrar o uso.');
+        return SaudePainelModelo.registrarOcorrencia(t,{...uso,ocorrenciaId:o.id,estado:'Registrado'},u=>registrarUso(t,{...uso,...u}));
+      }
+    }
     t.usos=t.usos||[];t.usos.push({...uso,id:uid(),registradoEm:new Date().toISOString()});
   }
   const diario=t=>t.usoDiario===true||(t.usoDiario!==false&&numero(t.intervaloConsumoDias)===1);
@@ -33,6 +43,7 @@ const SaudeTratamentos = (() => {
   function registrarUsoDiario(t){
     if(!ativo(t))throw Error('Confirme que o medicamento está em andamento antes de marcar o uso diário.');
     if(!diario(t))throw Error('Marque a opção de uso diário em Editar.');
+    if(new Set((t.horariosUso||[]).filter(h=>/^([01]\d|2[0-3]):[0-5]\d$/.test(h))).size>1)throw Error('Registre cada tomada no horário planejado; este item tem várias ocorrências.');
     if(usoHoje(t))throw Error('Já há um uso registrado hoje. Confira o histórico.');
     if(!(numero(t.consumoPorCiclo)>0)||!controlaEstoque(t))throw Error('Informe a quantidade diária e a unidade em Editar antes de marcar o uso.');
     registrarUso(t,{data:hoje(),hora:new Date().toTimeString().slice(0,5),quantidade:numero(t.consumoPorCiclo),tipoRegistro:'check-diario'});
