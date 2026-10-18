@@ -17,7 +17,7 @@ Patch local auditável: nos dois arquivos minificados, o único fallback de desc
 do global do core-js `Function("return this")()` foi substituído por `globalThis`.
 Em navegadores suportados esse caminho já era precedido por globalThis/window/self.
 Não há mais chamada a Function() ou eval() nos arquivos distribuídos.
-Não carregue pdf.sandbox: esse componente não faz parte desta integração.
+pdf.sandbox e o motor quickjs-eval foram excluídos: não fazem parte desta integração.
 
 Limitação: PDFs protegidos por senha precisam de uma cópia desbloqueada para
 este leitor; o link para o original continua disponível. PDFs imagem não
