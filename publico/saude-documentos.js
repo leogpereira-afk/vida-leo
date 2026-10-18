@@ -5,7 +5,8 @@
  * sdoc-card/item (borda e padding), sdoc-leitor (altura responsiva),
  * sdoc-viewport (overflow auto), sdoc-imagem (max-width:100%), sdoc-form
  * (grid responsivo), sdoc-erro (contraste de erro), sdoc-nota, sdoc-status.
- * iframe dentro de sdoc-viewport deve ocupar 100% de largura e >= 55vh.
+ * Canvas em sdoc-viewport: não fixar altura; texto acessível em sdoc-texto-pdf.
+ * PDF.js/worker/recursos são locais, versão fixa 6.4.299 (vendor com licença).
  */
 (function(root){
  'use strict';
@@ -15,8 +16,14 @@
  const tipoArquivo=a=>a.tipo==='application/pdf'?'pdf':/^image\/(png|jpeg|webp|gif|bmp)$/i.test(a.tipo||'')?'imagem':'outro';
  const normal=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
  const refs=()=>SaudePainelModelo.documentosRefs(E);
- const meta=id=>tem(E.saudeDocumentos,id)?E.saudeDocumentos[id]:{};
- const msg=(box,texto)=>{box.textContent=texto};
+ const objeto=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+ const meta=id=>tem(E.saudeDocumentos,id)&&objeto(E.saudeDocumentos[id])?E.saudeDocumentos[id]:{};
+ const itensDe=m=>Array.isArray(m.itens)?m.itens.filter(objeto):[];
+ const dia=v=>{const s=String(v||'').slice(0,10);return SaudePainelModelo.data(s)?s:''};
+ const dataBR=v=>{const d=dia(v);return d?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):'Data não informada'};
+ const pdfBase=new URL('vendor/pdfjs-6.4.299/',document.currentScript?.src||document.baseURI).href;
+ let motorPdf;
+ const carregarMotorPdf=()=>motorPdf||(motorPdf=import(pdfBase+'pdf.min.mjs').catch(e=>{motorPdf=null;throw e}));
  function urlSegura(valor){
   const u=new URL(String(valor));
   if(u.username||u.password)throw Error('O endereço do arquivo não é seguro.');
@@ -40,10 +47,12 @@
  function leitor(anexo){
   const box=el('<section class="sdoc-leitor"><p class="sdoc-status" role="status" aria-live="polite">Carregando original…</p><div class="sdoc-acoes"></div><div class="sdoc-viewport"></div></section>');
   const aviso=box.querySelector('.sdoc-status'),acoes=box.querySelector('.sdoc-acoes'),area=box.querySelector('.sdoc-viewport');
-  let url='',fechado=false;
-  const liberar=()=>{fechado=true;if(url.startsWith('blob:'))URL.revokeObjectURL(url)};
+  let url='',fechado=false,tarefaPdf=null,desenho=null,geracao=0;
+  const pararPdf=()=>{geracao++;desenho?.cancel();desenho=null;const tarefa=tarefaPdf;tarefaPdf=null;if(tarefa)Promise.resolve(tarefa.destroy()).catch(()=>{})};
+  const liberar=()=>{fechado=true;pararPdf();if(url.startsWith('blob:'))URL.revokeObjectURL(url);url=''};
+  const falha=e=>{if(fechado||e?.name==='RenderingCancelledException')return;aviso.textContent='Não foi possível ler o original: '+(e.message||e)+'. O link do original continua disponível quando o endereço é seguro.';if(!acoes.querySelector('[data-sdoc="repetir"]')){const repetir=acao('Tentar abrir novamente',carregar);repetir.setAttribute('data-sdoc','repetir');acoes.appendChild(repetir)}};
   const carregar=async()=>{
-   acoes.replaceChildren();area.replaceChildren();aviso.textContent='Carregando original…';
+   pararPdf();acoes.replaceChildren();area.replaceChildren();aviso.textContent='Carregando original…';
    const tipo=tipoArquivo(anexo);
    if(tipo==='outro'){aviso.textContent='Visualização disponível para PDF e imagens PNG, JPEG, WebP, GIF ou BMP. Confira o tipo do arquivo.';return}
    try{
@@ -52,18 +61,43 @@
     if(fechado){if(obtida.startsWith('blob:'))URL.revokeObjectURL(obtida);return}
     if(url.startsWith('blob:'))URL.revokeObjectURL(url);url=obtida;
     const link=el('<a class="sdoc-abrir" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Abrir original em outra aba</a>');link.href=url;acoes.appendChild(link);
-    const campos=el('<div class="sdoc-linha"><label>Página <input data-sdoc="pagina" type="number" min="1" max="10000" value="1" step="1"></label><label>Zoom <select data-sdoc="zoom"><option value="75">75%</option><option value="100" selected>100%</option><option value="125">125%</option><option value="150">150%</option><option value="200">200%</option></select></label></div>');acoes.appendChild(campos);
+    const campos=el('<div class="sdoc-linha"><label>Página <input data-sdoc="pagina" type="number" min="1" value="1" step="1"></label><span class="sdoc-paginas"></span><label>Zoom <select data-sdoc="zoom"><option value="75">75%</option><option value="100" selected>100%</option><option value="125">125%</option><option value="150">150%</option><option value="200">200%</option></select></label></div>');acoes.appendChild(campos);
     const pagina=campos.querySelector('input'),zoom=campos.querySelector('select');
-    const view=tipo==='pdf'?el('<iframe title="Original do documento de saúde" sandbox="allow-same-origin" referrerpolicy="no-referrer"></iframe>'):el('<img class="sdoc-imagem" alt="Original do documento de saúde" referrerpolicy="no-referrer">');area.appendChild(view);
-    const atualizar=()=>{const p=Math.max(1,Math.min(10000,Math.trunc(+pagina.value)||1)),z=[75,100,125,150,200].includes(+zoom.value)?+zoom.value:100;pagina.value=String(p);if(tipo==='pdf')view.src=url.split('#')[0]+'#page='+p+'&zoom='+z;else{view.src=url;view.style.width=z+'%';view.style.maxWidth='none'}};
-    pagina.disabled=tipo!=='pdf';pagina.onchange=atualizar;zoom.onchange=atualizar;atualizar();
-    aviso.textContent='Original disponível. '+(tipo==='pdf'?'Página e zoom dependem do leitor PDF do navegador; se necessário, abra em outra aba.':'Imagem de uma página.');
-   }catch(e){if(fechado)return;aviso.textContent='Não foi possível abrir o original: '+(e.message||e);acoes.appendChild(acao('Tentar abrir novamente',carregar))}
+    if(tipo==='imagem'){
+     const imagem=el('<img class="sdoc-imagem" alt="Original do documento de saúde" referrerpolicy="no-referrer">');area.appendChild(imagem);imagem.src=url;pagina.disabled=true;
+     const atualizar=()=>{imagem.style.width=zoom.value+'%';imagem.style.maxWidth='none'};zoom.onchange=atualizar;atualizar();aviso.textContent='Imagem de uma página. Nenhum reconhecimento de texto é realizado.';return;
+    }
+    pagina.disabled=true;zoom.disabled=true;
+    const pdfjs=await carregarMotorPdf();if(fechado)return;
+    pdfjs.GlobalWorkerOptions.workerSrc=pdfBase+'pdf.worker.min.mjs';
+    const tarefa=pdfjs.getDocument({url,cMapUrl:pdfBase+'cmaps/',cMapPacked:true,standardFontDataUrl:pdfBase+'standard_fonts/',wasmUrl:pdfBase+'wasm/',iccUrl:pdfBase+'iccs/',isEvalSupported:false,enableXfa:false,disableWorkerRendering:true,withCredentials:false});tarefaPdf=tarefa;
+    const pdf=await tarefa.promise;if(fechado||tarefaPdf!==tarefa)return;
+    pagina.max=String(pdf.numPages);pagina.disabled=false;zoom.disabled=false;campos.querySelector('.sdoc-paginas').textContent='de '+pdf.numPages;
+    const texto=el('<details open class="sdoc-texto-pdf"><summary>Texto embutido da página (sem OCR)</summary><pre tabindex="0"></pre></details>');
+    const atualizar=async()=>{
+     const pedido=++geracao;desenho?.cancel();desenho=null;
+     const n=Math.max(1,Math.min(pdf.numPages,Math.trunc(+pagina.value)||1)),z=[75,100,125,150,200].includes(+zoom.value)?+zoom.value:100;pagina.value=String(n);aviso.textContent='Renderizando página '+n+'…';
+     try{
+      const page=await pdf.getPage(n);if(fechado||pedido!==geracao)return;
+      const original=page.getViewport({scale:1}),ajuste=area.clientWidth>0?Math.min(1,area.clientWidth/original.width):1;
+      const viewport=page.getViewport({scale:ajuste*z/100});if(!Number.isFinite(viewport.width)||!Number.isFinite(viewport.height)||viewport.width<=0||viewport.height<=0)throw Error('Dimensões da página inválidas.');
+      const escala=Math.min(root.devicePixelRatio||1,2,Math.sqrt(12000000/(viewport.width*viewport.height)),8192/viewport.width,8192/viewport.height);
+      const canvas=el('<canvas role="img"></canvas>');canvas.setAttribute('aria-label','Página '+n+' de '+pdf.numPages+' do PDF original');canvas.width=Math.max(1,Math.floor(viewport.width*escala));canvas.height=Math.max(1,Math.floor(viewport.height*escala));canvas.style.width=Math.floor(viewport.width)+'px';canvas.style.height=Math.floor(viewport.height)+'px';
+      area.replaceChildren(canvas,texto);texto.querySelector('pre').textContent='Carregando texto embutido…';
+      const render=page.render({canvas,canvasContext:canvas.getContext('2d'),viewport,transform:escala===1?null:[escala,0,0,escala,0,0]});desenho=render;await render.promise;
+      if(fechado||pedido!==geracao)return;desenho=null;
+      const conteudo=await page.getTextContent();if(fechado||pedido!==geracao)return;
+      texto.querySelector('pre').textContent=conteudo.items.filter(i=>typeof i.str==='string').map(i=>i.str+(i.hasEOL?'\n':' ')).join('').trim()||'Esta página não contém texto embutido disponível. Confira a imagem do original; nenhum OCR foi realizado.';
+      aviso.textContent='Página '+n+' de '+pdf.numPages+' · '+z+'%. Renderização local do original; a conferência permanece manual.';
+     }catch(e){if(pedido===geracao)falha(e)}
+    };
+    pagina.onchange=atualizar;zoom.onchange=atualizar;await atualizar();
+   }catch(e){falha(e)}
   };
   carregar();return {box,liberar};
  }
  function abrir(anexo){
-  let l;abrirModal('Original do documento',esc(anexo.nome||'Arquivo'),c=>{l=leitor(anexo);c.appendChild(l.box)},()=>l?.liberar(),{recarregar:false});
+  let l;abrirModal('Original do documento',esc(anexo.nome||'Arquivo'),c=>{c.classList.add('sdoc');l=leitor(anexo);c.appendChild(l.box)},()=>l?.liberar(),{recarregar:false});
  }
  function campo(nome,titulo,tipo='text',valor=''){
   const c=el('<label>'+esc(titulo)+(tipo==='textarea'?'<textarea></textarea>':'<input type="'+tipo+'">')+'</label>'),i=c.querySelector('input,textarea');i.name=nome;i.value=String(valor??'');return c;
@@ -72,7 +106,7 @@
   if(!idSeguro(anexo.id))throw Error('Identificador de arquivo inválido.');
   const salvo=meta(anexo.id),refOriginal=salvo.origem?.ref||anexo.ref||ref;
   if(!refs().some(x=>x.ref===refOriginal))throw Error('A referência deste documento não está disponível na Saúde.');
-  const rascunho=copia({...salvo,origem:salvo.origem||{anexoId:anexo.id,ref:refOriginal,nome:anexo.nome||'',tipo:anexo.tipo||'',em:anexo.em||''},itens:Array.isArray(salvo.itens)?salvo.itens:[]});
+  const rascunho=copia({...salvo,origem:salvo.origem||{anexoId:anexo.id,ref:refOriginal,nome:anexo.nome||'',tipo:anexo.tipo||'',em:anexo.em||''},itens:itensDe(salvo)});
   let l,ocupado=false;
   abrirModal('Conferência manual do documento',esc(anexo.nome||'Arquivo'),(c,fechar)=>{
    c.classList.add('sdoc');c.appendChild(el('<p class="sdoc-nota">Não há extração automática neste painel. Transcreva e confira cada item no original. Confirmar aqui registra sua conferência; não altera resultados nem tratamentos.</p>'));
@@ -123,9 +157,9 @@
   const filtroRef=box.querySelector('[data-sdoc="ref"]');for(const r of refs()){const o=el('<option></option>');o.value=r.ref;o.textContent=r.titulo;filtroRef.appendChild(o)}
   let arquivos=[],falhas=[],geracao=0;
   const pintar=()=>{
-   lista.replaceChildren();const vistos=arquivos.filter(a=>{const m=meta(a.id),data=m.dataDocumento||a.em||a.origem.data||'';return(!filtroRef.value||a.ref===filtroRef.value)&&(!tipo.value||tipoArquivo(a)===tipo.value)&&(!de.value||!!data&&data>=de.value)&&(!ate.value||!!data&&data<=ate.value)&&(!busca.value||normal([a.nome,a.origem.titulo,m.titulo,m.textoOriginal].join(' ')).includes(normal(busca.value)))});
-   for(const a of vistos){const m=meta(a.id),itens=Array.isArray(m.itens)?m.itens:[],pendentes=itens.filter(i=>i.estado!=='confirmado').length,confirmados=itens.length-pendentes;
-    const card=el('<article class="sdoc-card"><h4>'+esc(m.titulo||a.nome)+'</h4><p>'+esc(a.origem.titulo)+' · '+esc(m.dataDocumento||a.em||'Data não informada')+'</p><p class="sdoc-nota">Arquivo: '+(a.nuvem?'na nuvem':a.pendente?'neste aparelho · envio pendente':'situação a conferir')+' · Revisão: '+(tem(E.saudeDocumentos,a.id)?pendentes+' pendente(s), '+confirmados+' confirmado(s)':'não iniciada')+'</p><div class="sdoc-acoes"></div></article>');
+   lista.replaceChildren();const vistos=arquivos.filter(a=>{const m=meta(a.id),data=dia(m.dataDocumento||a.em||a.origem.data);return(!filtroRef.value||a.ref===filtroRef.value)&&(!tipo.value||tipoArquivo(a)===tipo.value)&&(!de.value||!!data&&data>=de.value)&&(!ate.value||!!data&&data<=ate.value)&&(!busca.value||normal([a.nome,a.origem.titulo,m.titulo,m.textoOriginal].join(' ')).includes(normal(busca.value)))});
+   for(const a of vistos){const m=meta(a.id),itens=itensDe(m),pendentes=itens.filter(i=>i.estado!=='confirmado').length,confirmados=itens.length-pendentes;
+    const card=el('<article class="sdoc-card"><h4>'+esc(m.titulo||a.nome)+'</h4><p>'+esc(a.origem.titulo)+' · '+esc(dataBR(m.dataDocumento||a.em||a.origem.data))+'</p><p class="sdoc-nota">Arquivo: '+(a.nuvem?'na nuvem':a.pendente?'neste aparelho · envio pendente':'situação a conferir')+' · Revisão: '+(objeto(E.saudeDocumentos?.[a.id])?pendentes+' pendente(s), '+confirmados+' confirmado(s)':'não iniciada')+'</p><div class="sdoc-acoes"></div></article>');
     const buttons=card.querySelector('.sdoc-acoes');buttons.append(acao('Ler original',()=>abrir(a)),acao('Conferir documento',()=>revisar(a,a.ref)));lista.appendChild(card);
    }
    if(!vistos.length)lista.appendChild(el('<p class="sdoc-nota">Nenhum documento encontrado para estes filtros.</p>'));

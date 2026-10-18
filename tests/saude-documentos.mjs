@@ -5,13 +5,17 @@ import {readFileSync,existsSync} from 'node:fs';
 import {parseHTML} from 'linkedom';
 const file=new URL('../publico/saude-documentos.js',import.meta.url);
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
+let ambienteId=0;
+const pdfFalso=`export const GlobalWorkerOptions={};export let config;export let destruido=0;export const paginas=[];export const desenhos=[];export function getDocument(opcoes){config=opcoes;return {destroy(){destruido++},promise:Promise.resolve({numPages:3,async getPage(n){paginas.push(n);return {getViewport({scale}){return {width:600*scale,height:800*scale}},render(o){desenhos.push(o.viewport.width);return {promise:Promise.resolve(),cancel(){}}},async getTextContent(){return {items:[{str:'Texto fictício da página '+n,hasEOL:true}]}}}}})}}`;
 function ambiente({arquivos={},estado={},url='https://storage.example.test/laudo.pdf?assinatura=ficticia',falharSalvar=false,falharRef=''}={}){
- const {document,HTMLSelectElement}=parseHTML('<html><body></body></html>');
+ const {document,HTMLSelectElement,HTMLCanvasElement}=parseHTML('<html><body></body></html>');
  Object.defineProperty(HTMLSelectElement.prototype,'value',{configurable:true,get(){return [...this.options].find(o=>o.selected)?.value||this.options[0]?.value||''},set(v){for(const o of this.options)o.removeAttribute('selected');[...this.options].find(o=>o.value===String(v))?.setAttribute('selected','')}});
+ Object.defineProperty(document,'baseURI',{value:'https://central.example.test/'});HTMLCanvasElement.prototype.getContext=function(){return {}};
+ const pdfURL='data:text/javascript,'+encodeURIComponent(pdfFalso)+'#'+(++ambienteId);const pdf=import(pdfURL);
  const modais=[],fechamentos=[],chamadas=[];
  const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
  const el=h=>{const d=document.createElement('div');d.innerHTML=h;return d.firstElementChild};
- const c=vm.createContext({document,URL,Date,Map,Set,console,structuredClone,E:estado,el,esc,
+ const c=vm.createContext({document,URL,Date,Map,Set,console,structuredClone,E:estado,el,esc,__importPdfTeste:()=>pdf,
   acao:(t,f)=>{const b=el('<button></button>');b.textContent=t;b.onclick=f;return b},
   abrirModal:(t,s,m,close)=>{const box=el('<div></div>');document.body.append(box);modais.push(box);const fechar=()=>{close?.();box.remove()};fechamentos.push(fechar);m(box,fechar)},
   arqPor:async ref=>{if(ref===falharRef)throw Error('Falha fictícia');return arquivos[ref]||[]},
@@ -21,8 +25,8 @@ function ambiente({arquivos={},estado={},url='https://storage.example.test/laudo
   salvar:()=>{chamadas.push(['salvar']);if(falharSalvar)throw Error('Falha fictícia ao salvar')}
  });
  vm.runInContext(readFileSync(new URL('../publico/saude-modelo.js',import.meta.url),'utf8'),c);
- if(existsSync(file))vm.runInContext(readFileSync(file,'utf8'),c);
- return {c,document,modais,fechamentos,chamadas};
+ if(existsSync(file))vm.runInContext(readFileSync(file,'utf8').replace("import(pdfBase+'pdf.min.mjs')",'__importPdfTeste()'),c);
+ return {c,document,modais,fechamentos,chamadas,pdf};
 }
 const anexo={id:'a-ficticio',ref:'exame:e',nome:'Laudo fictício.pdf',tipo:'application/pdf',em:'2026-01-02',nuvem:true};
 const clic=async(b)=>{assert.ok(b,'controle existe');await b.onclick?.({preventDefault(){}});await tick()};
@@ -31,9 +35,9 @@ test('catálogo preserva ID/ref existentes, deduplica sem copiar anexos e report
  const {c}=ambiente({estado:{exames:[{id:'e',exame:'Exame fictício'}],consultas:[{id:'c'}]},arquivos:{'saude:documentos':[anexo],'exame:e':[anexo,{...anexo,id:'b',ref:'exame:e',pendente:true,nuvem:false}]},falharRef:'consulta:c'});
  assert.equal(typeof c.saudeCatalogoDocumentos,'function');const r=await c.saudeCatalogoDocumentos();assert.equal(r.documentos.length,2);assert.equal(r.documentos[0].ref,'exame:e');assert.equal(r.documentos[1].id,'b');assert.equal(r.falhas[0].ref,'consulta:c');
 });
-test('leitor usa URL assinada e controles página/zoom sem alterar original e libera blob ao fechar',async()=>{
- const {c,modais,fechamentos}=ambiente({url:'blob:https://central.example.test/arquivo-ficticio'});let revogada;c.URL=class extends URL {static revokeObjectURL(u){revogada=u}};
- c.saudeAbrirDocumento(anexo);await tick();const box=modais[0],frame=box.querySelector('iframe');assert.ok(frame);assert.match(frame.src,/blob:https/);const pagina=box.querySelector('[data-sdoc="pagina"]');pagina.value='3';pagina.onchange();assert.match(frame.src,/#page=3/);const zoom=box.querySelector('[data-sdoc="zoom"]');zoom.value='150';zoom.onchange();assert.match(frame.src,/zoom=150/);assert.equal(anexo.ref,'exame:e');fechamentos[0]();assert.equal(revogada,'blob:https://central.example.test/arquivo-ficticio');
+test('leitor PDF desenha Canvas com página/zoom reais e texto acessível, libera tarefa e blob ao fechar',async()=>{
+ const a=ambiente({url:'blob:https://central.example.test/arquivo-ficticio'});let revogada;a.c.URL=class extends URL {static revokeObjectURL(u){revogada=u}};
+ a.c.saudeAbrirDocumento(anexo);await tick();await tick();const box=a.modais[0],canvas=box.querySelector('canvas');assert.ok(canvas);assert.equal(box.querySelector('iframe'),null);assert.equal(canvas.width,600);assert.match(box.querySelector('.sdoc-texto-pdf').textContent,/página 1/);const pagina=box.querySelector('[data-sdoc="pagina"]');pagina.value='2';await pagina.onchange();const zoom=box.querySelector('[data-sdoc="zoom"]');zoom.value='150';await zoom.onchange();assert.equal(box.querySelector('canvas').width,900);assert.match(box.querySelector('.sdoc-texto-pdf').textContent,/página 2/);assert.ok(box.classList.contains('sdoc'));const motor=await a.pdf;assert.equal(motor.config.isEvalSupported,false);assert.equal(motor.config.enableXfa,false);assert.equal(motor.GlobalWorkerOptions.workerSrc,'https://central.example.test/vendor/pdfjs-6.4.299/pdf.worker.min.mjs');assert.equal(motor.config.cMapUrl,'https://central.example.test/vendor/pdfjs-6.4.299/cmaps/');a.fechamentos[0]();assert.equal(revogada,'blob:https://central.example.test/arquivo-ficticio');assert.equal(motor.destruido,1);
 });
 test('URL ativa, credenciais e documento SVG não entram no leitor nem em link',async()=>{
  for(const url of ['javascript:alert(1)','data:text/html,ativo','http://inseguro.test/a.pdf','https://usuario:senha@example.test/a.pdf']){
@@ -57,7 +61,7 @@ test('biblioteca filtra pela referência real e upload chama somente serviço ex
  const select=box.querySelector('[aria-label="Registro de origem do anexo"]');select.value='exame:e';const input=box.querySelector('input[type=file]');Object.defineProperty(input,'files',{value:[{name:'Novo fictício.pdf',type:'application/pdf'}]});await input.onchange();assert.deepEqual(a.chamadas,[['add','exame:e','Novo fictício.pdf']]);assert.equal(a.c.E.saudeDocumentos,undefined);assert.match(box.textContent,/envio pendente/);
 });
 test('falha do leitor permite retomar sem salvar metadados nem guardar URL assinada',async()=>{
- const a=ambiente();let n=0;a.c.arqUrlDe=async()=>{if(n++===0)throw Error('Rede fictícia indisponível');return 'https://storage.example.test/original.pdf?token=ficticio'};a.c.saudeAbrirDocumento(anexo);await tick();assert.match(a.modais[0].textContent,/Rede fictícia/);await clic(botao(a.modais[0],'Tentar abrir novamente'));assert.ok(a.modais[0].querySelector('iframe'));assert.equal(a.c.E.saudeDocumentos,undefined);
+ const a=ambiente();let n=0;a.c.arqUrlDe=async()=>{if(n++===0)throw Error('Rede fictícia indisponível');return 'https://storage.example.test/original.pdf?token=ficticio'};a.c.saudeAbrirDocumento(anexo);await tick();assert.match(a.modais[0].textContent,/Rede fictícia/);await clic(botao(a.modais[0],'Tentar abrir novamente'));await tick();assert.ok(a.modais[0].querySelector('canvas'));assert.equal(a.c.E.saudeDocumentos,undefined);
 });
 test('revisão valida item vazio, página e cobertura antes de persistir, e cancelar nunca cria mapa',async()=>{
  const a=ambiente({estado:{exames:[{id:'e'}]}});a.c.saudeRevisarDocumento(anexo);await tick();const box=a.modais[0];await clic(botao(box,'Adicionar item'));await clic(botao(box,'Salvar revisão'));assert.equal(a.c.E.saudeDocumentos,undefined);assert.match(box.textContent,/Preencha o item/);const linha=box.querySelector('.sdoc-item');linha.querySelector('[name=descricao]').value='Item fictício';linha.querySelector('[name=pagina]').value='0';await clic(botao(box,'Salvar revisão'));assert.match(box.textContent,/Confira a página/);linha.querySelector('[name=pagina]').value='1';box.querySelector('[data-sdoc=cobertura]').value='completa';await clic(botao(box,'Salvar revisão'));assert.match(box.textContent,/Indique as páginas/);a.fechamentos[0]();assert.equal(a.c.E.saudeDocumentos,undefined);assert.equal(a.chamadas.filter(c=>c[0]==='salvar').length,0);
@@ -70,4 +74,19 @@ test('abrir origem resolve coleção plural e registro por ID no estado atual',a
 });
 test('cobertura completa recusa itens pendentes e trechos não reconhecidos até conferência explícita',async()=>{
  const a=ambiente({estado:{exames:[{id:'e'}]}});a.c.saudeRevisarDocumento(anexo);await tick();const box=a.modais[0];box.querySelector('[data-sdoc=cobertura]').value='completa';box.querySelector('[data-sdoc=paginasRevisadas]').value='1';await clic(botao(box,'Adicionar item'));const item=box.querySelector('.sdoc-item');item.querySelector('[name=descricao]').value='Item fictício';await clic(botao(box,'Salvar revisão'));assert.equal(a.c.E.saudeDocumentos,undefined);assert.match(box.textContent,/itens pendentes/i);item.querySelector('[name=estado]').value='confirmado';box.querySelector('[data-sdoc=naoReconhecidos]').value='Trecho fictício ilegível';await clic(botao(box,'Salvar revisão'));assert.equal(a.c.E.saudeDocumentos,undefined);assert.match(box.textContent,/não reconhecidos/i);box.querySelector('[data-sdoc=naoReconhecidos]').value='';await clic(botao(box,'Salvar revisão'));assert.equal(a.c.E.saudeDocumentos['a-ficticio'].cobertura,'completa');assert.equal(a.c.E.saudeDocumentos['a-ficticio'].itens[0].estado,'confirmado');
+});
+
+test('metadados null/array e itens null não derrubam catálogo ou revisão',async()=>{
+ for(const salvo of [null,[],{itens:[null,{descricao:'Válido fictício',estado:'pendente'}]}]){
+  const a=ambiente({estado:{exames:[{id:'e'}],saudeDocumentos:{'a-ficticio':salvo}},arquivos:{'exame:e':[anexo]}}),box=a.c.quadroDocumentosSaude();await tick();assert.equal(box.querySelectorAll('.sdoc-card').length,1);assert.doesNotThrow(()=>a.c.saudeRevisarDocumento(anexo));await tick();assert.equal(a.modais[0].querySelectorAll('.sdoc-item').length,salvo?.itens?1:0);
+ }
+});
+test('cartão mostra data BR e Até inclui arquivos com timestamp no mesmo dia',async()=>{
+ const a=ambiente({estado:{exames:[{id:'e'}]},arquivos:{'exame:e':[{...anexo,em:'2026-10-18T23:59:59Z'}]}}),box=a.c.quadroDocumentosSaude();await tick();assert.match(box.querySelector('.sdoc-card').textContent,/18\/10\/2026/);const ate=box.querySelector('[data-sdoc=ate]');ate.value='2026-10-18';ate.onchange();assert.equal(box.querySelectorAll('.sdoc-card').length,1);
+});
+test('100% ajusta PDF à largura da região e zoom amplia a página dentro dela',async()=>{
+ const a=ambiente();a.c.saudeAbrirDocumento(anexo);const box=a.modais[0];Object.defineProperty(box.querySelector('.sdoc-viewport'),'clientWidth',{value:300});await tick();await tick();assert.equal(box.querySelector('canvas').width,300);const zoom=box.querySelector('[data-sdoc=zoom]');zoom.value='150';await zoom.onchange();assert.equal(box.querySelector('canvas').width,450);
+});
+test('fechar enquanto URL é resolvida revoga blob tardio e não cria tarefa PDF',async()=>{
+ const a=ambiente();let resolver,revogada;a.c.arqUrlDe=()=>new Promise(r=>resolver=r);a.c.URL=class extends URL {static revokeObjectURL(u){revogada=u}};a.c.saudeAbrirDocumento(anexo);a.fechamentos[0]();resolver('blob:https://central.example.test/tardio');await tick();assert.equal(revogada,'blob:https://central.example.test/tardio');assert.equal((await a.pdf).config,undefined);assert.equal(a.modais[0].querySelector('canvas'),null);
 });
