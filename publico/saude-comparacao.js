@@ -1,6 +1,8 @@
 /* Comparação documental: valores e unidades, sem inferir melhora clínica. */
 const SaudeComparacao=(()=>{
   const unidade=x=>String(x.unidade||'').trim().replace(/\s+/g,' ');
+  const metodo=x=>String(x.metodo||'').trim().toLocaleLowerCase('pt-BR');
+  const compativel=(a,b)=>unidade(a)===unidade(b)&&metodo(a)===metodo(b);
   const chave=x=>normaliza(String(x.exame||'').trim());
   const valido=x=>chave(x)&&resultadoSaudeRegistrado(x);
   function linhas(lista,ate,base){
@@ -13,6 +15,7 @@ const SaudeComparacao=(()=>{
       else if(anteriores.filter(x=>x.data===anterior.data).length>1)motivo='Mais de um resultado na data de comparação';
       else if(!unidade(atual)||!unidade(anterior))motivo='Conferir unidade no laudo';
       else if(unidade(atual)!==unidade(anterior))motivo='Unidades diferentes';
+      else if(metodo(atual)!==metodo(anterior))motivo='Métodos diferentes ou não informados em uma das coletas';
       else if(!Number.isFinite(numeroResultadoSaude(atual.valor))||!Number.isFinite(numeroResultadoSaude(anterior.valor)))motivo='Resultado não numérico';
       else{const a=numeroResultadoSaude(anterior.valor),b=numeroResultadoSaude(atual.valor);diferenca=b-a;percentual=a===0?null:100*(b-a)/Math.abs(a)}
       return {nome:atual.exame,atual,anterior,itens,motivo,diferenca,percentual};
@@ -45,7 +48,7 @@ const SaudeComparacao=(()=>{
     for(const c of E.consultas){const g=E.tratamentos.find(t=>t.id===c.tratamentoId);if(g&&valorSaude('saude:consulta:'+c.id,c)===null)add('Consultas','Valor da consulta não informado',c,()=>editarConsultaTratamento(g,c))}
     return avisos;
   }
-  return {linhas,auditoria,unidade,valido};
+  return {linhas,auditoria,unidade,valido,compativel};
 })();
 function auditoriaSaude(){
   abrirModal('🔎 Qualidade dos dados da Saúde','Pendências de cadastro e consistência documental. Os registros originais são preservados.',(c,fechar)=>{
@@ -55,10 +58,11 @@ function auditoriaSaude(){
   });
 }
 let examesComparacaoAte='',examesComparacaoBase='',examesComparacaoBusca='',examesComparacaoFiltro='todos',examesComparacaoMarcador='';
-function dashboardExamesSaude(){
+function dashboardExamesSaude(opcoes={}){
+  const registros=Array.isArray(opcoes.registros)?opcoes.registros:E.exames;
   const box=el('<section data-bid="sa-ex-dash" class="exames-dashboard trat-card"><div class="trat-toolbar"><div><small>HISTÓRICO DE RESULTADOS</small><h2>🧪 Comparação de exames</h2></div><div class="trat-actions"></div></div><div class="exames-controles"></div><div class="trat-kpis exames-kpis"></div><div class="trat-filtros exames-filtros"></div><div class="exames-quadro"></div><div class="exames-tendencia"></div></section>');
   box.querySelector('.trat-actions').append(acao('+ Exame',()=>novoExameRotina(),'mini'),acao('📄 Importar resultados',importarExamesRotina,'ghost mini'),acao('🔎 Conferir dados',auditoriaSaude,'ghost mini'));
-  const datas=[...new Set(E.exames.filter(SaudeComparacao.valido).map(x=>x.data))].sort();
+  const datas=[...new Set(registros.filter(SaudeComparacao.valido).map(x=>x.data))].sort();
   if(!datas.includes(examesComparacaoAte))examesComparacaoAte=datas.at(-1)||'';
   if(!datas.includes(examesComparacaoBase)||examesComparacaoBase>=examesComparacaoAte)examesComparacaoBase=datas.filter(d=>d<examesComparacaoAte).at(-1)||'';
   const controls=box.querySelector('.exames-controles');
@@ -66,7 +70,7 @@ function dashboardExamesSaude(){
   const ate=sel('Resultados até',examesComparacaoAte,datas.map(d=>[d,fmtDataAno(d)])),base=sel('Comparar com',examesComparacaoBase,[['','Sem coleta anterior'],...datas.filter(d=>d<examesComparacaoAte).map(d=>[d,fmtDataAno(d)])]);
   const busca=el('<label>Buscar marcador<input type="search" aria-label="Buscar marcador" placeholder="Nome do exame"></label>');controls.append(busca);busca.querySelector('input').value=examesComparacaoBusca;
   function pintar(){
-    const todos=SaudeComparacao.linhas(E.exames,examesComparacaoAte,examesComparacaoBase),linhas=todos.filter(x=>(examesComparacaoFiltro!=='comparaveis'||x.diferenca!==null)&&(examesComparacaoFiltro!=='conferir'||x.motivo)&&normaliza(x.nome).includes(normaliza(examesComparacaoBusca)));
+    const todos=SaudeComparacao.linhas(registros,examesComparacaoAte,examesComparacaoBase),linhas=todos.filter(x=>(examesComparacaoFiltro!=='comparaveis'||x.diferenca!==null)&&(examesComparacaoFiltro!=='conferir'||x.motivo)&&normaliza(x.nome).includes(normaliza(examesComparacaoBusca)));
     box.querySelector('.exames-kpis').innerHTML=[['Marcadores',todos.length],['Comparações disponíveis',todos.filter(x=>x.diferenca!==null).length],['Sem comparação',todos.filter(x=>x.diferenca===null).length],['Coletas registradas',datas.length]].map(([l,v])=>'<article class="trat-kpi"><small>'+l+'</small><b>'+v+'</b></article>').join('');
     const chips=box.querySelector('.exames-filtros');chips.innerHTML='';[['todos','Todos'],['comparaveis','Comparáveis'],['conferir','A conferir']].forEach(([k,l])=>{const b=acao(l,()=>{examesComparacaoFiltro=k;pintar()},'ghost mini');b.setAttribute('aria-pressed',String(k===examesComparacaoFiltro));chips.append(b)});
     const quadro=box.querySelector('.exames-quadro');quadro.innerHTML='';
@@ -74,14 +78,16 @@ function dashboardExamesSaude(){
     if(!linhas.length){quadro.append(el('<div class="trat-baseline"><span>🧪</span><div><b>'+(!datas.length?'Seus exames, lado a lado':'Nenhum marcador neste filtro')+'</b><p>'+(!datas.length?'Adicione resultados de pelo menos duas coletas para comparar. Fotos e PDFs podem ser anexados à ficha do exame.':'Revise a busca e as datas selecionadas.')+'</p></div></div>'));box.querySelector('.exames-tendencia').innerHTML='';return}
     const rol=el('<div class="saude-matriz-scroll" tabindex="0" role="region" aria-label="Comparativo de exames"><table class="saude-matriz"><thead><tr><th>Exame / unidade</th><th>Anterior</th><th>Atual</th><th>Variação</th><th>Referência do laudo</th><th>Detalhes</th></tr></thead><tbody></tbody></table></div>');
     linhas.forEach(x=>{const tr=document.createElement('tr'),valor=r=>r?esc(r.valor==null||r.valor===''?'—':r.valor)+'<small>'+fmtDataAno(r.data)+'</small>':'Não informado';tr.innerHTML='<th scope="row">'+esc(x.nome)+'<small>'+esc(SaudeComparacao.unidade(x.atual)||'Unidade a conferir')+'</small></th><td>'+valor(x.anterior)+'</td><td>'+valor(x.atual)+'</td><td>'+esc(x.diferenca===null?x.motivo:(x.diferenca>0?'↑ +':x.diferenca<0?'↓ ':'= ')+x.diferenca.toLocaleString('pt-BR',{maximumFractionDigits:3})+' '+SaudeComparacao.unidade(x.atual))+(x.percentual!==null?'<small>'+esc((x.percentual>0?'+':'')+x.percentual.toLocaleString('pt-BR',{maximumFractionDigits:1})+'%')+'</small>':'')+'</td><td>'+esc(x.atual.referenciaLaudo||'Consultar laudo original')+'<small>'+esc(x.atual.resultado||'Sem avaliação registrada')+'</small></td><td></td>';tr.lastElementChild.append(acao('Ver gráfico',()=>{examesComparacaoMarcador=x.nome;grafico(todos)},'ghost mini'),acao('Abrir exame',()=>modalExame(x.atual),'ghost mini'));rol.querySelector('tbody').append(tr)});quadro.append(rol);
+    const cards=el('<div class="exames-cards-mobile"></div>');linhas.forEach(x=>{const c=el('<article class="sui-card"><h3>'+esc(x.nome)+'</h3><p>Atual: <b>'+esc(x.atual.valor)+' '+esc(SaudeComparacao.unidade(x.atual))+'</b> · '+fmtDataAno(x.atual.data)+'</p><p>Anterior: '+esc(x.anterior?x.anterior.valor:'Não informado')+(x.anterior?' · '+fmtDataAno(x.anterior.data):'')+'</p><p>'+esc(x.diferenca===null?x.motivo:'Variação: '+x.diferenca.toLocaleString('pt-BR')+' '+SaudeComparacao.unidade(x.atual))+'</p></article>');c.append(acao('Abrir exame',()=>typeof saudeEditarRegistro==='function'?saudeEditarRegistro('exames',x.atual):modalExame(x.atual),'ghost'));cards.append(c)});quadro.append(cards);
     grafico(todos);
   }
   function grafico(linhas){const area=box.querySelector('.exames-tendencia');area.innerHTML='';const x=linhas.find(x=>x.nome===examesComparacaoMarcador)||linhas.find(x=>x.diferenca!==null)||linhas[0];if(!x)return;
-    const validos=x.itens.filter(r=>SaudeComparacao.unidade(r)&&SaudeComparacao.unidade(r)===SaudeComparacao.unidade(x.atual)&&Number.isFinite(numeroResultadoSaude(r.valor))&&x.itens.filter(y=>y.data===r.data).length===1);
-    area.append(el('<header><h3>📈 '+esc(x.nome)+'</h3><p class="trat-muted">'+esc(SaudeComparacao.unidade(x.atual)||'Unidade a informar')+' · resultados registrados, sem projeção.</p></header>'));
+    const validos=x.itens.filter(r=>SaudeComparacao.unidade(r)&&SaudeComparacao.compativel(r,x.atual)&&Number.isFinite(numeroResultadoSaude(r.valor))&&x.itens.filter(y=>y.data===r.data).length===1);
+    area.append(el('<header><h3>📈 '+esc(x.nome)+'</h3><p class="trat-muted">'+esc(SaudeComparacao.unidade(x.atual)||'Unidade a informar')+' · resultados registrados, sem projeção. Método: '+esc(x.atual.metodo||'não informado')+'.</p></header>'));
     if(validos.length<2)area.append(el('<p>São necessárias duas coletas numéricas, com a mesma unidade e sem duplicidade, para traçar a evolução.</p>'));
     else area.append(el('<div class="grafico">'+gLinha(validos.map(r=>({r:fmtDataAno(r.data),v:numeroResultadoSaude(r.valor)})),{fmt:v=>v.toLocaleString('pt-BR')})+'</div>'));
   }
+  if(typeof saudeRevisarRelatorio==='function')box.querySelector('.trat-actions').append(acao('PDF do comparativo',()=>{const rs=SaudeComparacao.linhas(registros,examesComparacaoAte,examesComparacaoBase).filter(x=>(examesComparacaoFiltro!=='comparaveis'||x.diferenca!==null)&&(examesComparacaoFiltro!=='conferir'||x.motivo)&&normaliza(x.nome).includes(normaliza(examesComparacaoBusca))).map(x=>({oque:x.nome,data:x.atual.data,valor:x.atual.valor,unidade:SaudeComparacao.unidade(x.atual),anterior:x.anterior?x.anterior.valor+' · '+fmtDataAno(x.anterior.data):'Não informado',variacao:x.diferenca===null?x.motivo:x.diferenca.toLocaleString('pt-BR')+' '+SaudeComparacao.unidade(x.atual),referenciaLaudo:x.atual.referenciaLaudo,metodo:x.atual.metodo}));saudeRevisarRelatorio({de:examesComparacaoBase,ate:examesComparacaoAte,geradoEm:new Date().toISOString(),secoes:[{tipo:'comparacao',registros:rs}]})},'ghost'));
   ate.onchange=()=>{examesComparacaoAte=ate.value;const ds=datas.filter(d=>d<ate.value);if(!ds.includes(examesComparacaoBase))examesComparacaoBase=ds.at(-1)||'';base.innerHTML='<option value="">Sem coleta anterior</option>'+ds.map(d=>'<option value="'+d+'">'+fmtDataAno(d)+'</option>').join('');base.value=examesComparacaoBase;pintar()};base.onchange=()=>{examesComparacaoBase=base.value;pintar()};busca.querySelector('input').oninput=e=>{examesComparacaoBusca=e.target.value;pintar()};pintar();return box;
 }
 function fotosEvolucaoTratamento(g,m){

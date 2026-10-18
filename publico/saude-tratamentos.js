@@ -57,8 +57,8 @@ const SaudeTratamentos = (() => {
 })();
 let tratamentoSelecionado='',tratamentoFiltro='ativos';
 function tratamentoCommit(t,fn){
-  const antes=structuredClone(t);
-  try{fn();salvar();return true}catch(e){for(const k of Object.keys(t))delete t[k];Object.assign(t,antes);throw e}
+  const antes=structuredClone(t),mt=Object.getOwnPropertyDescriptor(E,'_mt');
+  try{fn();salvar();return true}catch(e){for(const k of Object.keys(t))delete t[k];Object.assign(t,antes);if(mt)Object.defineProperty(E,'_mt',mt);else delete E._mt;throw e}
 }
 function tratamentoForm(titulo,campos,base,aoSalvar){
   abrirModal(titulo,'Salve apenas informações confirmadas. A prescrição original continua nos anexos.',(c,fechar)=>{
@@ -75,11 +75,12 @@ function editarTratamento(t,grupo){
   tratamentoForm(novo?'Novo medicamento ou cuidado':'Editar medicamento ou cuidado',[
     ['oque','Nome do medicamento ou cuidado *'],['tipo','Tipo','select',['Medicamento','Suplemento','Procedimento','Fisioterapia','Acompanhamento','Outro']],
     ['status','Situação','select',['A confirmar','Em andamento','Contínuo','Pausado','Encerrado']],['motivo','Objetivo informado'],
-    ['frequencia','Orientação / dose conforme a receita','textarea'],['usoDiario','Uso diário, conforme a orientação cadastrada','checkbox'],['inicio','Início confirmado','date'],['fim','Término previsto','date'],
+    ['frequencia','Orientação / dose conforme a receita','textarea'],['usoDiario','Uso diário, conforme a orientação cadastrada','checkbox'],['horariosUsoTexto','Horários confirmados por tomada (ex.: 08:00, 20:00); vazio mantém total diário'],['inicio','Início confirmado','date'],['fim','Término previsto','date'],
     ['medico','Médico / profissional'],['especialidade','Especialidade informada'],['contatoMedico','Telefone do consultório','tel'],['enderecoMedico','Endereço do consultório'],
     ['unidade','Unidade do estoque (cápsula, ampola, g…)'],['estoqueInicial','Estoque inicial disponível','number'],['alertaEstoque','Avisar quando restarem (unidades)','number'],
-    ['consumoPorCiclo','Quantidade confirmada por ciclo ou total por dia, se diário (unidades do estoque)','number'],['intervaloConsumoDias','Intervalo confirmado entre ciclos (dias inteiros)','number'],['proximaData','Próximo cuidado confirmado','date'],['horario','Horário escolhido','time'],['obs','Pendências / orientações adicionais','textarea']
-  ],{...t,usoDiario:SaudeTratamentos.diario(t)},d=>{
+    ['consumoPorCiclo','Quantidade por tomada configurada ou total diário, sem horários individuais (unidades do estoque)','number'],['intervaloConsumoDias','Intervalo confirmado entre ciclos (dias inteiros)','number'],['proximaData','Próximo cuidado confirmado','date'],['horario','Horário escolhido','time'],['obs','Pendências / orientações adicionais','textarea']
+  ],{...t,usoDiario:SaudeTratamentos.diario(t),horariosUsoTexto:(t.horariosUso||[]).join(', ')},d=>{
+    const horarios=String(d.horariosUsoTexto||'').split(/[,;\s]+/).filter(Boolean);if(horarios.some(h=>!/^([01]\d|2[0-3]):[0-5]\d$/.test(h)))throw Error('Informe horários como 08:00 e 20:00, separados por vírgula.');d.horariosUso=[...new Set(horarios)].sort();delete d.horariosUsoTexto;
     if(d.usoDiario)d.intervaloConsumoDias=1;
     if(!d.oque)throw Error('Informe o nome do tratamento.');
     for(const k of ['inicio','fim','proximaData'])if(d[k]&&!dataISOValida(d[k]))throw Error('Confira a data informada.');
@@ -109,7 +110,7 @@ function registrarUsoTratamento(t,d){
       if(['Pausado','Encerrado'].includes(t.status)||!d.confirmarEmUso)throw Error('Marque a confirmação de que o medicamento está em uso para continuar.');
       t.status='Em andamento';t.usoConfirmadoEm=new Date().toISOString();
     }
-    const {confirmarEmUso,...uso}=d;SaudeTratamentos.registrarUso(t,{...uso,quantidade:+d.quantidade});
+    const {confirmarEmUso,...uso}=d;if(d.ocorrenciaId&&typeof SaudePainelModelo!=='undefined')SaudePainelModelo.registrarOcorrencia(t,{...uso,quantidade:+d.quantidade,estado:'Registrado'},u=>SaudeTratamentos.registrarUso(t,u));else SaudeTratamentos.registrarUso(t,{...uso,quantidade:+d.quantidade});
   });
 }
 function quadroUsoDireto(t,aoSalvar){
@@ -117,6 +118,7 @@ function quadroUsoDireto(t,aoSalvar){
   const form=box.querySelector('form'),q=form.querySelector('[name=quantidade]'),bloqueado=['Pausado','Encerrado'].includes(t.status),unidade=SaudeTratamentos.controlaEstoque(t);
   q.value=t.consumoPorCiclo||'';q.setAttribute('aria-label','Quantidade usada ('+(t.unidade||'defina a unidade')+')');form.querySelector('.trat-uso-linha span').textContent=t.unidade||'Unidade a definir';
   form.querySelector('[name=data]').value=hoje();form.querySelector('button').disabled=bloqueado||!unidade;
+  if(typeof SaudePainelModelo!=='undefined'&&(t.horariosUso||[]).length){const l=el('<label class="trat-uso-ocorrencia">Ocorrência planejada<select name="ocorrenciaId"></select></label>');form.querySelector('.trat-uso-linha').after(l);const pintarOcorrencias=()=>{const s=l.querySelector('select');s.innerHTML='<option value="">Uso sem vínculo com horário planejado</option>';SaudePainelModelo.ocorrencias(t,form.querySelector('[name=data]').value).forEach(o=>s.append(el('<option value="'+esc(o.id)+'"'+(['Registrado','Não utilizado'].includes(o.estado)?' disabled':'')+'>'+esc(o.hora+' · '+o.estado)+'</option>')))};pintarOcorrencias();form.querySelector('[name=data]').onchange=pintarOcorrencias}
   if(!SaudeTratamentos.ativo(t)&&!bloqueado){const check=el('<label class="trat-uso-confirmar"><input type="checkbox" name="confirmarEmUso"> Confirmo que este medicamento ou cuidado está em uso</label>');form.querySelector('.trat-uso-linha').after(check)}
   if(bloqueado)box.append(el('<p class="trat-uso-nota">Uso pausado ou encerrado. Confira a situação em Editar antes de registrar.</p>'));
   const aviso=SaudeTratamentos.alertaReposicao(t),alerta=box.querySelector('[data-alerta-reposicao]');alerta.dataset.nivel=aviso.nivel;alerta.querySelector('p').textContent=aviso.texto;
@@ -125,7 +127,7 @@ function quadroUsoDireto(t,aoSalvar){
     const b=acao(compra?'Informar quantidade da compra':'Definir unidade e estoque',()=>compra?comprarTratamento(t,compra):editarTratamento(t),'ghost mini');if(compra)b.dataset.completarCompra='';alerta.append(b);
   }
   form.onsubmit=e=>{e.preventDefault();try{
-    registrarUsoTratamento(t,{data:form.querySelector('[name=data]').value,hora:form.querySelector('[name=hora]').value||new Date().toTimeString().slice(0,5),quantidade:q.value,obs:form.querySelector('[name=obs]').value.trim(),confirmarEmUso:!!form.querySelector('[name=confirmarEmUso]')?.checked});aoSalvar();
+    registrarUsoTratamento(t,{data:form.querySelector('[name=data]').value,hora:form.querySelector('[name=hora]').value||new Date().toTimeString().slice(0,5),quantidade:q.value,obs:form.querySelector('[name=obs]').value.trim(),ocorrenciaId:form.querySelector('[name=ocorrenciaId]')?.value||'',confirmarEmUso:!!form.querySelector('[name=confirmarEmUso]')?.checked});aoSalvar();
   }catch(erro){form.querySelector('[role=alert]').textContent=erro.message}};
   return box;
 }
@@ -160,7 +162,7 @@ function quadroItensTratamento(itens,grupo){
     d.append(el('<header><small>'+esc(t.tipo||'Tratamento')+'</small><h3>'+esc(t.oque||'Tratamento')+'</h3><p>'+esc(t.status||'A confirmar')+(t.inicio?' · início '+fmtDataAno(t.inicio):' · início não confirmado')+'</p></header>'));
     const usoDireto=SaudeTratamentos.controlaEstoque(t)||['Medicamento','Suplemento'].includes(t.tipo)?quadroUsoDireto(t,pintar):null;
     const a=el('<div class="trat-actions"></div>');a.append(acao('✏️ Editar',()=>editarTratamento(t),'ghost mini'));if(SaudeTratamentos.controlaEstoque(t))a.append(acao('🛒 Compra',()=>comprarTratamento(t),'ghost mini'));a.append(acao('📈 Evolução',()=>evolucaoTratamento(t),'ghost mini'),acao('📅 Lembrete',()=>agendaTratamento(t),'ghost mini'));d.append(a);if(usoDireto)d.append(usoDireto);
-    if(SaudeTratamentos.diario(t)){
+    if(SaudeTratamentos.diario(t)&&!(t.horariosUso?.length>1)){
       const feito=!!SaudeTratamentos.usoHoje(t),configurado=SaudeTratamentos.controlaEstoque(t)&&SaudeTratamentos.numero(t.consumoPorCiclo)>0;
       const bloco=el('<section class="trat-diario"><label><input type="checkbox" data-uso-diario><span></span></label><p></p><p role="status" data-erro-uso-diario></p></section>'),check=bloco.querySelector('input');
       check.checked=feito;check.disabled=feito||!SaudeTratamentos.ativo(t)||!configurado;
@@ -169,13 +171,23 @@ function quadroItensTratamento(itens,grupo){
       check.onchange=()=>{if(!check.checked)return;try{tratamentoCommit(t,()=>SaudeTratamentos.registrarUsoDiario(t));pintar()}catch(e){check.checked=false;bloco.querySelector('[data-erro-uso-diario]').textContent=e.message}};
       d.append(bloco);
     }
-    d.append(el('<div class="trat-resumo"><div><small>Estoque</small><b>'+esc(!SaudeTratamentos.controlaEstoque(t)?'Não se aplica':saldo===null?'Não informado':saldo+' '+(t.unidade||''))+'</b><span>'+esc(SaudeTratamentos.controlaEstoque(t)?(saldo===null?'Quantidade a confirmar':SaudeTratamentos.estoque(t)):'Sem controle de material')+'</span></div><div><small>Última compra</small><b>'+esc(compras.at(-1)?.data?fmtDataAno(compras.at(-1).data):'Não informada')+'</b><span>'+esc(compras.at(-1)?.marca||'Marca não informada')+'</span></div><div><small>Previsão de acabar</small><b>'+esc(previsao.data?fmtDataAno(previsao.data):'A confirmar')+'</b><span>'+esc(previsao.motivo)+'</span></div><div><small>Próximo cuidado</small><b>'+esc(t.proximaData?fmtDataAno(t.proximaData):'A definir')+'</b><span>'+esc(t.horario||'Horário a definir')+'</span></div></div>'));
+    if(t.horariosUso?.length>1)d.append(el('<p class="trat-uso-nota">Tomadas configuradas: '+esc(t.horariosUso.join(' · '))+'. Registre cada ocorrência na tela Hoje ou selecione o horário no formulário acima.</p>'));
+    const resumo=el('<div class="trat-resumo"></div>'),resumoCards=[];
+    if(SaudeTratamentos.controlaEstoque(t))resumoCards.push(['Estoque',saldo===null?'Quantidade a confirmar':saldo+' '+t.unidade,saldo===null?'Complete a quantidade em Editar ou Compra.':SaudeTratamentos.estoque(t)]);
+    if(compras.at(-1)?.data)resumoCards.push(['Última compra',fmtDataAno(compras.at(-1).data),compras.at(-1).marca||'Marca não informada']);
+    if(previsao.data)resumoCards.push(['Previsão de acabar',fmtDataAno(previsao.data),previsao.motivo]);
+    if(t.proximaData)resumoCards.push(['Próximo cuidado',fmtDataAno(t.proximaData),t.horario||'Horário a definir']);
+    resumoCards.forEach(([titulo,valor,nota])=>resumo.append(el('<div><small>'+esc(titulo)+'</small><b>'+esc(valor)+'</b><span>'+esc(nota)+'</span></div>')));
+    if(!SaudeTratamentos.controlaEstoque(t))resumo.append(el('<p class="trat-previsao-pendente">Estoque: Não se aplica · sem controle de material.</p>'));
+    if(!previsao.data){const nota=el('<p class="trat-previsao-pendente"></p>');nota.textContent='Previsão de duração: '+previsao.motivo;resumo.append(nota)}
+    d.append(resumo);
+
     d.append(el('<section class="trat-info"><h4>📋 Orientação registrada</h4><p class="trat-texto">'+esc(t.frequencia||'Consulte a receita e registre a orientação.')+'</p>'+(t.obs?'<p class="trat-texto trat-aviso">'+esc(t.obs)+'</p>':'')+'<p><b>'+usos.length+' uso(s) registrado(s).</b> Estoque baixa somente após registrar um uso. Avisos de reposição aparecem neste painel; não há compra ou alteração de dose automática.</p></section>'));
     d.append(el('<details class="trat-info"><summary>🩺 Médico e consultório</summary><p>'+esc(t.medico||'Profissional a informar')+'</p><p>'+esc(t.especialidade||'')+'</p><p>'+esc(t.contatoMedico||'Telefone a informar')+'</p><p>'+esc(t.enderecoMedico||'Endereço a informar')+'</p></details>'));
     const arquivos=el('<details class="trat-info" open><summary>📎 Receitas e documentos</summary></details>');arquivos.append(areaArquivos('tratamento:'+t.id,'Adicionar foto ou PDF do tratamento'));if(t.origemTratamentoId&&E.tratamentos.some(x=>x.id===t.origemTratamentoId)){arquivos.append(el('<p>Documentos do plano de origem:</p>'));arquivos.append(areaArquivos('tratamento:'+t.origemTratamentoId,'',true))}d.append(arquivos);
-    const hist=el('<details class="trat-info"><summary>🕒 Histórico · '+(compras.length+usos.length+evolucao.length)+' registros</summary></details>');
-    const eventos=[...compras.map(x=>({...x,compra:true,texto:'Compra: '+(x.quantidade==null?'quantidade a informar':x.quantidade+' '+(t.unidade||''))+' · '+x.marca})),...usos.map(x=>({...x,texto:'Uso às '+x.hora+': '+x.quantidade+' '+(t.unidade||''),uso:true})),...evolucao.map(x=>({...x,texto:'Evolução: '+x.descricao+(x.efeitos?' · Sintomas: '+x.efeitos:'')+(x.proximo?' · Próximo passo: '+x.proximo:'')}))].sort((a,b)=>b.data.localeCompare(a.data));
-    eventos.forEach(x=>{const row=el('<div class="trat-historico"><b>'+fmtDataAno(x.data)+'</b><p>'+esc(x.texto)+'</p><small>'+esc(x.obs||'')+'</small></div>');if(x.compra){const c=t.compras.find(c=>c.id===x.id),ref='saude:compra:'+c.id,v=valorSaude(ref,c);row.append(el('<p>'+esc(c.local||'Local a informar')+' · '+esc(v===null?'Valor a informar':brl(v))+'</p>'),acao('Corrigir compra',()=>comprarTratamento(t,c),'ghost mini'),acao(gastoSaude(ref)?'💸 Ver gasto vinculado':'💸 Vincular a Gastos',()=>vincularGastoSaude(ref,c),'ghost mini'));}if(x.uso)row.append(acao('Desfazer registro',()=>{if(!confirm('Desfazer este registro e devolver a quantidade ao estoque?'))return;try{tratamentoCommit(t,()=>t.usos.find(u=>u.id===x.id).desfeitoEm=new Date().toISOString());pintar()}catch(e){alert(e.message)}},'ghost mini'));hist.append(row)});d.append(hist);
+    const hist=el('<details class="trat-info"><summary>🕒 Histórico · '+(compras.length+usos.length+evolucao.length+(t.ocorrencias||[]).filter(o=>!o.desfeitoEm&&o.estado!=='Registrado').length)+' registros</summary></details>');
+    const eventos=[...(t.ocorrencias||[]).filter(o=>!o.desfeitoEm&&o.estado!=='Registrado').map(o=>({...o,ocorrencia:true,texto:o.estado+(o.horaPrevista&&o.horaPrevista!=='dia'?' · planejado '+o.horaPrevista:'')+(o.adiadoPara?' · novo horário '+o.adiadoPara:'')})),...compras.map(x=>({...x,compra:true,texto:'Compra: '+(x.quantidade==null?'quantidade a informar':x.quantidade+' '+(t.unidade||''))+' · '+x.marca})),...usos.map(x=>({...x,texto:'Uso às '+x.hora+': '+x.quantidade+' '+(t.unidade||''),uso:true})),...evolucao.map(x=>({...x,texto:'Evolução: '+x.descricao+(x.efeitos?' · Sintomas: '+x.efeitos:'')+(x.proximo?' · Próximo passo: '+x.proximo:'')}))].sort((a,b)=>b.data.localeCompare(a.data));
+    eventos.forEach(x=>{const row=el('<div class="trat-historico"><b>'+fmtDataAno(x.data)+'</b><p>'+esc(x.texto)+'</p><small>'+esc(x.obs||'')+'</small></div>');if(x.compra){const c=t.compras.find(c=>c.id===x.id),ref='saude:compra:'+c.id,v=valorSaude(ref,c);row.append(el('<p>'+esc(c.local||'Local a informar')+' · '+esc(v===null?'Valor a informar':brl(v))+'</p>'),acao('Corrigir compra',()=>comprarTratamento(t,c),'ghost mini'),acao(gastoSaude(ref)?'💸 Ver gasto vinculado':'💸 Vincular a Gastos',()=>vincularGastoSaude(ref,c),'ghost mini'));}if(x.uso)row.append(acao('Desfazer registro',()=>{if(!confirm('Desfazer este registro e devolver a quantidade ao estoque?'))return;try{tratamentoCommit(t,()=>t.usos.find(u=>u.id===x.id).desfeitoEm=new Date().toISOString());pintar()}catch(e){alert(e.message)}},'ghost mini'));if(x.ocorrencia)row.append(acao('Desfazer situação',()=>{try{tratamentoCommit(t,()=>t.ocorrencias.find(o=>o.id===x.id).desfeitoEm=new Date().toISOString());pintar()}catch(e){alert(e.message)}},'ghost mini'));hist.append(row)});d.append(hist);
   }
   pintar();return sec;
 }

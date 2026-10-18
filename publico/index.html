@@ -663,6 +663,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./central-fluida.css?v=25438d2d9ef6">
 <link rel="stylesheet" href="./documentos-revisao.css?v=90d5f0ab4afe">
 <link rel="stylesheet" href="./painel-compacto.css?v=4baf1a7c4d03">
+<link rel="stylesheet" href="./saude-painel.css?v=1a51ba4466c2">
 <link rel="stylesheet" href="./saude-visual.css?v=a6af9ad6f2c6">
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
 <link rel="stylesheet" href="./aviao.css?v=44fae810ca9e">
@@ -724,11 +725,14 @@ tr:hover .lixo{opacity:1}
 <script src="./fortemais-documentos.js?v=fc5f80ca53c6"></script>
 <script src="./fortemais-pdf.js?v=27455f7f3e11"></script>
 <script src="openclaw-fila.js?v=066cb079a2b5"></script>
-<script src="./saude-comparacao.js?v=e1e154463ba3"></script>
+<script src="./saude-comparacao.js?v=e98e9397f3b3"></script>
 <script src="./leonardo-design.js?v=e7e72ac5ec0c"></script>
 <script src="./rendimentos-modelo.js?v=1b7ecf7da152"></script>
 <script src="./rendimentos-avancado.js?v=57c6ed1815ca"></script>
-<script src="./saude-tratamentos.js?v=ce3009fbe457"></script>
+<script src="./saude-modelo.js?v=3d115423ea28"></script>
+<script src="./saude-documentos.js?v=b84409b155ce"></script>
+<script src="./saude-painel.js?v=70e819803ca8"></script>
+<script src="./saude-tratamentos.js?v=87fcd6f2683f"></script>
 <script src="donboy-email.js?v=6a1ba6d316f6"></script>
 <script>
 /* ============================================================
@@ -1117,7 +1121,7 @@ const SEED={
   obraM2Fora:[],
   assinaturas:[],seguros:[],planos:[],casa:[],documentos:[],metas:[],pessoas:[],paraEles:[],colapso:{},
   // saúde ampliada
-  vitais:[],vacinas:[],histFamiliar:[],rastreios:[],acervoDocumental:[],
+  vitais:[],vacinas:[],histFamiliar:[],rastreios:[],saudeDocumentos:{},saudePreferencias:{},acervoDocumental:[],
   /* O QUE EU SINTO, QUEM EU CONSULTEI, E A FISIOTERAPIA (15/09/2026).
      Antes disso a tela guardava o que MEDE (peso, pressão, exame) e o que TOMA
      (remédio, vacina) -- e não guardava o que DÓI. A queixa era digitada na
@@ -1260,7 +1264,7 @@ function carregar(){
   prepararDesenvolvimento(d);
   return d;
 }
-const salvar=()=>{E._mt=Math.max(Date.now(),(+E._mt||0)+1);localStorage.setItem(CHAVE,JSON.stringify(E));agendaPush()};
+const salvar=()=>{E._mt=Math.max(Date.now(),(+E._mt||0)+1);localStorage.setItem(CHAVE,JSON.stringify(E));if(typeof saudeNotificarGravacao==='function')saudeNotificarGravacao();agendaPush()};
 
 /* ---------------- visual ---------------- */
 const CORES_STATUS={'Realizado':['var(--sucesso-cl)','var(--sucesso)'],'Confirmado':['var(--azul-cl)','var(--azul)'],
@@ -5068,6 +5072,7 @@ function ultimoRegistroSaude(lista,campos){
   return lista.filter(x=>dataISOValida(x.data)&&x.data<=hoje()&&campos.every(k=>Number.isFinite(+x[k])&&+x[k]>0)).slice().sort((a,b)=>b.data.localeCompare(a.data))[0]||null;
 }
 function organizarSaude(pagina,alvo){
+  if(pagina.dataset.saudeWorkbench){if(alvo&&typeof saudeIr==='function'){SaudeUI.area=abaDoBlocoSaude(alvo);saudePainel(pagina)}return}
   pagina.classList.add('saude-layout');
   Object.entries({'sa-peso':'peso','sa-vit':'vitais','sa-trat':'tratamentos','sa-vac':'vacinas','sa-quei':'queixas','sa-cons':'consultas','sa-fisio':'fisio','sa-fam':'histFamiliar'}).forEach(([id,tipo])=>{const bt=pagina.querySelector('[data-bid="'+id+'"] .mais');if(bt)bt.onclick=()=>novoCuidadoRotina(tipo)});
   const opcoes=[['resumo','Resumo'],['exames','Exames'],['medidas','Medidas'],['queixas','Queixas e consultas'],['tratamentos','💊 Tratamentos'],['cuidados','Cuidados']];
@@ -5106,6 +5111,7 @@ function organizarSaude(pagina,alvo){
 }
 
 function vSaude(m) {
+  if(typeof saudePainel==='function'){saudePainel(m);return}
   const r = rr('saude');
   const ord = E.peso.filter(x=>dataISOValida(x.data)&&x.data<=hoje()&&+x.peso>0).sort((a, b) => (a.data || '').localeCompare(b.data || ''));
   const ult = ord[ord.length - 1], pri = ord[0];
@@ -16466,6 +16472,7 @@ function validarBackup(j){
     if(typeof FortemaisInovacoesModelo==='undefined')throw Error('Atualize a página para validar as inovações antes de restaurar.');
     FortemaisInovacoesModelo.validar(j.fortemaisInovacoes);
   }
+  if(j.saudeDocumentos&&Object.keys(j.saudeDocumentos).length){if(typeof SaudePainelModelo==='undefined')throw Error('Atualize a página para conferir os documentos da Saúde.');SaudePainelModelo.validarMetadados(j.saudeDocumentos);}
   validarBackupEmpresas(j);
   if(j.organogramas?.length){if(typeof LeoOrganograma==='undefined')throw Error('Atualize a página para validar os organogramas antes de restaurar.');LeoOrganograma.validar(j.organogramas);}
   if(j.desenvolvimento)for(const k of ['fontes','leituras','revisoes','reflexoes','validacoes','resultados'])if(j.desenvolvimento[k]!==undefined&&(!Array.isArray(j.desenvolvimento[k])||j.desenvolvimento[k].some(x=>!x||typeof x!=='object'||Array.isArray(x))))throw new Error('Lista inválida: desenvolvimento.'+k);
@@ -16521,8 +16528,8 @@ async function apiSync(metodo,corpo){
   return r.json();
 }
 let syncTimer=null;
-function pintaSync(t){const x=document.getElementById('stSync');if(x)x.textContent='☁ '+t}
-function agendaPush(){if(DEV||!pegaToken())return;clearTimeout(syncTimer);syncTimer=setTimeout(enviarNuvem,2500)}
+function pintaSync(t){const x=document.getElementById('stSync');if(x)x.textContent='☁ '+t;if(typeof saudeNotificarSync==='function')saudeNotificarSync(t)}
+function agendaPush(){if(DEV||!pegaToken())return;pintaSync('alterações pendentes');clearTimeout(syncTimer);syncTimer=setTimeout(enviarNuvem,2500)}
 // ---- sincronização com gravação condicional (CAS) -------------------------
 // Cada ABA guarda, em memória, a versão do servidor que viu por último
 // (_tabBase). O PUT leva essa base junto; o servidor só grava se ela ainda for
@@ -16544,7 +16551,7 @@ function lerRascunhoSync(){
 }
 function guardarRascunhoSync(){
   const formularios=[];
-  const fontes=[...document.querySelectorAll('#modais .fundo'),
+  const fontes=[...document.querySelectorAll('#modais .fundo'),...document.querySelectorAll('#main [data-uso-direto]'),
     ...[...document.querySelectorAll('#main [data-fm-pagina]')].filter(p=>p._fmDirty===true)];
   fontes.forEach(f=>{
     if(f.querySelector('[data-recuperacao-sync]'))return;
