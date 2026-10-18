@@ -11,7 +11,7 @@ const RendimentosModelo=(()=>{
   const [ano,m]=mes.split('-').map(Number),a=m===12?ano+1:ano,n=m===12?1:m+1;
   if(a>9999)throw Error('O próximo ano não é válido.');
   const destino=String(a).padStart(4,'0')+'-'+String(n).padStart(2,'0');
-  const fontes=registros.filter(x=>mensal(x)&&x.data.slice(0,7)===mes&&investimento(x));
+  const fontes=registros.filter(x=>mensal(x)&&x.data.slice(0,7)===mes);
   const ignorados=[],itens=[];
   for(const x of fontes){
    if(existentes.some(y=>y.copiadoDeId===x.id&&y.data?.slice(0,7)===destino)){ignorados.push(x);continue}

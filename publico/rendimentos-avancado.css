@@ -135,3 +135,14 @@
  .ra-app .ra-matriz td{min-width:105px}
 }
 @media print{.ra-app .ra-filtros-extra,.ra-app .ra-resumo-cab>.btn{display:none!important}.ra-app .ra-resumo[data-expandido=false] .ra-kpi small{display:block}}
+
+/* Cópia mensal: seleção explícita antes de criar qualquer lançamento. */
+.ra-copia-selecao{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:12px;background:var(--bg);border-radius:10px}
+.ra-copia-selecao p{margin:0 0 0 auto;font-size:13px;font-weight:650;color:var(--tinta)}
+.ra-copia-item{grid-template-columns:24px minmax(0,1fr) 170px;gap:14px}
+.ra-copia-item.is-selected{border-color:var(--marca);background:var(--marca-cl)}
+.ra-copia-descricao{min-width:0;overflow-wrap:anywhere}.ra-copia-anterior{display:block;margin-top:6px;font-size:12px;color:var(--suave)}
+.ra-copia-form input[type=checkbox]{width:20px;height:20px;min-height:20px;padding:0;margin:0;accent-color:var(--marca);cursor:pointer}
+.ra-copia-form input[data-copia-valor]:disabled{background:var(--bg);color:var(--suave);opacity:.7;cursor:not-allowed}
+.ra-copia-form .ff-actions{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--linha);padding:12px 0}
+@media(max-width:540px){.ra-copia-item{grid-template-columns:24px minmax(0,1fr);gap:10px}.ra-copia-item .ra-copia-valor{grid-column:2}.ra-copia-selecao p{width:100%;margin:0}}

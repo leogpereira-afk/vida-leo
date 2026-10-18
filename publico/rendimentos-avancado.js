@@ -152,40 +152,69 @@ const RendimentosUI=(()=>{
    input.onclick=e=>e.stopPropagation();input.onkeydown=e=>{e.stopPropagation();if(e.key==='Enter'){e.preventDefault();gravar()}else if(e.key==='Escape'){fechado=true;pinta()}};input.onblur=gravar;input.focus();input.select?.();
   }pinta();return td;
  }
- function copiarInvestimentos(mes,fontes,r){
-  const plano=RendimentosModelo.prepararCopia(fontes,mes,E.rendimentos);
+ function copiarLancamentos(mes,r){
+  const plano=RendimentosModelo.prepararCopia(E.rendimentos,mes,E.rendimentos);
   const nomeMes=iso=>meses[+iso.slice(5,7)-1]+'/'+iso.slice(0,4);
-  abrirModal('Copiar investimentos para '+nomeMes(plano.destino),'Confira os investimentos de '+nomeMes(mes)+' e preencha os novos valores.',(c,fechar)=>{
+  abrirModal('Copiar lançamentos para '+nomeMes(plano.destino),'Selecione o que deseja copiar de '+nomeMes(mes)+' e informe os novos valores.',(c,fechar)=>{
    const form=el('<form class="ra-copia-form"></form>'),campos=[];
-   form.appendChild(el('<p class="ff-note">Descrições e datas já estão preenchidas. Nenhum lançamento será criado até confirmar os valores.</p>'));
-   if(plano.ignorados.length)form.appendChild(el('<p class="ff-note">'+plano.ignorados.length+' investimento(s) já copiado(s) para este mês. Esses itens foram ignorados.</p>'));
+   form.appendChild(el('<p class="ff-note">Todos os tipos e todas as páginas deste mês estão nesta lista. Os filtros da tela não limitam a cópia. Descrições e datas são mantidas; o dia é ajustado quando o mês seguinte é mais curto.</p>'));
+   if(plano.ignorados.length)form.appendChild(el('<p class="ff-note">'+plano.ignorados.length+' lançamento(s) já copiado(s) para este mês. Esses itens foram ignorados.</p>'));
+   const selecao=el('<div class="ra-copia-selecao"></div>');
+   const todos=btn('Selecionar todos',()=>marcarTodos(true),'ghost mini');todos.dataset.copiaTodos='';
+   const limpar=btn('Desmarcar todos',()=>marcarTodos(false),'ghost mini');limpar.dataset.copiaLimpar='';
+   const resumo=el('<p role="status" aria-live="polite" data-copia-resumo></p>');
+   if(plano.itens.length){selecao.append(todos,limpar,resumo);form.appendChild(selecao)}
    for(const item of plano.itens){
-    const row=el('<div class="ra-copia-item"><div><strong></strong><p></p><small></small></div><label class="ra-field"><span>Novo valor (R$)</span><input type="text" inputmode="decimal" required data-copia-valor placeholder="0,00"></label></div>');
-    row.querySelector('strong').textContent=item.registro.empresa||'Sem empresa';
+    const row=el('<div class="ra-copia-item"><input type="checkbox" data-copia-selecionar><div class="ra-copia-descricao"><strong></strong><p></p><small></small><span class="ra-copia-anterior"></span></div><label class="ra-field ra-copia-valor"><span>Novo valor (R$)</span><input type="text" inputmode="decimal" data-copia-valor placeholder="Selecione para preencher" disabled></label></div>');
+    const nome=item.registro.empresa||'Sem empresa';
+    row.querySelector('strong').textContent=nome;
     row.querySelector('p').textContent=[item.registro.instituicao,item.registro.tipo,fmtDataAno(item.registro.data)].filter(Boolean).join(' · ');
     row.querySelector('small').textContent=item.registro.obs;
-    const input=row.querySelector('input');input.setAttribute('aria-label','Novo valor de '+(item.registro.empresa||'investimento')+' · '+item.registro.instituicao+' · '+fmtDataAno(item.registro.data));
-    campos.push({item,input,base:JSON.stringify(item.origem)});form.appendChild(row);
+    const valorAnterior=RendimentosModelo.numero(item.origem.valor);
+    row.querySelector('.ra-copia-anterior').textContent='Valor anterior: '+(valorAnterior===null?'não informado':money(valorAnterior));
+    const check=row.querySelector('[data-copia-selecionar]'),input=row.querySelector('[data-copia-valor]');
+    check.checked=false;check.setAttribute('aria-label','Copiar '+nome+' · '+(item.registro.tipo||'Sem tipo')+' · '+fmtDataAno(item.registro.data));
+    input.setAttribute('aria-label','Novo valor de '+nome+' · '+item.registro.instituicao+' · '+fmtDataAno(item.registro.data));
+    check.onchange=atualizarSelecao;
+    campos.push({item,input,check,row,base:JSON.stringify(item.origem)});form.appendChild(row);
    }
-   const erro=el('<p role="alert" class="form-erro" tabindex="-1"></p>'),actions=el('<div class="ff-actions"></div>'),cancelar=btn('Cancelar',fechar),salvarBt=btn('Confirmar '+plano.itens.length+' investimento(s)','', '');
+   const erro=el('<p role="alert" class="form-erro" tabindex="-1"></p>'),actions=el('<div class="ff-actions"></div>'),cancelar=btn('Cancelar',fechar),salvarBt=btn('Confirmar 0 lançamentos','', '');
    cancelar.dataset.copiaCancelar='';actions.appendChild(cancelar);
-   if(plano.itens.length){salvarBt.type='submit';actions.appendChild(salvarBt)}else form.appendChild(el('<p class="ff-note">Nenhum investimento novo para copiar neste recorte.</p>'));
+   if(plano.itens.length){salvarBt.type='submit';actions.appendChild(salvarBt)}else form.appendChild(el('<p class="ff-note">Nenhum lançamento novo para copiar neste mês.</p>'));
    form.append(erro,actions);c.appendChild(form);let concluido=false;
-   form.onsubmit=e=>{e.preventDefault();if(concluido||!campos.length)return;
+   function atualizarSelecao(){
+    let quantidade=0;
+    for(const campo of campos){
+     const marcado=campo.check.checked;
+     if(marcado)quantidade++;
+     campo.input.disabled=!marcado;campo.input.required=marcado;
+     campo.input.placeholder=marcado?'0,00':'Selecione para preencher';
+     campo.row.classList.toggle('is-selected',marcado);
+    }
+    resumo.textContent=quantidade+' de '+campos.length+' selecionados';
+    salvarBt.textContent='Confirmar '+quantidade+' lançamento'+(quantidade===1?'':'s');
+    salvarBt.disabled=quantidade===0||concluido;
+    todos.disabled=quantidade===campos.length;limpar.disabled=quantidade===0;
+    erro.textContent='';
+   }
+   function marcarTodos(marcado){campos.forEach(campo=>campo.check.checked=marcado);atualizarSelecao()}
+   atualizarSelecao();
+   form.onsubmit=e=>{e.preventDefault();if(concluido)return;
     try{
-     const novos=campos.map(({item,input,base})=>{
+     const escolhidos=campos.filter(campo=>campo.check.checked);
+     if(!escolhidos.length)throw Error('Selecione pelo menos um lançamento para copiar.');
+     const novos=escolhidos.map(({item,input,base})=>{
       if(!input.value.trim())throw Error('Informe o novo valor de '+item.registro.empresa+'.');
       const valor=financeiroNumero(input.value);if(valor===0)throw Error('Informe um valor diferente de zero.');
-      const atual=E.rendimentos.find(x=>x.id===item.origem.id);if(!atual||JSON.stringify(atual)!==base)throw Error('Um investimento de origem mudou. Feche e abra a cópia novamente.');
-      if(E.rendimentos.some(x=>x.copiadoDeId===item.origem.id&&x.data?.slice(0,7)===plano.destino))throw Error('Este investimento já foi copiado. Feche e abra novamente para conferir.');
+      const atual=E.rendimentos.find(x=>x.id===item.origem.id);if(!atual||JSON.stringify(atual)!==base)throw Error('Um lançamento de origem mudou. Feche e abra a cópia novamente.');
+      if(E.rendimentos.some(x=>x.copiadoDeId===item.origem.id&&x.data?.slice(0,7)===plano.destino))throw Error('Este lançamento já foi copiado. Feche e abra novamente para conferir.');
       return{...item.registro,id:uid(),valor};
      });
      const tamanho=E.rendimentos.length,mt=E._mt;E.rendimentos.push(...novos);
      try{salvar()}catch(falha){E.rendimentos.splice(tamanho);E._mt=mt;throw falha}
-     concluido=true;salvarBt.disabled=true;Object.assign(estado,{anos:[+plano.destino.slice(0,4)],meses:[+plano.destino.slice(5)],de:'',ate:'',busca:'',tipo:'',situacao:'Todos',pagina:1});fechar();
+     concluido=true;salvarBt.disabled=true;Object.assign(estado,{anos:[+plano.destino.slice(0,4)],meses:[+plano.destino.slice(5)],empresas:[],de:'',ate:'',busca:'',tipo:'',situacao:'Todos',pagina:1});fechar();
     }catch(falha){erro.textContent=falha.message||'Não foi possível salvar. Tente novamente.';erro.focus?.()}
    };
-   campos[0]?.input.focus();
   },r);
  }
  function linhasLancamentos(body,d,list,r){
@@ -201,7 +230,7 @@ const RendimentosUI=(()=>{
    const filhas=[];let trigger;
    if(g){const tr=document.createElement('tr'),td=document.createElement('td');tr.className='ra-grupo-mes';td.colSpan=pre.length;
     const rot=estado.grupo==='mes'?meses[+g.slice(5,7)-1].toLowerCase()+' de '+g.slice(0,4):g;
-    trigger=btn('',()=>{const on=trigger.getAttribute('aria-expanded')!=='true';estado.gruposAbertos[key]=on;trigger.setAttribute('aria-expanded',String(on));trigger.querySelector('small').textContent=(on?'▾ ':'▸ ')+todos.length+' lançamento(s)'+(todos.length>items.length?' · '+items.length+' nesta página':'');filhas.forEach(tr=>tr.hidden=!on)},'ra-grupo-toggle');trigger.innerHTML='<b>'+esc(rot)+'</b><small>'+(aberto?'▾ ':'▸ ')+todos.length+' lançamento(s)'+(todos.length>items.length?' · '+items.length+' nesta página':'')+'</small>';trigger.setAttribute('aria-expanded',String(aberto));const cab=el('<div class="ra-grupo-cab"></div>');cab.appendChild(trigger);if(estado.grupo==='mes'&&todos.some(RendimentosModelo.investimento)){const copiar=btn('Copiar investimentos → '+meses[(+g.slice(5,7))%12],()=>copiarInvestimentos(g,todos,r),'ghost mini');copiar.dataset.raCopiar=g;cab.appendChild(copiar)}td.appendChild(cab);tr.appendChild(td);
+    trigger=btn('',()=>{const on=trigger.getAttribute('aria-expanded')!=='true';estado.gruposAbertos[key]=on;trigger.setAttribute('aria-expanded',String(on));trigger.querySelector('small').textContent=(on?'▾ ':'▸ ')+todos.length+' lançamento(s)'+(todos.length>items.length?' · '+items.length+' nesta página':'');filhas.forEach(tr=>tr.hidden=!on)},'ra-grupo-toggle');trigger.innerHTML='<b>'+esc(rot)+'</b><small>'+(aberto?'▾ ':'▸ ')+todos.length+' lançamento(s)'+(todos.length>items.length?' · '+items.length+' nesta página':'')+'</small>';trigger.setAttribute('aria-expanded',String(aberto));const cab=el('<div class="ra-grupo-cab"></div>');cab.appendChild(trigger);if(estado.grupo==='mes'&&todos.some(RendimentosModelo.mensal)){const copiar=btn('Copiar lançamentos → '+meses[(+g.slice(5,7))%12],()=>copiarLancamentos(g,r),'ghost mini');copiar.dataset.raCopiar=g;cab.appendChild(copiar)}td.appendChild(cab);tr.appendChild(td);
     const reais=todos.filter(x=>!d.previsto(x)).reduce((s,x)=>s+(+x.valor),0),valores=[money(valor),estado.grupo==='mes'&&reais>0?'100%':'—',estado.grupo==='mes'?taxa(reais,anoTotal[g.slice(0,4)]):'—',...(cols.includes('obs')?[todos.some(d.previsto)?'Inclui previstos':'']:[]),...(cols.includes('acoes')?['']:[])];valores.forEach(v=>{const cell=document.createElement('td');cell.textContent=v;tr.appendChild(cell)});tbody.appendChild(tr);
    }
    items.forEach(x=>{const tr=document.createElement('tr');tr.dataset.raLanc=x.id;tr.className='ra-lancamento';tr.hidden=!!g&&!aberto;tr.tabIndex=0;tr.setAttribute('aria-label','Abrir rendimento de '+d.nome(x)+' em '+fmtDataAno(x.data));tr.onclick=()=>modalRendimento(x);tr.onkeydown=e=>{if(e.target===tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();modalRendimento(x)}};
