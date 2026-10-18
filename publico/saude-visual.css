@@ -100,3 +100,5 @@
 
 .saude-matriz tbody th{text-transform:none;font-size:12px;letter-spacing:normal}.saude-matriz small{text-transform:none;letter-spacing:normal}
 @media(max-width:600px){.saude-layout .btn.mini,.saude-layout .trat-filtros .btn{min-height:40px}.saude-matriz td .btn{min-height:40px}}
+
+.trat-diario{padding:14px 16px;border:1px solid var(--linha);border-radius:12px;background:var(--card);margin:14px 0}.trat-diario label,.rotina-form .trat-campo-check{display:flex;align-items:center;gap:10px;cursor:pointer}.trat-diario input[type=checkbox],.rotina-form .trat-campo-check input[type=checkbox]{width:22px;height:22px;min-height:22px;flex:none;accent-color:#256e5e}.rotina-form .trat-campo-check{grid-column:1/-1;flex-direction:row-reverse;justify-content:flex-end;min-height:44px}.trat-diario label{min-height:44px;font-weight:650}.trat-diario p{font-size:13px;color:var(--suave);margin:6px 0 0}.trat-diario [data-erro-uso-diario]{color:#b43c36}.trat-diario [data-erro-uso-diario]:empty{display:none}
