@@ -21,3 +21,7 @@ O alerta diferencia saldo desconhecido, falta de estoque e reposição próxima.
 Cinco testes adicionais verificam formulário direto, confirmação, limite de reposição, compra incompleta e falha de persistência. Verificação completa final: 1.283 testes, zero falhas; sintaxe JS e git diff --check sem erros. Navegador com dados fictícios: primeira tentativa sem confirmação recusada, confirmação e consumo gravados juntos, alerta acionado ao atingir três usos, sem janela modal e sem erro JavaScript. Em 390 px, conteúdo de 390 px, sem rolagem lateral; formulário legível e ação acessível.
 
 A conferência de documentos e registros reais está exclusivamente fora do repositório público. Não houve atualização de tratamentos reais nem publicação. Nenhum envio externo de lembrete foi configurado.
+
+## Atalho junto às ações principais
+
+A pedido do dono, Registrar uso voltou à barra superior da ficha, entre Compra e Evolução. O botão coloca o foco na quantidade do formulário direto, sem abrir janela nem gravar um uso automaticamente. Verificação desta alteração: 45 testes relacionados passaram, sintaxe e diff sem erros; clique conferido no navegador e em 390 px, com foco na quantidade, sem rolagem lateral ou erro JavaScript. Continua local, sem publicação.
