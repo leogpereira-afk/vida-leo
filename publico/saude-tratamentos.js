@@ -7,7 +7,17 @@ const SaudeTratamentos = (() => {
     if((numero(t.estoqueInicial)===null&&!(t.compras||[]).length)||(t.compras||[]).some(c=>numero(c.quantidade)===null))return null;
     return +(Number(t.estoqueInicial||0)+(t.compras||[]).reduce((s,c)=>s+Number(c.quantidade||0),0)-(t.usos||[]).filter(u=>!u.desfeitoEm).reduce((s,u)=>s+Number(u.quantidade||0),0)).toFixed(4);
   }
-  function estoque(t){const n=saldo(t);return n===null?'Não informado':n<=0?'Sem estoque':numero(t.alertaEstoque)!==null&&n<=+t.alertaEstoque?'Comprar mais':'Disponível'}
+  function alertaReposicao(t){
+    const n=saldo(t),q=numero(t.consumoPorCiclo),limite=numero(t.alertaEstoque),usosRestantes=n!==null&&q>0?Math.floor(n/q):null;
+    if(!controlaEstoque(t))return{nivel:'pendente',rotulo:'Sem controle',texto:'Defina a unidade e a quantidade disponível em Editar para acompanhar a reposição.',usosRestantes:null};
+    if(n===null)return{nivel:'pendente',rotulo:'Não informado',texto:'Quantidade disponível a confirmar. Complete a quantidade comprada ou o estoque inicial.',usosRestantes:null};
+    if(n<=0)return{nivel:'critico',rotulo:'Sem estoque',texto:'Sem estoque disponível. Registre a reposição quando a compra for recebida.',usosRestantes:0};
+    const baixo=limite!==null?n<=limite:usosRestantes!==null&&usosRestantes<=3;
+    const detalhe=n+' '+t.unidade+(usosRestantes!==null?' · '+usosRestantes+' uso(s) completo(s) na quantidade cadastrada':'');
+    return{nivel:baixo?'atencao':'ok',rotulo:baixo?'Comprar mais':'Disponível',texto:(baixo?'Estoque baixo: ':'Saldo disponível: ')+detalhe+'.'+(baixo?(limite!==null?' Limite de aviso cadastrado: '+limite+' '+t.unidade+'.':' Aviso padrão: até 3 usos; ajuste o limite em Editar.') :''),usosRestantes};
+  }
+  function estoque(t){return alertaReposicao(t).rotulo}
+
   function registrarUso(t,uso){
     if(!ativo(t))throw Error('Confirme o tratamento e deixe-o em andamento antes de registrar o uso.');
     if(!dataISOValida(uso.data)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(uso.hora))throw Error('Informe data e horário válidos.');
@@ -43,7 +53,7 @@ const SaudeTratamentos = (() => {
     if(!ativo(t)||!dataISOValida(t.proximaData)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(t.horario||''))return null;
     return {id:'tratamento-'+t.id+'-'+t.proximaData+'-'+t.horario.replace(':',''),titulo:'Lembrete de cuidado',data:t.proximaData,hora:t.horario,local:'',obs:'Confira seu tratamento na Central do Léo.'};
   }
-  return {ativo,controlaEstoque,numero,saldo,estoque,registrarCompra,registrarUso,registrarUsoDiario,diario,usoHoje,lembrete};
+  return {ativo,controlaEstoque,numero,saldo,estoque,registrarCompra,registrarUso,registrarUsoDiario,diario,usoHoje,alertaReposicao,lembrete};
 })();
 let tratamentoSelecionado='',tratamentoFiltro='ativos';
 function tratamentoCommit(t,fn){
@@ -91,13 +101,33 @@ function usarTratamento(t){
   tratamentoForm('Registrar uso realizado',[
     ['data','Data do uso','date'],['hora','Horário real','time'],['quantidade','Quantidade consumida ('+(t.unidade||'unidade não definida')+')','number'],['obs','Observação'],
     ...(confirmar?[['confirmarEmUso','Confirmo que este medicamento ou cuidado está em uso','checkbox']]:[])
-  ],{data:hoje(),hora:new Date().toTimeString().slice(0,5),quantidade:t.consumoPorCiclo||''},d=>tratamentoCommit(t,()=>{
+  ],{data:hoje(),hora:new Date().toTimeString().slice(0,5),quantidade:t.consumoPorCiclo||''},d=>registrarUsoTratamento(t,d));
+}
+function registrarUsoTratamento(t,d){
+  return tratamentoCommit(t,()=>{
     if(!SaudeTratamentos.ativo(t)){
       if(['Pausado','Encerrado'].includes(t.status)||!d.confirmarEmUso)throw Error('Marque a confirmação de que o medicamento está em uso para continuar.');
       t.status='Em andamento';t.usoConfirmadoEm=new Date().toISOString();
     }
     const {confirmarEmUso,...uso}=d;SaudeTratamentos.registrarUso(t,{...uso,quantidade:+d.quantidade});
-  }));
+  });
+}
+function quadroUsoDireto(t,aoSalvar){
+  const box=el('<section class="trat-uso-direto"><h4>Registrar uso</h4><form data-uso-direto><div class="trat-uso-linha"><label>Quantidade usada<span></span><input type="number" name="quantidade" min="0.0001" step="any" required inputmode="decimal"></label><button class="btn" type="submit">Registrar uso</button></div><details><summary>Data, horário e observação</summary><div class="trat-uso-opcoes"><label>Data do uso<input type="date" name="data" required></label><label>Horário real<input type="time" name="hora"></label><label>Observação<input type="text" name="obs"></label></div></details><p role="alert" class="rotina-form-erro"></p></form><div data-alerta-reposicao role="status"><p></p></div></section>');
+  const form=box.querySelector('form'),q=form.querySelector('[name=quantidade]'),bloqueado=['Pausado','Encerrado'].includes(t.status),unidade=SaudeTratamentos.controlaEstoque(t);
+  q.value=t.consumoPorCiclo||'';q.setAttribute('aria-label','Quantidade usada ('+(t.unidade||'defina a unidade')+')');form.querySelector('.trat-uso-linha span').textContent=t.unidade||'Unidade a definir';
+  form.querySelector('[name=data]').value=hoje();form.querySelector('button').disabled=bloqueado||!unidade;
+  if(!SaudeTratamentos.ativo(t)&&!bloqueado){const check=el('<label class="trat-uso-confirmar"><input type="checkbox" name="confirmarEmUso"> Confirmo que este medicamento ou cuidado está em uso</label>');form.querySelector('.trat-uso-linha').after(check)}
+  if(bloqueado)box.append(el('<p class="trat-uso-nota">Uso pausado ou encerrado. Confira a situação em Editar antes de registrar.</p>'));
+  const aviso=SaudeTratamentos.alertaReposicao(t),alerta=box.querySelector('[data-alerta-reposicao]');alerta.dataset.nivel=aviso.nivel;alerta.querySelector('p').textContent=aviso.texto;
+  if(aviso.nivel==='pendente'){
+    const compra=(t.compras||[]).slice().reverse().find(c=>SaudeTratamentos.numero(c.quantidade)===null);
+    const b=acao(compra?'Informar quantidade da compra':'Definir unidade e estoque',()=>compra?comprarTratamento(t,compra):editarTratamento(t),'ghost mini');if(compra)b.dataset.completarCompra='';alerta.append(b);
+  }
+  form.onsubmit=e=>{e.preventDefault();try{
+    registrarUsoTratamento(t,{data:form.querySelector('[name=data]').value,hora:form.querySelector('[name=hora]').value||new Date().toTimeString().slice(0,5),quantidade:q.value,obs:form.querySelector('[name=obs]').value.trim(),confirmarEmUso:!!form.querySelector('[name=confirmarEmUso]')?.checked});aoSalvar();
+  }catch(erro){form.querySelector('[role=alert]').textContent=erro.message}};
+  return box;
 }
 function evolucaoTratamento(t){tratamentoForm('Registrar evolução',[
   ['data','Data','date'],['descricao','Como você está / evolução percebida','textarea'],['efeitos','Sintomas ou efeitos percebidos','textarea'],['proximo','Próximo passo combinado','textarea']
@@ -128,7 +158,7 @@ function quadroItensTratamento(itens,grupo){
     lista.forEach(x=>{const b=el('<button type="button" class="trat-item"><strong>'+esc(x.oque||'Sem nome')+'</strong><small>'+esc(x.tipo||'Tratamento')+' · '+esc(x.status||'A confirmar')+'</small><span>'+esc(SaudeTratamentos.controlaEstoque(x)?SaudeTratamentos.estoque(x):'Acompanhamento')+'</span></button>');b.setAttribute('aria-pressed',String(x===t));b.onclick=()=>{tratamentoSelecionado=x.id;pintar()};l.append(b)});
     const saldo=SaudeTratamentos.saldo(t),compras=(t.compras||[]).slice().sort((a,b)=>(a.data||'').localeCompare(b.data||'')),previsao=previsaoEstoqueTratamento(t),usos=(t.usos||[]).filter(x=>!x.desfeitoEm),evolucao=t.evolucao||[];
     d.append(el('<header><small>'+esc(t.tipo||'Tratamento')+'</small><h3>'+esc(t.oque||'Tratamento')+'</h3><p>'+esc(t.status||'A confirmar')+(t.inicio?' · início '+fmtDataAno(t.inicio):' · início não confirmado')+'</p></header>'));
-    const a=el('<div class="trat-actions"></div>');a.append(acao('✏️ Editar',()=>editarTratamento(t),'ghost mini'));if(SaudeTratamentos.controlaEstoque(t))a.append(acao('🛒 Compra',()=>comprarTratamento(t),'ghost mini'),acao('✓ Registrar uso',()=>usarTratamento(t),'mini'));a.append(acao('📈 Evolução',()=>evolucaoTratamento(t),'ghost mini'),acao('📅 Lembrete',()=>agendaTratamento(t),'ghost mini'));d.append(a);
+    const a=el('<div class="trat-actions"></div>');a.append(acao('✏️ Editar',()=>editarTratamento(t),'ghost mini'));if(SaudeTratamentos.controlaEstoque(t))a.append(acao('🛒 Compra',()=>comprarTratamento(t),'ghost mini'));a.append(acao('📈 Evolução',()=>evolucaoTratamento(t),'ghost mini'),acao('📅 Lembrete',()=>agendaTratamento(t),'ghost mini'));d.append(a);if(SaudeTratamentos.controlaEstoque(t)||['Medicamento','Suplemento'].includes(t.tipo))d.append(quadroUsoDireto(t,pintar));
     if(SaudeTratamentos.diario(t)){
       const feito=!!SaudeTratamentos.usoHoje(t),configurado=SaudeTratamentos.controlaEstoque(t)&&SaudeTratamentos.numero(t.consumoPorCiclo)>0;
       const bloco=el('<section class="trat-diario"><label><input type="checkbox" data-uso-diario><span></span></label><p></p><p role="status" data-erro-uso-diario></p></section>'),check=bloco.querySelector('input');

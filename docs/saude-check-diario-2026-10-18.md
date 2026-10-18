@@ -11,3 +11,13 @@ A função de formulário passou a ler checkbox como booleano e tratar campos va
 Verificação: sete testes novos; os seis primeiros foram escritos antes da implementação e falharam pela ausência do fluxo e do check, incluindo o erro da imagem, configuração, consumo, duplicação, estoque, falha ao salvar, desfazer e retomada por serialização. Suíte completa: 1.278 testes, zero falhas. Sintaxe JS e diff conferidos. Navegador local com dados fictícios: primeiro uso sem confirmação recusado, confirmação permitiu gravar, check registrou o dia e baixou a quantidade correta. Sem erros JavaScript. Em 390 px, largura de conteúdo 390 px, sem transbordamento.
 
 Prévia local: http://127.0.0.1:5502/preview-saude-check.html. O arquivo de prévia está ignorado pelo Git.
+
+## Registro direto e reposição
+
+A ficha agora contém formulário de Registrar uso com quantidade visível. Data, horário e observação ficam em detalhes recolhíveis. O horário vazio usa a hora real no momento do registro; datas anteriores podem ser informadas. A confirmação de item pendente fica no mesmo formulário. Unidades ausentes e situações pausadas/encerradas explicam o bloqueio antes da gravação. Falha de gravação mantém os campos e reverte a alteração.
+
+O alerta diferencia saldo desconhecido, falta de estoque e reposição próxima. Usa o limite configurado; quando ausente, alerta em até três usos completos pela quantidade cadastrada, explicando essa regra. Sem quantidade por uso, não inventa previsão. O indicador da lista e o filtro Compras usam a mesma regra. Para compra sem quantidade, o atalho abre o registro existente para completar, preservando seu vínculo.
+
+Cinco testes adicionais verificam formulário direto, confirmação, limite de reposição, compra incompleta e falha de persistência. Verificação completa final: 1.283 testes, zero falhas; sintaxe JS e git diff --check sem erros. Navegador com dados fictícios: primeira tentativa sem confirmação recusada, confirmação e consumo gravados juntos, alerta acionado ao atingir três usos, sem janela modal e sem erro JavaScript. Em 390 px, conteúdo de 390 px, sem rolagem lateral; formulário legível e ação acessível.
+
+A conferência de documentos e registros reais está exclusivamente fora do repositório público. Não houve atualização de tratamentos reais nem publicação. Nenhum envio externo de lembrete foi configurado.
