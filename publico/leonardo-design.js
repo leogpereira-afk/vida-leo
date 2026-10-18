@@ -5,7 +5,7 @@ const LeonardoDesign = (() => {
     donboy: ['#6941c6','#c4a8ff','#39275c','spark'],
     agenda: ['#2563a6','#94c5ff','#203e61','calendar'],
     planilhas: ['#2c7059','#8fd6b7','#244a3e','table'],
-    rendimentos: ['#13766a','#6fdbc8','#1b4d46','trend'],
+    rendimentos: ['#3840e8','#9298ff','#3840e8','trend'],
     gastos: ['#9a4b25','#ffb68d','#5c3528','wallet'],
     empresas: ['#4656ac','#acb8ff','#2e365f','building'],
     marketing: ['#a23d76','#f6a3d2','#602f4c','megaphone'],
