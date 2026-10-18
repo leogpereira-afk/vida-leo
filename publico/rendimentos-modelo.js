@@ -5,6 +5,21 @@ const RendimentosModelo=(()=>{
  const mensal=x=>data(x.data)&&!/lançado em 31\/12/i.test(x.obs||'')&&x.granularidade!=='anual';
  const soma=xs=>xs.length?xs.reduce((s,x)=>s+x,0):null;
  const delta=(a,b)=>a==null||b==null?{valor:null,percentual:null}:{valor:a-b,percentual:b>0?(a-b)/b*100:null};
+ const investimento=x=>/^investimentos?$/.test(String(x.tipo||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase());
+ function prepararCopia(registros,mes,existentes=registros){
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes))throw Error('Confira o mês de origem.');
+  const [ano,m]=mes.split('-').map(Number),a=m===12?ano+1:ano,n=m===12?1:m+1;
+  if(a>9999)throw Error('O próximo ano não é válido.');
+  const destino=String(a).padStart(4,'0')+'-'+String(n).padStart(2,'0');
+  const fontes=registros.filter(x=>mensal(x)&&x.data.slice(0,7)===mes&&investimento(x));
+  const ignorados=[],itens=[];
+  for(const x of fontes){
+   if(existentes.some(y=>y.copiadoDeId===x.id&&y.data?.slice(0,7)===destino)){ignorados.push(x);continue}
+   const dia=Math.min(+x.data.slice(8,10),new Date(Date.UTC(a,n,0)).getUTCDate());
+   itens.push({origem:x,registro:{data:destino+'-'+String(dia).padStart(2,'0'),empresa:x.empresa||'',instituicao:x.instituicao||'',tipo:x.tipo||'',obs:x.obs||'',copiadoDeId:x.id}});
+  }
+  return{destino,itens,ignorados};
+ }
  function construir(registros,historico={},hoje=new Date().toISOString().slice(0,10)){
   const validos=(registros||[]).filter(x=>data(x.data)&&numero(x.valor)!==null);
   const invalidos=(registros||[]).filter(x=>!validos.includes(x));
@@ -50,5 +65,5 @@ const RendimentosModelo=(()=>{
   }
   return{anos,empresas,validos,invalidos,mensal,previsto,nome,recorte,celula,analisar,comparar};
  }
- return{construir,delta,data,mensal,numero};
+ return{construir,delta,data,mensal,numero,investimento,prepararCopia};
 })();
