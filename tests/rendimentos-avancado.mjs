@@ -22,3 +22,24 @@ test('busca de lançamentos não muda média do resumo ao alternar abas',()=>{co
 test('Resumo mantém empresas em linhas, meses em colunas, logos e totais',()=>{const a=app();const t=a.document.querySelector('.ra-matriz table');assert.ok(t);assert.deepEqual([...t.querySelectorAll('th')].map(t=>t.textContent),['Empresa','JAN','FEV','Total']);assert.equal(t.querySelectorAll('tbody tr').length,2);assert.ok(t.querySelector('.ra-empresa span'));assert.match(t.querySelector('tfoot').textContent,/150,00/);assert.match(t.querySelector('tbody').textContent,/—/)});
 test('extrato preserva cabeçalhos, agrupamento mensal, percentuais e expansão',()=>{const a=app();a.run("RendimentosUI.estado().aba='lancamentos';tela()");assert.deepEqual([...a.document.querySelectorAll('.ra-extrato th')].map(t=>t.textContent),['Data','Empresa','Instituição','Tipo','Valor','% do mês','% do ano','Observação']);const g=a.document.querySelector('.ra-grupo-toggle');assert.match(g.textContent,/fev de 2025/);g.onclick();assert.equal(a.document.querySelector('[data-ra-lanc="t2"]').hidden,true);g.onclick();assert.equal(a.document.querySelector('[data-ra-lanc="t2"]').hidden,false);assert.match(a.document.querySelector('[data-ra-lanc="t2"]').textContent,/33,3%/)});
 test('edição em linha salva só o campo e rejeita mudança concorrente',()=>{const a=app();a.run("RendimentosUI.estado().aba='lancamentos';tela()");const td=a.document.querySelector('[data-ra-lanc="t1"] .ra-inline-cell');td.querySelector('button').onclick({stopPropagation(){}});let input=td.querySelector('input');input.value='Banco de teste';input.onkeydown({key:'Enter',preventDefault(){},stopPropagation(){}});assert.equal(a.run("E.rendimentos.find(x=>x.id==='t1').instituicao"),'Banco de teste');const other=a.document.querySelector('[data-ra-lanc="t1"] .ra-inline-cell');other.querySelector('button').onclick({stopPropagation(){}});input=other.querySelector('input');a.run("E.rendimentos.find(x=>x.id==='t1').instituicao='Alteração externa'");input.value='Sobrescrita';input.onkeydown({key:'Enter',preventDefault(){},stopPropagation(){}});assert.equal(a.run("E.rendimentos.find(x=>x.id==='t1').instituicao"),'Alteração externa');assert.match(other.textContent,/mudou/)});
+test('resumo compacto expande detalhes e mantém a escolha ao filtrar sem alterar a base',()=>{
+ const a=app(),antes=a.run('JSON.stringify(E)');
+ const detalhe=()=>a.document.querySelector('#ra-resumo-detalhes');
+ const alternar=()=>a.document.querySelector('[aria-controls="ra-resumo-detalhes"]');
+ assert.equal(detalhe().hidden,true);assert.equal(alternar().getAttribute('aria-expanded'),'false');
+ alternar().onclick();assert.equal(detalhe().hidden,false);assert.equal(alternar().getAttribute('aria-expanded'),'true');
+ [...a.document.querySelectorAll('.ra-chips button')].find(b=>b.textContent==='Jan').onclick();
+ assert.equal(detalhe().hidden,false);assert.equal(a.run('JSON.stringify(E)'),antes);
+ alternar().onclick();assert.equal(detalhe().hidden,true);
+});
+test('tabela recolhida continua recolhida ao navegar e mostra os mesmos dados ao reabrir',()=>{
+ const a=app(),antes=a.run('JSON.stringify(E)');
+ a.document.querySelector('[aria-controls="ra-matriz-2025"]').onclick();
+ assert.equal(a.document.querySelector('#ra-matriz-2025').hidden,true);
+ for(const nome of ['Histórico','Resumo']) [...a.document.querySelectorAll('.finance-tabs button')].find(b=>b.textContent.includes(nome)).onclick();
+ assert.equal(a.document.querySelector('#ra-matriz-2025').hidden,true);
+ a.document.querySelector('[aria-controls="ra-matriz-2025"]').onclick();
+ assert.equal(a.document.querySelector('#ra-matriz-2025').hidden,false);
+ assert.match(a.document.querySelector('#ra-matriz-2025 tfoot').textContent,/150,00/);
+ assert.equal(a.run('JSON.stringify(E)'),antes);
+});

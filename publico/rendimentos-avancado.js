@@ -2,7 +2,7 @@
 const RendimentosUI=(()=>{
  let estado=null;
  const meses=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
- const cores=['#13766a','#4159b7','#a64b80','#95621b','#2d79a4','#7651a4','#566b2c'];
+ const cores=['#3840e8','#4159b7','#a64b80','#95621b','#2d79a4','#7651a4','#566b2c'];
  const paleta=new Map();
  const cor=s=>paleta.get(String(s))||cores[[...String(s)].reduce((n,c)=>n+c.charCodeAt(0),0)%cores.length];
  const money=v=>v===null?'Sem informação':brl(v);
@@ -14,22 +14,23 @@ const RendimentosUI=(()=>{
  function dados(){return RendimentosModelo.construir(E.rendimentos,E.rendHist,hoje())}
  function novo(){modalRendimento({id:uid(),data:hoje(),empresa:estado.empresas[0]||empresasParaLancar()[0]||'Outro',instituicao:'',tipo:'',valor:0,obs:''},true)}
  function render(m){
-  const d=dados();d.empresas.forEach((e,i)=>paleta.set(e,cores[i%cores.length]));d.anos.forEach((y,i)=>paleta.set(String(y),cores[i%cores.length]));if(!estado)estado={anos:filtro.rendAno==='todos'?d.anos:[filtro.rendAno||anoHoje],empresas:filtro.rendEmp&&filtro.rendEmp!=='Todas'?[filtro.rendEmp]:[],meses:[],de:'',ate:'',aba:abasFinanceiras.rendimentos||'resumo',grafico:'mensal',busca:'',tipo:'',situacao:'Todos',ordem:'data-desc',grupo:'mes',pagina:1,colunas:['instituicao','tipo','obs'],ocultos:[],rotacao:35,compAnoA:anoHoje,compAnoB:anoHoje-1,compEmpA:'Todas',compEmpB:'Todas'};
+  const d=dados();d.empresas.forEach((e,i)=>paleta.set(e,cores[i%cores.length]));d.anos.forEach((y,i)=>paleta.set(String(y),cores[i%cores.length]));if(!estado)estado={anos:filtro.rendAno==='todos'?d.anos:[filtro.rendAno||anoHoje],empresas:filtro.rendEmp&&filtro.rendEmp!=='Todas'?[filtro.rendEmp]:[],meses:[],de:'',ate:'',aba:abasFinanceiras.rendimentos||'resumo',grafico:'mensal',busca:'',tipo:'',situacao:'Todos',ordem:'data-desc',grupo:'mes',pagina:1,colunas:['instituicao','tipo','obs'],ocultos:[],rotacao:35,compAnoA:anoHoje,compAnoB:anoHoje-1,compEmpA:'Todas',compEmpB:'Todas',filtrosAbertos:false,resumoExpandido:false,matrizesFechadas:[]};
   m.classList.add('ra-app','financeiro');
   const r=()=>{if(atual==='rendimentos')tela()};
   const mudar=patch=>{Object.assign(estado,patch);estado.pagina=1;r()};
-  const top=cab('Rendimentos','Histórico, comparações e lançamentos. Do panorama ao detalhe.');top.appendChild(btn('+ Novo rendimento',novo,''));m.appendChild(top);
+  const top=cab('Rendimentos','Resumo, comparações e lançamentos.');top.appendChild(btn('+ Novo rendimento',novo,''));m.appendChild(top);
   const filtros=el('<section class="ra-filtros" aria-label="Filtros de rendimentos"></section>');
-  filtros.appendChild(selecionar('Período',estado.de||estado.ate?'intervalo':estado.anos.length===1?estado.anos[0]:estado.anos.length===d.anos.length?'todos':'selecao',[...d.anos.slice().reverse().map(a=>[a,a]),['todos','Todos os anos'],...(estado.anos.length>1&&estado.anos.length<d.anos.length?[['selecao','Anos selecionados']]:[]),['intervalo','Intervalo personalizado']],v=>v!=='selecao'&&mudar(v==='intervalo'?{de:hoje().slice(0,4)+'-01-01',ate:hoje(),anos:d.anos,meses:[]}:v==='todos'?{anos:d.anos,de:'',ate:''}:{anos:[+v],de:'',ate:''})));
+  const avancados=el('<details class="ra-filtros-extra"><summary>Mais filtros</summary><div></div></details>');avancados.open=!!estado.filtrosAbertos;avancados.ontoggle=()=>{estado.filtrosAbertos=avancados.open};const extra=avancados.lastElementChild;
+  filtros.appendChild(selecionar('Período',estado.de||estado.ate?'intervalo':estado.anos.length===1?estado.anos[0]:estado.anos.length===d.anos.length?'todos':'selecao',[...d.anos.slice().reverse().map(a=>[a,a]),['todos','Todos os anos'],...(estado.anos.length>1&&estado.anos.length<d.anos.length?[['selecao','Anos selecionados']]:[]),['intervalo','Intervalo personalizado']],v=>v!=='selecao'&&mudar(v==='intervalo'?{de:hoje().slice(0,4)+'-01-01',ate:hoje(),anos:d.anos,meses:[],filtrosAbertos:true}:v==='todos'?{anos:d.anos,de:'',ate:''}:{anos:[+v],de:'',ate:''})));
   const picks=(titulo,lista,selecionados,fn)=>{const det=el('<details class="ra-picks"><summary></summary><div></div></details>');det.querySelector('summary').textContent=titulo;lista.forEach(([v,t])=>{const l=el('<label><input type="checkbox"><span></span></label>');l.querySelector('span').textContent=t;l.querySelector('input').checked=selecionados.includes(v);l.querySelector('input').onchange=e=>fn(v,e.target.checked);det.lastElementChild.appendChild(l)});return det};
-  filtros.appendChild(picks('Anos selecionados · '+estado.anos.length,d.anos.map(a=>[a,a]),estado.anos,(a,on)=>mudar({anos:on?[...estado.anos,a].sort():estado.anos.filter(y=>y!==a)})));
+  extra.appendChild(picks('Anos selecionados · '+estado.anos.length,d.anos.map(a=>[a,a]),estado.anos,(a,on)=>mudar({anos:on?[...estado.anos,a].sort():estado.anos.filter(y=>y!==a)})));
   filtros.appendChild(picks(estado.empresas.length?estado.empresas.length+' empresa(s)':'Todas as empresas',d.empresas.map(e=>[e,e]),estado.empresas,(e,on)=>mudar({empresas:on?[...estado.empresas,e]:estado.empresas.filter(x=>x!==e)})));
-  filtros.appendChild(btn('Limpar filtros',()=>mudar({anos:d.anos,empresas:[],meses:[],de:'',ate:'',busca:'',tipo:'',situacao:'Todos'})));
-  const ex=el('<details class="ra-export"><summary>Exportar</summary><div></div></details>');ex.lastElementChild.append(btn('CSV do recorte',()=>exportar('csv')),btn('Excel do recorte',()=>exportar('xlsx')),btn('Relatório / PDF',imprimir));filtros.appendChild(ex);m.appendChild(filtros);
-  if(estado.de||estado.ate){const dates=el('<div class="ra-dates"></div>');dates.append(texto('De',estado.de,'date',v=>mudar({de:v})),texto('Até',estado.ate,'date',v=>mudar({ate:v})));m.appendChild(dates)}
-  const chips=el('<nav class="ra-chips" aria-label="Meses do recorte"></nav>');const todos=btn('Ano inteiro',()=>mudar({meses:[],de:'',ate:''}));todos.setAttribute('aria-pressed',String(!estado.meses.length));chips.appendChild(todos);meses.forEach((nome,i)=>{const b=btn(nome,()=>mudar({meses:estado.meses.includes(i+1)?estado.meses.filter(x=>x!==i+1):[...estado.meses,i+1].sort((a,b)=>a-b)}));b.setAttribute('aria-pressed',String(estado.meses.includes(i+1)));chips.appendChild(b)});m.appendChild(chips);
+  extra.appendChild(btn('Limpar filtros',()=>mudar({anos:d.anos,empresas:[],meses:[],de:'',ate:'',busca:'',tipo:'',situacao:'Todos'})));
+  const ex=el('<details class="ra-export"><summary>Exportar</summary><div></div></details>');ex.lastElementChild.append(btn('CSV do recorte',()=>exportar('csv')),btn('Excel do recorte',()=>exportar('xlsx')),btn('Relatório / PDF',imprimir));filtros.append(avancados,ex);m.appendChild(filtros);
+  if(estado.de||estado.ate){const dates=el('<div class="ra-dates"></div>');dates.append(texto('De',estado.de,'date',v=>mudar({de:v})),texto('Até',estado.ate,'date',v=>mudar({ate:v})));extra.appendChild(dates)}
+  const chips=el('<nav class="ra-chips" aria-label="Meses do recorte"></nav>');const todos=btn('Ano inteiro',()=>mudar({meses:[],de:'',ate:''}));todos.setAttribute('aria-pressed',String(!estado.meses.length));chips.appendChild(todos);meses.forEach((nome,i)=>{const b=btn(nome,()=>mudar({meses:estado.meses.includes(i+1)?estado.meses.filter(x=>x!==i+1):[...estado.meses,i+1].sort((a,b)=>a-b)}));b.setAttribute('aria-pressed',String(estado.meses.includes(i+1)));chips.appendChild(b)});extra.appendChild(chips);
   const contexto=()=>estado.anos.join(', ')+' · '+(estado.empresas.join(', ')||'Todas as empresas')+' · '+(estado.meses.length?estado.meses.map(i=>meses[i-1]).join(', '):'Ano inteiro')+(estado.de||estado.ate?' · '+(estado.de||'início')+' a '+(estado.ate||'fim'):'');
-  m.appendChild(el('<p class="ra-contexto">'+esc(contexto())+' · Data do recebimento · '+esc(hoje())+'</p>'));
+  m.appendChild(el('<p class="ra-contexto">'+esc(contexto())+' · Data do recebimento'+'</p>'));
   const nav=el('<nav class="finance-tabs" aria-label="Visões financeiras"></nav>');[['resumo','◉ Resumo'],['graficos','▥ Gráficos'],['comparar','⇄ Comparar'],['lancamentos','☷ Lançamentos'],['historico','◷ Histórico']].forEach(([id,t])=>{const b=btn(t,()=>{abasFinanceiras.rendimentos=id;mudar({aba:id})});b.setAttribute('aria-pressed',String(estado.aba===id));nav.appendChild(b)});m.appendChild(nav);
 
   if(!estado.anos.length){m.appendChild(el('<p class="ra-note">Selecione pelo menos um ano.</p>'));return}
@@ -40,19 +41,23 @@ const RendimentosUI=(()=>{
   if(estado.aba==='comparar'){comparacao(m,d,mudar,abrir);return}
   if(estado.aba==='historico'){historico(m,d,a,abrir);return}
   if(estado.aba==='graficos'){graficos(m,d,a,mudar,abrir);return}
+  const resumo=el('<section class="ra-resumo" aria-label="Resumo do período"></section>');resumo.dataset.expandido=String(!!estado.resumoExpandido);m.appendChild(resumo);
+  const resumoCab=el('<header class="ra-resumo-cab"><h2>Resumo do período</h2></header>');const expandir=btn('',()=>{estado.resumoExpandido=!estado.resumoExpandido;atualizarResumo()});expandir.setAttribute('aria-controls','ra-resumo-detalhes');resumoCab.appendChild(expandir);resumo.appendChild(resumoCab);
+  const detalhes=el('<div id="ra-resumo-detalhes" class="ra-resumo-detalhes"></div>');
+  function atualizarResumo(){resumo.dataset.expandido=String(!!estado.resumoExpandido);detalhes.hidden=!estado.resumoExpandido;expandir.textContent=estado.resumoExpandido?'Recolher detalhes':'Expandir detalhes';expandir.setAttribute('aria-expanded',String(!!estado.resumoExpandido))}atualizarResumo();
   const grid=el('<div class="ra-kpis"></div>');const k=(rot,val,sub,fn)=>{const c=btn('',fn,'ra-kpi');c.innerHTML='<span>'+esc(rot)+'</span><strong>'+esc(val)+'</strong><small>'+esc(sub)+'</small>';grid.appendChild(c)};
   k('Total registrado',money(a.total),'Base anual sem duplicar lançamentos',()=>mudar({aba:'historico'}));
   k('Média mensal datada',money(a.media),a.nMeses+' meses com informação',()=>mudar({aba:'graficos',grafico:'mensal'}));
   k('Maior fonte',a.rank[0]?.nome||'Sem informação',a.rank[0]?money(a.rank[0].valor):'Cadastre um rendimento',()=>mudar({aba:'graficos',grafico:'empresas'}));
-  k('Lançamentos',String(a.linhas.length),a.previstos.length+' com data futura / previstos',()=>mudar({aba:'lancamentos'}));m.appendChild(grid);
-  m.appendChild(el('<p class="ra-note">'+(a.semMes?'Há totais sem detalhamento mensal. Eles aparecem no anual, mas não são distribuídos pelos meses. ':'')+'Meses vazios significam ausência de informação. Valores futuros ficam separados do total registrado.</p>'));
-  matrizEmpresas(m,d,abrir);
+  k('Lançamentos',String(a.linhas.length),a.previstos.length+' com data futura / previstos',()=>mudar({aba:'lancamentos'}));resumo.appendChild(grid);
+  detalhes.appendChild(el('<p class="ra-note">'+(a.semMes?'Há totais sem detalhamento mensal. Eles aparecem no anual, mas não são distribuídos pelos meses. ':'')+'Meses vazios significam ausência de informação. Valores futuros ficam separados do total registrado.</p>'));
+  matrizEmpresas(resumo,d,abrir);resumo.appendChild(detalhes);
   const pair=el('<div class="ra-grid"></div>');const c=card('Evolução anual','Clique em um ano para conferir a origem.');c.lastElementChild.appendChild(chartBars(a.cells.map(c=>({label:String(c.ano),valor:c.valor,cor:cor(c.ano),fn:()=>abrir(c.ano)}))));pair.appendChild(c);
-  const rank=card('Participação por empresa','Valores registrados no recorte.');rank.lastElementChild.appendChild(ranking(a.rank,a.total,abrir));pair.appendChild(rank);m.appendChild(pair);
+  const rank=card('Participação por empresa','Valores registrados no recorte.');rank.lastElementChild.appendChild(ranking(a.rank,a.total,abrir));pair.appendChild(rank);detalhes.appendChild(pair);
   const mensal=serieMensal(d,estado.anos,estado.empresas,estado.meses).flatMap(s=>s.pontos.filter(p=>p.valor!==null).map(p=>({...p,ano:s.ano})));
   const max=mensal.slice().sort((a,b)=>b.valor-a.valor)[0],min=mensal.slice().sort((a,b)=>a.valor-b.valor)[0];
   const insights=el('<div class="ra-insights"></div>');for(const [t,p] of [['Maior mês registrado',max],['Menor mês registrado',min]])insights.appendChild(btn(p?t+': '+meses[p.mes-1]+'/'+p.ano+' · '+money(p.valor):t+': sem dados',()=>p&&abrir(p.ano,null,p.mes)));
-  const positivos=a.rank.filter(x=>x.valor>0),base=positivos.reduce((s,x)=>s+x.valor,0);insights.appendChild(el('<p>Concentração das 3 maiores fontes: <b>'+(base?((positivos.slice(0,3).reduce((s,x)=>s+x.valor,0)/base)*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%':'Sem base positiva')+'</b><br><small>Sobre fontes com saldo positivo; ajustes negativos ficam fora dessa proporção.</small></p>'));m.appendChild(insights);
+  const positivos=a.rank.filter(x=>x.valor>0),base=positivos.reduce((s,x)=>s+x.valor,0);insights.appendChild(el('<p>Concentração das 3 maiores fontes: <b>'+(base?((positivos.slice(0,3).reduce((s,x)=>s+x.valor,0)/base)*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%':'Sem base positiva')+'</b><br><small>Sobre fontes com saldo positivo; ajustes negativos ficam fora dessa proporção.</small></p>'));detalhes.appendChild(insights);
  }
 
  function destino(alvo){if(estado&&alvo){estado.aba=alvo==='rd-lanc'?'lancamentos':alvo==='rd-graficos'?'graficos':'historico';estado.anos=filtro.rendAno==='todos'?dados().anos:[filtro.rendAno||anoHoje];estado.empresas=!filtro.rendEmp||filtro.rendEmp==='Todas'?[]:[filtro.rendEmp];estado.meses=[]}}
@@ -128,7 +133,7 @@ const RendimentosUI=(()=>{
    const es=estado.empresas.length?estado.empresas:d.empresas;
    const rows=es.map(nome=>{const vals=meses.map((_,i)=>estado.meses.length&&!estado.meses.includes(i+1)?null:d.celula(ano,[nome],[i+1],estado.de,estado.ate).valor);const conhecidos=vals.filter(v=>v!==null);return{nome,vals,total:conhecidos.length?conhecidos.reduce((s,v)=>s+v,0):null}}).filter(x=>x.total!==null).sort((a,b)=>b.total-a.total);
    const c=card('Por empresa, mês a mês','O mesmo recorte dos filtros · '+ano);c.classList.add('ra-matriz');c.dataset.bid='rd-mensal';
-   const collapse=btn('▾',()=>{c.lastElementChild.hidden=!c.lastElementChild.hidden;collapse.textContent=c.lastElementChild.hidden?'▸':'▾';collapse.setAttribute('aria-expanded',String(!c.lastElementChild.hidden))});collapse.setAttribute('aria-label','Recolher ou expandir empresas de '+ano);collapse.setAttribute('aria-expanded','true');c.querySelector('header').appendChild(collapse);
+   const corpo=c.lastElementChild;corpo.id='ra-matriz-'+ano;corpo.hidden=(estado.matrizesFechadas||[]).includes(ano);const collapse=btn('',()=>{corpo.hidden=!corpo.hidden;estado.matrizesFechadas=corpo.hidden?[...(estado.matrizesFechadas||[]),ano]:(estado.matrizesFechadas||[]).filter(y=>y!==ano);atualizarMatriz()});function atualizarMatriz(){collapse.textContent=corpo.hidden?'Expandir':'Recolher';collapse.setAttribute('aria-expanded',String(!corpo.hidden))}atualizarMatriz();collapse.setAttribute('aria-label','Recolher ou expandir empresas de '+ano);collapse.setAttribute('aria-controls',corpo.id);c.querySelector('header').appendChild(collapse);
    if(!rows.length){c.lastElementChild.appendChild(el('<p class="ra-contexto">'+ano+': sem detalhamento mensal neste recorte. '+(d.celula(ano,estado.empresas).fonte==='Histórico anual'?'O total histórico permanece disponível em Histórico.':'')+'</p>'));m.appendChild(c);continue}
    const indices=meses.map((_,i)=>i).filter(i=>rows.some(r=>r.vals[i]!==null));
    const table=tabela(['Empresa',...indices.map(i=>meses[i].toUpperCase()),'Total'],rows.map(row=>{

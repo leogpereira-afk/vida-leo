@@ -1,7 +1,8 @@
 /* Componentes exclusivos do módulo Rendimentos. */
 .pagina.ra-app{max-width:1520px;margin-inline:auto;--ra-muted:var(--suave);font-variant-numeric:tabular-nums}
-.pagina.ra-app .topo{margin-bottom:18px;padding:24px 28px;min-height:130px}
-.pagina.ra-app .topo h1{font-size:clamp(25px,3vw,36px)}
+.pagina.ra-app[data-leo-area]>.topo{margin-bottom:12px;padding:14px 18px;min-height:80px;gap:12px}
+.pagina.ra-app[data-leo-area]>.topo::before{width:36px;height:36px;border-radius:10px;background-size:22px 22px}
+.pagina.ra-app[data-leo-area]>.topo h1{font-size:clamp(23px,2.3vw,29px);margin-bottom:2px}
 .ra-app .ra-filtros,.ra-app .ra-tools,.ra-app .ra-dates{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:14px 0}
 .ra-app .ra-field{display:flex;flex-direction:column;gap:6px;min-width:145px;max-width:100%;flex:0 1 auto;font-size:12px;font-weight:650}
 .ra-app .ra-field>span{color:var(--ra-muted)}
@@ -22,9 +23,9 @@
 .ra-app .finance-tabs{margin:16px 0;display:flex;gap:6px;border-bottom:1px solid var(--linha);padding-bottom:12px;flex-wrap:wrap}
 .ra-app .finance-tabs .btn{border-radius:100px;padding:10px 18px}
 .ra-app .ra-contexto{font-size:12px;color:var(--ra-muted);line-height:1.6;margin:8px 0;overflow-wrap:anywhere}
-.ra-app .ra-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}
-.ra-app .ra-kpi{display:flex;flex-direction:column;align-items:start;text-align:left;gap:9px;padding:19px!important;background:var(--card)!important;color:var(--tinta)!important;border:1px solid var(--linha)!important;min-width:0;border-radius:16px!important;box-shadow:0 2px 5px #00000004}
-.ra-app .ra-kpi span{font-size:12px;color:var(--ra-muted);font-weight:500}.ra-app .ra-kpi strong{font-size:clamp(19px,2vw,27px);font-weight:700;letter-spacing:-.03em;overflow-wrap:anywhere;line-height:1.2}.ra-app .ra-kpi small{font-size:11px;color:var(--ra-muted);font-weight:400}
+.ra-app .ra-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:8px 0 12px}
+.ra-app .ra-kpi{display:flex;flex-direction:column;align-items:start;text-align:left;gap:5px;padding:12px 14px!important;background:var(--card)!important;color:var(--tinta)!important;border:1px solid var(--linha)!important;min-width:0;border-radius:12px!important;box-shadow:none}
+.ra-app .ra-kpi span{font-size:12px;color:var(--ra-muted);font-weight:500}.ra-app .ra-kpi strong{font-size:clamp(18px,1.7vw,23px);font-weight:700;letter-spacing:-.03em;overflow-wrap:anywhere;line-height:1.2}.ra-app .ra-kpi small{font-size:11px;color:var(--ra-muted);font-weight:400}
 .ra-app .ra-kpi:first-child{background:var(--leo-tint)!important;border-color:var(--leo-accent)!important}.ra-app .ra-kpi:first-child strong{color:var(--leo-accent)}
 .ra-app .ra-note{border-left:3px solid var(--leo-accent);background:var(--leo-tint);color:var(--tinta);border-radius:0 8px 8px 0;padding:10px 14px;font-size:12px;line-height:1.6;margin:14px 0}
 .ra-app .ra-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
@@ -85,3 +86,52 @@
 .ra-copia-form .ra-field{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:650}.ra-copia-form input{padding:10px 12px;min-height:44px;border:1px solid var(--linha);border-radius:8px;background:var(--card);color:var(--tinta);font:inherit}.ra-copia-form input:focus-visible{outline:2px solid var(--leo-accent);outline-offset:2px}
 
 .ra-copia-form{padding:18px 22px}.ra-copia-form .ff-actions{margin:0;padding-top:12px}@media(max-width:540px){.ra-copia-form{padding:14px}}
+
+/* Resumo compacto: os valores ficam à vista, critérios e análises sob demanda. */
+.ra-app .ra-resumo-cab{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.ra-app .ra-resumo-cab h2{font-size:14px;margin:0;font-weight:600}
+.ra-app .ra-resumo-cab>.btn{min-height:34px;padding:6px 10px;color:var(--leo-ui,var(--leo-accent))}
+.ra-app .ra-resumo[data-expandido=false] .ra-kpi small{display:none}
+.ra-app [hidden]{display:none!important}
+.ra-app .ra-resumo-detalhes>.ra-note{margin:8px 0 12px}
+.ra-app .ra-filtros{gap:8px;margin:10px 0 6px;align-items:center}
+.ra-app .ra-filtros>.ra-field>span{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.ra-app .ra-filtros>.ra-field{min-width:135px}
+.ra-app .ra-filtros-extra{position:relative;min-width:125px;font-size:13px}
+.ra-app .ra-filtros-extra>summary{border:1px solid var(--linha);border-radius:10px;background:var(--card);min-height:40px;padding:10px 12px;box-sizing:border-box}
+.ra-app .ra-filtros-extra[open]>summary{color:var(--leo-ui,var(--leo-accent));border-color:var(--leo-ui,var(--leo-accent));background:var(--leo-tint)}
+.ra-app .ra-filtros-extra>div{position:absolute;left:0;top:calc(100% + 7px);z-index:20;width:min(490px,calc(100vw - 48px));box-sizing:border-box;display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:14px;background:var(--card);border:1px solid var(--linha);border-radius:12px;box-shadow:0 12px 30px #0002}
+.ra-app .ra-filtros-extra .ra-chips{flex-basis:100%;margin:0}
+.ra-app .ra-filtros-extra .ra-dates{margin:0;flex-basis:100%}
+.ra-app .ra-filtros-extra .ra-picks>div{position:static;min-width:0;max-height:160px;box-shadow:none;border:0;padding:8px}
+.ra-app .ra-contexto{margin:5px 0 9px}
+.ra-app .finance-tabs{margin:8px 0 10px;padding-bottom:8px}
+.ra-app .finance-tabs .btn{padding:7px 13px;min-height:36px;flex:0 0 auto}
+.ra-app .ra-matriz>header{padding:10px 14px;gap:10px}
+.ra-app .ra-matriz>header h2{font-size:15px}
+.ra-app .ra-matriz>header>.btn{min-height:34px;min-width:72px;padding:6px 10px;border:1px solid var(--linha);border-radius:8px;font-size:12px}
+.ra-app .ra-matriz th,.ra-app .ra-matriz td{padding:9px 12px;font-size:12px}
+.ra-app .ra-matriz .ra-empresa{font-size:12px}
+@media(max-width:600px){
+ .pagina.ra-app[data-leo-area]>.topo{padding:12px 14px;min-height:0;gap:10px}
+ .pagina.ra-app[data-leo-area]>.topo>div:first-of-type{min-width:0;flex-basis:calc(100% - 50px)}
+ .pagina.ra-app[data-leo-area]>.topo .btn{margin-left:46px;min-height:40px;padding:8px 12px}
+ .ra-app .ra-filtros{display:flex;gap:6px}
+ .ra-app .ra-filtros>.ra-field{min-width:0;flex:1 1 100px}
+ .ra-app .ra-filtros>.ra-picks{flex:1 1 150px}
+ .ra-app .ra-filtros>.ra-picks>div{left:auto;right:0}
+ .ra-app .ra-filtros-extra{min-width:0}
+ .ra-app .ra-filtros-extra>div{left:0;max-height:60vh;overflow:auto}
+ .ra-app .ra-export{margin-left:auto;min-width:100px}
+ .ra-app .ra-export>div{left:auto;right:0}
+ .ra-app .ra-filtros-extra>summary,.ra-app .ra-export>summary,.ra-app .ra-picks>summary{min-height:44px}
+ .ra-app .ra-resumo-cab>.btn{min-height:44px}
+ .ra-app .ra-kpi{min-height:76px;padding:10px 12px!important}
+ .ra-app .ra-kpi strong{font-size:clamp(14px,4vw,18px);white-space:nowrap}
+ .ra-app .ra-matriz>header{flex-wrap:wrap;padding:10px 12px}
+ .ra-app .ra-matriz>header h2{font-size:14px}
+ .ra-app .ra-matriz>header p{order:0;flex-basis:auto}
+ .ra-app .ra-matriz>header>.btn{min-height:44px}
+ .ra-app .ra-matriz td{min-width:105px}
+}
+@media print{.ra-app .ra-filtros-extra,.ra-app .ra-resumo-cab>.btn{display:none!important}.ra-app .ra-resumo[data-expandido=false] .ra-kpi small{display:block}}
