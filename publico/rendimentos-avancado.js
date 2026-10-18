@@ -40,7 +40,7 @@ const RendimentosUI=(()=>{
   if(estado.aba==='lancamentos'){lancamentos(m,d,a,r,mudar);return}
   if(estado.aba==='comparar'){comparacao(m,d,mudar,abrir);return}
   if(estado.aba==='historico'){historico(m,d,a,abrir);return}
-  if(estado.aba==='graficos'){graficos(m,d,a,mudar,abrir);return}
+  if(estado.aba==='graficos'){RendimentosDashboards.render(m,{estado,mudar,abrir,legacy:alvo=>graficos(alvo,d,a,mudar,abrir)});return}
   const resumo=el('<section class="ra-resumo" aria-label="Resumo do período"></section>');resumo.dataset.expandido=String(!!estado.resumoExpandido);m.appendChild(resumo);
   const resumoCab=el('<header class="ra-resumo-cab"><h2>Resumo do período</h2></header>');const expandir=btn('',()=>{estado.resumoExpandido=!estado.resumoExpandido;atualizarResumo()});expandir.setAttribute('aria-controls','ra-resumo-detalhes');resumoCab.appendChild(expandir);resumo.appendChild(resumoCab);
   const detalhes=el('<div id="ra-resumo-detalhes" class="ra-resumo-detalhes"></div>');
@@ -226,12 +226,12 @@ const RendimentosUI=(()=>{
  }
 
  function edicaoRapida(x,r){abrirModal('Editar classificação','Atualize o tipo e a instituição deste rendimento.',(c,fechar)=>financeiroFormulario(c,[{k:'tipo',t:'Tipo',sugestoes:maisUsados(E.rendimentos,'tipo')},{k:'instituicao',t:'Instituição',sugestoes:maisUsados(E.rendimentos,'instituicao',CFG('instituicoes'))}],x,(v,p)=>financeiroSalvarRegistro(E.rendimentos,x,v,p),fechar),r)}
- function exportData(){const d=dados(),a=d.analisar(estado.aba==='lancamentos'?estado:{...estado,busca:'',tipo:'',situacao:'Todos'}),compare=estado.aba==='comparar';const rows=[['Rendimentos',hoje()],['Anos',estado.anos.join(', ')],['Empresas',estado.empresas.join(', ')||'Todas'],['Meses',estado.meses.map(m=>meses[m-1]).join(', ')||'Todos'],['Intervalo',estado.de||'',estado.ate||''],['Data usada','Recebimento'],['Busca / tipo / situação',...(estado.aba==='lancamentos'?[estado.busca,estado.tipo,estado.situacao]:['Não se aplica nesta visão'])],[]];
+ function exportData(){if(estado.aba==='graficos'&&!estado.dbBiblioteca)return RendimentosDashboards.exportData();const d=dados(),a=d.analisar(estado.aba==='lancamentos'?estado:{...estado,busca:'',tipo:'',situacao:'Todos'}),compare=estado.aba==='comparar';const rows=[['Rendimentos',hoje()],['Anos',estado.anos.join(', ')],['Empresas',estado.empresas.join(', ')||'Todas'],['Meses',estado.meses.map(m=>meses[m-1]).join(', ')||'Todos'],['Intervalo',estado.de||'',estado.ate||''],['Data usada','Recebimento'],['Busca / tipo / situação',...(estado.aba==='lancamentos'?[estado.busca,estado.tipo,estado.situacao]:['Não se aplica nesta visão'])],[]];
  if(compare){const c=compararAtual(d);rows.push(['Cenário','Empresa','Ano','Total','Fonte'],['A',estado.compEmpA,estado.compAnoA,c.a.valor??'Sem informação',c.a.fonte],['B',estado.compEmpB,estado.compAnoB,c.b.valor??'Sem informação',c.b.fonte],['Diferença',c.valor??'Sem informação'],['Variação %',c.percentual??'Sem base comparável']);}
  else if(estado.aba==='lancamentos')rows.push(['Data','Empresa','Instituição','Tipo','Valor','Observações','Situação'],...d.recorte(estado).map(x=>[x.data,d.nome(x),x.instituicao||'',x.tipo||'',+x.valor,x.obs||'',d.previsto(x)?'Futuro / previsto':'Registrado']));
  else rows.push(['Ano','Total','Fonte','Meses datados'],...a.cells.map(c=>[c.ano,c.valor??'Sem informação',c.fonte,c.meses.join(', ')]),[],['Empresa','Total'],...a.rank.map(x=>[x.nome,x.valor]),[],['Ano',...meses],...serieMensal(d,estado.anos,estado.empresas,estado.meses).map(s=>[s.ano,...s.pontos.map(p=>p.valor??'Sem informação')]));
  rows.push([],['Cobertura','Totais anuais não são distribuídos pelos meses. Futuro / previsto separado do registrado.']);return rows;}
  function exportar(tipo){const rows=exportData();if(tipo==='xlsx')baixarBlob(gerarXlsx([{nome:'Rendimentos',linhas:rows}]),'rendimentos-recorte.xlsx');else{const safe=v=>{const s=String(v??'');return '"'+(/^[=+@\-\t\r]/.test(s)&&typeof v!=='number'?"'"+s:s).replace(/"/g,'""')+'"'};baixarBlob(new Blob(['\ufeff'+rows.map(r=>r.map(safe).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'}),'rendimentos-recorte.csv')}}
- function imprimir(){abrirModal('Relatório de rendimentos','Recorte atual. Use Imprimir e escolha Salvar como PDF.',(c)=>{c.classList.add('ra-print-report');const rows=exportData(),t=tabela([],rows);c.appendChild(t);c.appendChild(btn('Imprimir / PDF',()=>window.print(),''))})}
- return{render,destino,exportData,estado:()=>estado,reset:()=>{estado=null}};
+ function imprimir(){if(estado.aba==='graficos'&&!estado.dbBiblioteca){RendimentosDashboards.imprimir();return}abrirModal('Relatório de rendimentos','Recorte atual. Use Imprimir e escolha Salvar como PDF.',(c)=>{c.classList.add('ra-print-report');const rows=exportData(),t=tabela([],rows);c.appendChild(t);c.appendChild(btn('Imprimir / PDF',()=>window.print(),''))})}
+ return{render,destino,exportData,tabela,estado:()=>estado,reset:()=>{estado=null}};
 })();
