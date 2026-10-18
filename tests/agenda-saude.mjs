@@ -43,20 +43,21 @@ test('Saúde na agenda: exame com laudo pronto já aconteceu — não é comprom
 
 test('Saúde na agenda: rastreio SEM registro não vira data inventada', () => {
   const run = app();
-  // sem nenhum exame lançado, todo rastreio está "Sem registro" — e sem data
+  // Sem exame lançado, o catálogo fica A confirmar e não fornece datas.
   assert.equal(run("rastreiosPendentes().some(x=>!x.ultima)"), true, 'o cenário precisa ter rastreio sem registro');
   assert.deepEqual(saude(run), []);
 });
 
-test('Saúde na agenda: rastreio COM registro cai no vencimento, não em hoje', () => {
+test('Saúde na agenda: histórico de rastreio não fabrica vencimento pelo catálogo', () => {
   const run = app();
-  run("E.exames=[{exame:rastreiosPendentes(true)[0].nome,data:'2026-01-10',resultado:'Normal'}]");
-  const cada = Number(run("rastreiosPendentes(true)[0].cada"));
-  const ev = saude(run).filter(e => /refazer/.test(e.titulo));
-  assert.equal(ev.length, 1, JSON.stringify(saude(run)));
-  const d = new Date('2026-01-10T12:00'); d.setMonth(d.getMonth() + cada);
-  assert.equal(ev[0].data, d.toISOString().slice(0, 10));
-  assert.notEqual(ev[0].data, run('hoje()'));
+  run("E.exames=[{exame:rastreiosPendentes(true)[0].nome,data:'2020-01-10',resultado:'Normal'}]");
+  assert.deepEqual(saude(run), []);
+});
+
+test('Saúde na agenda: próxima data informada conserva o prazo cadastrado', () => {
+  const run = app();
+  run("E.exames=[{exame:'Exame fictício',data:'2020-01-10',resultado:'Normal',proximo:'2030-04-09'}]");
+  assert.deepEqual(saude(run), [{data:'2030-04-09',titulo:'Exame fictício · próxima data informada'}]);
 });
 
 test('Saúde na agenda: a fonte existe nos chips e tem cor', () => {

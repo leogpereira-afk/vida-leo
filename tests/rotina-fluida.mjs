@@ -81,7 +81,7 @@ test('Saúde: exames em unidades diferentes não ganham variação percentual',(
  const {run,document}=setup();run("E.exames=[{id:'a',exame:'LDL',data:'2026-01-01',valor:100},{id:'b',exame:'LDL',data:'2026-02-01',valor:2.5,unidade:'mmol/L'}];vSaude(document.getElementById('main'))");assert.match(document.querySelector('[data-bid="sa-ex"] tbody tr').textContent,/Sem comparação numérica/);
 });
 test('Saúde: data futura não transforma acompanhamento em realizado',()=>{
- const {run}=setup();run("E.perfil={nascimento:'1980-01-01'};E.exames=[{exame:'Dentista (limpeza)',data:'2099-01-01',resultado:'Aguardando'}]");assert.equal(run("rastreiosPendentes(true).find(x=>x.nome==='Dentista (limpeza)').situacao"),'Sem registro');
+ const {run}=setup();run("E.perfil={nascimento:'1980-01-01'};E.exames=[{exame:'Dentista (limpeza)',data:'2099-01-01',resultado:'Aguardando'}]");assert.equal(run("rastreiosPendentes(true).find(x=>x.nome==='Dentista (limpeza)').ultima"),null);assert.equal(run("rastreiosPendentes(true).find(x=>x.nome==='Dentista (limpeza)').situacao"),'A confirmar');
 });
 test('Ficha de emergência PDF inclui saúde e contatos, sem dados bancários',()=>{
  const {run}=setup();run("var pdfRotina='';window.open=()=>({document:{write:s=>pdfRotina=s,close(){}},print(){}});E.sos={alergias:'Teste alergia',contato1:'Contato de teste'};E.bancos=[{banco:'Banco secreto',conta:'123456789'}];E.patrimonio=[{nome:'Imóvel privado'}];imprimirSOS()");assert.match(run('pdfRotina'),/Teste alergia/);assert.match(run('pdfRotina'),/Contato de teste/);assert.doesNotMatch(run('pdfRotina'),/Banco secreto|123456789|Imóvel privado/);

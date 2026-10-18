@@ -2462,9 +2462,7 @@ function radar(){
   // exames a repetir
   E.exames.forEach(x=>{const n=dias(x.proximo);
     if(n!=null&&n<60) add(n<0?0:1,'🩺',`Repetir ${x.exame||'exame'} ${n<0?'(atrasado desde '+fmtData(x.proximo)+')':fmtData(x.proximo)}`,n,'saude','exames',x)});
-  // rastreios por idade
-  (typeof rastreiosPendentes==='function'?rastreiosPendentes():[]).forEach(p=>
-    add(p.situacao==='Atrasado'?0:1,'🩺',`${p.nome} — ${p.situacao==='Sem registro'?'sem registro na Central':p.situacao.toLowerCase()}`,p.venceEm,'saude'));
+  // Sugestões genéricas de prevenção não são prazos individuais no radar.
   // vacinas
   E.vacinas.forEach(v=>{const n=dias(v.proxima);
     if(n!=null&&n<90) add(n<0?0:1,'💉',`Reforço de ${v.vacina||'vacina'} ${n<0?'atrasado':fmtData(v.proxima)}`,n,'saude','vacinas',v)});
@@ -2613,7 +2611,13 @@ function novoRegistroRotina(titulo,lista,base,defs,abrir){
       }
       if(registro.volta&&registro.ida&&registro.volta<registro.ida||registro.ate&&registro.data&&registro.ate<registro.data){erro.textContent='A data final precisa ser igual ou posterior à inicial.';return}
       if(lista===E.vitais&&!['sis','dia','fc'].some(k=>+registro[k]>0)){erro.textContent='Informe pelo menos uma medida de pressão ou batimentos.';return}
-      incluido=true;lista.push(registro);salvar();fechar();abrir?.(registro);
+      const tamanho=lista.length,mt=Object.getOwnPropertyDescriptor(E,'_mt');
+      lista.push(registro);
+      try{salvar()}catch(e){
+        lista.splice(tamanho);if(mt)Object.defineProperty(E,'_mt',mt);else delete E._mt;
+        erro.textContent='Não foi possível salvar. Seus dados anteriores foram preservados. Tente novamente.';return;
+      }
+      incluido=true;fechar();abrir?.(registro);
     };
     c.appendChild(form);
   });
@@ -4284,13 +4288,9 @@ function eventosDoEcossistema(){
       if(!aguardando&&x.data<=h)return;
       ev.push({data:x.data,hora:'',titulo:(x.exame||'Exame')+(aguardando?' · resultado pendente':' · marcado'),
         sub:x.medico||'',fonte:'saude',ic:'🧪',ir:'saude',col:'sa-ex',ref:x})});
-    (typeof rastreiosPendentes==='function'?rastreiosPendentes(true):[]).forEach(x=>{
-      if(!dataISOValida(x.ultima)||!(+x.cada>0))return;
-      const d=new Date(x.ultima+'T12:00');d.setMonth(d.getMonth()+(+x.cada));
-      const quando=d.toISOString().slice(0,10);
-      ev.push({data:quando,hora:'',titulo:x.nome+' · refazer',
-        sub:'último em '+fmtDataAno(x.ultima)+' · a cada '+x.cada+' meses',
-        fonte:'saude',ic:'🩺',ir:'saude',col:'sa-rast',ref:x})});
+    (E.exames||[]).forEach(x=>{if(dataISOValida(x.proximo))ev.push({
+      data:x.proximo,hora:'',titulo:(x.exame||'Exame')+' · próxima data informada',
+      sub:x.medico||'',fonte:'saude',ic:'🩺',ir:'saude',col:'sa-ex',ref:x})});
   }
 
   /* Chega da nuvem, não do estado: se ainda não chegou, a lista sai sem ele e
@@ -4924,8 +4924,8 @@ function registrosResultadoSaude(lista){return lista.filter(resultadoSaudeRegist
    entra o que o dono marcar. Nada é gravado antes do clique.
 
    O QUE JÁ EXISTE VEM DESMARCADO, não escondido: mesmo exame na mesma data já
-   registrado aparece com o aviso, para o dono decidir. Esconder viraria
-   "sumiu", e reimportar o mesmo laudo duplicaria o histórico calado.
+   registrado aparece com o aviso para conferência. O clique final revalida
+   a duplicidade para não repetir um resultado que já entrou no histórico.
 
    O QUE NÃO FOI ENTENDIDO É DITO. Linha sem exame ou sem data entra na conta
    dos descartados com o motivo — lista que descarta em silêncio faz o dono
@@ -4962,6 +4962,7 @@ function importarExamesRotina(){
     topo.appendChild(arq);topo.appendChild(cola);topo.appendChild(bLer);c.appendChild(topo);
     const previa=el('<div class="secao"></div>');c.appendChild(previa);
     const rodape=el('<div class="secao" style="display:flex;gap:9px;align-items:center"></div>');c.appendChild(rodape);
+    let concluido=false;
     arq.onchange=()=>{const f=arq.files&&arq.files[0];if(!f)return;const fr=new FileReader();
       fr.onload=()=>{cola.value=String(fr.result||'');mostrar()};
       fr.onerror=()=>{previa.replaceChildren(el('<div class="aviso">Não consegui abrir o arquivo.</div>'))};
@@ -5010,11 +5011,23 @@ function importarExamesRotina(){
       const contar=()=>linhas.filter(l=>l.cx.checked).length;
       const rotular=()=>{bOk.textContent='Adicionar '+contar()+' exame(s)';bOk.disabled=!contar()};
       linhas.forEach(l=>l.cx.onchange=rotular);rotular();
+      const erro=el('<p class="rotina-form-erro" role="status" aria-live="polite"></p>');previa.appendChild(erro);
       bOk.onclick=()=>{
-        const escolhidos=linhas.filter(l=>l.cx.checked).map(l=>l.x);
-        if(!escolhidos.length)return;
+        if(concluido)return;
+        erro.textContent='';
+        const vistos=new Set(),escolhidos=linhas.filter(l=>l.cx.checked).map(l=>l.x).filter(x=>{
+          const chave=JSON.stringify([normaliza(x.exame),x.data]);
+          if(jaTemExame(x)||vistos.has(chave))return false;
+          vistos.add(chave);return true;
+        });
+        if(!escolhidos.length){erro.textContent='Os exames selecionados já estão registrados. Nenhum exame foi adicionado.';return}
+        const tamanho=E.exames.length,mt=Object.getOwnPropertyDescriptor(E,'_mt');
         escolhidos.forEach(x=>E.exames.push({id:uid(),...x}));
-        salvar();fechar();
+        try{salvar()}catch(e){
+          E.exames.splice(tamanho);if(mt)Object.defineProperty(E,'_mt',mt);else delete E._mt;
+          erro.textContent='Não foi possível salvar. Seus dados anteriores foram preservados. Tente novamente.';return;
+        }
+        concluido=true;bOk.disabled=true;fechar();
         alert(escolhidos.length+' exame(s) adicionados à Saúde.');
       };
       const bTodos=el('<button class="btn ghost">Marcar todos</button>');
@@ -5040,6 +5053,7 @@ function novoCuidadoRotina(tipo){
     vacinas:['Nova vacina',E.vacinas,{data:hoje(),proxima:'',viagem:'Não',obs:''},[{k:'vacina',t:'Vacina',obrigatorio:true},{k:'data',t:'Data da dose',tipo:'date',obrigatorio:true},{k:'proxima',t:'Próxima data informada',tipo:'date'},{k:'obs',t:'Observação'}],'sa-vac'],
     queixas:['Nova queixa',E.queixas,{data:hoje(),onde:'',intensidade:'',situacao:'Ativa',obs:''},[{k:'oque',t:'O que estou sentindo',obrigatorio:true},{k:'data',t:'Sinto desde',tipo:'date',obrigatorio:true},{k:'onde',t:'Onde',opcoes:['','Cabeça','Pescoço','Ombro','Braço','Cotovelo','Punho / mão','Peito','Costas','Lombar','Quadril','Joelho','Perna','Tornozelo / pé','Abdômen','Geral','Outro']},{k:'intensidade',t:'Intensidade de 0 a 10',tipo:'number'},{k:'obs',t:'O que melhora ou piora'}],'sa-quei'],
     consultas:['Nova consulta',E.consultas,{data:hoje(),retorno:'',obs:''},[{k:'especialidade',t:'Especialidade',obrigatorio:true},{k:'data',t:'Data da consulta',tipo:'date',obrigatorio:true},{k:'profissional',t:'Profissional'},{k:'queixaId',t:'Por causa de qual queixa',tipo:'select',opcoes:opcoesDeQueixa()},{k:'motivo',t:'Por que fui'},{k:'conduta',t:'O que ficou combinado'},{k:'retorno',t:'Retorno marcado para',tipo:'date'}],'sa-cons'],
+    histFamiliar:['Novo histórico familiar',E.histFamiliar,{parente:'Pai',doenca:'',idade:'',situacao:'Vivo',obs:''},[{k:'parente',t:'Parente',opcoes:['Pai','Mãe','Avô paterno','Avó paterna','Avô materno','Avó materna','Irmão','Irmã','Outro']},{k:'doenca',t:'Doença informada',obrigatorio:true,opcoes:[{v:'',t:'Selecione a informação confirmada'},...CFG('doencasFamilia')]},{k:'idade',t:'Com que idade',tipo:'number'},{k:'situacao',t:'Situação',opcoes:['Vivo','Faleceu']},{k:'obs',t:'Observação'}],'sa-fam'],
     fisio:['Nova sessão de fisioterapia',E.fisio,{data:hoje(),queixaId:'',sessao:'',total:'',dorAntes:'',dorDepois:'',obs:''},[{k:'oque',t:'Para quê',obrigatorio:true},{k:'queixaId',t:'Por causa de qual queixa',tipo:'select',opcoes:opcoesDeQueixa()},{k:'data',t:'Data da sessão',tipo:'date',obrigatorio:true},{k:'sessao',t:'Número da sessão',tipo:'number'},{k:'total',t:'De quantas sessões',tipo:'number'},{k:'dorAntes',t:'Dor antes, de 0 a 10',tipo:'number'},{k:'dorDepois',t:'Dor depois, de 0 a 10',tipo:'number'},{k:'profissional',t:'Profissional'}],'sa-fisio']
   };
   const [titulo,lista,base,defs,blocoId]=opcoes[tipo];novoRegistroRotina(titulo,lista,base,defs,()=>{abreBloco(blocoId);rr('saude')()});
@@ -5055,7 +5069,7 @@ function ultimoRegistroSaude(lista,campos){
 }
 function organizarSaude(pagina,alvo){
   pagina.classList.add('saude-layout');
-  Object.entries({'sa-peso':'peso','sa-vit':'vitais','sa-trat':'tratamentos','sa-vac':'vacinas','sa-quei':'queixas','sa-cons':'consultas','sa-fisio':'fisio'}).forEach(([id,tipo])=>{const bt=pagina.querySelector('[data-bid="'+id+'"] .mais');if(bt)bt.onclick=()=>novoCuidadoRotina(tipo)});
+  Object.entries({'sa-peso':'peso','sa-vit':'vitais','sa-trat':'tratamentos','sa-vac':'vacinas','sa-quei':'queixas','sa-cons':'consultas','sa-fisio':'fisio','sa-fam':'histFamiliar'}).forEach(([id,tipo])=>{const bt=pagina.querySelector('[data-bid="'+id+'"] .mais');if(bt)bt.onclick=()=>novoCuidadoRotina(tipo)});
   const opcoes=[['resumo','Resumo'],['exames','Exames'],['medidas','Medidas'],['queixas','Queixas e consultas'],['tratamentos','💊 Tratamentos'],['cuidados','Cuidados']];
   const paineis=Object.fromEntries(opcoes.map(([id])=>[id,el('<div class="saude-pane"></div>')]));
   const nav=el('<nav class="finance-tabs saude-tabs" aria-label="Áreas de saúde"></nav>');
@@ -5181,31 +5195,23 @@ function vSaude(m) {
     m.appendChild(bloco('sa-pend','Registros para completar',incompletos.length+' exame(s) preservados, sem substituir resultados já registrados.',pendentes));
   }
 
-  /* ---- 2. rastreios por idade ---- */
+  /* ---- 2. sugestões para conversar na consulta ---- */
   const rc = el('<div class="rolagem"></div>');
-  /* Ordem de urgência, a MESMA régua do rastreiosPendentes() sem argumento:
-     nunca feito primeiro (venceEm nulo vira -9999), depois o mais atrasado, e
-     o que está em dia por último. Antes a linha vencida ganhava borda vermelha
-     e ficava perdida no meio de dez — cor não ordena. */
-  const listaR = rastreiosPendentes(true).slice().sort((a,b)=>(a.venceEm??-9999)-(b.venceEm??-9999));
+  const listaR = rastreiosPendentes(true);
   if (idade) {
     const t = document.createElement('table');
-    t.innerHTML = '<thead><tr><th>Rastreio</th><th>A cada</th><th>Última vez</th><th>Situação</th><th>Para quê</th></tr></thead>';
+    t.innerHTML = '<thead><tr><th>Sugestão para a consulta</th><th>Último registro</th><th>Situação</th></tr></thead>';
     const tb = document.createElement('tbody');
     listaR.forEach(x => {
       const tr = document.createElement('tr');
-      if (x.situacao === 'Atrasado') tr.style.boxShadow = 'inset 3px 0 0 var(--vermelho)';
-      else if (x.situacao === 'Em dia') tr.style.boxShadow = 'inset 3px 0 0 var(--verde)';
       tr.innerHTML = `<td style="padding:9px 10px"><b>${esc(x.nome)}</b></td>
-        <td style="padding:9px 10px;color:var(--suave)">${x.cada >= 12 ? (x.cada / 12) + ' ano(s)' : x.cada + ' meses'}</td>
-        <td style="padding:9px 10px;white-space:nowrap">${x.ultima ? fmtData(x.ultima) : '—'}</td>
-        <td style="padding:9px 10px">${chip(x.situacao === 'Em dia' ? 'Em dia' : x.situacao === 'Sem registro' ? 'Sem registro' : x.situacao === 'Atrasado' ? 'Vencido' : 'Vencendo')}</td>
-        <td style="padding:9px 10px;color:var(--suave);font-size:12.5px">${esc(x.porque)}</td>`;
+        <td style="padding:9px 10px;white-space:nowrap">${x.ultima ? fmtData(x.ultima) : 'Sem registro na Central'}</td>
+        <td style="padding:9px 10px">${chip('A confirmar')}</td>`;
       tb.appendChild(tr);
     });
     t.appendChild(tb); rc.appendChild(t);
   } else rc.innerHTML = '<div class="vazio">Informe sua data de nascimento em ⚙️ Configurações.</div>';
-  m.appendChild(bloco('sa-rast', 'Histórico de acompanhamento' + (idade ? ` (${idade} anos)` : ''), 'Sem registro significa que não há uma data cadastrada. Os intervalos sugeridos precisam ser confirmados na consulta.', rc));
+  m.appendChild(bloco('sa-rast', 'Sugestões de prevenção' + (idade ? ` (${idade} anos)` : ''), 'Catálogo genérico para conversar na consulta. A indicação e o intervalo individual estão a confirmar; este quadro não define prazos. Datas informadas nos cadastros continuam nos lembretes.', rc));
 
   /* ---- 3. sinais vitais ---- */
   // só o que vira número em algum lugar: pressão (KPI + rastreio) e batimento de repouso (KPI).
@@ -5306,11 +5312,11 @@ function vSaude(m) {
   /* ---- 7. histórico familiar ---- */
   m.appendChild(tabelaBloco('sa-fam', 'Histórico familiar', 'informações familiares para compartilhar nas consultas', E.histFamiliar, [
     { k: 'parente', t: 'Parente', tipo: 'select', opcoes: ['Pai', 'Mãe', 'Avô paterno', 'Avó paterna', 'Avô materno', 'Avó materna', 'Irmão', 'Irmã', 'Outro'] },
-    { k: 'doenca', t: 'Doença', tipo: 'select', opcoes: CFG('doencasFamilia') },
+    { k: 'doenca', t: 'Doença', tipo: 'select', opcoes: ['',...CFG('doencasFamilia')] },
     { k: 'idade', t: 'Com que idade', tipo: 'number', num: 1, w: 130 },
     { k: 'situacao', t: 'Situação', tipo: 'select', opcoes: ['Vivo', 'Faleceu'] },
     { k: 'obs', t: 'Observação', ph: '—' },
-  ], () => ({ parente: 'Pai', doenca: CFG('doencasFamilia')[0], idade: '', situacao: 'Vivo', obs: '' }), r));
+  ], () => ({ parente: 'Pai', doenca: '', idade: '', situacao: 'Vivo', obs: '' }), r));
 
   const pesoRecente=ultimoRegistroSaude(E.peso,['peso']);
   const pressaoRecente=ultimoRegistroSaude(E.vitais,['sis','dia']);
@@ -5356,7 +5362,7 @@ function vSaude(m) {
     vit.filter(v => v.sis).map(v => ({ r: fmtData(v.data), v: +v.sis })), { fmt: v => v.toFixed(0) }))));
 }
 
-// rastreios: cruza a idade com o histórico de exames
+// Sugestões preventivas: idade seleciona a pauta e o histórico só informa a última data.
 function rastreiosPendentes(todos) {
   const idade = idadeLeo();
   if (!idade) return [];
@@ -5371,16 +5377,10 @@ function rastreiosPendentes(todos) {
     if (fonte && fonte.vitais)
       (E.vitais || []).forEach(x => { if (+x[fonte.vitais]>0&&dataISOValida(x.data)&&x.data<=h) datas.push(x.data) });
     const ultima = datas.filter(Boolean).sort().pop() || null;
-    let situacao = 'Sem registro', venceEm = null;
-    if (ultima) {
-      const prox = new Date(ultima + 'T12:00'); prox.setMonth(prox.getMonth() + cada);
-      venceEm = Math.round((prox - new Date(h + 'T12:00')) / 864e5);
-      situacao = venceEm < 0 ? 'Atrasado' : venceEm < 60 ? 'Chegando' : 'Em dia';
-    }
-    const item = { nome, cada, ultima, situacao, venceEm, porque };
-    if (todos || situacao === 'Sem registro' || situacao === 'Atrasado' || situacao === 'Chegando') out.push(item);
+    // O catálogo genérico serve como pauta, não como prescrição ou prazo individual.
+    out.push({nome,cada:null,ultima,situacao:'A confirmar',venceEm:null,porque});
   });
-  return todos ? out : out.sort((a, b) => (a.venceEm ?? -9999) - (b.venceEm ?? -9999));
+  return out;
 }
 
 // histórico de um marcador: gráfico, todas as medições e o caminho até o alvo
