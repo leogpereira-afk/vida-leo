@@ -93,7 +93,10 @@
     const registro={linha,campos};linhas.push(registro);linha.appendChild(acao('Remover item do rascunho',()=>{linhas.splice(linhas.indexOf(registro),1);linha.remove()}));lista.appendChild(linha);
    };
    rascunho.itens.forEach(adicionarItem);c.appendChild(acao('Adicionar item',()=>adicionarItem()));
-   if(typeof saudeEditarRegistro==='function'&&refOriginal!=='saude:documentos')c.appendChild(acao('Abrir registro de origem',()=>{const p=refOriginal.indexOf(':');saudeEditarRegistro(refOriginal.slice(0,p),refOriginal.slice(p+1))}));
+   if(typeof saudeEditarRegistro==='function'&&refOriginal!=='saude:documentos')c.appendChild(acao('Abrir registro de origem',()=>{
+    const p=refOriginal.indexOf(':'),tipo={exame:'exames',tratamento:'tratamentos',consulta:'consultas',queixa:'queixas',vacina:'vacinas',peso:'peso',vitais:'vitais',fisio:'fisio'}[refOriginal.slice(0,p)],id=refOriginal.slice(p+1),registro=tipo&&Array.isArray(E[tipo])?E[tipo].find(r=>r.id===id):null;
+    if(!registro){erro.textContent='O registro de origem não está mais disponível.';return}saudeEditarRegistro(tipo,registro);
+   }));
    const erro=el('<p class="sdoc-erro" role="alert"></p>'),status=el('<p class="sdoc-status" role="status" aria-live="polite"></p>');c.append(erro,status);
    const salvarBotao=acao('Salvar revisão',async()=>{
     if(ocupado)return;erro.textContent='';
@@ -101,6 +104,8 @@
     if(itens.some(i=>!i.descricao)){erro.textContent='Preencha o item / marcador de cada linha ou remova a linha vazia.';return}
     if(itens.some(i=>i.pagina&&(!/^\d+$/.test(i.pagina)||+i.pagina<1||+i.pagina>10000))){erro.textContent='Confira a página dos itens (1 a 10000).';return}
     if(coberturaInput.value==='completa'&&!paginas.value.trim()){erro.textContent='Indique as páginas conferidas antes de declarar o documento inteiro conferido.';return}
+    if(coberturaInput.value==='completa'&&itens.some(i=>i.estado!=='confirmado')){erro.textContent='Há itens pendentes. Confira todos ou mantenha a cobertura parcial.';return}
+    if(coberturaInput.value==='completa'&&naoReconhecidos.value.trim()){erro.textContent='Há trechos não reconhecidos. Confira esses trechos ou mantenha a cobertura parcial.';return}
     if(data.value&&!SaudePainelModelo.data(data.value)){erro.textContent='Confira a data do documento.';return}
     const antes=E.saudeDocumentos,mt=E._mt,tinhaMt=tem(E,'_mt');ocupado=true;salvarBotao.disabled=true;
     try{
