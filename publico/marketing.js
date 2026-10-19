@@ -50,12 +50,13 @@
     let marca=EMPRESAS.some(e=>e[0]===retornoEmpresa)?retornoEmpresa:EMPRESAS.some(e=>e[0]===empresa)?empresa:'fortemais',semana='',resposta=null,erro='',ocupado=false,sequencia=0,controleForte=null;
     const doc=container.ownerDocument;
     container.innerHTML='<section class="mkt-painel"></section>';const area=container.firstElementChild;
+    function guardarEmpresa(){if(root.history?.replaceState&&root.location?.pathname)root.history.replaceState(null,'',root.location.pathname+'?mkt='+marca+'#marketing')}
     function desenhar(){
       const ss=semanas(resposta);if(!ss.includes(semana))semana=ss[0]||'';
       if(['fortemais','domo'].includes(marca)&&resposta?.detalhe&&root.LeoFortemaisMarketing){
         area.innerHTML=`<header class="mkt-cab"><div><span class="mkt-sobre">${marca==='domo'?'DOMO':'FORTEMAIS'} · MARKETING E ADMINISTRAÇÃO</span><h1>Presença digital</h1><p>${marca==='domo'?'Indicadores, contas e oportunidades comerciais da Domo.':'Indicadores, contas e oportunidades das casas prontas da Fortemais.'}</p></div><button type="button" data-atualizar ${ocupado?'disabled':''}>${ocupado?'Consultando…':'Atualizar leitura'}</button></header><div class="mkt-filtros"><label>Empresa<select data-empresa>${EMPRESAS.map(([id,nome])=>`<option value="${id}" ${id===marca?'selected':''}>${nome}</option>`).join('')}</select></label><span class="mkt-chip">Indicadores somente leitura</span></div><div role="status" aria-live="polite">${erro?esc(erro):ocupado?'Consultando fontes…':''}</div><div data-forte></div><p class="mkt-nota">Consulta à Central: ${esc(hora(resposta.lidoEm))}. Atualizar leitura relê os dados recebidos; não inicia coleta nos provedores.</p>`;
         controleForte=root.LeoFortemaisMarketing.montar(area.querySelector('[data-forte]'),{detalhe:resposta.detalhe,api,empresa:marca});
-        area.querySelector('[data-empresa]').onchange=e=>{if(controleForte&&!controleForte.podeAtualizar()){e.target.value=marca;area.querySelector('[role=status]').textContent='Salve ou cancele o cadastro antes de trocar de empresa.';return}marca=e.target.value;semana='';resposta=null;controleForte=null;carregar()};
+        area.querySelector('[data-empresa]').onchange=e=>{if(controleForte&&!controleForte.podeAtualizar()){e.target.value=marca;area.querySelector('[role=status]').textContent='Salve ou cancele o cadastro antes de trocar de empresa.';return}marca=e.target.value;guardarEmpresa();semana='';resposta=null;controleForte=null;carregar()};
         area.querySelector('[data-atualizar]').onclick=()=>{if(controleForte&&!controleForte.podeAtualizar()){area.querySelector('[role=status]').textContent='Salve ou cancele o cadastro antes de atualizar.';return}carregar()};
         return;
       }
@@ -65,7 +66,7 @@
       ${resposta?`<div class="mkt-conexoes" aria-label="Fontes">${resposta.fontes.map(f=>`<span class="mkt-chip">${FONTES[f.id].nome}: ${esc(f.atrasado?'dados antigos':ESTADOS[f.estado]||'sem confirmação')}</span>`).join('')}</div><div class="mkt-grade">${resposta.fontes.map(f=>card(f,semana,marca)).join('')}</div>
       <section class="mkt-analise"><div><span class="mkt-sobre">PRÓXIMOS PASSOS</span><h2>Leitura dos indicadores</h2><p>Comparação automática dos dados disponíveis.</p></div><ul>${analise(resposta,semana).map(t=>`<li>${esc(t)}</li>`).join('')}</ul><button type="button" data-resumo>Preparar resumo para Aurora</button><div data-resumo-area></div></section>
       <details class="mkt-detalhes"><summary>Origens de visitas e páginas mais vistas</summary><div data-tabelas class="mkt-grade-dupla"></div></details><p class="mkt-nota">Consulta à Central: ${esc(hora(resposta.lidoEm))}. “Atualizar leitura” relê a última coleta disponível; não inicia uma nova coleta nos provedores. Métricas de fontes diferentes não são somadas.</p>`:''}`;
-      area.querySelector('[data-empresa]').onchange=e=>{marca=e.target.value;semana='';resposta=null;carregar()};
+      area.querySelector('[data-empresa]').onchange=e=>{marca=e.target.value;guardarEmpresa();semana='';resposta=null;carregar()};
       area.querySelector('[data-semana]').onchange=e=>{semana=e.target.value;desenhar()};
       area.querySelector('[data-atualizar]').onclick=carregar;
       if(resposta){

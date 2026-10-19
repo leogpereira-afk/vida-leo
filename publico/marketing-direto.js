@@ -11,7 +11,7 @@ function concluirRetorno(chamar,empresa){
  const q=new URLSearchParams(root.location.search),nonce=q.get('fm');if(!nonce)return Promise.resolve(false);
  const prova=root.sessionStorage.getItem(empresa==='domo'?'dm-direto-prova':'fm-direto-prova');
  const retorno=(async()=>{
-  root.history.replaceState(null,'',root.location.pathname+'#marketing');
+  root.history.replaceState(null,'',root.location.pathname+'?mkt='+empresa+'#marketing');
   if(q.get('resultado')!=='ok')throw Error('O provedor não concluiu a autorização. Revise o aplicativo e conecte novamente.');
   await chamar('marketingDiretoConfirmar',{nonce,prova});root.sessionStorage.removeItem(empresa==='domo'?'dm-direto-prova':'fm-direto-prova');return true;
  })();retornos.set(empresa,retorno);return retorno;

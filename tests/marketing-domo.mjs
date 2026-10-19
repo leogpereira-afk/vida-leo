@@ -52,3 +52,13 @@ test('Domo UI: conexão envia empresa correta e o retorno restaura a empresa ant
  vm.runInContext(readFileSync(new URL('../publico/marketing.js',import.meta.url),'utf8'),ctx);
  ctx.LeoMarketing.montar(document.querySelector('main'),{empresa:'fortemais',api:async(m,b)=>{calls.push(b);return resumirMarketing(b.empresa,[],tempo)}});await new Promise(r=>setImmediate(r));assert.equal(calls.at(-1).empresa,'domo');
 });
+test('Domo: retorno OAuth preserva empresa na URL quando a sincronização remonta o painel',async()=>{
+ const {document}=parseHTML('<main id="a"></main><main id="b"></main>');const location={search:'?fm='+('a'.repeat(64))+'&resultado=ok&mkt=domo',pathname:'/vida-leo/'};
+ const ctx=vm.createContext({document,console,Date,URL,URLSearchParams,location,sessionStorage:{getItem:()=> 'a'.repeat(64),removeItem(){}},history:{replaceState(a,b,u){location.search=u.includes('?')?u.slice(u.indexOf('?'),u.indexOf('#')):''}}});
+ vm.runInContext(readFileSync(new URL('../publico/marketing-direto.js',import.meta.url),'utf8'),ctx);
+ const api=async()=>({ok:true,provedores:{google:{},google_ads:{},meta:{}},fontes:{}});
+ ctx.LeoMarketingDireto.montar(document.querySelector('#a'),{empresa:'domo',api});await new Promise(r=>setImmediate(r));
+ assert.equal(new URLSearchParams(location.search).get('mkt'),'domo');
+ vm.runInContext(readFileSync(new URL('../publico/marketing.js',import.meta.url),'utf8'),ctx);let empresa;
+ ctx.LeoMarketing.montar(document.querySelector('#b'),{api:async(m,b)=>{empresa=b.empresa;return resumirMarketing(empresa,[],tempo)}});await new Promise(r=>setImmediate(r));assert.equal(empresa,'domo');
+});
