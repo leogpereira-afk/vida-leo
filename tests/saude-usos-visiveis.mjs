@@ -14,7 +14,7 @@ function enviar(a,hora='08:00',quantidade='1'){
 const linhas=a=>[...a.document.querySelectorAll('.trat-usos-recentes [data-uso-id]')];
 test('uso aparece em linha visível fora de details, com data, hora e quantidade, sem repetir estoque',()=>{
   const a=app();enviar(a,'08:00','2');assert.equal(linhas(a).length,1);
-  assert.match(linhas(a)[0].textContent,/02\/01\/2020/);assert.match(linhas(a)[0].textContent,/08:00/);assert.match(linhas(a)[0].textContent,/2 unidade/);
+  assert.match(linhas(a)[0].textContent,/02\/01\/2020/);assert.match(linhas(a)[0].textContent,/08:00/);assert.match(linhas(a)[0].textContent,/2 und/);
   assert.equal(linhas(a)[0].closest('details'),null);assert.equal(a.run('SaudeTratamentos.saldo(t)'),8);
   assert.doesNotMatch(a.document.querySelector('.trat-resumo').textContent,/Estoque/);
 });

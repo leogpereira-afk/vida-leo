@@ -41,3 +41,11 @@ A ficha tem título, ações, formulário e metadados menores. O saldo aparece s
 Oito novas regressões verificam linha imediata, ordem por data e horário sem reordenar o cadastro, check diário, desfazer, rollback de gravação, isolamento entre itens, preservação das linhas ao reabrir e visibilidade de uso retroativo. Suíte completa atual: **1.468 testes aprovados**, zero falhas ou ignorados. Sintaxe e diff conferidos. Revisão independente encontrou dois problemas de integração, ambos corrigidos e cobertos por testes.
 
 No navegador, registro e reversão foram testados com um medicamento fictício: saldo de dez para nove unidades e retorno para dez ao desfazer. Painéis de 319 e 390 px ficaram sem transbordamento da página; botões de toque mantêm pelo menos 44 px. Também foi conferida a apresentação no computador e o console sem erros. Não houve teste ou alteração de uso real, nem publicação desta versão.
+
+## Números e abreviação da unidade
+
+Foi reproduzida a origem dos zeros no campo vazio: a primeira seta gerava 0,0001 por causa do mínimo do input. Agora a primeira seta gera 1; frações continuam permitidas e o mínimo anterior de 0,0001 é validado no motor. Ao sair do campo, zeros finais desnecessários são retirados somente da apresentação.
+
+Unidades genéricas são apresentadas como `und`. Unidades específicas, campos ausentes, prescrição e cadastros originais permanecem intactos. Saldo, limites, linhas de uso, histórico, check diário, previsão e formulário de Hoje usam os novos formatos. A tabela não arredonda mais frações pequenas a zero: por exemplo, 0,0001 continua 0,0001. O editor de estoque e unidade preserva os valores brutos para evitar mudanças indevidas em cadastros com movimentos.
+
+Nove testes novos cobrem precisão da apresentação, zeros finais, unidades, ausência de mutação, edição legada, Hoje e o mínimo anterior. Suíte completa: **1.477 testes aprovados**, zero falhas ou ignorados. Três scripts com sintaxe válida, diff conferido e revisão independente sem bloqueios. No navegador, a seta foi conferida em 1, o campo 0.5000 foi normalizado para 0.5 e o saldo exibiu 10 und; console sem erros. Alteração local, sem publicação.

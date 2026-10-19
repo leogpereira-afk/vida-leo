@@ -120,5 +120,5 @@ function previsaoEstoqueTratamento(t){
   if(SaudeTratamentos.diario(t)&&dias!==1)return nao('Confirme o intervalo e o planejamento diário antes de estimar');
   const data=new Date(t.proximaData+'T12:00:00Z');data.setUTCDate(data.getUTCDate()+Math.floor((n-1)/tomadas)*dias);if(!Number.isFinite(data.getTime()))return nao('Revise os valores do consumo');const fim=data.toISOString().slice(0,10);
   if(t.fim&&dataISOValida(t.fim)&&t.fim<fim)return nao('Término do tratamento anterior ao fim estimado do estoque');
-  return {data:fim,motivo:'Último uso estimado com o saldo atual; '+tomadas+' tomada(s) por data planejada, '+q+' '+t.unidade+' por tomada, intervalo de '+dias+' dia(s). Depende do consumo registrado.',usos:n};
+  return {data:fim,motivo:'Último uso estimado com o saldo atual; '+tomadas+' tomada(s) por data planejada, '+SaudeTratamentos.formatarNumero(q)+' '+SaudeTratamentos.unidadeExibida(t.unidade)+' por tomada, intervalo de '+dias+' dia(s). Depende do consumo registrado.',usos:n};
 }
