@@ -9,6 +9,7 @@ const source=html.slice(html.indexOf('<script>')+8,html.lastIndexOf('</script>')
 function app(date='2026-09-05T12:00:00-03:00'){
  const NativeDate=Date; class Clock extends NativeDate {constructor(...args){super(...(args.length?args:[date]))} static now(){return new NativeDate(date).getTime()}}
  const data=new Map();const ctx=vm.createContext({LeoGoogleDatas:globalThis.LeoGoogleDatas,ICAL,atob,btoa,Date:Clock,structuredClone,console,setTimeout,clearTimeout,URL,Blob,TextEncoder,TextDecoder,location:{hostname:'localhost',hash:''},document:{addEventListener(){},getElementById(){return null}},window:{addEventListener(){}},localStorage:{getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)},sessionStorage:{getItem:()=>null}});
+ vm.runInContext(readFileSync(new URL('../publico/fortemais-apoio-modelo.js',import.meta.url),'utf8'),ctx);
  vm.runInContext(source,ctx);return code=>vm.runInContext(code,ctx);
 }
 test('hoje respeita o dia local após 21h',()=>assert.equal(app('2026-09-05T23:30:00-03:00')('hoje()'),'2026-09-05'));
@@ -58,7 +59,7 @@ test('agenda: próximos incluem andamento e ordenam horas sem alterar origem',()
 test('busca: compromisso abre registro correto',()=>assert.equal(app()("var compromissoTeste;irTela=()=>{};modalCompromisso=a=>compromissoTeste=a.id;abrirRegistro('agenda','agenda',{id:'agenda-exata'});compromissoTeste"),'agenda-exata'));
 
 
-function telaAssincronaTeste(){const run=app();run("var paginaTeste={isConnected:true,dataset:{},querySelectorAll:()=>[]},concluirTelaTeste;document.createElement=()=>({innerHTML:'',firstElementChild:paginaTeste});document.getElementById=()=>({replaceChildren(){}});indiceDaTela=()=>{};var saltosTeste=[];rolaAlvo=(p,id)=>saltosTeste.push(id);MODS.push({id:'teste-assincrono',nome:'Teste',render:()=>new Promise(r=>concluirTelaTeste=r)});atual='teste-assincrono';_alvoBloco='assunto-teste';tela()");return run}
+function telaAssincronaTeste(){const run=app();run("var paginaTeste={isConnected:true,dataset:{},querySelectorAll:()=>[]},concluirTelaTeste;document.createElement=()=>({innerHTML:'',firstElementChild:paginaTeste});document.getElementById=()=>({replaceChildren(){},querySelectorAll:()=>[]});indiceDaTela=()=>{};var saltosTeste=[];rolaAlvo=(p,id)=>saltosTeste.push(id);MODS.push({id:'teste-assincrono',nome:'Teste',render:()=>new Promise(r=>concluirTelaTeste=r)});atual='teste-assincrono';_alvoBloco='assunto-teste';tela()");return run}
 test('navegação: atalho espera conteúdo assíncrono',async()=>{const run=telaAssincronaTeste();assert.equal(run('saltosTeste.length'),0);await run('concluirTelaTeste();Promise.resolve()');assert.equal(run("saltosTeste.join(',')"),'assunto-teste')});
 test('navegação: tela antiga não interfere após a troca',async()=>{const run=telaAssincronaTeste();await run('paginaTeste.isConnected=false;concluirTelaTeste();Promise.resolve()');assert.equal(run('saltosTeste.length'),0)});
 test('navegação: destino solicitado é consumido pela própria tela',()=>{const run=telaAssincronaTeste();assert.equal(run('_alvoBloco'),null)});
