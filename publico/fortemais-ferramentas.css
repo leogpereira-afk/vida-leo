@@ -2,3 +2,5 @@
 
 .fmf button[data-action=calcular],.fmf button[data-action=calcular]:hover{color:#fff!important;background:#b21e24;border-color:#b21e24}
 .fmf-table td strong{font-weight:600;white-space:nowrap}.fmf-table td small{display:block;font-size:11px;color:#616771;line-height:1.45}
+
+.fmf,.fmf>*,.fmf details,.fmf-workspace>*,.fmf-card>*{min-width:0;max-width:100%;box-sizing:border-box}.fmf-table-scroll{width:100%;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}.fmf-table-scroll>.fmf-table{min-width:440px}.fmf-saved strong,.fmf-saved small{overflow-wrap:anywhere}.fmf-grid>*,.fmf-toolbar>*{min-width:0}@media print{.fmf-table-scroll{overflow:visible}.fmf-table-scroll>.fmf-table{min-width:0}}
