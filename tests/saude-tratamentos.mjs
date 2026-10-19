@@ -36,7 +36,7 @@ test('pacote inválido é recusado antes de gravar e falha local reverte altera�
 });
 test('aba tratamentos exibe lista e detalhe sem retirar cuidados ou dados legados',()=>{
  const {run,document}=iniciar();run("E.tratamentos=[{id:'legado',oque:'Cuidado fictício',frequencia:'Conforme profissional',status:'Contínuo'}];vSaude(document.getElementById('main'));organizarSaude(document.getElementById('main'))");
- assert.ok(document.querySelector('[data-area=tratamentos]'));assert.ok(document.querySelector('[data-area=cuidados]'));[...document.querySelectorAll('.trat-subtabs button')].find(b=>b.textContent.includes('Itens prescritos')).click();assert.match(document.querySelector('.trat-detalhe').textContent,/Cuidado fictício/);assert.match(document.querySelector('.trat-detalhe').textContent,/Não se aplica/);
+ assert.ok(document.querySelector('[data-area=tratamentos]'));assert.ok(document.querySelector('[data-area=cuidados]'));document.querySelector('.trat-avulsos button').click();assert.match(document.querySelector('.trat-detalhe').textContent,/Cuidado fictício/);assert.match(document.querySelector('.trat-detalhe').textContent,/Não se aplica/);
 });
 
 test('corrigir compra não permite saldo negativo nem altera movimentos ao falhar',()=>{

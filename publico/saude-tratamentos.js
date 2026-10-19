@@ -158,7 +158,7 @@ function agendaTratamento(t){
     }catch(e){status.textContent=e.message}finally{b.disabled=false}});c.append(status,b);
   });
 }
-function quadroItensTratamento(itens,grupo){
+function quadroItensTratamento(itens,grupo,{selecionarPrimeiro=true}={}){
   const sec=el('<section class="tratamentos-itens"><div class="trat-toolbar"><h2>Medicamentos e cuidados</h2><div class="trat-actions"></div></div><div class="trat-filtros"></div><div class="trat-split"><aside class="trat-lista" aria-label="Itens prescritos do tratamento"></aside><div class="trat-detalhe"></div></div></section>');
   const actions=sec.querySelector('.trat-actions');actions.append(acao('+ Medicamento / cuidado',()=>editarTratamento(null,grupo),'ghost mini'));
   function pintar(){
@@ -167,8 +167,9 @@ function quadroItensTratamento(itens,grupo){
     const filtros=sec.querySelector('.trat-filtros');filtros.innerHTML='';[['ativos','Em acompanhamento',ativos.length],['compras','Compras',ativos.filter(t=>SaudeTratamentos.controlaEstoque(t)&&['Sem estoque','Comprar mais','Não informado'].includes(SaudeTratamentos.estoque(t))).length],['todos','Todos',itens.length]].forEach(([k,n,q])=>{const b=acao(n+' · '+q,()=>{tratamentoFiltro=k;pintar()},'ghost mini');b.setAttribute('aria-pressed',String(tratamentoFiltro===k));filtros.append(b)});
     const l=sec.querySelector('.trat-lista'),d=sec.querySelector('.trat-detalhe');l.innerHTML='';d.innerHTML='';
     if(!lista.length){d.append(el('<div class="trat-empty"><h3>Nenhum item neste filtro</h3><p>Adicione os medicamentos e cuidados prescritos para este tratamento.</p></div>'));return}
-    const t=lista.find(x=>x.id===tratamentoSelecionado)||lista[0];tratamentoSelecionado=t.id;
+    const t=lista.find(x=>x.id===tratamentoSelecionado)||(selecionarPrimeiro?lista[0]:null);if(t)tratamentoSelecionado=t.id;
     lista.forEach(x=>{const b=el('<button type="button" class="trat-item"><strong>'+esc(x.oque||'Sem nome')+'</strong><small>'+esc(x.tipo||'Tratamento')+' · '+esc(x.status||'A confirmar')+'</small><span>'+esc(SaudeTratamentos.controlaEstoque(x)?SaudeTratamentos.estoque(x):'Acompanhamento')+'</span></button>');b.setAttribute('aria-pressed',String(x===t));b.onclick=()=>{tratamentoSelecionado=x.id;pintar()};l.append(b)});
+    if(!t){d.append(el('<div class="trat-empty"><h3>💊 Escolha um medicamento ou cuidado</h3><p>Selecione um item da lista para consultar a orientação, os documentos e os registros ou informar um uso realizado.</p><p>Nenhum medicamento foi selecionado automaticamente.</p></div>'));return}
     const saldo=SaudeTratamentos.saldo(t),compras=(t.compras||[]).slice().sort((a,b)=>(a.data||'').localeCompare(b.data||'')),previsao=previsaoEstoqueTratamento(t),usos=(t.usos||[]).filter(x=>!x.desfeitoEm),evolucao=t.evolucao||[];
     d.append(el('<header><small>'+esc(t.tipo||'Tratamento')+'</small><h3>'+esc(t.oque||'Tratamento')+'</h3><p>'+esc(t.status||'A confirmar')+(t.inicio?' · início '+fmtDataAno(t.inicio):' · início não confirmado')+'</p></header>'));
     const usoDireto=SaudeTratamentos.controlaEstoque(t)||['Medicamento','Suplemento'].includes(t.tipo)?quadroUsoDireto(t,pintar):null;
@@ -273,8 +274,14 @@ function gruposTratamento(){
   const ids=new Set(E.tratamentos.map(t=>t.id));
   return E.tratamentos.filter(t=>!t.origemTratamentoId||!ids.has(t.origemTratamentoId)).map(plano=>{
     const filhos=E.tratamentos.filter(t=>t.origemTratamentoId===plano.id);
-    return {plano,itens:filhos.length||plano.tipo==='Plano de tratamento'?filhos:[plano]};
-  });
+    const principal=filhos.length>0||plano.tipo==='Plano de tratamento';
+    return {plano,itens:principal?filhos:[plano],principal};
+  }).sort((a,b)=>prioridadeGrupoTratamento(a)-prioridadeGrupoTratamento(b));
+}
+function prioridadeGrupoTratamento(grupo){return grupo.principal?(/emagrec/i.test(normaliza(grupo.plano.oque||''))?0:1):2}
+function tratamentoAbrirVisaoGeral(){
+  const grupo=gruposTratamento()[0];tratamentoGrupoSelecionado=grupo?.plano.id||'';tratamentoSelecionado='';tratamentoVisao='resumo';
+  if(typeof saudeIr==='function')saudeIr('tratamentos');else{abaSaude='tratamentos';tela()}
 }
 function medidasTratamento(g){return E.peso.filter(m=>m.tratamentoId===g.id&&dataISOValida(m.data)&&m.data<=hoje()).sort((a,b)=>a.data.localeCompare(b.data))}
 function gastoSaude(ref){return E.gastos.find(g=>g.origemRef===ref)}
@@ -383,28 +390,31 @@ function dashboardTratamento(grupo,abrir){
   const kpis=box.querySelector('.trat-kpis');
   for(const [k,l,u] of METRICAS_TRATAMENTO.slice(0,4)){const v=ult?SaudeTratamentos.numero(ult[k]):null;kpis.append(el('<article class="trat-kpi"><small>'+esc(l)+'</small><b>'+esc(v===null?'—':v.toLocaleString('pt-BR')+' '+u)+'</b><span>'+esc(v===null?'Ainda não informado':fmtDataAno(ult.data))+'</span></article>'))}
   const oper=el('<div class="trat-status-grid"></div>');[['💊',r.itens,'Itens prescritos','itens'],['🛒',r.comprados,'Com compra registrada','itens'],['✓',r.usos,'Usos registrados','itens'],['💸',r.custos.length>r.semValor?brl(r.total):'A informar','Valores informados','consultas']].forEach(([ic,v,l,tab])=>oper.append(acao(ic+' '+v+' · '+l,()=>tab==='consultas'?custosTratamento(grupo):abrir(tab),'ghost')));box.append(oper);
-  box.querySelector('.trat-dashboard-linha').append(quadroEvolucaoGrupo(g));
+  box.querySelector('.trat-dashboard-linha').append(quadroEvolucaoGrupo(g,false));
   const dados=el('<section class="trat-card"><h3>🧬 Dados da última avaliação</h3><dl class="trat-dados"></dl><p class="trat-muted">'+esc(ult?(ult.fonte||'Registro de saúde')+' · '+fmtDataAno(ult.data):'Nenhuma medição vinculada.')+'</p></section>');METRICAS_TRATAMENTO.slice(4).forEach(([k,l,u])=>{const v=ult?SaudeTratamentos.numero(ult[k]):null;dados.querySelector('dl').append(el('<div><dt>'+l+'</dt><dd>'+esc(v===null?'A informar':v.toLocaleString('pt-BR')+' '+u)+'</dd></div>'))});box.querySelector('.trat-dashboard-linha').append(dados);
   const prox=[...r.consultas.filter(c=>c.situacao==='Agendada'&&c.data>=hoje()).map(c=>({data:c.data,label:c.tipoConsulta||'Consulta'})),...r.consultas.filter(c=>c.situacao!=='Cancelada'&&dataISOValida(c.retorno)&&c.retorno>=hoje()).map(c=>({data:c.retorno,label:'Retorno'})),...grupo.itens.filter(t=>SaudeTratamentos.lembrete(t)&&t.proximaData>=hoje()).map(t=>({data:t.proximaData,label:t.oque}))].sort((a,b)=>a.data.localeCompare(b.data));
   const rodape=el('<div class="trat-dashboard-linha"><section class="trat-card"><h3>📅 Próximos cuidados</h3>'+(prox.length?prox.slice(0,4).map(x=>'<p>'+fmtDataAno(x.data)+' · '+esc(x.label)+'</p>').join(''):'<p class="trat-muted">Nenhuma próxima data confirmada.</p>')+'</section><section class="trat-card"><h3>📋 Para completar</h3><p>'+r.pendentes+' itens aguardam confirmação do acompanhamento.</p><p>'+r.semValor+' compras ou consultas sem valor informado.</p><p class="trat-muted">Compra registrada não significa uso realizado. Valores não informados ficam fora da soma.</p></section></div>');box.append(rodape);return box;
 }
 function quadroTratamentos(){
-  const sec=el('<section data-bid="sa-trat" class="tratamentos-hub"><div class="trat-toolbar"><h2>Meus tratamentos</h2><div class="trat-actions"></div></div><nav class="trat-grupos" aria-label="Escolher tratamento"></nav><div class="trat-plano"></div></section>');
+  const sec=el('<section data-bid="sa-trat" class="tratamentos-hub"><div class="trat-toolbar"><h2>Meus tratamentos</h2><div class="trat-actions"></div></div><p class="trat-entrada-nota">Primeiro o tratamento; dentro dele, consultas, evolução e medicamentos. Os registros de uso ficam no medicamento escolhido.</p><nav class="trat-grupos" aria-label="Escolher plano de tratamento"></nav><details class="trat-avulsos"><summary></summary><div class="trat-avulsos-lista"></div></details><div class="trat-plano"></div></section>');
   sec.querySelector('.trat-actions').append(acao('+ Novo tratamento',()=>editarPlanoTratamento(),'mini'),acao('📎 Importar receitas',importarPacoteTratamentos,'ghost mini'));
   function pintar(){
-    const grupos=gruposTratamento(),nav=sec.querySelector('.trat-grupos'),conteudo=sec.querySelector('.trat-plano');nav.innerHTML='';conteudo.innerHTML='';
-    if(!grupos.length){conteudo.append(el('<div class="trat-card"><h3>Um espaço para cada tratamento</h3><p>Crie um tratamento e reúna consultas, itens prescritos, documentos e evolução.</p></div>'));return}
+    const grupos=gruposTratamento(),nav=sec.querySelector('.trat-grupos'),avulsos=sec.querySelector('.trat-avulsos'),conteudo=sec.querySelector('.trat-plano');nav.innerHTML='';conteudo.innerHTML='';avulsos.lastElementChild.innerHTML='';
+    nav.hidden=!grupos.some(x=>x.principal);
+    if(!grupos.length){avulsos.hidden=true;conteudo.append(el('<div class="trat-card"><h3>Um espaço para cada tratamento</h3><p>Crie um tratamento e reúna consultas, itens prescritos, documentos e evolução.</p></div>'));return}
     const grupo=grupos.find(x=>x.plano.id===tratamentoGrupoSelecionado)||grupos.find(x=>x.itens.some(i=>i.id===tratamentoSelecionado))||grupos[0],g=grupo.plano;tratamentoGrupoSelecionado=g.id;
-    grupos.forEach(x=>{const b=acao('🩺 '+(x.plano.oque||'Tratamento'),()=>{tratamentoGrupoSelecionado=x.plano.id;tratamentoSelecionado='';tratamentoVisao='resumo';pintar()},'ghost');b.setAttribute('aria-pressed',String(x===grupo));nav.append(b)});
+    const soltos=grupos.filter(x=>!x.principal);avulsos.hidden=!soltos.length;avulsos.querySelector('summary').textContent='💊 Medicamentos e cuidados sem plano · '+soltos.length;avulsos.open=!grupo.principal;
+    grupos.forEach(x=>{const b=acao((x.principal?'🩺 ':'💊 ')+(x.plano.oque||'Tratamento'),()=>{tratamentoGrupoSelecionado=x.plano.id;tratamentoSelecionado=x.principal?'':x.plano.id;tratamentoVisao=x.principal?'resumo':'itens';pintar()},'ghost');b.setAttribute('aria-pressed',String(x===grupo));(x.principal?nav:avulsos.lastElementChild).append(b)});
+    if(!grupo.principal){conteudo.append(el('<header class="trat-avulso-head"><h3>💊 Medicamento ou cuidado sem plano</h3><p>Este cadastro não está vinculado a um plano de tratamento.</p></header>'));conteudo.append(quadroItensTratamento(grupo.itens,null,{selecionarPrimeiro:false}));return}
     const hero=el('<header class="trat-plano-hero"><span class="trat-plano-icone" aria-hidden="true">🩺</span><div><small>SEU TRATAMENTO · '+esc(g.status||'A confirmar')+'</small><h2>'+esc(g.oque||'Tratamento')+'</h2><p class="trat-medico"><b>'+esc(g.medico||'Médico a informar')+'</b>'+esc(g.clinica?' · '+g.clinica:'')+'</p><p>'+esc(g.motivo||g.especialidade||'Consultas, prescrições e evolução reunidas.')+'</p></div><div class="trat-actions"></div></header>');hero.querySelector('.trat-actions').append(acao('✏️ Editar tratamento',()=>editarPlanoTratamento(g),'ghost mini'));conteudo.append(hero);
     const local=el('<details class="trat-contato"><summary>📍 Consultório e informações do plano</summary><p>'+esc(g.enderecoMedico||'Endereço a informar')+' · '+esc(g.contatoMedico||'Contato a informar')+'</p><p>'+esc(g.obs||'')+'</p></details>');conteudo.append(local);
     const tabs=el('<nav class="trat-subtabs" aria-label="Seções do tratamento"></nav>'),corpo=el('<div class="trat-corpo"></div>');conteudo.append(tabs,corpo);
     const abrir=v=>{tratamentoVisao=v;pintar()};[['resumo','📊 Visão geral'],['consultas','🩺 Consultas e retornos'],['itens','💊 Itens prescritos'],['evolucao','📈 Evolução'],['documentos','📎 Documentos']].forEach(([k,l])=>{const b=acao(l,()=>abrir(k),'ghost');b.setAttribute('aria-pressed',String(tratamentoVisao===k));tabs.append(b);if(k==='resumo'){
       const itensUso=grupo.itens.filter(t=>SaudeTratamentos.controlaEstoque(t)||['Medicamento','Suplemento'].includes(t.tipo));
-      const registrar=acao('✓ Registrar uso',()=>{const t=itensUso.find(t=>t.id===tratamentoSelecionado&&!['Pausado','Encerrado'].includes(t.status))||itensUso.find(t=>!['Pausado','Encerrado'].includes(t.status))||itensUso[0];if(!t)return;tratamentoSelecionado=t.id;tratamentoFiltro=['Pausado','Encerrado'].includes(t.status)?'todos':'ativos';abrir('itens');conteudo.querySelector('[data-uso-direto] [name=quantidade]')?.focus()});
-      registrar.disabled=!itensUso.length;if(registrar.disabled)registrar.title='Adicione um medicamento ou cuidado com unidade para registrar o uso.';tabs.append(registrar);
+      const registrar=acao('✓ Registrar uso',()=>{tratamentoSelecionado='';tratamentoFiltro='ativos';abrir('itens');conteudo.querySelector('.trat-item')?.focus()});
+      registrar.disabled=!itensUso.length;if(registrar.disabled)registrar.title='Adicione um medicamento ou cuidado com unidade para registrar o uso.';hero.querySelector('.trat-actions').append(registrar);
     }});
-    if(tratamentoVisao==='itens')corpo.append(quadroItensTratamento(grupo.itens,g));
+    if(tratamentoVisao==='itens')corpo.append(quadroItensTratamento(grupo.itens,g,{selecionarPrimeiro:false}));
     else if(tratamentoVisao==='consultas')corpo.append(quadroConsultasTratamento(g));
     else if(tratamentoVisao==='evolucao')corpo.append(tabelaCompletaEvolucao(g),quadroEvolucaoGrupo(g,false));
     else if(tratamentoVisao==='documentos'){const docs=el('<section class="trat-card"><h3>📎 Documentos do tratamento</h3><p class="trat-muted">Receitas, exames e orientações deste plano.</p></section>');docs.append(areaArquivos('tratamento:'+g.id,'Adicionar foto ou PDF'));corpo.append(docs)}
