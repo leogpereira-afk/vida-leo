@@ -145,3 +145,25 @@ foi criada rotina recorrente. O cadastro manual não comprova autorização.
 Os testes usam respostas simuladas. Só a autorização e uma coleta bem-sucedida
 na conta real confirmam operação de ponta a ponta. Configurar o app não resolve
 automaticamente bloqueios ou aprovações pendentes no Google/Meta.
+
+### Domo: conexões próprias (19/10/2026)
+
+A Domo usa o mesmo motor de leitura e as mesmas seis áreas de fontes, com
+identidade fixa `domoconstrutora.com.br` / `@domoconstrutora`. A autorização é
+feita por empresa, sem copiar o token da Fortemais ou da Impresilk. O servidor
+continua exigindo o dono autenticado, inclusive na administração e na coleta.
+
+- Cofre: prefixo `marketing_domo_direto_` em `leo_config`.
+- Métricas: `leo_marketing_domo_direto_<fonte>` em `painel_cache`.
+- OAuth: state `dm.`, prova de navegador própria e confirmação de uso único;
+  o retorno restaura a empresa Domo. O fluxo `fm.` anterior permanece válido.
+- Domínio e usuário do Instagram são conferidos antes de vincular e coletar.
+  A seleção de contas de anúncios deve corresponder à empresa apresentada.
+- A instalação de tags no site não autoriza a API de métricas da Central.
+  As conexões só são operacionais depois de autorização e coleta reais.
+- Mantida a janela consolidada de 28 dias, excluindo os três dias mais recentes.
+  Um site com medição recém-instalada pode ainda não ter dados nessa janela.
+
+Sem criação de campanhas, alteração de verbas, postagem, novas rotinas
+recorrentes ou mudança de permissões públicas do banco. Pendências de aprovação
+ou limites dos provedores continuam explícitos, sem inventar métricas.
