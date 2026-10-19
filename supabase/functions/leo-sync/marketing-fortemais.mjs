@@ -1,4 +1,5 @@
-// Contrato privado da Fortemais. Dados de outras empresas nunca são fallback.
+import {marcaMarketing} from './marketing-marcas.mjs';
+// Projeção privada por empresa. Dados de outras empresas nunca são fallback.
 export const CHAVE_FORTEMAIS = 'leo_marketing_fortemais';
 export const CHAVE_ADMIN = 'leo_marketing_fortemais_admin';
 export const CATALOGO = Object.freeze({
@@ -19,19 +20,19 @@ const estados=['ok','parcial','pendente','reconectar','sem_permissao','erro','ag
 const progressos=['nao_verificado','localizado','aguarda_autorizacao','bloqueado','autorizado'];
 function metricas(x,chaves){return Object.fromEntries(chaves.map(k=>[k,numero(x?.[k])]))}
 function intervalo(p){const inicio=dia(p?.inicio),fim=dia(p?.fim);return inicio&&fim&&inicio<=fim?{inicio,fim}:null}
-function vinculo(id,f){
- if(f?.empresa!=='fortemais')return false;
- if(id==='instagram')return f.identidade?.usuario?.toLowerCase()==='fortemais';
- if(id==='ga4'||id==='search'||id==='perfil')return host(f.identidade?.site)==='fortemais.net';
+function vinculo(id,f,marca){
+ if(f?.empresa!==marca.id)return false;
+ if(id==='instagram')return f.identidade?.usuario?.toLowerCase()===marca.instagram;
+ if(id==='ga4'||id==='search'||id==='perfil')return host(f.identidade?.site)===marca.host;
  // Mídia paga: conta deve ter sido vinculada pelo dono; o nome não prova empresa.
  return f.identidade?.vinculo_confirmado===true&&typeof f.identidade?.conta==='string'&&/^\d[\d-]{2,40}$/.test(f.identidade.conta);
 }
-function projetarFonte(id,bruto,agora){
+function projetarFonte(id,bruto,agora,marca){
  const c=CATALOGO[id],base={id,nome:c.nome,estado:'pendente',coletadoEm:null,atrasado:false,identidade:'',moeda:null,periodos:[],avisos:[]};
  if(!bruto)return base;
- if(!vinculo(id,bruto))return {...base,estado:'vinculo_divergente'};
+ if(!vinculo(id,bruto,marca))return {...base,estado:'vinculo_divergente'};
  const coletadoEm=instante(bruto.coletadoEm),estado=estados.includes(bruto.estado)?bruto.estado:'erro';
- const f={...base,estado,coletadoEm,moeda:/^[A-Z]{3}$/.test(bruto.moeda||'')?bruto.moeda:null,atrasado:!!coletadoEm&&agora-Date.parse(coletadoEm)>48*3600000,identidade:id==='instagram'?'@fortemais':id.endsWith('_ads')?'Conta '+bruto.identidade.conta:'fortemais.net'};
+ const f={...base,estado,coletadoEm,moeda:/^[A-Z]{3}$/.test(bruto.moeda||'')?bruto.moeda:null,atrasado:!!coletadoEm&&agora-Date.parse(coletadoEm)>48*3600000,identidade:id==='instagram'?'@'+marca.instagram:id.endsWith('_ads')?'Conta '+bruto.identidade.conta:marca.host};
  if(!coletadoEm||Date.parse(coletadoEm)>agora+300000)return {...f,estado:'erro',coletadoEm:null};
  if(!['ok','parcial'].includes(estado))return f;
  const vistos=new Set();
@@ -55,11 +56,13 @@ export function limparAdmin(entrada){
  }
  return {fontes};
 }
-export function detalharFortemais(linhas,agora=Date.now()){
- const map=new Map(arr(linhas).map(r=>[r.chave,r.valor]));const dados=map.get(CHAVE_FORTEMAIS);
- return {versao:1,fontes:Object.keys(CATALOGO).map(id=>projetarFonte(id,map.get('leo_marketing_fortemais_direto_'+id)||(dados?.empresa==='fortemais'?dados.fontes?.[id]:null),agora)),administracao:limparAdmin(map.get(CHAVE_ADMIN))};
+export function detalharFortemais(linhas,agora=Date.now(),empresa='fortemais'){
+ const marca=marcaMarketing(empresa),chave='leo_marketing_'+empresa;
+ const map=new Map(arr(linhas).map(r=>[r.chave,r.valor]));const dados=map.get(chave);
+ return {versao:1,fontes:Object.keys(CATALOGO).map(id=>projetarFonte(id,map.get(chave+'_direto_'+id)||(dados?.empresa===marca.id?dados.fontes?.[id]:null),agora,marca)),administracao:limparAdmin(map.get(chave+'_admin'))};
 }
-export async function salvarAdminFortemais(sb,entrada){
- const admin=limparAdmin(entrada);const {error}=await sb.from('painel_cache').upsert({chave:CHAVE_ADMIN,valor:admin,atualizado_em:new Date().toISOString()},{onConflict:'chave'});
+export async function salvarAdminFortemais(sb,entrada,empresa='fortemais'){
+ marcaMarketing(empresa);
+ const admin=limparAdmin(entrada);const {error}=await sb.from('painel_cache').upsert({chave:'leo_marketing_'+empresa+'_admin',valor:admin,atualizado_em:new Date().toISOString()},{onConflict:'chave'});
  if(error)throw Error('Não foi possível salvar a administração.');return {ok:true,administracao:admin};
 }

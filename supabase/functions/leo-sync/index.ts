@@ -32,6 +32,7 @@ import { googleAcao } from "./google.ts";
 import { empresaAcao } from "./empresa.ts";
 import { lerBancosGestao } from "./bancos.ts";
 import { lerMarketing } from "./marketing.mjs";
+import {empresaDoState} from "./marketing-marcas.mjs";
 import {criarDireto,bancoDireto,FalhaDireta,MENSAGENS} from "./marketing-direto.mjs";
 import { salvarAdminFortemais } from "./marketing-fortemais.mjs";
 import { donboyAcao } from "./donboy.ts";
@@ -340,8 +341,8 @@ Deno.serve(async (req: Request) => {
       const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
       const p = await crachaPayload(t);
       if (!p || p.uso !== "" || p.sub.toLowerCase() !== DONO || p.papel !== "dono") return json({erro:"Não autorizado"},401);
-      if (corpo.empresa !== "fortemais") return json({erro:"Empresa inválida"},400);
-      const direto=criarDireto({banco:bancoDireto(sb),env:(n:string)=>Deno.env.get(n)});
+      if (!["fortemais","domo"].includes(corpo.empresa)) return json({erro:"Empresa inválida"},400);
+      const direto=criarDireto({empresa:corpo.empresa,banco:bancoDireto(sb,corpo.empresa),env:(n:string)=>Deno.env.get(n)});
       try {
         const r = acao === "marketingDiretoStatus" ? await direto.status() :
           acao === "marketingDiretoInicio" ? await direto.inicio(corpo.provedor,corpo.prova,p.sub) :
@@ -359,9 +360,9 @@ Deno.serve(async (req: Request) => {
       const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
       const p = await crachaPayload(t);
       if (!p || p.uso !== "" || p.sub.toLowerCase() !== DONO || p.papel !== "dono") return json({erro:"Não autorizado"},401);
-      if (corpo.empresa !== "fortemais") return json({erro:"Empresa inválida"},400);
+      if (!["fortemais","domo"].includes(corpo.empresa)) return json({erro:"Empresa inválida"},400);
       try {
-        const resposta = json(await salvarAdminFortemais(sb, corpo.administracao));
+        const resposta = json(await salvarAdminFortemais(sb, corpo.administracao, corpo.empresa));
         resposta.headers.set("Cache-Control", "no-store");
         return resposta;
       } catch { return json({erro:"Não foi possível salvar a administração."},503); }
@@ -653,9 +654,10 @@ Deno.serve(async (req: Request) => {
      ?state=&code=&scope=). */
   // a conferência barata primeiro: só quem cheira a volta do Strava vira URL
   // volta do Google: mesmo desenho do Strava — o `state` é o crachá curto
-  if (req.method === "GET" && new URL(req.url).pathname.endsWith("/googleCallback") && (new URL(req.url).searchParams.get("state")||"").startsWith("fm.")) {
+  if (req.method === "GET" && new URL(req.url).pathname.endsWith("/googleCallback") && empresaDoState(new URL(req.url).searchParams.get("state"))) {
     try {
-      const direto=criarDireto({banco:bancoDireto(sb),env:(n:string)=>Deno.env.get(n)});
+      const empresa=empresaDoState(new URL(req.url).searchParams.get("state"));
+      const direto=criarDireto({empresa,banco:bancoDireto(sb,empresa),env:(n:string)=>Deno.env.get(n)});
       return new Response(null,{status:302,headers:{Location:await direto.callback(new URL(req.url)),"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
     } catch { return new Response("Autorização inválida ou vencida. Volte à Central e conecte novamente.",{status:400,headers:{"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}}); }
   }

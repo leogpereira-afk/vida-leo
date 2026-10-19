@@ -69,13 +69,13 @@ export function resumirMarketing(empresa,linhas,agora=Date.now()){
   // herdam seu cache. A configuração e autorização delas são uma etapa separada.
   return {ok:true,empresa:marca,empresas:EMPRESAS,lidoEm:new Date(agora).toISOString(),
     fontes:['site','google','instagram'].map(tipo=>fonte(tipo,porChave.get(tipo==='instagram'?config.meta:config.google),config,agora)),
-    ...(empresa==='fortemais'?{detalhe:detalharFortemais(linhas,agora)}:{})};
+    ...(['fortemais','domo'].includes(empresa)?{detalhe:detalharFortemais(linhas,agora,empresa)}:{})};
 }
 
 export async function lerMarketing(sb,empresa,agora=Date.now()){
   if(!EMPRESAS.some(x=>x.id===empresa))throw Error('Empresa inválida.');
   const config=CONFIG[empresa]||{};
-  const chaves=empresa==='fortemais'?[CHAVE_FORTEMAIS,CHAVE_ADMIN,...["ga4","search","perfil","instagram","meta_ads","google_ads"].map(f=>"leo_marketing_fortemais_direto_"+f)]:[config.google,config.meta].filter(Boolean);
+  const chaves=['fortemais','domo'].includes(empresa)?['leo_marketing_'+empresa,'leo_marketing_'+empresa+'_admin',...["ga4","search","perfil","instagram","meta_ads","google_ads"].map(f=>"leo_marketing_"+empresa+"_direto_"+f)]:[config.google,config.meta].filter(Boolean);
   if(!chaves.length)return resumirMarketing(empresa,[],agora);
   const {data,error}=await sb.from('painel_cache').select('chave,valor').in('chave',chaves);
   if(error)throw Error('Não foi possível consultar os indicadores. Tente novamente.');
