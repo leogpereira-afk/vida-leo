@@ -671,6 +671,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-demandas.css?v=fafdab59a91c">
 <link rel="stylesheet" href="./fortemais-compacto.css?v=6899567e34c1">
 <link rel="stylesheet" href="./fortemais-inovacoes.css?v=be85f228f8ae">
+<link rel="stylesheet" href="./fortemais-ferramentas.css?v=20261018">
 <link rel="stylesheet" href="./fortemais-documentos.css?v=dac3ec0db7f9">
 <link rel="stylesheet" href="./fortemais-obras-moderno.css?v=2fbc3e7b4e73">
 <link rel="stylesheet" href="./donboy-painel.css?v=05a4255f7b34">
@@ -722,7 +723,11 @@ tr:hover .lixo{opacity:1}
 <script src="./fortemais-demandas-modelo.js?v=e2ba946c28ef"></script>
 <script src="./fortemais-demandas.js?v=be177dcfa8dd"></script>
 <script src="./fortemais-inovacoes-modelo.js?v=365393461781"></script>
-<script src="./fortemais-inovacoes.js?v=1d4c94e102a3"></script>
+<script src="./fortemais-inovacoes.js?v=20261018"></script>
+<script src="./fortemais-ferramentas-modelo.js?v=20261018"></script>
+<script src="./fortemais-apoio-modelo.js?v=20261018"></script>
+<script src="./fortemais-obra-3d.js?v=20261018"></script>
+<script src="./fortemais-ferramentas.js?v=20261018"></script>
 <script src="./fortemais-documentos-modelo.js?v=e1839cfeccdb"></script>
 <script src="./fortemais-documentos.js?v=fc5f80ca53c6"></script>
 <script src="./fortemais-pdf.js?v=27455f7f3e11"></script>
@@ -1114,7 +1119,7 @@ const SEED={
      BOMBEIRO = Hidráulica" uma vez, os 21 pagamentos dele viram mão de obra
      hidráulica -- de uma vez, para trás e para a frente. É a diferença entre
      classificar 90 fornecedores e classificar 824 lançamentos. */
-  obras:[],obraAportes:[],obraFornecedores:{},fortemaisLinks:[],fortemaisInovacoes:[],
+  obras:[],obraAportes:[],obraFornecedores:{},fortemaisLinks:[],fortemaisInovacoes:[],fortemaisApoio:{schema:1,simulacoes:[],favoritos:[],dicas:[],dicasFavoritas:[]},
   /* Caixa e VGV — o modelo patrimonial que morava na planilha "Patrimonial".
      São poucas dezenas de linhas em cada lista: cabem no estado, ao contrário
      do livro-caixa das obras. Quatro listas independentes, como na planilha:
@@ -1207,6 +1212,7 @@ function carregar(){
   if(!Array.isArray(d.fortemaisLinks))d.fortemaisLinks=[];
   d.fortemaisLinks.forEach(x=>{if(!x.id)x.id=uid()});
   if(d.fortemaisInovacoes===undefined)d.fortemaisInovacoes=[];
+  if(d.fortemaisApoio===undefined)d.fortemaisApoio={schema:1,simulacoes:[],favoritos:[],dicas:[],dicasFavoritas:[]};
   // migração: todo registro precisa de id estável (arquivos são ligados por ele)
   for(const k of ['viagens','rendimentos','gastos','agenda','demandas','peso','exames','tratamentos','assinaturas','seguros','planos','casa','documentos','metas','pessoas','paraEles','vitais','vacinas','histFamiliar','rastreios','queixas','consultas','fisio','rituais','instrucoes','protecao','planoAno','pdi','livros','bancos','contabilidades','empresasPJ','patrimonio','oportunidades','obras','obraAportes','contas','empreend','casas','reservas'])
     (d[k]||[]).forEach(x=>{if(!x.id)x.id=uid()});
@@ -2354,7 +2360,9 @@ function organizarPainelCompacto(pagina,secao){
 function tela(opcoes={}){
   if(atual==='fortemais'&&opcoes.baseRemota!==true&&!fmPodeNavegar())return false;
   aplicarFonteInterface();
-  const m=document.getElementById('main'),pagina=el('<div class="pagina"></div>');m.replaceChildren(pagina);
+  const m=document.getElementById('main'),pagina=el('<div class="pagina"></div>');
+  for(const p of m.querySelectorAll('[data-fm-pagina]'))p._fmDispose?.();
+  m.replaceChildren(pagina);
   if(typeof LeonardoDesign!=='undefined')LeonardoDesign.aplicar(atual,pagina);
   const alvo=_alvoBloco;_alvoBloco=null;
   if(atual==='rendimentos'&&typeof RendimentosUI!=='undefined')RendimentosUI.destino(alvo);
@@ -6364,9 +6372,11 @@ async function vFortemais(m){
   m.classList.add('fortemais-fluida');const r=rr('fortemais');
   const vista=Symbol('fortemais');m._fmVista=vista;
   m.appendChild(el('<header class="fm-marca-topo"><div class="fm-marca-logo"><img src="fortemais-logo.png" width="220" height="49" alt="Fortemais Construtora"></div><div><h1>Obras e investimentos</h1><p>Planeje cada imóvel, seus custos e a participação dos sócios.</p></div></header>'));
-  const visao=filtro.fmVisao==='inovacoes'?'inovacoes':'obras';
+  const visao=['inovacoes','ferramentas','dicas'].includes(filtro.fmVisao)?filtro.fmVisao:'obras';
   m.appendChild(fmInovacoesNavegacao(m,visao,r));
   if(visao==='inovacoes'){m.appendChild(fmInovacoesPainel());return}
+  if(visao==='ferramentas'){m.appendChild(fmFerramentasPainel());return}
+  if(visao==='dicas'){m.appendChild(fmDicasObraPainel());return}
   const apoio=el('<details class="fm-apoio"><summary>Links rápidos e marketing</summary></details>');
   apoio.appendChild(fmPainelLinks());
   const marketing=el('<div class="fm-marketing-atalho"><div><b>◎ Marketing da Fortemais</b><p>Site, Google Meu Negócio e Instagram no mesmo lugar.</p></div><button type="button" class="btn">Ver indicadores →</button></div>');
@@ -16479,6 +16489,10 @@ function validarBackup(j){
       for(const x of item.links||[])validarTextos(x,['id','nome','url']);
       for(const x of item.historico||[])validarTextos(x,['id','em','autor','tipo','texto','de','para']);
     }
+  }
+  if(j.fortemaisApoio!==undefined){
+    if(typeof FortemaisApoioModelo==='undefined')throw Error('Atualize a página para validar o apoio da Fortemais antes de restaurar.');
+    FortemaisApoioModelo.validar(j.fortemaisApoio);
   }
   if(j.fortemaisInovacoes?.length){
     if(typeof FortemaisInovacoesModelo==='undefined')throw Error('Atualize a página para validar as inovações antes de restaurar.');

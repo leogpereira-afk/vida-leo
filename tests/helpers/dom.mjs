@@ -13,6 +13,7 @@ const storage={getItem:()=>null,setItem(){},removeItem(){}};
 const ctx=vm.createContext({LeoGoogleDatas:globalThis.LeoGoogleDatas,FortemaisFinance:globalThis.FortemaisFinance,FortemaisDemandasModelo:globalThis.FortemaisDemandasModelo,FortemaisInovacoesModelo:globalThis.FortemaisInovacoesModelo,FortemaisDocumentosModelo:globalThis.FortemaisDocumentosModelo,ICAL,atob,btoa,document,window:{addEventListener(){},scrollTo(){},matchMedia:()=>({matches:false})},location:{hostname,hash:''},history:{pushState(){}},localStorage:storage,sessionStorage:storage,console,structuredClone,Date,URL,URLSearchParams,Blob,TextEncoder,TextDecoder,setTimeout:()=>0,clearTimeout(){},alert(){},confirm:()=>false});
 vm.runInContext(readFileSync(new URL('../../publico/fortemais-demandas.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/fortemais-inovacoes.js',import.meta.url),'utf8'),ctx);
+for(const file of ['fortemais-ferramentas-modelo.js','fortemais-apoio-modelo.js','fortemais-obra-3d.js','fortemais-ferramentas.js'])vm.runInContext(readFileSync(new URL('../../publico/'+file,import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/fortemais-documentos.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/fortemais-pdf.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/donboy-email.js',import.meta.url),'utf8'),ctx);
