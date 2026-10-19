@@ -29,3 +29,8 @@ test('keyboard zoom changes real projected drawing and destroy removes owned lis
  api.destroy();assert.equal(host.children.length,0);assert.equal(Object.values(canvas.listeners).flat().length,0);
  }finally{globalThis.ResizeObserver=previous;}
 });
+test('expanded renderer uses same canvas and Escape restores compact view and focus',()=>{
+ const previous=globalThis.ResizeObserver;globalThis.ResizeObserver=class{observe(){}disconnect(){}};
+ try{const {host,calls}=surface();const api=globalThis.FortemaisObra3D.montar(host,{elements:[]});const root=host.children[0],toolbar=root.children[0],canvas=root.children[1];const expand=toolbar.children.find(b=>b.textContent==='Ampliar 3D');assert.ok(expand,'expand action exists');let focused=0;expand.focus=()=>focused++;expand.emit('click');assert.equal(root.attrs.role,'dialog');assert.equal(root.attrs['aria-modal'],'true');assert.equal(root.children[1],canvas);const close=toolbar.children.find(b=>b.textContent==='Fechar 3D');assert.ok(close);assert.equal(close.hidden,false);canvas.emit('keydown',{key:'Escape'});assert.notEqual(root.attrs['aria-modal'],'true');assert.equal(close.hidden,true);assert.equal(focused,1);api.destroy();assert.equal(host.children.length,0);
+ }finally{globalThis.ResizeObserver=previous;}
+});
