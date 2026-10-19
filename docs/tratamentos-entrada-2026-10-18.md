@@ -49,3 +49,11 @@ Foi reproduzida a origem dos zeros no campo vazio: a primeira seta gerava 0,0001
 Unidades genéricas são apresentadas como `und`. Unidades específicas, campos ausentes, prescrição e cadastros originais permanecem intactos. Saldo, limites, linhas de uso, histórico, check diário, previsão e formulário de Hoje usam os novos formatos. A tabela não arredonda mais frações pequenas a zero: por exemplo, 0,0001 continua 0,0001. O editor de estoque e unidade preserva os valores brutos para evitar mudanças indevidas em cadastros com movimentos.
 
 Nove testes novos cobrem precisão da apresentação, zeros finais, unidades, ausência de mutação, edição legada, Hoje e o mínimo anterior. Suíte completa: **1.477 testes aprovados**, zero falhas ou ignorados. Três scripts com sintaxe válida, diff conferido e revisão independente sem bloqueios. No navegador, a seta foi conferida em 1, o campo 0.5000 foi normalizado para 0.5 e o saldo exibiu 10 und; console sem erros. Alteração local, sem publicação.
+
+## Compactação de todas as abas da Saúde
+
+O cabeçalho compacto passou a valer para Hoje, Exames, Medidas, Consultas e sintomas, Tratamentos, Cuidados e Documentos. O menu permanece em uma faixa, com rolagem interna quando necessária. Filtros e sincronização compartilham uma faixa única em todas as áreas. Títulos de seção, margens e ações ficam mais próximos.
+
+Na densidade Compacta, indicadores, cards, próximos atendimentos, tabelas, evolução e biblioteca de documentos receberam menos preenchimento. As prioridades do computador usam linhas mais baixas; no celular, texto, data e ação continuam disponíveis. A densidade Confortável conserva seus espaçamentos maiores. Formulários, leitor de PDF, conteúdo dos gráficos e modelos de dados não foram alterados.
+
+Verificação: **1.478 testes aprovados**, sem falhas ou ignorados. Nova regressão verifica as sete abas com uma faixa única, filtros e status preservados e sem mutação dos cadastros. Navegador em 1.024, 390 e 319 px: sete abas sem transbordamento da página; controles principais de pelo menos 44 px no celular; Compacta e Confortável distintas; console sem erros. Em Hoje a 1.024 px, o conteúdo começa em 198,2 px em vez de 269,0 px e a primeira próxima ação em 429,5 px em vez de 545,4 px. Revisão independente do diff sem bloqueios. Prévia local, sem publicação.

@@ -16,3 +16,14 @@ test('sem emagrecimento, plano existente precede avulso; sem planos, avulso perm
 test('visão geral resume o acompanhamento e deixa tabela completa para Evolução',()=>{const a=app();a.run("E.peso=[{id:'medida',data:'2025-01-01',peso:80,tratamentoId:'emag'}];document.body.append(quadroTratamentos())");assert.equal(a.document.querySelector('.trat-dashboard .trat-medicoes'),null);assert.ok(a.document.querySelector('.trat-dashboard .trat-kpis'));bt(a.document.querySelector('.trat-subtabs'),'Evolução').click();assert.ok(a.document.querySelector('.evolucao-matriz table'));assert.equal(a.document.querySelectorAll('.evolucao-matriz tbody tr').length,1)});
 
 test('compactação acompanha a área atual e não permanece ao sair de Tratamentos',()=>{const a=app(),antes=a.run('JSON.stringify(E)');a.run("SaudeUI.area='tratamentos';saudePainel(document.getElementById('main'))");assert.equal(a.document.querySelector('#main').dataset.saudeArea,'tratamentos');bt(a.document.querySelector('.sui-nav'),'Cuidados').click();assert.equal(a.document.querySelector('#main').dataset.saudeArea,'cuidados');assert.equal(a.document.querySelector('.trat-escolha'),null);assert.equal(a.run('JSON.stringify(E)'),antes)});
+
+test('todas as abas conservam filtros e sincronização únicos na faixa comum sem alterar os dados',()=>{
+  const a=app(),antes=a.run('JSON.stringify(E)');
+  for(const area of ['resumo','exames','medidas','queixas','tratamentos','cuidados','documentos']){
+    a.run(`SaudeUI.area=${JSON.stringify(area)};saudePainel(document.getElementById('main'))`);
+    const main=a.document.querySelector('#main'),contexto=main.querySelector('.sui-contexto');assert.ok(contexto,area);
+    assert.equal(main.querySelectorAll('.sui-sync').length,1);assert.equal(main.querySelectorAll('.sui-periodo-detalhes').length,1);
+    assert.ok(contexto.querySelector('[role=status]'));assert.ok(contexto.querySelector('input[name=saude-de]'));assert.equal(main.querySelectorAll('.sui-nav [aria-pressed=true]').length,1);
+    assert.equal(a.run('JSON.stringify(E)'),antes,area);
+  }
+});

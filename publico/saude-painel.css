@@ -42,19 +42,19 @@
 .trat-entrada-nota{font-size:12px;color:var(--sui-suave,var(--suave));line-height:1.5;margin:2px 0 12px}.trat-avulsos{font-size:12px;color:var(--sui-suave,var(--suave));margin:0 0 15px;padding:9px 12px;border:1px solid var(--linha);border-radius:9px;background:var(--card)}.trat-avulsos[hidden]{display:none}.trat-avulsos>summary{cursor:pointer;min-height:28px;line-height:28px;font-weight:600}.trat-avulsos-lista{display:flex;flex-wrap:wrap;gap:7px;padding:8px 0 2px}.trat-avulsos-lista .btn{font-size:12px}.trat-avulsos-lista [aria-pressed=true]{background:var(--sui-fundo);border-color:var(--sui-verde);color:var(--sui-verde)}.trat-avulso-head h3{font-size:17px;margin:0 0 5px}.trat-avulso-head p{font-size:12px;color:var(--sui-suave,var(--suave));margin:0 0 16px}.trat-detalhe>.trat-empty{background:var(--sui-fundo);border:1px dashed var(--sui-borda);padding:22px;border-radius:12px}.trat-detalhe>.trat-empty h3{font-size:18px!important}.trat-detalhe>.trat-empty p{font-size:13px;line-height:1.5;color:var(--sui-suave)}
 @media(max-width:650px){.trat-avulsos>summary{min-height:44px;line-height:1.5;display:list-item;padding:10px 0}.trat-avulsos-lista .btn{min-height:44px}}
 
-/* Tratamentos: contexto e indicadores próximos, sem reduzir as áreas de toque. */
-.pagina.saude-workbench[data-saude-area=tratamentos]{padding-top:12px}
-.saude-workbench[data-saude-area=tratamentos] .sui-header{gap:12px;padding-bottom:6px;margin-bottom:3px}
-.saude-workbench[data-saude-area=tratamentos] .sui-header h1{font-size:23px;margin:2px 0;line-height:1.25}
-.saude-workbench[data-saude-area=tratamentos] .sui-header p{font-size:13px;line-height:1.4}
-.saude-workbench[data-saude-area=tratamentos] .sui-nav{margin:5px 0 3px;padding-bottom:4px;gap:4px}
-.saude-workbench[data-saude-area=tratamentos] .sui-nav .btn{padding:6px 10px}
-.saude-workbench[data-saude-area=tratamentos] .sui-periodo-detalhes{margin-bottom:5px}
-.saude-workbench[data-saude-area=tratamentos] .sui-periodo-detalhes>summary{min-height:26px;padding:2px 0}
-.saude-workbench[data-saude-area=tratamentos] .trat-contexto{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:3px 12px;margin-bottom:5px}
-.saude-workbench[data-saude-area=tratamentos] .trat-contexto .sui-periodo-detalhes{margin:0}
-.saude-workbench[data-saude-area=tratamentos] .trat-contexto .sui-periodo-detalhes[open]{flex-basis:100%}
-.saude-workbench[data-saude-area=tratamentos] .trat-contexto .sui-sync{margin-left:auto;min-height:32px;font-size:11px}
+/* Cabeçalho compacto comum; regras específicas de Tratamentos abaixo. */
+.pagina.saude-workbench{padding-top:12px}
+.saude-workbench .sui-header{gap:12px;padding-bottom:6px;margin-bottom:3px}
+.saude-workbench .sui-header h1{font-size:23px;margin:2px 0;line-height:1.25}
+.saude-workbench .sui-header p{font-size:13px;line-height:1.4}
+.saude-workbench .sui-nav{margin:5px 0 3px;padding-bottom:4px;gap:4px}
+.saude-workbench .sui-nav .btn{padding:6px 10px}
+.saude-workbench .sui-periodo-detalhes{margin-bottom:5px}
+.saude-workbench .sui-periodo-detalhes>summary{min-height:26px;padding:2px 0}
+.saude-workbench .sui-contexto{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:3px 12px;margin-bottom:5px}
+.saude-workbench .sui-contexto .sui-periodo-detalhes{margin:0}
+.saude-workbench .sui-contexto .sui-periodo-detalhes[open]{flex-basis:100%}
+.saude-workbench .sui-contexto .sui-sync{margin-left:auto;min-height:32px;font-size:11px}
 .saude-workbench[data-saude-area=tratamentos] .trat-toolbar{margin-bottom:6px;gap:6px}
 .saude-workbench[data-saude-area=tratamentos] .trat-toolbar h2{font-size:19px}
 .saude-workbench[data-saude-area=tratamentos] .trat-escolha{display:flex;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:6px;min-width:0}
@@ -85,20 +85,20 @@
 .saude-workbench[data-saude-area=tratamentos] .trat-status-grid{gap:8px}
 .pagina.saude-workbench[data-saude-area=tratamentos] :is(.sui-header,.sui-nav,.trat-toolbar,.trat-grupos,.trat-subtabs,.trat-plano-hero,.trat-status-grid) .btn{min-height:36px;padding:7px 10px;font-size:13px}
 @media(min-width:1150px){
-  .saude-workbench[data-saude-area=tratamentos] .sui-header>div:first-child{display:grid;grid-template-columns:auto 1fr;align-items:baseline;column-gap:14px}
-  .saude-workbench[data-saude-area=tratamentos] .sui-header small{grid-column:1/-1}
+  .saude-workbench .sui-header>div:first-child{display:grid;grid-template-columns:auto 1fr;align-items:baseline;column-gap:14px}
+  .saude-workbench .sui-header small{grid-column:1/-1}
 }
 @media(max-width:1000px){
   .saude-workbench[data-saude-area=tratamentos] .trat-plano-hero .trat-actions{width:auto;margin-left:auto}
 }
 @media(max-width:650px){
-  .pagina.saude-workbench[data-saude-area=tratamentos]{padding-top:10px}
-  .saude-workbench[data-saude-area=tratamentos] .sui-header{gap:6px}
-  .saude-workbench[data-saude-area=tratamentos] .sui-header h1{font-size:22px}
-  .saude-workbench[data-saude-area=tratamentos] .sui-header p{display:none}
-  .saude-workbench[data-saude-area=tratamentos] .sui-header .sui-actions{gap:6px}
-  .saude-workbench[data-saude-area=tratamentos] .sui-nav{padding-bottom:5px}
-  .saude-workbench[data-saude-area=tratamentos] .trat-contexto .sui-sync{width:100%;margin:0}
+  .pagina.saude-workbench{padding-top:10px}
+  .saude-workbench .sui-header{gap:6px}
+  .saude-workbench .sui-header h1{font-size:22px}
+  .saude-workbench .sui-header p{display:none}
+  .saude-workbench .sui-header .sui-actions{gap:6px}
+  .saude-workbench .sui-nav{padding-bottom:5px}
+  .saude-workbench .sui-contexto .sui-sync{width:100%;margin:0}
   .pagina.saude-workbench[data-saude-area=tratamentos] :is(.sui-header,.sui-nav,.trat-toolbar,.trat-grupos,.trat-subtabs,.trat-plano-hero,.trat-status-grid) .btn{min-height:44px;padding:7px 10px}
   .saude-workbench[data-saude-area=tratamentos] .trat-escolha{gap:5px}
   .saude-workbench[data-saude-area=tratamentos] .trat-grupos{flex-basis:100%;flex-wrap:nowrap;overflow-x:auto;padding:2px;scrollbar-width:thin}
@@ -179,4 +179,61 @@
 @media(prefers-color-scheme:dark){
   .saude-workbench[data-saude-area=tratamentos] .trat-uso-direto [data-alerta-reposicao][data-nivel=atencao]{background:#392e16;color:#f3cf8b}
   .saude-workbench[data-saude-area=tratamentos] .trat-uso-direto [data-alerta-reposicao][data-nivel=critico]{background:#3b2324;color:#ffb1aa}
+}
+
+/* Densidade compacta em todas as abas, mantendo a preferência Confortável. */
+.pagina.saude-workbench .sui-nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;min-width:0;max-width:100%}
+.pagina.saude-workbench .sui-nav .btn{flex:none;white-space:nowrap}
+.pagina.saude-workbench :is(.sui-header,.sui-nav,.sui-section-head) .btn{min-height:36px;font-size:13px;padding:7px 10px}
+.pagina.saude-workbench .sui-section-head{gap:8px;margin:0 0 7px;align-items:center}
+.pagina.saude-workbench .sui-section-head h2{font-size:18px;line-height:1.3;margin:0 0 2px}
+.pagina.saude-workbench .sui-section-head p{font-size:12px;line-height:1.4;max-width:none}
+.pagina.saude-workbench .sui-actions{gap:5px}
+.pagina.saude-workbench .sui-filtros{margin-bottom:6px;gap:7px}
+.pagina.saude-workbench .sui-lista{margin-bottom:14px}
+.pagina.saude-workbench .sui-visoes-nav{margin-bottom:7px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-kpis{gap:8px;margin:7px 0 10px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-kpi{min-height:72px;padding:9px 11px;gap:3px;border-radius:10px;justify-content:flex-start}
+.pagina.saude-workbench[data-densidade=compacta] .sui-kpi strong{font-size:21px;line-height:1.2}
+.pagina.saude-workbench[data-densidade=compacta] .sui-kpi span{font-size:11px;line-height:1.35}
+.pagina.saude-workbench[data-densidade=compacta] .sui-grid{gap:8px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-card{padding:10px;border-radius:10px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-card .sui-value{font-size:20px;margin:5px 0}
+.pagina.saude-workbench[data-densidade=compacta] .sui-meta{margin:4px 0 6px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-card .sui-actions{margin-top:6px;padding-top:5px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-prioridades{gap:6px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-prioridade{gap:8px;padding:8px 10px;border-radius:9px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-prioridade>div{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-prioridade h3{font-size:14px;margin:2px 0}
+.pagina.saude-workbench[data-densidade=compacta] .sui-prioridade>.btn{min-height:36px;font-size:12px;padding:6px 9px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-pendencias{padding:10px 12px;margin:10px 0}
+.pagina.saude-workbench[data-densidade=compacta] .sui-vazio{padding:12px;border-radius:9px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-vazio p{font-size:13px;margin:4px 0 7px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-detalhes{padding:9px 11px;margin:7px 0 12px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-evolucao{padding:10px 12px;margin-bottom:9px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-evolucao-head{margin-bottom:6px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-evolucao-nota{margin:5px 0}
+.pagina.saude-workbench[data-densidade=compacta] .sui-evolucao-controles{gap:6px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-tabela th,.pagina.saude-workbench[data-densidade=compacta] .sui-tabela td{padding-top:5px;padding-bottom:5px}
+.pagina.saude-workbench[data-densidade=compacta] .sui-tabela caption{padding-top:5px;padding-bottom:5px}
+.pagina.saude-workbench[data-densidade=compacta] :is(.sdoc-filtros,.sdoc-acoes,.sdoc-linha){gap:6px;margin:6px 0 8px}
+.pagina.saude-workbench[data-densidade=compacta] .sdoc-card{padding:10px;border-radius:10px}
+.pagina.saude-workbench[data-densidade=compacta] .sdoc-card h4{margin-bottom:4px}
+.pagina.saude-workbench[data-densidade=compacta] .sdoc-card p{font-size:12px;margin:4px 0;line-height:1.4}
+.pagina.saude-workbench .sui-footer{margin-top:12px;padding:9px 0;gap:8px}
+@media(max-width:650px){
+  .pagina.saude-workbench :is(.sui-header,.sui-nav,.sui-section-head) .btn{min-height:44px}
+  .pagina.saude-workbench .sui-sync button,.pagina.saude-workbench .sui-evolucao-dados .btn{min-height:44px!important}
+  .pagina.saude-workbench .sui-contexto .sui-sync{align-items:center}
+  .pagina.saude-workbench .sui-section-head{gap:5px}
+  .pagina.saude-workbench .sui-section-head h2{font-size:17px}
+  .pagina.saude-workbench[data-densidade=compacta] .sui-kpi{min-height:76px;padding:8px 9px}
+  .pagina.saude-workbench[data-densidade=compacta] .sui-kpi strong{font-size:20px}
+  .pagina.saude-workbench[data-densidade=compacta] .sui-prioridade>div{display:block;grid-column:2;grid-row:1/3}
+  .pagina.saude-workbench[data-densidade=compacta] .sui-prioridade>b{grid-column:3;grid-row:1;font-size:11px}
+  .pagina.saude-workbench[data-densidade=compacta] .sui-prioridade>.btn{grid-column:3;grid-row:2;min-width:0;min-height:44px;max-width:110px;justify-self:end;align-self:end}
+  .pagina.saude-workbench[data-densidade=compacta] .sui-evolucao-controles select{min-height:44px}
+  .pagina.saude-workbench .sui-periodo-detalhes>summary{min-height:44px;line-height:1.4;display:flex;align-items:center}
+  .pagina.saude-workbench .sui-periodo-detalhes>summary::before{content:'▸';margin-right:5px}
+  .pagina.saude-workbench .sui-periodo-detalhes[open]>summary::before{content:'▾'}
 }
