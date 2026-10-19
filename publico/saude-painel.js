@@ -1,6 +1,6 @@
 /* Painel pessoal de Saúde. Usa os cadastros, autenticação e anexos da Central. */
 var SaudeUI={area:'resumo',de:'',ate:'',busca:'',filtros:{},densidade:'compacta'};
-var SAUDE_AREAS=[['resumo','Hoje'],['exames','Exames'],['medidas','Medidas'],['queixas','Consultas e sintomas'],['tratamentos','Tratamentos'],['cuidados','Cuidados'],['documentos','Documentos']];
+var SAUDE_AREAS=[['resumo','🏠 Hoje'],['exames','🧪 Exames'],['medidas','📏 Medidas'],['queixas','🩺 Consultas e sintomas'],['tratamentos','💊 Tratamentos'],['cuidados','💚 Cuidados'],['documentos','📂 Documentos']];
 var SAUDE_TIPOS={comparacao:'Exames comparados',exames:'Exames',peso:'Peso e medidas',vitais:'Sinais vitais',queixas:'Sintomas e queixas',consultas:'Consultas',fisio:'Fisioterapia',vacinas:'Vacinas',histFamiliar:'Histórico familiar',tratamentos:'Medicamentos em uso',tratamentosConferencia:'Cadastros legados ativos para conferência',planos:'Planos de saúde vinculados',rastreios:'Prevenção',usos:'Histórico de usos e cuidados',estoque:'Estoque atual'};
 var _saudePagina=null,_saudeGravacao={estado:'',em:''},_saudeConfirmadoEm='';
 function saudeNotificarSync(t){if(t==='sincronizado')_saudeConfirmadoEm=new Date().toISOString()}
@@ -90,14 +90,46 @@ function saudeEditarRegistro(tipo,registro){
 function saudeNoVazio(titulo,descricao,rotulo,fn){const x=el('<div class="sui-vazio"><b>'+esc(titulo)+'</b><p>'+esc(descricao)+'</p></div>');if(fn)x.append(acao(rotulo,fn));return x}
 function saudeCabecalho(titulo,sub,acoes=[]){const x=el('<header class="sui-section-head"><div><h2>'+esc(titulo)+'</h2><p>'+esc(sub||'')+'</p></div><div class="sui-actions"></div></header>');acoes.forEach(a=>x.lastElementChild.append(a));return x}
 function saudeCard(titulo,valor,meta,estado,acoes=[]){const x=el('<article class="sui-card"><div class="sui-card-top"><h3>'+esc(titulo)+'</h3>'+(estado?'<span class="sui-tag">'+esc(estado)+'</span>':'')+'</div>'+(valor!==''?'<strong class="sui-value">'+esc(valor)+'</strong>':'')+'<p class="sui-meta">'+esc(meta||'')+'</p><div class="sui-actions"></div></article>');acoes.forEach(a=>x.lastElementChild.append(a));return x}
+function saudeColunas(tipo){
+  const n=(r,k)=>r[k]!==''&&r[k]!=null?saudeValor(r[k]):'—';
+  const data=['Data',r=>saudeData(r.data)+(r.hora?' · '+r.hora:'')],estado=['Situação',r=>r.situacao||r.status||r.resultado||'Registrado'];
+  return {
+    exames:[data,['Exame',r=>saudeNome(r,tipo)],['Resultado',r=>r.valor!==''&&r.valor!=null?String(r.valor):'Sem resultado'],['Unidade',r=>r.unidade||'—'],estado,['Laboratório / fonte',r=>r.medico||r.laboratorio||r.fonte||'Não informado']],
+    peso:[data,['Peso (kg)',r=>n(r,'peso')],['Altura',r=>r.altura?saudeValor(r.altura)+(Number(r.altura)>3?' cm':' m'):'—'],['Cintura (cm)',r=>n(r,'cintura')],['Gordura (%)',r=>n(r,'gordura')],['Massa gorda (kg)',r=>n(r,'massaGorda')],['Massa magra (kg)',r=>n(r,'massaMagra')],['Fonte / método',r=>[r.fonte,r.metodo].filter(Boolean).join(' · ')||'Não informado']],
+    vitais:[data,['Sistólica (mmHg)',r=>n(r,'sis')],['Diastólica (mmHg)',r=>n(r,'dia')],['Batimentos (bpm)',r=>n(r,'fc')],['Fonte',r=>r.fonte||'Não informado']],
+    consultas:[data,['Profissional',r=>r.profissional||'Não informado'],['Especialidade',r=>r.especialidade||'—'],estado,['Local',r=>r.local||'—'],['Retorno',r=>r.retorno?saudeData(r.retorno)+(r.retornoConcluidoEm?' · realizado':''):'—']],
+    queixas:[data,['Sintoma / queixa',r=>saudeNome(r,tipo)],['Local / região',r=>r.onde||'—'],['Intensidade',r=>r.intensidade!==''&&r.intensidade!=null?saudeValor(r.intensidade)+'/10':'—'],estado],
+    fisio:[data,['Objetivo',r=>saudeNome(r,tipo)],['Sessão',r=>r.sessao?String(r.sessao)+(r.total?' / '+r.total:''):'—'],['Dor antes / depois',r=>n(r,'dorAntes')+' / '+n(r,'dorDepois')],['Profissional',r=>r.profissional||'—']]
+  }[tipo];
+}
+function saudeTabela(tipo,itens,titulo){
+  const defs=saudeColunas(tipo),rol=el('<div class="sui-tabela-scroll" tabindex="0" role="region"><table class="sui-tabela"><caption></caption><thead><tr></tr></thead><tbody></tbody></table></div>');
+  rol.setAttribute('aria-label',titulo+' em linhas');rol.querySelector('caption').textContent=itens.length+' registro(s) · '+titulo;
+  for(const label of [...defs.map(d=>d[0]),'Ações']){const th=document.createElement('th');th.scope='col';th.textContent=label;rol.querySelector('thead tr').append(th)}
+  for(const r of itens){
+    const tr=document.createElement('tr');tr.dataset.saudeRegistro=r.id||'';
+    defs.forEach(([label,fn])=>{const td=document.createElement('td');td.dataset.coluna=label;td.textContent=fn(r);if(label==='Situação'){const tag=el('<span class="sui-tag"></span>');tag.textContent=fn(r);td.replaceChildren(tag)}tr.append(td)});
+    const td=document.createElement('td'),acoes=el('<div class="sui-linha-acoes"></div>');
+    const abrir=acao(tipo==='consultas'?'🩺 Abrir consulta':'✏️ Ver / editar',()=>saudeEditarRegistro(tipo,r),'ghost mini');abrir.setAttribute('aria-label','Editar '+saudeNome(r,tipo)+' em '+saudeData(r.data));acoes.append(abrir);
+    if(tipo==='consultas')acoes.append(acao('📋 Preparar consulta',()=>saudePrepararConsulta(r),'ghost mini'));
+    if(tipo==='queixas')acoes.append(acao('🔎 Ver episódio',()=>saudeEpisodio(r),'ghost mini'));
+    const docs=acao('📎 Documentos',()=>saudeDocumentosRegistro(tipo,r),'ghost mini');docs.setAttribute('aria-label','Documentos de '+saudeNome(r,tipo)+' em '+saudeData(r.data));acoes.append(docs);
+    const outrasMedidas=tipo==='peso'&&typeof METRICAS_TRATAMENTO!=='undefined'?METRICAS_TRATAMENTO.filter(([k])=>!['peso','gordura','massaGorda','massaMagra'].includes(k)&&r[k]!==''&&r[k]!=null).map(([k,nome,u])=>[nome,saudeValor(r[k])+(u?' '+u:'')]):[];
+    const detalhes=[...outrasMedidas,['Frequência',r.frequencia],...(['peso','vitais','fisio'].includes(tipo)?[['Situação',r.situacao||r.status]]:[]),['Referência do laudo',r.referenciaLaudo],['Método',r.metodo],['Fonte',r.fonte],['Motivo',r.motivo],['Conduta',r.conduta],['Perguntas',r.perguntas],['Observações',r.obs],['Fatores',r.fatores],['Evolução',r.funcional]].filter(([,v])=>v!==''&&v!=null);
+    if(detalhes.length){const det=el('<details class="sui-linha-detalhes"><summary>🔎 Detalhes</summary><dl></dl></details>');detalhes.forEach(([label,valor])=>{const div=el('<div><dt></dt><dd></dd></div>');div.firstElementChild.textContent=label;div.lastElementChild.textContent=String(valor);det.querySelector('dl').append(div)});acoes.append(det)}
+    td.append(acoes);tr.append(td);rol.querySelector('tbody').append(tr);
+  }
+  return rol;
+}
 function saudeLista(tipo,itens,{titulo=SAUDE_TIPOS[tipo],descricao='',criar=true}={}){
   const box=el('<section class="sui-lista"></section>');box.append(saudeCabecalho(titulo,descricao,criar?[acao('+ Adicionar',()=>saudeEditarRegistro(tipo))]:[]));
   const ferramentas=el('<div class="sui-filtros"><label>Buscar<input type="search" placeholder="Nome, profissional ou observação"></label><label>Situação<select><option value="">Todas</option></select></label></div>');
   const guardado=(SaudeUI.filtros||{})[tipo]||{};ferramentas.querySelector('input').value=guardado.busca||'';
-  const estados=[...new Set(itens.map(x=>x.situacao||x.status).filter(Boolean))];estados.forEach(s=>ferramentas.querySelector('select').append(el('<option>'+esc(s)+'</option>')));const estadoGuardado=[...ferramentas.querySelector('select').options].find(x=>x.value===guardado.estado);if(estadoGuardado)estadoGuardado.selected=true;box.append(ferramentas);const grade=el('<div class="sui-grid"></div>');box.append(grade);
+  const estados=[...new Set(itens.map(x=>x.situacao||x.status||x.resultado).filter(Boolean))];estados.forEach(s=>ferramentas.querySelector('select').append(el('<option>'+esc(s)+'</option>')));const estadoGuardado=[...ferramentas.querySelector('select').options].find(x=>x.value===guardado.estado);if(estadoGuardado)estadoGuardado.selected=true;box.append(ferramentas);const compacta=!!saudeColunas(tipo),grade=el('<div class="'+(compacta?'sui-linhas':'sui-grid')+'"></div>');box.append(grade);if(compacta)box.dataset.formato='linhas';
   const pintar=()=>{grade.innerHTML='';const busca=normaliza(ferramentas.querySelector('input').value),estado=ferramentas.querySelector('select').value;SaudeUI.filtros=SaudeUI.filtros||{};SaudeUI.filtros[tipo]={busca:ferramentas.querySelector('input').value,estado};
-    const filtrados=itens.filter(x=>(!SaudeUI.de||!x.data||x.data>=SaudeUI.de)&&(!SaudeUI.ate||!x.data||x.data<=SaudeUI.ate)&&(!estado||(x.situacao||x.status)===estado)&&normaliza([saudeNome(x,tipo),x.profissional,x.obs,x.fonte].filter(Boolean).join(' ')).includes(busca)).slice().sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+    const filtrados=itens.filter(x=>(!SaudeUI.de||!x.data||x.data>=SaudeUI.de)&&(!SaudeUI.ate||!x.data||x.data<=SaudeUI.ate)&&(!estado||(x.situacao||x.status||x.resultado)===estado)&&normaliza([saudeNome(x,tipo),x.profissional,x.especialidade,x.medico,x.laboratorio,x.unidade,x.metodo,x.obs,x.fonte].filter(Boolean).join(' ')).includes(busca)).slice().sort((a,b)=>(b.data||'').localeCompare(a.data||'')||(b.hora||'').localeCompare(a.hora||''));
     if(!filtrados.length){grade.append(saudeNoVazio('Nenhum registro neste recorte','Adicione um registro ou ajuste a busca e o período.',criar?'Adicionar registro':'',criar?()=>saudeEditarRegistro(tipo):null));return}
+    if(compacta){grade.append(saudeTabela(tipo,filtrados,titulo));return}
     filtrados.forEach(r=>{
       let valor='',meta=[saudeData(r.data),r.hora,r.fonte||'Fonte não informada'].filter(Boolean).join(' · ');
       if(tipo==='peso'){valor=r.peso!==''&&r.peso!=null?saudeValor(r.peso)+' kg':'Peso a confirmar';meta+=' · '+(r.metodo||'Método não informado')}
@@ -170,8 +202,19 @@ function saudeEpisodio(q){
     const b=el('<div class="sui-actions"></div>');b.append(acao('+ Consulta',()=>saudeEditarRegistro('consultas',{id:uid(),data:hoje(),queixaId:q.id,situacao:'A confirmar'}),'ghost'),acao('+ Sessão',()=>saudeEditarRegistro('fisio',{id:uid(),data:hoje(),queixaId:q.id}),'ghost'));c.append(b);
   });
 }
+function saudeVisoes(tipo,linhas,evolucao){
+  const box=el('<div class="sui-visoes"><nav class="sui-visoes-nav"></nav><div class="sui-visoes-linhas"></div><div class="sui-visoes-evolucao"></div></div>');
+  box.querySelector('nav').setAttribute('aria-label','Visualização de '+tipo);box.querySelector('.sui-visoes-linhas').append(linhas);box.querySelector('.sui-visoes-evolucao').append(evolucao);
+  SaudeUI.visoes=SaudeUI.visoes||{};const mudar=modo=>{SaudeUI.visoes[tipo]=modo;box.querySelector('.sui-visoes-linhas').hidden=modo==='evolucao';box.querySelector('.sui-visoes-evolucao').hidden=modo==='linhas';box.querySelectorAll('[data-saude-visao]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.saudeVisao===modo)))};
+  for(const [id,nome]of [['linhas','📋 Linhas'],['evolucao','📈 Evolução'],['juntos','◫ Juntos']]){const b=acao(nome,()=>mudar(id),'ghost mini');b.dataset.saudeVisao=id;box.querySelector('nav').append(b)}mudar(SaudeUI.visoes[tipo]||'linhas');return box;
+}
 function saudeMedidas(){
-  const b=el('<div></div>'),i=SaudePainelModelo.indicadores(E,hoje());b.append(saudeCabecalho('Medidas e sinais vitais','Cada valor conserva a data e a fonte do próprio registro.',[acao('+ Medição',()=>saudeEditarRegistro('peso')),acao('+ Sinais vitais',()=>saudeEditarRegistro('vitais'),'ghost')]));
+  const b=el('<div></div>'),i=SaudePainelModelo.indicadores(E,hoje());b.append(saudeCabecalho('📏 Medidas e sinais vitais','Evolução e histórico em linhas, com a data e a fonte de cada medição.',[acao('➕ Medição',()=>saudeEditarRegistro('peso')),acao('💓 Sinais vitais',()=>saudeEditarRegistro('vitais'),'ghost')]));
+  if(typeof saudeDashboardEvolucao==='function'){
+    const paineis=el('<div class="sui-dash-medidas"></div>');paineis.append(saudeDashboardEvolucao('peso',saudeListaDados('peso'),{de:SaudeUI.de,ate:SaudeUI.ate}));
+    if(saudeListaDados('vitais').length){const vitais=el('<details class="sui-vitais-evolucao"><summary>💓 Evolução dos sinais vitais</summary></details>');vitais.append(saudeDashboardEvolucao('vitais',saudeListaDados('vitais'),{de:SaudeUI.de,ate:SaudeUI.ate}));paineis.append(vitais)}
+    const linhas=el('<div></div>');linhas.append(saudeLista('peso',saudeListaDados('peso'),{titulo:'📋 Histórico de medidas',criar:false}),saudeLista('vitais',saudeListaDados('vitais'),{titulo:'💓 Histórico de sinais vitais',criar:false}));b.append(saudeVisoes('medidas',linhas,paineis));return b;
+  }
   const grade=el('<div class="sui-kpis"></div>');for(const [k,l]of[['peso','Peso'],['imc','IMC calculado'],['pressao','Pressão'],['pulso','Batimentos']])if(i[k].valor!==null){const v=saudeCard(l,saudeValor(i[k].valor)+' '+i[k].unidade,saudeData(i[k].data),null);v.classList.add('sui-kpi');if(k==='imc')v.append(el('<small>'+esc(i[k].formula)+'</small>'));grade.append(v)}if(grade.childElementCount)b.append(grade);
   const pontos=saudeListaDados('peso').filter(r=>r.data<=hoje()&&r.peso>0&&(!SaudeUI.de||r.data>=SaudeUI.de)&&(!SaudeUI.ate||r.data<=SaudeUI.ate)).slice().sort((a,b)=>a.data.localeCompare(b.data));
   if(pontos.length){
@@ -185,8 +228,11 @@ function saudeMedidas(){
   }
   b.append(saudeLista('peso',saudeListaDados('peso'),{criar:false}),saudeLista('vitais',saudeListaDados('vitais'),{criar:false}));return b;
 }
-function saudeExames(){const b=el('<div></div>');b.append(saudeCabecalho('Exames e laudos','Resultado, unidade e referência documental, sem interpretação automática.',[acao('+ Exame',()=>saudeEditarRegistro('exames')),acao('Comparar coletas',()=>abrirModal('Comparação de exames','Compatibilidade dos registros e evolução numérica.',c=>c.append(dashboardExamesSaude({registros:saudeListaDados('exames').filter(x=>(!SaudeUI.de||x.data>=SaudeUI.de)&&(!SaudeUI.ate||x.data<=SaudeUI.ate))}))),'ghost'),acao('Importar JSON',importarExamesRotina,'ghost')]));b.append(saudeLista('exames',saudeListaDados('exames'),{criar:false,descricao:'Abra um resultado para conferir a origem e os documentos.'}));const x=el('<details class="sui-detalhes"><summary>Documentos e transcrição</summary><p>Adicione o PDF ou a foto em Documentos. A conferência é manual; não há extração automática por OCR nesta versão.</p></details>');x.append(acao('Abrir biblioteca',()=>saudeIr('documentos'),'ghost mini'));b.append(x);return b}
-function saudeConsultas(){const b=el('<div></div>');b.append(saudeCabecalho('Consultas, sintomas e acompanhamento','Planejamento e realização têm estados próprios.',[acao('Preparar consulta',()=>saudePrepararConsulta(),'ghost')]));for(const k of ['consultas','queixas','fisio'])b.append(saudeLista(k,saudeListaDados(k)));return b}
+function saudeExames(){const b=el('<div></div>');b.append(saudeCabecalho('🧪 Exames e laudos','Evolução por marcador e resultados em linhas. As referências são as do próprio laudo.',[acao('➕ Exame',()=>saudeEditarRegistro('exames')),acao('⚖️ Comparar coletas',()=>abrirModal('Comparação de exames','Compatibilidade dos registros e evolução numérica.',c=>c.append(dashboardExamesSaude({registros:saudeListaDados('exames').filter(x=>(!SaudeUI.de||x.data>=SaudeUI.de)&&(!SaudeUI.ate||x.data<=SaudeUI.ate))}))),'ghost'),acao('📥 Importar JSON',importarExamesRotina,'ghost')]));
+  const linhas=saudeLista('exames',saudeListaDados('exames'),{titulo:'📋 Histórico de exames',criar:false,descricao:'Uma linha por resultado; detalhes e documentos nas ações.'});
+  if(typeof saudeDashboardEvolucao==='function')b.append(saudeVisoes('exames',linhas,saudeDashboardEvolucao('exames',saudeListaDados('exames'),{de:SaudeUI.de,ate:SaudeUI.ate})));else b.append(linhas);
+  const x=el('<details class="sui-detalhes"><summary>📂 Documentos e transcrição</summary><p>Adicione o PDF ou a foto em Documentos. A conferência é manual; não há extração automática por OCR nesta versão.</p></details>');x.append(acao('Abrir biblioteca',()=>saudeIr('documentos'),'ghost mini'));b.append(x);return b}
+function saudeConsultas(){const b=el('<div></div>');b.append(saudeCabecalho('🩺 Consultas, sintomas e acompanhamento','Consultas, episódios e sessões em linhas. Abra os detalhes quando precisar.',[acao('📋 Preparar consulta',()=>saudePrepararConsulta(),'ghost')]));for(const k of ['consultas','queixas','fisio'])b.append(saudeLista(k,saudeListaDados(k),{titulo:({consultas:'🩺 Consultas',queixas:'💬 Sintomas e queixas',fisio:'🏃 Fisioterapia'})[k]}));return b}
 function saudeCuidados(){const b=el('<div></div>');b.append(saudeLista('vacinas',saudeListaDados('vacinas'),{descricao:'Dose, comprovante e próxima data informada.'}));b.append(saudeLista('rastreios',saudeListaDados('rastreios'),{titulo:'Acompanhamentos indicados',descricao:'Datas confirmadas e respectivas orientações; sem calendário individual presumido.'}));const d=el('<details class="sui-detalhes"><summary>Pautas para conversar com o profissional</summary><p>Sugestões gerais do catálogo existente. Não definem necessidade, periodicidade ou situação individual.</p></details>');const sugestões=typeof rastreiosPendentes==='function'?rastreiosPendentes(true):[];sugestões.forEach(r=>d.append(el('<p><b>'+esc(r.nome)+'</b> · A confirmar'+(r.ultima?' · última data registrada: '+saudeData(r.ultima):' · sem realização comprovada')+'</p>')));b.append(d,saudeLista('histFamiliar',saudeListaDados('histFamiliar'),{descricao:'Somente informações declaradas; nenhum risco individual é calculado.'}));return b}
 function saudeAdicionar(){abrirModal('Adicionar registro de Saúde','Escolha o tipo. Você pode completar os detalhes depois.',c=>{const g=el('<div class="sui-grid"></div>');for(const k of ['peso','vitais','exames','consultas','queixas','fisio','vacinas','histFamiliar','rastreios','tratamentos'])g.append(acao(SAUDE_TIPOS[k],()=>saudeEditarRegistro(k),'ghost'));c.append(g)})}
 function saudeRelatorioHTML(r){
