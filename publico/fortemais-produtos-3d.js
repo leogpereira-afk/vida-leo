@@ -41,7 +41,7 @@ function criar(source,options={}){
   }else{
    let count=0,visits=0;
    outer:for(const s of original){
-    
+
     for(let row=0;row<Math.min(1000,Math.ceil(n(a.altura)/(h+j)));row++){
      let y=row*(h+j),bottom=Math.max(y,s.y),top=Math.min(y+h,s.y+s.h);if(top<=bottom)continue;
      for(let col=-1;col<Math.min(1500,Math.ceil(n(a.largura)/(w+j)));col++){
