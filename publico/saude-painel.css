@@ -41,3 +41,78 @@
 @media(max-width:650px){.pagina.saude-workbench .sui-visoes-nav .btn{min-height:44px}.sui-visoes-nav{margin-bottom:12px}}
 .trat-entrada-nota{font-size:12px;color:var(--sui-suave,var(--suave));line-height:1.5;margin:2px 0 12px}.trat-avulsos{font-size:12px;color:var(--sui-suave,var(--suave));margin:0 0 15px;padding:9px 12px;border:1px solid var(--linha);border-radius:9px;background:var(--card)}.trat-avulsos[hidden]{display:none}.trat-avulsos>summary{cursor:pointer;min-height:28px;line-height:28px;font-weight:600}.trat-avulsos-lista{display:flex;flex-wrap:wrap;gap:7px;padding:8px 0 2px}.trat-avulsos-lista .btn{font-size:12px}.trat-avulsos-lista [aria-pressed=true]{background:var(--sui-fundo);border-color:var(--sui-verde);color:var(--sui-verde)}.trat-avulso-head h3{font-size:17px;margin:0 0 5px}.trat-avulso-head p{font-size:12px;color:var(--sui-suave,var(--suave));margin:0 0 16px}.trat-detalhe>.trat-empty{background:var(--sui-fundo);border:1px dashed var(--sui-borda);padding:22px;border-radius:12px}.trat-detalhe>.trat-empty h3{font-size:18px!important}.trat-detalhe>.trat-empty p{font-size:13px;line-height:1.5;color:var(--sui-suave)}
 @media(max-width:650px){.trat-avulsos>summary{min-height:44px;line-height:1.5;display:list-item;padding:10px 0}.trat-avulsos-lista .btn{min-height:44px}}
+
+/* Tratamentos: contexto e indicadores próximos, sem reduzir as áreas de toque. */
+.pagina.saude-workbench[data-saude-area=tratamentos]{padding-top:12px}
+.saude-workbench[data-saude-area=tratamentos] .sui-header{gap:12px;padding-bottom:6px;margin-bottom:3px}
+.saude-workbench[data-saude-area=tratamentos] .sui-header h1{font-size:23px;margin:2px 0;line-height:1.25}
+.saude-workbench[data-saude-area=tratamentos] .sui-header p{font-size:13px;line-height:1.4}
+.saude-workbench[data-saude-area=tratamentos] .sui-nav{margin:5px 0 3px;padding-bottom:4px;gap:4px}
+.saude-workbench[data-saude-area=tratamentos] .sui-nav .btn{padding:6px 10px}
+.saude-workbench[data-saude-area=tratamentos] .sui-periodo-detalhes{margin-bottom:5px}
+.saude-workbench[data-saude-area=tratamentos] .sui-periodo-detalhes>summary{min-height:26px;padding:2px 0}
+.saude-workbench[data-saude-area=tratamentos] .trat-contexto{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:3px 12px;margin-bottom:5px}
+.saude-workbench[data-saude-area=tratamentos] .trat-contexto .sui-periodo-detalhes{margin:0}
+.saude-workbench[data-saude-area=tratamentos] .trat-contexto .sui-periodo-detalhes[open]{flex-basis:100%}
+.saude-workbench[data-saude-area=tratamentos] .trat-contexto .sui-sync{margin-left:auto;min-height:32px;font-size:11px}
+.saude-workbench[data-saude-area=tratamentos] .trat-toolbar{margin-bottom:6px;gap:6px}
+.saude-workbench[data-saude-area=tratamentos] .trat-toolbar h2{font-size:19px}
+.saude-workbench[data-saude-area=tratamentos] .trat-escolha{display:flex;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:6px;min-width:0}
+.saude-workbench[data-saude-area=tratamentos] .trat-grupos{flex:1;gap:6px;margin:0;min-width:0}
+.saude-workbench[data-saude-area=tratamentos] .trat-grupos[hidden]{display:none}
+.saude-workbench[data-saude-area=tratamentos] .trat-avulsos{flex:0 1 auto;margin:0;padding:0 10px;max-width:100%;box-sizing:border-box}
+.saude-workbench[data-saude-area=tratamentos] .trat-avulsos[open]{flex-basis:100%}
+.saude-workbench[data-saude-area=tratamentos] .trat-avulsos>summary{min-height:34px;line-height:34px;padding:0}
+.saude-workbench[data-saude-area=tratamentos] .trat-plano-hero{padding:10px 12px;gap:10px;margin:0 0 6px}
+.saude-workbench[data-saude-area=tratamentos] .trat-plano-hero h2{font-size:21px;line-height:1.25;margin:2px 0 4px}
+.saude-workbench[data-saude-area=tratamentos] .trat-plano-hero p{font-size:13px;line-height:1.4;margin:2px 0}
+.saude-workbench[data-saude-area=tratamentos] .trat-plano-icone{width:36px;height:36px;font-size:22px;border-radius:10px}
+.saude-workbench[data-saude-area=tratamentos] .trat-secoes-barra{display:flex;align-items:flex-start;flex-wrap:wrap;gap:5px 10px;margin-bottom:8px;min-width:0}
+.saude-workbench[data-saude-area=tratamentos] .trat-subtabs{flex:1;gap:5px;margin:0}
+.saude-workbench[data-saude-area=tratamentos] .trat-contato{padding:0;max-width:100%;font-size:12px}
+.saude-workbench[data-saude-area=tratamentos] .trat-contato>summary{min-height:36px;line-height:36px;cursor:pointer}
+.saude-workbench[data-saude-area=tratamentos] .trat-contato[open]{flex-basis:100%}
+.saude-workbench[data-saude-area=tratamentos] .trat-contato p{margin:4px 0;overflow-wrap:anywhere}
+.saude-workbench[data-saude-area=tratamentos] .trat-dashboard{gap:8px}
+.saude-workbench[data-saude-area=tratamentos] .trat-kpis{gap:8px}
+.saude-workbench[data-saude-area=tratamentos] .trat-kpi{padding:9px 11px;gap:4px;border-radius:10px}
+.saude-workbench[data-saude-area=tratamentos] .trat-kpi b{font-size:22px}
+.saude-workbench[data-saude-area=tratamentos] .trat-dashboard-linha{gap:8px}
+.saude-workbench[data-saude-area=tratamentos] .trat-card{padding:12px;border-radius:11px}
+.saude-workbench[data-saude-area=tratamentos] .trat-card h3{margin-bottom:8px}
+.saude-workbench[data-saude-area=tratamentos] .trat-card .trat-toolbar h3{margin:0}
+.saude-workbench[data-saude-area=tratamentos] .trat-dados>div{padding:6px 0}
+.saude-workbench[data-saude-area=tratamentos] .trat-status-grid{gap:8px}
+.pagina.saude-workbench[data-saude-area=tratamentos] :is(.sui-header,.sui-nav,.trat-toolbar,.trat-grupos,.trat-subtabs,.trat-plano-hero,.trat-status-grid) .btn{min-height:36px;padding:7px 10px;font-size:13px}
+@media(min-width:1150px){
+  .saude-workbench[data-saude-area=tratamentos] .sui-header>div:first-child{display:grid;grid-template-columns:auto 1fr;align-items:baseline;column-gap:14px}
+  .saude-workbench[data-saude-area=tratamentos] .sui-header small{grid-column:1/-1}
+}
+@media(max-width:1000px){
+  .saude-workbench[data-saude-area=tratamentos] .trat-plano-hero .trat-actions{width:auto;margin-left:auto}
+}
+@media(max-width:650px){
+  .pagina.saude-workbench[data-saude-area=tratamentos]{padding-top:10px}
+  .saude-workbench[data-saude-area=tratamentos] .sui-header{gap:6px}
+  .saude-workbench[data-saude-area=tratamentos] .sui-header h1{font-size:22px}
+  .saude-workbench[data-saude-area=tratamentos] .sui-header p{display:none}
+  .saude-workbench[data-saude-area=tratamentos] .sui-header .sui-actions{gap:6px}
+  .saude-workbench[data-saude-area=tratamentos] .sui-nav{padding-bottom:5px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-contexto .sui-sync{width:100%;margin:0}
+  .pagina.saude-workbench[data-saude-area=tratamentos] :is(.sui-header,.sui-nav,.trat-toolbar,.trat-grupos,.trat-subtabs,.trat-plano-hero,.trat-status-grid) .btn{min-height:44px;padding:7px 10px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-escolha{gap:5px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-grupos{flex-basis:100%;flex-wrap:nowrap;overflow-x:auto;padding:2px;scrollbar-width:thin}
+  .saude-workbench[data-saude-area=tratamentos] .trat-grupos .btn{flex:none;white-space:nowrap}
+  .saude-workbench[data-saude-area=tratamentos] .trat-avulsos{width:100%}
+  .saude-workbench[data-saude-area=tratamentos] .trat-avulsos>summary{min-height:44px;line-height:44px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-plano-hero{gap:7px;padding:10px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-plano-hero h2{font-size:20px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-plano-hero .trat-actions{width:100%;margin:0}
+  .saude-workbench[data-saude-area=tratamentos] .trat-plano-hero .trat-actions .btn{flex:1}
+  .saude-workbench[data-saude-area=tratamentos] .trat-secoes-barra{gap:4px;margin-bottom:6px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-subtabs{flex:1 1 100%;min-width:0;flex-wrap:nowrap;overflow-x:auto;padding:2px;scrollbar-width:thin}
+  .saude-workbench[data-saude-area=tratamentos] .trat-subtabs .btn{flex:none;white-space:nowrap}
+  .saude-workbench[data-saude-area=tratamentos] .trat-contato>summary{min-height:44px;line-height:44px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-kpi{padding:8px 10px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-card{padding:10px}
+}

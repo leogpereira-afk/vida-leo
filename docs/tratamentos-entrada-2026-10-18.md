@@ -23,3 +23,11 @@ A Visão geral mantém os indicadores e o gráfico resumido. A tabela completa d
 ## Entrega
 
 Prévia local em ramo próprio. Publicação ainda não solicitada para esta correção. A prévia e as dependências locais estão excluídas do Git.
+
+## Compactação vertical da tela
+
+O cabeçalho, os seletores, as ações e os indicadores receberam espaçamentos menores somente em Tratamentos. O status de gravação compartilha a faixa dos filtros; os itens sem plano ficam junto ao seletor; o consultório compartilha a faixa das seções. Nenhuma informação clínica foi removida. No celular, a frase de apresentação cede espaço e os seletores usam rolagem horizontal, mantendo controles de pelo menos 44 px.
+
+Na comparação com dados fictícios e viewport de 1.440 × 1.000 px, o início dos indicadores mudou de 716,3 para 422,6 px e o gráfico de 882,9 para 560,2 px. Em 390 px, a largura da página permanece em 390 px, sem transbordamento; a rolagem dos seletores fica contida neles.
+
+Verificação atual: **1.460 testes aprovados**, zero falhas, sintaxe dos dois scripts e `git diff --check` sem erros. No navegador foram conferidos o retorno à Visão geral, a abertura dos documentos e do consultório, a remoção do escopo compacto ao sair de Tratamentos e o console sem erros. Revisão independente do diff sem bloqueios. Os dados e a sincronização não foram alterados. Esta compactação também permanece local.
