@@ -1,0 +1,22 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const path=new URL('../publico/fortemais-ferramentas-modelo.js',import.meta.url);
+if(fs.existsSync(path)) vm.runInThisContext(fs.readFileSync(path,'utf8'));
+const M=globalThis.FortemaisFerramentasModelo;
+test('engine exists with complete catalog',()=>assert.ok(M?.catalogo.length>=22));
+test('all fictional examples yield finite numbers and geometry',()=>{assert.ok(M); for(const t of M.catalogo){const r=M.calcular(t.id,t.exemplo); assert.ok(r.scene.elements.length,t.id); const visit=o=>{if(typeof o==='number')assert.ok(Number.isFinite(o),t.id);else if(o&&typeof o==='object')Object.values(o).forEach(visit)};visit(r)}});
+test('comma, missing and negative values validate',()=>{assert.ok(M);assert.equal(M.numero('2,5'),2.5);assert.throws(()=>M.numero(null));assert.throws(()=>M.numero(-1));assert.equal(M.numero(0),0)});
+test('reboco volume loss once',()=>{assert.ok(M);let r=M.calcular('reboco',{areas:[{largura:10,altura:5,faces:1}],aberturas:0,espessuraCm:2,perdaPct:10,modo:'industrial',consumo:1.5,embalagem:20});assert.equal(r.metricas[1].value,1);assert.equal(r.materiais[0].comPerda,165)});
+test('concrete geometry and supplied ingredients',()=>{assert.ok(M);const r=M.calcular('concreto',{elementos:[{largura:3,comprimento:2,espessuraCm:10,quantidade:1}],perdaPct:10,cimento:300});assert.ok(Math.abs(r.materiais[0].liquido-.6)<1e-10);assert.ok(Math.abs(r.materiais[0].comPerda-.66)<1e-10);assert.ok(Math.abs(r.materiais[1].comPerda-198)<1e-10)});
+test('finished paint yield ignores coats',()=>{assert.ok(M);assert.equal(M.calcular('pintura',{area:100,rendimento:10,demao:3,modo:'acabado',embalagem:18,perdaPct:0}).materiais[0].liquido,10)});
+test('steel refuses spliced oversized piece',()=>{assert.ok(M);assert.throws(()=>M.calcular('barras',{pecas:[{comprimento:13,quantidade:1,diametro:10}],barra:12,perdaPct:0}),/barra/i)});
+test('electrical shared route and multicore physical length',()=>{assert.ok(M);const r=M.calcular('eletrica',{trechos:[{id:'a',comprimento:10,condutores:3,modo:'individual',secao:2.5,papel:'fase'},{id:'a',comprimento:10,condutores:4,modo:'multipolar',secao:1.5,papel:'dados'}],perdaPct:0,embalagem:100});assert.equal(r.materiais[0].liquido,10);assert.equal(r.materiais[1].liquido,30);assert.equal(r.materiais[2].liquido,10)});
+test('truck payload constrains earth trips',()=>{assert.ok(M);const r=M.calcular('terra',{setores:[{area:10,profundidadeCm:100}],reuso:0,fatorSolto:1.2,fatorNatural:1,caminhao:10,carga:4,densidade:2});assert.equal(r.metricas.find(x=>x.label==='Viagens de compra').value,6)});
+test('mesh uses edge overlap and whole layers',()=>{assert.ok(M);const r=M.calcular('malhas',{largura:4,comprimento:6,painelLargura:2,painelComprimento:3,sobreposicao:.2,camadas:2,perdaPct:0});assert.equal(r.materiais[0].liquido,18)});
+test('hydraulic lengths multiply quantity',()=>{assert.ok(M);const r=M.calcular('hidraulica',{trechos:[{comprimento:5,quantidade:3,diametro:25,material:'PVC',sistema:'fria'}],conexoes:[],barra:6,perdaPct:0});assert.equal(r.materiais[0].liquido,15);assert.equal(r.materiais[0].embalagens,3)});
+
+test('tiny positive purchase still needs one package',()=>{assert.equal(M.calcular('consumo',{quantidade:1e-12,consumo:1,embalagem:20,perdaPct:0}).materiais[0].embalagens,1)});
+test('overflow cannot escape as nonfinite result',()=>assert.throws(()=>M.calcular('produtividade',{quantidade:1e308,rup:1e308,equipe:1,horasDia:8}),/limite|finito/i));
+test('tile boxes round once after reserve',()=>{const r=M.calcular('pisos',{largura:4,comprimento:5,pecaLargura:60,pecaComprimento:60,juntaMm:2,caixaArea:2.16,perdaPct:10});assert.equal(r.materiais[0].embalagens,11);assert.equal(r.materiais[0].compra,23.76)});
