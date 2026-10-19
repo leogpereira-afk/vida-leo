@@ -116,3 +116,67 @@
   .saude-workbench[data-saude-area=tratamentos] .trat-kpi{padding:8px 10px}
   .saude-workbench[data-saude-area=tratamentos] .trat-card{padding:10px}
 }
+
+/* Ficha operacional: um saldo e linhas visíveis para cada uso realizado. */
+.saude-workbench[data-saude-area=tratamentos] .trat-split{gap:10px;align-items:start}
+.saude-workbench[data-saude-area=tratamentos] .trat-detalhe{padding:12px;border-radius:11px}
+.saude-workbench[data-saude-area=tratamentos] .trat-detalhe>header small{font-size:11px;color:var(--sui-suave)}
+.saude-workbench[data-saude-area=tratamentos] .trat-detalhe>header h3{font-size:18px;line-height:1.3;margin:2px 0}
+.saude-workbench[data-saude-area=tratamentos] .trat-detalhe>header p{font-size:12px;line-height:1.4;margin:2px 0 6px}
+.saude-workbench[data-saude-area=tratamentos] .trat-detalhe>.trat-actions{gap:5px;margin:0 0 6px}
+.pagina.saude-workbench[data-saude-area=tratamentos] .trat-detalhe :is(.trat-actions,.trat-usos-tabela) .btn{min-height:36px;font-size:12px;padding:6px 9px}
+.saude-workbench[data-saude-area=tratamentos] .trat-uso-direto{padding:9px 10px;margin:6px 0 8px;border:0;border-radius:8px;background:var(--sui-fundo)}
+.saude-workbench[data-saude-area=tratamentos] .trat-uso-direto h4{font-size:14px;margin:0 0 5px}
+.saude-workbench[data-saude-area=tratamentos] .trat-uso-linha{gap:8px;flex-wrap:nowrap;flex-direction:row;align-items:end}
+.saude-workbench[data-saude-area=tratamentos] .trat-uso-linha label{min-width:0;max-width:200px;gap:3px}
+.saude-workbench[data-saude-area=tratamentos] .trat-uso-linha span{font-size:12px;line-height:1.4}
+.saude-workbench[data-saude-area=tratamentos] .trat-uso-direto input{min-height:36px;padding:6px 8px;font-size:14px}
+.pagina.saude-workbench[data-saude-area=tratamentos] .trat-uso-linha .btn{min-width:0;min-height:36px;font-size:13px;padding:7px 12px;white-space:nowrap}
+.saude-workbench[data-saude-area=tratamentos] .trat-uso-direto details{margin-top:5px}
+.saude-workbench[data-saude-area=tratamentos] .trat-uso-direto summary{min-height:30px;line-height:30px;font-size:12px}
+.saude-workbench[data-saude-area=tratamentos] .trat-uso-opcoes{gap:8px;margin-top:4px}
+.saude-workbench[data-saude-area=tratamentos] .trat-uso-direto [data-alerta-reposicao]{margin-top:4px;padding:5px 0;border-radius:0;background:transparent;font-size:12px}
+.saude-workbench[data-saude-area=tratamentos] .trat-uso-direto [data-alerta-reposicao][data-nivel=atencao],.saude-workbench[data-saude-area=tratamentos] .trat-uso-direto [data-alerta-reposicao][data-nivel=critico]{padding:6px 8px;border-radius:6px}
+.saude-workbench[data-saude-area=tratamentos] .trat-uso-direto [data-alerta-reposicao] p{margin:0;line-height:1.5}
+.saude-workbench[data-saude-area=tratamentos] .trat-diario{margin:5px 0;padding:6px 9px;border-radius:8px}
+.saude-workbench[data-saude-area=tratamentos] .trat-diario label{min-height:36px;font-size:13px}
+.saude-workbench[data-saude-area=tratamentos] .trat-diario p{margin:2px 0;font-size:12px;line-height:1.4}
+.trat-usos-recentes{margin:8px 0;min-width:0;max-width:100%}
+.trat-usos-recentes h4{font-size:14px;line-height:1.4;margin:0 0 4px}
+.trat-usos-recentes>p{font-size:12px;margin:4px 0}
+.trat-usos-recentes:focus-visible{outline:2px solid var(--sui-verde,var(--sucesso));outline-offset:3px;border-radius:4px}
+.trat-usos-tabela{width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px;text-align:left;font-variant-numeric:tabular-nums}
+.trat-usos-tabela .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.trat-usos-tabela th{font-size:11px;color:var(--suave);font-weight:600;padding:4px 6px;border-bottom:1px solid var(--linha)}
+.trat-usos-tabela td{padding:4px 6px;border-bottom:1px solid var(--linha);vertical-align:middle;overflow-wrap:anywhere;line-height:1.5}
+.trat-usos-tabela th:first-child{width:40%}.trat-usos-tabela th:nth-child(2){width:30%}.trat-usos-tabela th:last-child{width:30%}
+.trat-usos-tabela time b{display:inline-block;font-weight:500;margin-left:4px}
+.trat-usos-tabela small{display:block;color:var(--suave);font-size:11px;white-space:pre-wrap}
+.trat-usos-tabela .btn{white-space:normal}
+.trat-usos-anteriores{font-size:12px;margin:4px 0}
+.trat-usos-anteriores>summary{cursor:pointer;min-height:32px;line-height:32px}
+.saude-workbench[data-saude-area=tratamentos] .trat-detalhe>.trat-resumo{display:flex;flex-wrap:wrap;gap:5px 12px;margin:6px 0}
+.saude-workbench[data-saude-area=tratamentos] .trat-detalhe>.trat-resumo>div{display:flex;flex-wrap:wrap;align-items:baseline;gap:3px 6px;padding:0;background:none;border-radius:0;font-size:12px}
+.saude-workbench[data-saude-area=tratamentos] .trat-detalhe>.trat-resumo b{font-size:13px}
+.saude-workbench[data-saude-area=tratamentos] .trat-detalhe .trat-previsao-pendente{font-size:12px;line-height:1.4;flex-basis:100%}
+.saude-workbench[data-saude-area=tratamentos] .trat-detalhe>.trat-info{padding:7px 0;font-size:12px}
+.saude-workbench[data-saude-area=tratamentos] .trat-detalhe>.trat-info h4{font-size:13px;margin-bottom:3px}
+.saude-workbench[data-saude-area=tratamentos] .trat-detalhe>.trat-info p{margin:3px 0;line-height:1.45;font-size:12px}
+.saude-workbench[data-saude-area=tratamentos] .trat-detalhe>.trat-info summary{min-height:32px;line-height:32px}
+@media(max-width:650px){
+  .saude-workbench[data-saude-area=tratamentos] .trat-detalhe{padding:10px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-detalhe>header h3{font-size:18px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-uso-linha{align-items:end;gap:6px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-uso-linha label{max-width:none;flex:1}
+  .pagina.saude-workbench[data-saude-area=tratamentos] .trat-detalhe :is(.trat-actions,.trat-usos-tabela) .btn,.pagina.saude-workbench[data-saude-area=tratamentos] .trat-uso-linha .btn{min-height:44px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-uso-direto input{min-height:44px;font-size:16px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-uso-direto summary,.saude-workbench[data-saude-area=tratamentos] .trat-detalhe>.trat-info summary,.trat-usos-anteriores>summary{min-height:44px;line-height:44px}
+  .saude-workbench[data-saude-area=tratamentos] .trat-diario label{min-height:44px}
+  .trat-usos-tabela th,.trat-usos-tabela td{padding:4px 3px}
+  .pagina.saude-workbench[data-saude-area=tratamentos] .trat-detalhe .trat-usos-tabela .btn{font-size:11px;padding:5px 4px;white-space:nowrap;overflow-wrap:normal}
+  .trat-usos-tabela time b{display:block;margin-left:0}
+}
+@media(prefers-color-scheme:dark){
+  .saude-workbench[data-saude-area=tratamentos] .trat-uso-direto [data-alerta-reposicao][data-nivel=atencao]{background:#392e16;color:#f3cf8b}
+  .saude-workbench[data-saude-area=tratamentos] .trat-uso-direto [data-alerta-reposicao][data-nivel=critico]{background:#3b2324;color:#ffb1aa}
+}

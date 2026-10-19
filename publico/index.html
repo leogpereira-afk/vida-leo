@@ -663,7 +663,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./central-fluida.css?v=25438d2d9ef6">
 <link rel="stylesheet" href="./documentos-revisao.css?v=90d5f0ab4afe">
 <link rel="stylesheet" href="./painel-compacto.css?v=4baf1a7c4d03">
-<link rel="stylesheet" href="./saude-painel.css?v=6c6960053167">
+<link rel="stylesheet" href="./saude-painel.css?v=7872ada17925">
 <link rel="stylesheet" href="./saude-visual.css?v=a6af9ad6f2c6">
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
 <link rel="stylesheet" href="./aviao.css?v=44fae810ca9e">
@@ -740,7 +740,7 @@ tr:hover .lixo{opacity:1}
 <script src="./saude-documentos.js?v=53ba39d8cf01"></script>
 <script src="./saude-evolucao.js?v=12f05d21e858"></script>
 <script src="./saude-painel.js?v=92487fab156a"></script>
-<script src="./saude-tratamentos.js?v=03b35b8abece"></script>
+<script src="./saude-tratamentos.js?v=c5375b8e2aa5"></script>
 <script src="donboy-email.js?v=6a1ba6d316f6"></script>
 <script>
 /* ============================================================
@@ -2321,7 +2321,7 @@ function prepararTabelas(pagina){
       tr.tabIndex=0;tr.setAttribute('role','button');tr.setAttribute('aria-label','Abrir '+tr.textContent.trim().replace(/\s+/g,' ').slice(0,100));
       tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tr.click()}};
     }});
-    if(pagina.classList.contains('financeiro')||pagina.classList.contains('saude-layout')||(pagina.dataset.saudeWorkbench&&t.closest('.sui-tabela-scroll,.sui-evolucao-tabela'))||t.classList.contains('aviao-tabela')||t.classList.contains('fm-orcamento')||t.parentElement.closest('table'))return;
+    if(pagina.classList.contains('financeiro')||pagina.classList.contains('saude-layout')||(pagina.dataset.saudeWorkbench&&t.closest('.sui-tabela-scroll,.sui-evolucao-tabela,.trat-usos-tabela'))||t.classList.contains('aviao-tabela')||t.classList.contains('fm-orcamento')||t.parentElement.closest('table'))return;
     const ths=[...t.querySelectorAll('thead>tr>th')].filter(x=>x.closest('table')===t);
     if(!ths.length||!linhas.length||linhas.some(tr=>tr.children.length!==ths.length||tr.querySelector('[colspan],table')))return;
     t.classList.add('tabela-adaptavel');

@@ -31,3 +31,13 @@ O cabeçalho, os seletores, as ações e os indicadores receberam espaçamentos 
 Na comparação com dados fictícios e viewport de 1.440 × 1.000 px, o início dos indicadores mudou de 716,3 para 422,6 px e o gráfico de 882,9 para 560,2 px. Em 390 px, a largura da página permanece em 390 px, sem transbordamento; a rolagem dos seletores fica contida neles.
 
 Verificação atual: **1.460 testes aprovados**, zero falhas, sintaxe dos dois scripts e `git diff --check` sem erros. No navegador foram conferidos o retorno à Visão geral, a abertura dos documentos e do consultório, a remoção do escopo compacto ao sair de Tratamentos e o console sem erros. Revisão independente do diff sem bloqueios. Os dados e a sincronização não foram alterados. Esta compactação também permanece local.
+
+## Ficha do medicamento e usos visíveis
+
+O registro direto e o check diário agora exibem uma linha imediatamente após salvar, com data e horário do uso, quantidade na unidade cadastrada e ação Desfazer. Os cinco usos mais recentes ficam abertos e os anteriores permanecem acessíveis em uma lista recolhível. Um uso retroativo recém-salvo abre automaticamente sua linha, mesmo fora dos cinco mais recentes. O histórico completo continua disponível.
+
+A ficha tem título, ações, formulário e metadados menores. O saldo aparece somente no aviso de estoque, preservando alertas de reposição e quantidade desconhecida. Receitas e dados do consultório ficam recolhíveis. A orientação cadastrada continua visível. O motor de validação, confirmação de início, ocorrências, estoque e gravação foi preservado; desfazer continua sendo uma reversão auditável, sem apagar o registro.
+
+Oito novas regressões verificam linha imediata, ordem por data e horário sem reordenar o cadastro, check diário, desfazer, rollback de gravação, isolamento entre itens, preservação das linhas ao reabrir e visibilidade de uso retroativo. Suíte completa atual: **1.468 testes aprovados**, zero falhas ou ignorados. Sintaxe e diff conferidos. Revisão independente encontrou dois problemas de integração, ambos corrigidos e cobertos por testes.
+
+No navegador, registro e reversão foram testados com um medicamento fictício: saldo de dez para nove unidades e retorno para dez ao desfazer. Painéis de 319 e 390 px ficaram sem transbordamento da página; botões de toque mantêm pelo menos 44 px. Também foi conferida a apresentação no computador e o console sem erros. Não houve teste ou alteração de uso real, nem publicação desta versão.
