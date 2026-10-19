@@ -55,7 +55,7 @@ function criar(source,options={}){
      }
     }
    }
-   note('Fiadas e juntas de '+n(a.juntaCm)+' cm · '+(a.produto||'perfil '+profile)+'. Amarração e posição dos vãos esquemáticas. Quantidade de compra permanece no cálculo; use “Detalhe do produto” para ver vazados e massa.'+(a.blocoEspessura?'':' Espessura visual provisória de 14 cm.'));
+   const openings=a.temAberturas==='nao'?[]:(a.aberturas||[]);const openingLabel=openings.length?'Com aberturas: '+openings.map(e=>(e.tipo==='janela'?'janela':e.tipo==='porta'?'porta':'vão anterior')+' '+n(e.largura)+' × '+n(e.altura)+' m · '+n(e.quantidade,1)+' un').join('; ')+'. ':'Sem portas ou janelas. ';note(openingLabel+'Fiadas e juntas de '+n(a.juntaCm)+' cm · '+(a.produto||'perfil '+profile)+'. Amarração esquemática. '+(openings.length?'Aberturas posicionadas lado a lado a partir da esquerda. ':'')+'Quantidade de compra permanece no cálculo; use “Detalhe do produto” para ver vazados e massa.'+(a.blocoEspessura?'':' Espessura visual provisória de 14 cm.'));
   }
  }else if(t==='malhas'){
   out.detailAvailable=true;const space=n(a.espacamento)/1000,dia=n(a.diametro)/1000;

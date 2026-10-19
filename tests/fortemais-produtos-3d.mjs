@@ -8,7 +8,7 @@ const engine=globalThis.FortemaisFerramentasModelo, visual=globalThis.FortemaisP
 const calc=(id,a={})=>engine.calcular(id,{...structuredClone(engine.catalogo.find(t=>t.id===id).exemplo),...a});
 for(const item of engine.catalogo)test('3D '+item.id+' mantém cálculo e geometria finita nas vistas',()=>{
  const r=calc(item.id),before=JSON.stringify(r);
- for(const detail of [false,true])for(const mortar of [false,true]){const s=visual.criar(r.scene,{detail,mortar}),valid=globalThis.FortemaisObra3D.preparar(s);assert.equal(valid.skipped,0);assert.ok(s.elements.length<=3800);assert.equal(s.elements.length,valid.elements.length);assert.ok(s.caption);}
+ for(const detail of [false,true])for(const mortar of [false,true]){const s=visual.criar(r.scene,{detail,mortar}),valid=globalThis.FortemaisObra3D.preparar(s);assert.equal(valid.skipped,0);assert.ok(s.elements.length<=3800);assert.equal(s.elements.length,valid.elements.length);assert.ok(s.caption);assert.ok(s.elements.length>0||s.noGeometry,item.id+' não pode ficar vazio sem explicar a ausência de geometria');}
  assert.equal(JSON.stringify(r),before);
 });
 test('tijolo frisado: vazados físicos 2 por 4, juntas e escolha do perfil',()=>{
@@ -21,7 +21,7 @@ test('tijolo frisado: vazados físicos 2 por 4, juntas e escolha do perfil',()=>
  const smooth=visual.criar(calc('alvenaria',presets.aplicar('city-9-29',a)).scene,{detail:true});assert.ok(!smooth.elements.some(e=>e.label.includes('Friso')));
 });
 test('parede respeita vãos e módulos com junta; compra não depende do render',()=>{
- const r=calc('alvenaria',{perfilBloco:'ceramico-frisado',blocoEspessura:9}),s=visual.criar(r.scene);const blocks=s.elements.filter(e=>e.label.startsWith('Bloco'));
+ const r=calc('alvenaria',{perfilBloco:'ceramico-frisado',blocoEspessura:9,temAberturas:'sim',aberturas:[{tipo:'porta',largura:1,altura:2,quantidade:1}]}),s=visual.criar(r.scene);const blocks=s.elements.filter(e=>e.label.startsWith('Bloco'));
  assert.ok(blocks.length>10);assert.ok(blocks.every(e=>e.x>=1-1e-9||e.y>=2-1e-9));assert.equal(blocks[0].d,.09);
 });
 test('malha tem fios no passo informado e tubos têm seção aberta',()=>{

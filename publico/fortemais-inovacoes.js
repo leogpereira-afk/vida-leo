@@ -32,7 +32,7 @@ function fmInovacoesBotao(texto,click,classe='ghost') {
 function fmInovacoesNavegacao(m,visao,recarregar) {
   const nav=el('<nav class="fm-visoes" aria-label="Áreas da Fortemais"></nav>');
   let aAplicar=0;try{aAplicar=FortemaisInovacoesModelo.resumo(fmInovacoesDados()).aAplicar}catch(e){}
-  for(const [id,nome] of [['obras','Obras'],['inovacoes','Inovações'],['ferramentas','Ferramentas de IA'],['dicas','Dicas de obra']]){
+  for(const [id,nome] of [['obras','Obras'],['inovacoes','Inovações'],['ferramentas','Ferramentas de obra'],['dicas','Dicas de obra']]){
     const b=fmInovacoesBotao(nome,()=>{
       if(id===visao)return;
       if([...m.querySelectorAll('[data-fm-pagina]')].some(p=>p._fmDirty)){

@@ -41,3 +41,24 @@ test('renderer alterna conjunto, peça e massa usando o mesmo resultado',()=>{
  const detail=bar.children.find(b=>b.textContent==='Detalhe do produto');assert.equal(detail.hidden,false);assert.match(root.children[2].textContent,/Fiadas/);detail.emit('click');assert.match(root.children[2].textContent,/peça/);assert.equal(detail.textContent,'Ver conjunto');const layer=bar.children.find(b=>b.textContent==='Ocultar camada aplicada');layer.emit('click');assert.equal(layer.attrs['aria-pressed'],'false');detail.emit('click');assert.match(root.children[2].textContent,/Fiadas/);assert.equal(JSON.stringify(scene),before);api.update({elements:[]});assert.equal(detail.hidden,true);assert.equal(layer.hidden,true);api.destroy();
  }finally{globalThis.ResizeObserver=previous;}
 });
+test('faces internas entre blocos e juntas são removidas sem abrir a superfície externa',()=>{
+ const r=globalThis.FortemaisObra3D;assert.equal(typeof r.superficies,'function');
+ const b={kind:'box',x:0,y:0,z:0,w:1,h:1,d:.2};
+ const faces=r.superficies([b,{...b,x:1,w:.01},{...b,x:1.01}]);
+ assert.equal(faces.length,14); // 18 faces minus 4 touching faces
+ assert.ok(!faces.some(f=>[4,5].includes(f.face)&&f.points.every(p=>Math.abs(p[0]-1)<1e-8||Math.abs(p[0]-1.01)<1e-8)));
+ const partial=r.superficies([b,{...b,x:1,h:.5}]);
+ const exposed=partial.filter(f=>f.e===b&&f.face===5);
+ assert.equal(exposed.length,1);assert.ok(exposed[0].points.every(p=>p[1]>=.5));
+});
+await import('../publico/fortemais-ferramentas-modelo.js');
+for(const tool of globalThis.FortemaisFerramentasModelo.catalogo)test('exemplo '+tool.id+' chega ao canvas com desenho ou explicação explícita',()=>{
+ const previous=globalThis.ResizeObserver;globalThis.ResizeObserver=class{observe(){}disconnect(){}};
+ try{const {host,calls}=surface(),r=globalThis.FortemaisFerramentasModelo.calcular(tool.id,tool.exemplo),api=globalThis.FortemaisObra3D.montar(host,r.scene);
+ if(['consumo','produtividade'].includes(tool.id)){assert.ok(calls.some(c=>c[0]==='fillText'&&c[1]==='Sem modelo 3D para este cálculo.'));}else{const points=calls.filter(c=>['moveTo','lineTo'].includes(c[0]));assert.ok(points.length>2,tool.id);assert.ok(points.every(c=>c.slice(1).every(Number.isFinite)),tool.id);}
+ api.destroy();}finally{globalThis.ResizeObserver=previous;}
+});
+test('atualização preserva detalhe e mesma tela; troca explícita pode repor a vista',()=>{
+ const previous=globalThis.ResizeObserver;globalThis.ResizeObserver=class{observe(){}disconnect(){}};
+ try{const {host}=surface();const a={largura:2,altura:1,blocoComprimento:19,blocoAltura:19,blocoEspessura:9,juntaCm:1,perfilBloco:'ceramico-frisado'},scene={elements:[{kind:'box',x:0,y:0,z:0,w:2,h:1,d:.09}],product:{tool:'alvenaria',inputs:a}};const api=globalThis.FortemaisObra3D.montar(host,scene),root=host.children[0],bar=root.children[0],canvas=root.children[1];bar.children.find(b=>b.textContent==='Detalhe do produto').emit('click');api.update({...scene,product:{tool:'alvenaria',inputs:{...a,blocoComprimento:29}}},{preserveView:true});assert.equal(root.children[1],canvas);assert.ok(bar.children.find(b=>b.textContent==='Ver conjunto'));assert.match(root.children[2].textContent,/29\.0/);api.update(scene);assert.ok(bar.children.find(b=>b.textContent==='Detalhe do produto'));api.destroy();}finally{globalThis.ResizeObserver=previous;}
+});
