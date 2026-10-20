@@ -77,7 +77,7 @@ test('marketing UI: resposta de outra empresa e falha não viram métricas zerad
  }});
 test('marketing UI: valores externos não se transformam em HTML',async()=>{
  const x=retrato();x[0].valor.dados.ga4.canais[0].canal='<img src=x onerror=alert(1)>';
- const {document,m}=browser();m.montar(document.querySelector('main'),{empresa:'impresilk',api:async()=>resumirMarketing('impresilk',x,agora)});await flush();assert.equal(document.querySelector('img'),null);assert.match(document.querySelector('[data-tabelas]').textContent,/<img/);
+ const {document,m}=browser();m.montar(document.querySelector('main'),{empresa:'impresilk',api:async()=>resumirMarketing('impresilk',x,agora)});await flush();assert.equal(document.querySelector('img[onerror],img[src="x"]'),null);assert.match(document.querySelector('[data-tabelas]').textContent,/<img/);
 });
 test('marketing: navegação lateral e atalho Fortemais abrem a área integrada',async()=>{
  const {run,document,ctx}=setup();ctx.resposta=resumirMarketing('fortemais',[],agora);

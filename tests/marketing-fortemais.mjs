@@ -61,7 +61,7 @@ test('Fortemais UI: editar preserva campos após falha e confirmação de cadast
  falhar=false;await form.onsubmit({preventDefault(){}});assert.equal(payload.empresa,'fortemais');assert.equal(controle.podeAtualizar(),true);assert.match(document.querySelector('[role=status]').textContent,/Cadastro salvo/);assert.match(document.querySelector('.fmkt-admin-grid').textContent,/Sem coleta confirmada/);
 });
 test('Fortemais UI: strings externas não executam HTML, editar impede perda em navegação',()=>{
- const x=linhas();x[1].valor.fontes.ga4.responsavel='<img src=x onerror=alert(1)>';const {document}=ui(detalharFortemais(x,agora));document.querySelector('.fmkt-tabs [data-aba=admin]').click();assert.equal(document.querySelector('img'),null);
+ const x=linhas();x[1].valor.fontes.ga4.responsavel='<img src=x onerror=alert(1)>';const {document}=ui(detalharFortemais(x,agora));document.querySelector('.fmkt-tabs [data-aba=admin]').click();assert.equal(document.querySelector('img[onerror],img[src="x"]'),null);
  document.querySelector('[data-editar=ga4]').click();document.querySelector('[name=conta]').value='nova@example.test';document.querySelector('.fmkt-tabs [data-aba=ga4]').click();assert.equal(document.querySelector('[name=conta]').value,'nova@example.test');assert.match(document.querySelector('[role=status]').textContent,/Salve ou cancele/);
 });
 
@@ -78,4 +78,33 @@ test('Fortemais UI: separa autorização bloqueada, autorizada e dados coletados
  document.querySelector('.fmkt-tabs [data-aba=instagram]').click();
  assert.match(document.querySelector('.fmkt-corpo').textContent,/Autorizado · falta validar coleta/);
  assert.match(document.querySelector('.fmkt-corpo').textContent,/Sem coleta confirmada/);
+});
+
+test('Marketing visual: comparação exige períodos adjacentes completos, mesma duração e base positiva',()=>{
+ const {m}=ui();const atual={inicio:'2026-06-08',fim:'2026-06-14',completo:true,metricas:{usuarios:150}};
+ const anterior={inicio:'2026-06-01',fim:'2026-06-07',completo:true,metricas:{usuarios:100}};
+ const f={estado:'ok',atrasado:false,periodos:[atual,anterior]};
+ assert.equal(m.compararPeriodo(f,atual,'usuarios').percentual,.5);
+ for(const v of [0,null,undefined])assert.equal(m.compararPeriodo({...f,periodos:[atual,{...anterior,metricas:{usuarios:v}}]},atual,'usuarios'),null);
+ for(const q of [{...anterior,completo:false},{...anterior,inicio:'2026-05-31'},{...anterior,fim:'2026-06-06'}])assert.equal(m.compararPeriodo({...f,periodos:[atual,q]},atual,'usuarios'),null);
+ assert.equal(m.compararPeriodo(f,{...atual,completo:false},'usuarios'),null);
+ assert.equal(m.compararPeriodo({...f,atrasado:true},atual,'usuarios'),null);
+ assert.equal(m.compararPeriodo({...f,estado:'parcial'},atual,'usuarios'),null);
+ assert.equal(m.compararPeriodo(f,{...atual,metricas:{usuarios:null}},'usuarios'),null);
+});
+test('Marketing visual: visão geral mostra seis canais sem somar métricas e preserva zero nos detalhes',()=>{
+ const {document}=ui();assert.equal(document.querySelectorAll('[data-canal]').length,6);
+ document.querySelector('.fmkt-tabs [data-aba=ga4]').click();
+ const extras=document.querySelector('.fmkt-extra');assert.ok(extras);assert.match(extras.textContent,/Eventos principais0Período consolidado/);
+ assert.ok(document.querySelectorAll('.fmkt-ausente').length>0);
+ assert.equal(document.querySelectorAll('.fmkt-kpis')[0].children.length,4);
+});
+test('Marketing visual: destaque ordena até cinco registros recebidos, escapa texto e não muda a tabela',()=>{
+ const x=linhas(),p=x[0].valor.fontes.ga4.periodos[0];p.tabelas.paginas=Array.from({length:7},(_,i)=>({nome:i===6?'<img src=x onerror=alert(1)>':'/pagina-'+i,visualizacoes:i*10}));
+ const {document}=ui(detalharFortemais(x,agora));document.querySelector('.fmkt-tabs [data-aba=ga4]').click();
+ assert.equal(document.querySelectorAll('.fmkt-ranking li').length,5);
+ assert.equal(document.querySelector('.fmkt-ranking strong').textContent,'60');
+ assert.match(document.querySelector('.fmkt-ranking').textContent,/<img/);
+ assert.equal(document.querySelector('img[onerror]'),null);
+ assert.equal(document.querySelector('.fmkt-table tbody').children.length,7);
 });
