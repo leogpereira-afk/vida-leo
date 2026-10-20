@@ -45,12 +45,12 @@ test('Fortemais: rota de administração exige dono, uso e empresa exatos',async
  const executar=new Function('req','crachaPayload','DONO','json','salvarAdminFortemais','sb','corpo','acao',`return (async()=>{${parte}})()`);const json=(x,status=200)=>new Response(JSON.stringify(x),{status});let salvos=0;
  const salvar=async()=>{salvos++;return {ok:true}};
  for(const p of [null,{uso:'oauth',sub:'dono',papel:'dono'},{uso:'',sub:'outro',papel:'dono'},{uso:'',sub:'dono',papel:'equipe'}])assert.equal((await executar(new Request('https://example.test'),async()=>p,'dono',json,salvar,{}, {empresa:'fortemais'},'marketingAdministracao')).status,401);
- const p={uso:'',sub:'dono',papel:'dono'};assert.equal((await executar(new Request('https://example.test'),async()=>p,'dono',json,salvar,{}, {empresa:'impresilk'},'marketingAdministracao')).status,400);assert.equal(salvos,0);
+ const p={uso:'',sub:'dono',papel:'dono'};assert.equal((await executar(new Request('https://example.test'),async()=>p,'dono',json,salvar,{}, {empresa:'desconhecida'},'marketingAdministracao')).status,400);assert.equal(salvos,0);
  const r=await executar(new Request('https://example.test'),async()=>p,'dono',json,salvar,{}, {empresa:'fortemais'},'marketingAdministracao');assert.equal(r.status,200);assert.equal(salvos,1);assert.equal(r.headers.get('Cache-Control'),'no-store');
 });
 test('Fortemais UI: sete áreas, período explícito, catálogo completo e resumo fiel',()=>{
  const {document,m}=ui();assert.equal(document.querySelectorAll('.fmkt-tabs button').length,7);
- for(const [id,def] of Object.entries(CATALOGO)){document.querySelector('.fmkt-tabs [data-aba="'+(id.endsWith('_ads')?'anuncios':id)+'"]').click();assert.match(document.querySelector('.fmkt-corpo').textContent,new RegExp(def.nome));}
+ for(const [id,def] of Object.entries(CATALOGO).filter(([id])=>!['facebook','pixel','linkedin','pinterest'].includes(id))){document.querySelector('.fmkt-tabs [data-aba="'+(id.endsWith('_ads')?'anuncios':id)+'"]').click();assert.match(document.querySelector('.fmkt-corpo').textContent,new RegExp(def.nome));}
  document.querySelector('.fmkt-tabs [data-aba="visao"]').click();document.querySelector('[data-fm-resumo]').click();assert.match(document.querySelector('textarea').value,/Visitantes ativos: 10/);assert.match(document.querySelector('textarea').value,/01\/06\/2026 a 07\/06\/2026/);assert.doesNotMatch(document.querySelector('textarea').value,/SEGREDO/);
  assert.match(m.valor(15,'moeda'),/moeda não informada/);assert.match(m.valor(15,'moeda','USD'),/US\$/);assert.equal(m.valor(null),'—');assert.equal(m.valor(0), '0');
 });

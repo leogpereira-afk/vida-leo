@@ -341,7 +341,7 @@ Deno.serve(async (req: Request) => {
       const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
       const p = await crachaPayload(t);
       if (!p || p.uso !== "" || p.sub.toLowerCase() !== DONO || p.papel !== "dono") return json({erro:"Não autorizado"},401);
-      if (!["fortemais","domo"].includes(corpo.empresa)) return json({erro:"Empresa inválida"},400);
+      if (!["fortemais","domo","minaslab"].includes(corpo.empresa)) return json({erro:"Empresa inválida"},400);
       const direto=criarDireto({empresa:corpo.empresa,banco:bancoDireto(sb,corpo.empresa),env:(n:string)=>Deno.env.get(n)});
       try {
         const r = acao === "marketingDiretoStatus" ? await direto.status() :
@@ -360,7 +360,7 @@ Deno.serve(async (req: Request) => {
       const t = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
       const p = await crachaPayload(t);
       if (!p || p.uso !== "" || p.sub.toLowerCase() !== DONO || p.papel !== "dono") return json({erro:"Não autorizado"},401);
-      if (!["fortemais","domo"].includes(corpo.empresa)) return json({erro:"Empresa inválida"},400);
+      if (!["fortemais","domo","minaslab","impresilk"].includes(corpo.empresa)) return json({erro:"Empresa inválida"},400);
       try {
         const resposta = json(await salvarAdminFortemais(sb, corpo.administracao, corpo.empresa));
         resposta.headers.set("Cache-Control", "no-store");

@@ -1,3 +1,4 @@
+import {detalharImpresilk} from './marketing-impresilk.mjs';
 import {CHAVE_FORTEMAIS, CHAVE_ADMIN, detalharFortemais} from './marketing-fortemais.mjs';
 // Resumo de leitura para o dono da Central. Nunca retorna tokens, público,
 // comentários, contatos nem o cache bruto. A origem tem vínculo fixo por empresa.
@@ -69,13 +70,13 @@ export function resumirMarketing(empresa,linhas,agora=Date.now()){
   // herdam seu cache. A configuração e autorização delas são uma etapa separada.
   return {ok:true,empresa:marca,empresas:EMPRESAS,lidoEm:new Date(agora).toISOString(),
     fontes:['site','google','instagram'].map(tipo=>fonte(tipo,porChave.get(tipo==='instagram'?config.meta:config.google),config,agora)),
-    ...(['fortemais','domo'].includes(empresa)?{detalhe:detalharFortemais(linhas,agora,empresa)}:{})};
+    ...(['fortemais','domo','minaslab'].includes(empresa)?{detalhe:detalharFortemais(linhas,agora,empresa)}:empresa==='impresilk'?{detalhe:detalharImpresilk(linhas,agora)}:{})};
 }
 
 export async function lerMarketing(sb,empresa,agora=Date.now()){
   if(!EMPRESAS.some(x=>x.id===empresa))throw Error('Empresa inválida.');
   const config=CONFIG[empresa]||{};
-  const chaves=['fortemais','domo'].includes(empresa)?['leo_marketing_'+empresa,'leo_marketing_'+empresa+'_admin',...["ga4","search","perfil","instagram","meta_ads","google_ads"].map(f=>"leo_marketing_"+empresa+"_direto_"+f)]:[config.google,config.meta].filter(Boolean);
+  const chaves=['fortemais','domo','minaslab'].includes(empresa)?['leo_marketing_'+empresa,'leo_marketing_'+empresa+'_admin',...["ga4","search","perfil","instagram","meta_ads","google_ads"].map(f=>"leo_marketing_"+empresa+"_direto_"+f)]:empresa==='impresilk'?['mkt_fonte_google','mkt_fonte_meta','mkt_fonte_google_ads','mkt_fonte_linkedin','mkt_fonte_pinterest','leo_marketing_impresilk_admin']:[config.google,config.meta].filter(Boolean);
   if(!chaves.length)return resumirMarketing(empresa,[],agora);
   const {data,error}=await sb.from('painel_cache').select('chave,valor').in('chave',chaves);
   if(error)throw Error('Não foi possível consultar os indicadores. Tente novamente.');

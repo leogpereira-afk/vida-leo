@@ -2,7 +2,12 @@ import {marcaMarketing} from './marketing-marcas.mjs';
 // Projeção privada por empresa. Dados de outras empresas nunca são fallback.
 export const CHAVE_FORTEMAIS = 'leo_marketing_fortemais';
 export const CHAVE_ADMIN = 'leo_marketing_fortemais_admin';
+export const CANAIS_DIRETOS=['ga4','search','perfil','instagram','google_ads','meta_ads'];
 export const CATALOGO = Object.freeze({
+ facebook:{nome:'Facebook',metricas:['alcance','visualizacoes','interacoes','cliques','visitas_perfil','novos_seguidores'],tabelas:{}},
+ pixel:{nome:'Pixel Meta',metricas:['eventos','pageview','lead','contact'],tabelas:{eventos:['eventos']}},
+ linkedin:{nome:'LinkedIn',metricas:['impressoes','cliques','reacoes','comentarios','compartilhamentos','seguidores','visitas'],tabelas:{}},
+ pinterest:{nome:'Pinterest',metricas:['impressoes','cliques','salvamentos','cliques_saida','alcance'],tabelas:{}},
  ga4:{nome:'Site',metricas:['usuarios','novos_usuarios','sessoes','sessoes_engajadas','taxa_engajamento','tempo_engajamento','visualizacoes','eventos','eventos_chave','cliques_whatsapp','formularios'],tabelas:{paginas:['visualizacoes','usuarios'],canais:['sessoes','eventos_chave'],cidades:['usuarios'],dispositivos:['usuarios'],eventos:['eventos']}},
  search:{nome:'Busca Google',metricas:['cliques','impressoes','ctr','posicao'],tabelas:{consultas:['cliques','impressoes','ctr','posicao'],paginas:['cliques','impressoes','ctr','posicao'],paises:['cliques','impressoes'],dispositivos:['cliques','impressoes']}},
  perfil:{nome:'Perfil da Empresa',metricas:['impressoes_busca','impressoes_maps','cliques_site','ligacoes','rotas','conversas','reservas'],tabelas:{termos:['impressoes']}},
@@ -22,17 +27,18 @@ function metricas(x,chaves){return Object.fromEntries(chaves.map(k=>[k,numero(x?
 function intervalo(p){const inicio=dia(p?.inicio),fim=dia(p?.fim);return inicio&&fim&&inicio<=fim?{inicio,fim}:null}
 function vinculo(id,f,marca){
  if(f?.empresa!==marca.id)return false;
+ if(['facebook','pixel','linkedin','pinterest'].includes(id))return f.identidade?.vinculo_confirmado===true;
  if(id==='instagram')return f.identidade?.usuario?.toLowerCase()===marca.instagram;
  if(id==='ga4'||id==='search'||id==='perfil')return host(f.identidade?.site)===marca.host;
  // Mídia paga: conta deve ter sido vinculada pelo dono; o nome não prova empresa.
  return f.identidade?.vinculo_confirmado===true&&typeof f.identidade?.conta==='string'&&/^\d[\d-]{2,40}$/.test(f.identidade.conta);
 }
-function projetarFonte(id,bruto,agora,marca){
+export function projetarFonte(id,bruto,agora,marca){
  const c=CATALOGO[id],base={id,nome:c.nome,estado:'pendente',coletadoEm:null,atrasado:false,identidade:'',moeda:null,periodos:[],avisos:[]};
  if(!bruto)return base;
  if(!vinculo(id,bruto,marca))return {...base,estado:'vinculo_divergente'};
  const coletadoEm=instante(bruto.coletadoEm),estado=estados.includes(bruto.estado)?bruto.estado:'erro';
- const f={...base,estado,coletadoEm,moeda:/^[A-Z]{3}$/.test(bruto.moeda||'')?bruto.moeda:null,atrasado:!!coletadoEm&&agora-Date.parse(coletadoEm)>48*3600000,identidade:id==='instagram'?'@'+marca.instagram:id.endsWith('_ads')?'Conta '+bruto.identidade.conta:marca.host};
+ const f={...base,estado,coletadoEm,moeda:/^[A-Z]{3}$/.test(bruto.moeda||'')?bruto.moeda:null,atrasado:!!coletadoEm&&agora-Date.parse(coletadoEm)>48*3600000,identidade:id==='instagram'?'@'+marca.instagram:id.endsWith('_ads')?'Conta '+bruto.identidade.conta:['facebook','pixel','linkedin','pinterest'].includes(id)?texto(bruto.identidade.nome)||marca.nome:marca.host};
  if(!coletadoEm||Date.parse(coletadoEm)>agora+300000)return {...f,estado:'erro',coletadoEm:null};
  if(!['ok','parcial'].includes(estado))return f;
  const vistos=new Set();
@@ -49,8 +55,8 @@ function projetarFonte(id,bruto,agora,marca){
  return f;
 }
 const campos=['responsavel','conta','ativo','observacao'];
-export function limparAdmin(entrada){
- const fontes={};for(const id of Object.keys(CATALOGO)){
+export function limparAdmin(entrada,empresa='fortemais'){
+ const fontes={};for(const id of empresa==='impresilk'?Object.keys(CATALOGO):CANAIS_DIRETOS){
   const r=entrada?.fontes?.[id]||{};
   fontes[id]={...Object.fromEntries(campos.map(k=>[k,texto(r[k])])),situacao:progressos.includes(r.situacao)?r.situacao:'nao_verificado'};
  }
@@ -59,10 +65,10 @@ export function limparAdmin(entrada){
 export function detalharFortemais(linhas,agora=Date.now(),empresa='fortemais'){
  const marca=marcaMarketing(empresa),chave='leo_marketing_'+empresa;
  const map=new Map(arr(linhas).map(r=>[r.chave,r.valor]));const dados=map.get(chave);
- return {versao:1,fontes:Object.keys(CATALOGO).map(id=>projetarFonte(id,map.get(chave+'_direto_'+id)||(dados?.empresa===marca.id?dados.fontes?.[id]:null),agora,marca)),administracao:limparAdmin(map.get(chave+'_admin'))};
+ return {versao:1,fontes:CANAIS_DIRETOS.map(id=>projetarFonte(id,map.get(chave+'_direto_'+id)||(dados?.empresa===marca.id?dados.fontes?.[id]:null),agora,marca)),administracao:limparAdmin(map.get(chave+'_admin'),empresa)};
 }
 export async function salvarAdminFortemais(sb,entrada,empresa='fortemais'){
  marcaMarketing(empresa);
- const admin=limparAdmin(entrada);const {error}=await sb.from('painel_cache').upsert({chave:'leo_marketing_'+empresa+'_admin',valor:admin,atualizado_em:new Date().toISOString()},{onConflict:'chave'});
+ const admin=limparAdmin(entrada,empresa);const {error}=await sb.from('painel_cache').upsert({chave:'leo_marketing_'+empresa+'_admin',valor:admin,atualizado_em:new Date().toISOString()},{onConflict:'chave'});
  if(error)throw Error('Não foi possível salvar a administração.');return {ok:true,administracao:admin};
 }
