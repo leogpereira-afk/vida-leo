@@ -14,3 +14,10 @@ test('auditoria: consolidar não compra embalagem adicional por erro decimal',()
 test('auditoria: mesma especificação agrupa apesar de ordem diferente nas linhas',()=>{const mat=(code)=>({code,nome:'Tubo',spec:'PVC 25',unit:'m',liquido:2,comPerda:2,embalagem:6,unidadeEmbalagem:'barras'});let a=M.salvar(undefined,{...draft,result:{materiais:[mat('hidraulica-0')]}},null,ctx);a=M.salvar(a,{...draft,elementoId:'P2',result:{materiais:[mat('hidraulica-1')]}},null,{id:'s2'});assert.equal(M.consolidar(a).length,1);assert.equal(M.consolidar(a)[0].liquido,4)});
 
 test('auditoria: perda consolidada pondera quantidades com percentuais diferentes',()=>{const mat=(q,p)=>({nome:'Areia',spec:'Média',unit:'m³',liquido:q,comPerda:q*(1+p/100),perdaPct:p});let a=M.salvar(undefined,{...draft,result:{materiais:[mat(10,10)]}},null,ctx);a=M.salvar(a,{...draft,elementoId:'P2',result:{materiais:[mat(30,20)]}},null,{id:'s2'});const r=M.consolidar(a)[0];assert.equal(r.liquido,40);assert.equal(r.compra,47);assert.ok(Math.abs(r.perdaPct-17.5)<1e-9)});
+
+test('salvar histórico válido com lacunas mantém números anteriores e cria versão crescente',()=>{
+ const a=M.salvar(undefined,draft,null,ctx);a.simulacoes[0].versoes[0].numero=2;a.simulacoes[0].ativa=2;
+ M.validar(a);const before=JSON.stringify(a);
+ const b=M.salvar(a,{...draft,inputs:{area:4}},'s1',{expected:2});
+ assert.equal(b.simulacoes[0].ativa,3);assert.deepEqual(b.simulacoes[0].versoes.map(v=>v.numero),[2,3]);assert.equal(JSON.stringify(a),before);
+});

@@ -74,3 +74,53 @@ test('auditoria: ciclo completo das 25 ferramentas preserva entrada, versões e 
 });
 test('auditoria: salvar edição atual não esquece rascunho de outra ferramenta',()=>{const {c}=setup();vm.runInContext(fs.readFileSync(new URL('../publico/fortemais-ferramentas-modelo.js',import.meta.url),'utf8'),c);const p=c.fmFerramentasPainel();p.querySelector('[name="largura"]').value='6';p.querySelector('[name="largura"]').oninput();p.querySelector('[data-category="terra"]').click();p.querySelector('[data-action="exemplo"]').click();for(const [key,value]of Object.entries({nome:'Terra teste',ambiente:'Teste',etapa:'terra',elementoId:'T1'}))p.querySelector('[name="'+key+'"]').value=value;p.querySelector('[data-action="salvar"]').click();assert.equal(p._fmDirty,true);assert.match(p.querySelector('.fmf-pending').textContent,/Blocos e alvenaria/);p.querySelector('[data-category="alvenaria"]').click();assert.equal(p.querySelector('[name="largura"]').value,'6');p.querySelector('[data-action="limpar"]').click();assert.equal(p._fmDirty,false)});
 test('auditoria: atualização automática preserva detalhes abertos do resultado',()=>{const {c}=setup();const p=c.fmFerramentasPainel();p.querySelector('[data-action="exemplo"]').click();const detail=[...p.querySelectorAll('.fmf-results details')].find(d=>d.querySelector('summary').textContent==='Memória de cálculo');detail.open=true;detail.setAttribute('open','');const input=p.querySelector('[name="area"]');input.value='3';input.oninput();c.flushUpdates();const updated=[...p.querySelectorAll('.fmf-results details')].find(d=>d.querySelector('summary').textContent==='Memória de cálculo');assert.equal(updated.hasAttribute('open'),true)});
+
+test('retomar obra ausente preserva o ID no novo salvamento sem vincular pelo nome',()=>{
+ const {c}=setup();c.E.obras=[{id:'outra-obra',nome:'Mesmo nome'}];
+ c.E.fortemaisApoio=c.FortemaisApoioModelo.salvar(undefined,{nome:'Mesmo nome',obraId:'obra-ausente',toolId:'piso',inputs:{}},null,{id:'registro'});
+ const p=c.fmFerramentasPainel();[...p.querySelectorAll('.fmf-saved button')].find(b=>b.textContent==='Retomar').click();
+ assert.equal(p.querySelector('[name="obraId"]').value,'obra-ausente');
+ assert.match(p.querySelector('[name="obraId"]').textContent,/não encontrada/);
+ p.querySelector('[data-action="rascunho"]').click();
+ assert.equal(c.E.fortemaisApoio.simulacoes[0].versoes.at(-1).obraId,'obra-ausente');
+});
+
+test('retomar rascunho incompleto não herda ambiente e elemento de outra edição',()=>{
+ const {c}=setup();c.E.fortemaisApoio=c.FortemaisApoioModelo.salvar(undefined,{nome:'Rascunho antigo',obraId:null,toolId:'piso',inputs:{}},null,{id:'rascunho'});
+ const p=c.fmFerramentasPainel();for(const key of ['ambiente','etapa','elementoId'])p.querySelector('[name="'+key+'"]').value='De outra edição';
+ [...p.querySelectorAll('.fmf-saved button')].find(b=>b.textContent==='Retomar').click();
+ for(const key of ['ambiente','etapa','elementoId'])assert.equal(p.querySelector('[name="'+key+'"]').value,'',key);
+ p.querySelector('[data-action="rascunho"]').click();assert.equal(c.E.fortemaisApoio.simulacoes[0].versoes.at(-1).ambiente,null);
+});
+
+test('lista salva filtra obra por ID e situação sem alterar dados ou compras',()=>{
+ const {c}=setup();const M=c.FortemaisApoioModelo;c.E.obras.push({id:'obra-2',nome:'Obra fictícia'});
+ const add=(id,obraId,nome,extra={})=>{c.E.fortemaisApoio=M.salvar(c.E.fortemaisApoio,{nome,obraId,toolId:'piso',ambiente:id,etapa:'pisos',elementoId:id,inputs:{},...extra},null,{id})};
+ add('s1','obra-1','Sala térrea',{result:{materiais:[]}});add('s2','obra-2','Parede cozinha');add('s3',null,'Alternativa',{incluirCompra:false});add('s4','obra-1','Antiga');c.E.fortemaisApoio=M.arquivar(c.E.fortemaisApoio,'s4');
+ const before=JSON.stringify(c.E);const p=c.fmFerramentasPainel();const rows=()=>[...p.querySelectorAll('.fmf-saved')];
+ assert.equal(rows().length,3);assert.match(rows().find(r=>r.textContent.includes('Sala térrea')).textContent,/Obra fictícia/);
+ const select=(name,value)=>{const el=p.querySelector('[name="'+name+'"]');assert.ok(el);el.querySelector('option[value="'+value+'"]').selected=true;el.onchange()};
+ select('simulacoesObra','obra-1');assert.equal(rows().length,1);assert.match(rows()[0].textContent,/Sala térrea/);
+ select('simulacoesSituacao','arquivadas');assert.equal(rows().length,1);assert.match(rows()[0].textContent,/Antiga/);
+ select('simulacoesObra','');select('simulacoesSituacao','todas');
+ const search=p.querySelector('[aria-label="Buscar simulação salva"]');assert.ok(search);search.value='terrea';search.oninput();assert.equal(rows().length,1);assert.match(rows()[0].textContent,/Sala térrea/);
+ search.value='nada-xyz';search.oninput();assert.equal(rows().length,0);assert.match(p.textContent,/Nenhuma simulação neste filtro/);
+ assert.equal(JSON.stringify(c.E),before);
+});
+
+test('compras por obra excluem alternativas e arquivos mesmo ao filtrar a lista',()=>{
+ const {c}=setup();const M=c.FortemaisApoioModelo;c.E.obras.push({id:'obra-2',nome:'Segunda obra'});
+ const add=(id,obraId,q,extra={})=>{c.E.fortemaisApoio=M.salvar(c.E.fortemaisApoio,{nome:id,obraId,toolId:'piso',ambiente:id,etapa:'Pisos',elementoId:id,inputs:{},result:{materiais:[{nome:'Revestimento',spec:'A',unit:'m²',liquido:q,comPerda:q,embalagem:2}]},...extra},null,{id})};
+ add('principal','obra-1',3);add('outra','obra-2',8);add('alternativa','obra-1',40,{incluirCompra:false});add('arquivada','obra-1',100);c.E.fortemaisApoio=M.arquivar(c.E.fortemaisApoio,'arquivada');
+ const before=JSON.stringify(c.E);const p=c.fmFerramentasPainel();const select=(name,v)=>{const field=p.querySelector('[name="'+name+'"]');field.querySelector('option[value="'+v+'"]').selected=true;field.onchange()};
+ select('consolidarObra','obra-1');const purchase=p.querySelector('[name="consolidarObra"]').closest('details');assert.match(purchase.textContent,/2 embalagens/);assert.match(purchase.textContent,/4 m²/);
+ select('simulacoesSituacao','arquivadas');assert.equal(p.querySelectorAll('.fmf-saved').length,1);assert.match(purchase.textContent,/4 m²/);
+ select('consolidarObra','obra-2');assert.match(purchase.textContent,/8 m²/);assert.equal(JSON.stringify(c.E),before);
+});
+
+test('comparação exige duas escolhas visíveis e limpa seleção ao mudar filtro',()=>{
+ const {c}=setup();const M=c.FortemaisApoioModelo;for(const id of ['Um','Dois','Três'])c.E.fortemaisApoio=M.salvar(c.E.fortemaisApoio,{nome:id,obraId:null,toolId:'piso',inputs:{}},null,{id});
+ const p=c.fmFerramentasPainel(),compare=[...p.querySelectorAll('button')].find(b=>b.textContent==='Comparar duas'),checks=[...p.querySelectorAll('.fmf-saved>input')];
+ const mark=i=>{checks[i].checked=true;checks[i].onchange()};assert.equal(compare.disabled,true);mark(0);assert.equal(compare.disabled,true);mark(1);assert.equal(compare.disabled,false);mark(2);assert.equal(compare.disabled,true);
+ const search=p.querySelector('[aria-label="Buscar simulação salva"]');search.value='Um';search.oninput();assert.equal(compare.disabled,true);assert.equal(p.querySelectorAll('.fmf-saved').length,1);assert.ok(!p.querySelector('.fmf-saved>input').checked);
+});
