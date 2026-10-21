@@ -69,3 +69,47 @@ test('prévia local não consulta token nem provoca recarga por sessão ausente'
  const {run}=setup();run("apiSync=async()=>{throw Error('não deveria consultar servidor')}");
  assert.equal(await run('googleCrachaDoServidor()'),false);
 });
+
+test('abrir o Drive apenas verifica o servidor, sem abrir login automaticamente',async()=>{
+ const {run,document}=setup({hostname:'central.example.test'});
+ run("window.__popups=0;apiSync=async()=>({precisaAutorizar:true});carregarGis=async()=>{window.__popups++;throw Error('popup inesperado')};tela=()=>{};atual='drive';driveAutoTentado=false;vDrive(document.getElementById('main'))");
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(run('window.__popups'),0);
+ run("vDrive(document.getElementById('main'))");
+ assert.match(document.getElementById('main').textContent,/Conectar Google/);
+});
+
+test('conexão permanente não aceita token vencido nem mantém escopo retirado',async()=>{
+ const run=app({token:'tk',vence,escopo:'https://www.googleapis.com/auth/gmail.readonly'});
+ await run('googleCrachaDoServidor()');
+ run("apiSync=async()=>({token:'tk2',vence:"+JSON.stringify(vence)+",escopo:'https://www.googleapis.com/auth/drive.readonly'})");
+ await run('googleCrachaDoServidor()');
+ assert.equal(run("googleConectado('gmail')"),false);
+ assert.equal(run('_gmailToken'),'');
+ run("apiSync=async()=>({token:'velho',vence:'2020-01-01T00:00:00Z',escopo:'https://www.googleapis.com/auth/drive.readonly'})");
+ assert.equal(await run('googleCrachaDoServidor()'),false);
+ assert.equal(run("googleConectado('drive')"),false);
+});
+
+test('Gmail oferece conexão que persiste e identifica a origem da sessão',async()=>{
+ const {run,document}=setup({hostname:'central.example.test'});
+ run("window.__autorizou=0;driveAutorizarNoGoogle=async()=>{window.__autorizou++};document.getElementById('main').appendChild(blocoGoogle('gmail'))");
+ const button=[...document.querySelectorAll('#main button')].find(b=>b.textContent==='Conectar Google');
+ assert.ok(button,'conexão permanente deve estar visível');
+ button.click();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(run('window.__autorizou'),1);
+ run("googleSessao.gmail={token:'tk',vence:Date.now()+3600000,origem:'servidor'};document.getElementById('main').replaceChildren(blocoGoogle('gmail'))");
+ assert.match(document.getElementById('main').textContent,/Reconexão automática/);
+ assert.doesNotMatch(document.getElementById('main').textContent,/Conectado nesta sessão/);
+});
+
+test('desconectar a autorização compartilhada limpa todos os serviços somente após confirmação do servidor',async()=>{
+ const run=app({token:'tk',vence,escopo:'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/calendar.readonly'});
+ await run('googleCrachaDoServidor()');
+ run("apiSync=async()=>{throw Error('sem resposta')};tela=()=>{}");
+ await assert.rejects(run('googleDesconectarTudo()'),/sem resposta/);
+ assert.equal(run("googleConectado('gmail')"),true);
+ run("apiSync=async()=>({ok:true})");await run('googleDesconectarTudo()');
+ for(const s of ['drive','gmail','agenda'])assert.equal(run(`googleConectado('${s}')`),false);
+ assert.equal(run('_gmailToken'),'');
+});

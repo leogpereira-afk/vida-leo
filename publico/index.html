@@ -682,7 +682,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./rendimentos-dashboards.css?v=ce16ccc09d43">
 <link rel="stylesheet" href="./gastos-painel.css?v=5715594d8373">
 <link rel="stylesheet" href="./fortemais-visual.css?v=4b49bedcb0e5">
-<link rel="stylesheet" href="./central-densidade.css?v=62f8fcaa093c">
+<link rel="stylesheet" href="./central-densidade.css?v=3f6974593cc3">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -8123,26 +8123,31 @@ function googleConectado(servico){return !!googleSessao[servico]?.token&&googleS
    eu levantar exatamente isso. */
 const GOOGLE_ESCOPO_DE={gmail:'gmail.readonly',agenda:'calendar.readonly',agendaEnviar:'calendar.app.created',drive:'drive.readonly'};
 let googleCrachaPedido=null;
+let googleConexaoErro='';
+function googleLimparServidor(){for(const serv in googleSessao)if(googleSessao[serv]?.origem==='servidor'){googleSessao[serv]=null;if(serv==='gmail')_gmailToken=''}}
 async function googleCrachaDoServidor(){
   if(DEV)return false; // Prévia local não solicita credenciais do servidor.
   if(googleCrachaPedido)return googleCrachaPedido;
   googleCrachaPedido=apiSync('POST',{acao:'googleToken'}).then(r=>{
+    googleConexaoErro='';
+    googleLimparServidor();
     if(!r||!r.token)return false;
-    const vence=Date.parse(r.vence),quando=Number.isFinite(vence)?vence:Date.now()+3000e3;
-    const concedidos=String(r.escopo||'');
+    const quando=Date.parse(r.vence);
+    if(!Number.isFinite(quando)||quando<=Date.now()+30000)return false;
+    const concedidos=String(r.escopo||'').split(/\s+/).filter(Boolean);
     let algum=false;
     for(const serv in GOOGLE_ESCOPO_DE){
       /* Autorização antiga não trazia a lista de escopos: nela só o Drive foi
          concedido, e é só ele que vale. Assumir o resto encheria a tela de 403
          sem explicação. */
-      const vale=concedidos?concedidos.includes(GOOGLE_ESCOPO_DE[serv]):serv==='drive';
+      const vale=concedidos.length?concedidos.includes(GOOGLE_ESCOPOS[serv]):serv==='drive';
       if(!vale)continue;
-      googleSessao[serv]={token:r.token,vence:quando};
+      googleSessao[serv]={token:r.token,vence:quando,origem:'servidor'};
       if(serv==='gmail')_gmailToken=r.token;
       algum=true;
     }
     return algum;
-  }).catch(()=>false).finally(()=>{googleCrachaPedido=null});
+  }).catch(()=>{googleConexaoErro='Não foi possível verificar a conexão salva. Tente atualizar a conexão.';return false}).finally(()=>{googleCrachaPedido=null});
   return googleCrachaPedido;
 }
 
@@ -8157,7 +8162,7 @@ async function conectarGoogle(servico){
       callback:r=>{
         if(r.error)return erro(new Error(r.error_description||r.error));
         if(!r.access_token||!google.accounts.oauth2.hasGrantedAllScopes(r,GOOGLE_ESCOPOS[servico]))return erro(new Error('Autorize as permissões solicitadas para concluir a conexão.'));
-        googleSessao[servico]={token:r.access_token,vence:Date.now()+(Number(r.expires_in)||3600)*1000};
+        googleSessao[servico]={token:r.access_token,vence:Date.now()+(Number(r.expires_in)||3600)*1000,origem:'sessao'};
         if(servico==='gmail')_gmailToken=r.access_token;
         ok(r.access_token);
       },error_callback:e=>erro(new Error(e?.type==='popup_closed'?'A janela foi fechada antes de concluir.':'Permita a janela do Google e tente novamente.'))});
@@ -8169,6 +8174,7 @@ async function pedirTokenGmail(){return conectarGoogle('gmail')}
    quem quer os bytes (PDF, imagem, planilha do Drive) chama googleFetch. */
 const GOOGLE_NOMES={gmail:'Gmail',agenda:'Google Agenda',agendaEnviar:'Google Agenda',drive:'Google Drive'};
 async function googleFetch(servico,caminho,tempo=20000,sinal=null){
+  if(!googleConectado(servico))await googleCrachaDoServidor();
   if(!googleConectado(servico))throw new Error('Conecte ou renove o acesso ao Google antes de consultar.');
   const limite=AbortSignal.timeout(tempo);
   const signal=sinal&&AbortSignal.any?AbortSignal.any([limite,sinal]):limite;
@@ -8196,16 +8202,60 @@ async function googleFetch(servico,caminho,tempo=20000,sinal=null){
 async function googleLer(servico,caminho){return (await googleFetch(servico,caminho)).json()}
 async function gmailApi(caminho){return googleLer('gmail',caminho)}
 function desligarGoogle(servico){googleSessao[servico]=null;if(servico==='gmail')_gmailToken='';tela()}
+function googleEstadoTexto(servico){
+  if(!googleConectado(servico))return 'Aguardando autorização';
+  return googleSessao[servico].origem==='servidor'?'Reconexão automática':'Acesso temporário · nesta sessão';
+}
+async function googleDesconectarTudo(){
+  await apiSync('POST',{acao:'googleDesconectar'});
+  for(const serv in googleSessao)googleSessao[serv]=null;
+  _gmailToken='';googleConexaoErro='';driveLimparCache();tela();
+}
+function googleAcoesConexao(servico,status){
+  const a=el('<div class="google-acoes"></div>');
+  const b=acao(googleConectado(servico)?'Revisar permissões':'Conectar Google',async()=>{
+    b.disabled=true;status.textContent='Abrindo a autorização no Google…';
+    try{await driveAutorizarNoGoogle()}catch(e){status.textContent=e.message;b.disabled=false}
+  });
+  const atualizar=acao('Atualizar conexão',async()=>{
+    atualizar.disabled=true;status.textContent='Verificando a conexão salva…';
+    await googleCrachaDoServidor();tela();
+  },'ghost');
+  a.append(b,atualizar);
+  return a;
+}
+function googleOpcoesConexao(servico,status){
+  const d=el('<details class="google-opcoes"><summary>Opções de acesso</summary><p class="google-nota">A conexão salva permite consultar Drive, Gmail e Agenda mesmo após fechar a Central. O Google também pode oferecer envio de e-mail para o Don Boy e criação de lembretes: essas permissões são opcionais para consultar. Marque apenas o que deseja autorizar.</p></details>');
+  const temporario=acao('Conectar só nesta sessão',async()=>{temporario.disabled=true;try{await conectarGoogle(servico);tela()}catch(e){status.textContent=e.message}finally{temporario.disabled=false}},'ghost');
+  d.appendChild(temporario);
+  if(Object.values(googleSessao).some(s=>s?.origem==='servidor'))d.appendChild(acao('Desconectar Google da Central',async()=>{
+    if(!confirm('Desconectar a conta Google da Central?\n\nA reconexão de Drive, Gmail, Agenda e os recursos do Don Boy que usam esta autorização será interrompida. Arquivos, e-mails e eventos permanecem no Google.'))return;
+    try{await googleDesconectarTudo()}catch(e){status.textContent='Não foi possível desconectar: '+e.message}
+  },'ghost'));
+  return d;
+}
 function blocoGoogle(servico){
   const cx=el('<div class="corpo google-conexao"></div>');
   const conectado=googleConectado(servico);
-  cx.appendChild(el(`<p><b>${conectado?'Conectado nesta sessão':'Conectar sua conta Google'}</b></p><p class="google-nota">${servico==='gmail'?'Consulte e-mails recentes ou busque passagens para revisar e importar.':'Escolha um calendário e revise os compromissos antes de trazê-los para a Central.'} A autorização é somente de leitura. Ao fechar ou recarregar a página, pode ser necessário conectar novamente.</p>`));
-  const a=el('<div class="google-acoes"></div>');
-  const b=acao(conectado?'Renovar conexão':'Conectar '+(servico==='gmail'?'Gmail':'Google Agenda'),async()=>{b.disabled=true;try{await conectarGoogle(servico);tela()}catch(e){status.textContent=e.message}finally{b.disabled=false}});
-  a.appendChild(b);
-  if(conectado){a.appendChild(acao(servico==='gmail'?'Ver e-mails recentes':'Escolher calendário',async()=>{try{if(servico==='gmail')await verEmailsGoogle();else await escolherCalendarioGoogle()}catch(e){status.textContent=e.message}},'ghost'));a.appendChild(acao('Desconectar desta sessão',()=>desligarGoogle(servico),'ghost'))}
-  const status=el('<p role="status" class="google-nota"></p>');cx.appendChild(a);cx.appendChild(status);
-  return bloco(servico==='gmail'?'google-gmail':'google-agenda',servico==='gmail'?'📧 Gmail':'📅 Google Agenda','conexão e importação',cx);
+  cx.appendChild(el(`<p class="google-estado ${conectado?'conectado':''}"><b>${conectado?'✓':'○'} ${googleEstadoTexto(servico)}</b></p><p class="google-nota">${servico==='gmail'?'Consulte e-mails recentes ou revise passagens e convites antes de importar.':'Escolha um calendário e revise os compromissos antes de importar.'}</p>`));
+  const status=el('<p role="status" class="google-nota"></p>');status.textContent=googleConexaoErro;
+  if(conectado)cx.appendChild(acao(servico==='gmail'?'Ver e-mails recentes':'Escolher calendário',async()=>{try{if(servico==='gmail')await verEmailsGoogle();else await escolherCalendarioGoogle()}catch(e){status.textContent=e.message}}));
+  else cx.appendChild(googleAcoesConexao(servico,status));
+  cx.append(googleOpcoesConexao(servico,status),status);
+  return bloco(servico==='gmail'?'google-gmail':'google-agenda',servico==='gmail'?'📧 Gmail':'📅 Google Agenda','consulta e importação',cx);
+}
+function blocoConexoesGoogle(){
+  const cx=el('<div class="corpo google-conexao"></div>');
+  const grade=el('<div class="google-servicos"></div>');
+  const status=el('<p role="status" class="google-nota"></p>');status.textContent=googleConexaoErro;
+  for(const [servico,nome,ic,rotulo] of [['drive','Google Drive','📁','Abrir Drive'],['gmail','Gmail','📧','Ver e-mails recentes'],['agenda','Google Agenda','📅','Escolher calendário']]){
+    const conectado=googleConectado(servico);
+    const card=el(`<div class="google-servico"><span aria-hidden="true">${ic}</span><div><strong>${nome}</strong><p class="google-estado ${conectado?'conectado':''}">${conectado?'✓':'○'} ${googleEstadoTexto(servico)}</p></div></div>`);
+    if(conectado)card.appendChild(acao(rotulo,async()=>{try{if(servico==='drive')irTela('drive');else if(servico==='gmail')await verEmailsGoogle();else await escolherCalendarioGoogle()}catch(e){status.textContent=e.message}},'ghost'));
+    grade.appendChild(card);
+  }
+  cx.append(grade,googleAcoesConexao('drive',status),googleOpcoesConexao('drive',status),status);
+  return bloco('google-conexoes','Google · conexões','Drive, Gmail e Agenda',cx);
 }
 function lerConvitesAgenda(txt,mensagem,lib=ICAL){
   const raiz=new lib.Component(lib.parse(txt)),eventos=[],avisos=[];
@@ -12950,7 +13000,7 @@ function driveTextoVolta(m){
     const nomes={'drive.readonly':'Google Drive','gmail.readonly':'Gmail','gmail.send':'Gmail (enviar, para o Don Boy)','calendar.readonly':'Google Agenda (ler)','calendar.app.created':'Google Agenda (criar lembrete)'};
     const faltou=m.slice(7).split(',').map(x=>nomes[x]||x).filter(Boolean);
     return 'A autorização saiu sem '+(faltou.length===1?'esta permissão':'estas permissões')+': '+faltou.join(', ')
-      +'. O que veio continua valendo; para ligar o resto, conecte de novo e deixe todas as caixas marcadas.';
+      +'. O que veio continua valendo. Para consulta, basta autorizar Drive, Gmail e Agenda em leitura; envio e criação de lembretes são opcionais.';
   }
   if(m==='sem-renovacao')return 'O Google não devolveu a chave de renovação. Tente conectar de novo; se repetir, remova o acesso da Central em myaccount.google.com e conecte outra vez.';
   if(m==='config')return 'Faltam as chaves do Google no servidor. É configuração de uma vez só.';
@@ -13340,26 +13390,15 @@ function vDrive(m){
     m.appendChild(av);
   }
   if(!googleConectado('drive')){
-    /* Conexão sozinha: com a permissão já dada uma vez, o Google devolve o
-       crachá sem abrir janela nenhuma (prompt vazio). Só quando ele recusa em
-       silêncio — permissão revogada, primeira vez, janela bloqueada — é que
-       aparece o botão. Uma tentativa por sessão, para não ficar em laço. */
+    // Verifica apenas a autorização salva. Login só nasce de um clique explícito.
     if(!driveAutoTentado){
       driveAutoTentado=true;
-      const espera=el('<div class="corpo"><p class="google-nota">Conectando ao Google Drive…</p></div>');
-      m.appendChild(bloco('dv-conectar','📁 Google Drive','conexão somente leitura',espera));
-      driveConectar().then(()=>{if(atual==='drive')tela()}).catch(e=>{driveAutoErro=e&&e.message||'';if(atual==='drive')tela()});
+      const espera=el('<div class="corpo"><p class="google-nota">Verificando a conexão salva…</p></div>');
+      m.appendChild(bloco('dv-conectar','Google Drive','conexão',espera));
+      driveCrachaDoServidor().finally(()=>{if(atual==='drive')tela()});
       return;
     }
-    const cx=el('<div class="corpo google-conexao"></div>');
-    cx.appendChild(el('<p><b>Conectar o Google Drive</b></p>'));
-    cx.appendChild(el('<p class="google-nota">A Central pede ao Google um acesso <b>somente de leitura</b>: dá para navegar, abrir e baixar; apagar, mover ou renomear continua sendo coisa que só se faz no próprio Drive. Autorizando desta vez, a Central passa a se conectar sozinha nas próximas — o Google guarda a permissão com o servidor, não com este navegador.</p>'));
-    const a=el('<div class="google-acoes"></div>');const status=el('<p role="status" class="google-nota"></p>');
-    if(driveAutoErro)status.textContent=driveAutoErro;
-    const b=acao('Conectar o Google Drive',async()=>{b.disabled=true;status.textContent='Levando você ao Google…';try{await driveAutorizarNoGoogle()}catch(e){status.textContent=e.message;b.disabled=false}});
-    const b2=acao('Conectar só desta vez',async()=>{b2.disabled=true;status.textContent='Abrindo a janela do Google…';try{await conectarGoogle('drive');tela()}catch(e){status.textContent=e.message}finally{b2.disabled=false}},'ghost');
-    a.appendChild(b);a.appendChild(b2);cx.appendChild(a);cx.appendChild(status);
-    m.appendChild(bloco('dv-conectar','📁 Google Drive','conexão somente leitura',cx));
+    m.appendChild(blocoConexoesGoogle());
     return;
   }
   // ---- barra: busca, atalhos, cota ----
@@ -13375,13 +13414,7 @@ function vDrive(m){
     const b=acao(rot,()=>{D.modo=modo;D.busca='';D.digitado='';if(modo==='pastas'){D.pasta='root';D.trilha=[{id:'root',nome:'Meu Drive'}];D.trilhaPendente=''}r()},(D.modo===modo?'':'ghost'));barra.appendChild(b)});
   barra.appendChild(el('<span class="cresce"></span>'));
   const cota=el('<div class="dv-cota" title="Espaço usado na conta Google inteira (Drive, Gmail e Fotos)"><span>Conta Google: …</span></div>');barra.appendChild(cota);
-  /* Agora a autorização mora no servidor: desconectar de verdade é apagar de lá a
-     chave de renovação. Dizer “desta sessão” seria mentira — bastaria recarregar. */
-  barra.appendChild(acao('Desconectar o Drive',async()=>{
-    if(!confirm('Desconectar o Google Drive?\n\nA Central esquece a autorização. Para ver as pastas de novo, você terá de autorizar mais uma vez no Google.'))return;
-    try{await apiSync('POST',{acao:'googleDesconectar'})}catch(e){alert('Não deu para desconectar agora: '+((e&&e.message)||e));return}
-    driveLimparCache();desligarGoogle('drive');
-  },'ghost'));
+  barra.appendChild(acao('Conexões Google',()=>{irTela('config');document.querySelector('[data-bid="google-conexoes"]')?.scrollIntoView({block:'start'})},'ghost'));
   m.appendChild(barra);
   driveSobre().then(s=>{const q=s.storageQuota||{},uso=+q.usage||0,lim=+q.limit||0;const pct=lim?Math.min(100,uso/lim*100):0;
     cota.innerHTML=`<span>Conta Google: ${tamanho(uso)}${lim?' de '+tamanho(lim):''}</span>${lim?`<div class="tr"><div class="b${pct>90?' cheia':''}" style="width:${pct.toFixed(0)}%"></div></div>`:''}`;
@@ -16133,7 +16166,7 @@ async function vConfig(m){
   aparencia.appendChild(seletor(E.config?.fonteInterface||'padrao',[['padrao','Padrão do sistema'],['inter','Inter'],['sistema','Fonte do aparelho'],['arial','Arial'],['georgia','Georgia']],escolherFonteInterface,'Fonte das letras'));
   m.appendChild(bloco('cf-aparencia','🎨 Aparência','fonte das letras, títulos e campos',aparencia));
 
-  m.appendChild(blocoConferenciaCadastros());m.appendChild(blocoGoogle('gmail'));m.appendChild(blocoGoogle('agenda'));
+  m.appendChild(blocoConferenciaCadastros());m.appendChild(blocoConexoesGoogle());
   const t=await arqTotal();
   if(atual!=='config')return;
   m.appendChild(el(`<div class="grade">
