@@ -1,6 +1,6 @@
 # Central do Léo — revisão visual compacta
 
-Estado: implementação local, sem publicação. Data: 21/10/2026.
+Estado: revisão local concluída, publicação autorizada pelo usuário em 21/10/2026. A confirmação do deploy e dos arquivos servidos é registrada separadamente após sua execução.
 
 ## Entrega
 
@@ -14,7 +14,7 @@ Estado: implementação local, sem publicação. Data: 21/10/2026.
 
 ## Verificação
 
-1. Suíte completa: 1.661 testes aprovados, zero falhas, zero ignorados. Inclui quatro novos testes para cobertura de imagens, busca/expansão, navegação e preservação de links externos e dados.
+1. Suíte completa: 1.662 testes aprovados, zero falhas, zero ignorados. Inclui quatro novos testes para cobertura de imagens, busca/expansão, navegação e preservação de links externos e dados.
 2. Renderização local das 24 áreas em larguras de 390 e 768 px: 48 conferências, sem transbordamento horizontal da página, imagens quebradas ou alerta fatal de renderização. Listas e abas com rolagem própria continuam funcionando como no módulo original.
 3. Inspeção visual da página inicial, coleção de ícones e áreas representativas; correção de contraste do Marketing e do alinhamento/tamanho dos cabeçalhos de Saúde, Rendimentos, Gastos e Strava.
 4. Sintaxe de JavaScript, hashes de cache dos arquivos alterados e `git diff --check` conferidos. O projeto é estático e não tem etapa separada de build.
@@ -26,4 +26,12 @@ Os testes de renderização usam uma prévia isolada com registros fictícios e 
 
 O bloqueio dos cliques foi resolvido e a conferência local foi concluída. A validação móvel foi realizada no navegador em iframe de largura controlada, não em aparelho físico. Não se deve confundir essa validação com um teste de ponta a ponta autenticado.
 
-Antes de publicar: revisar a versão remota e obter autorização de publicação. Nenhum cadastro real foi criado e nenhum servidor foi alterado nesta entrega.
+A publicação foi autorizada pelo usuário. A versão remota foi revisada, sem mudanças concorrentes na main no momento da conferência. Nenhum cadastro real foi criado nesta entrega. A publicação altera apenas os arquivos estáticos; não requer implantação de Edge Functions.
+
+## Compactação final
+
+- Folha de densidade separada e aplicada por último, somente em tela. Preserva a impressão.
+- Na página inicial, cabeçalho de 94 para aproximadamente 66 px, cards de áreas de 76 para 58 px e menu lateral de 42 para 35 px.
+- Menos preenchimento em cards, indicadores e áreas vazias; textos e ícones continuam identificando as funções. No celular, os principais controles e itens do menu mantêm 44 px de altura.
+- As 24 áreas foram novamente conferidas a 390 e 768 px: 48 verificações sem transbordamento horizontal da página, imagens quebradas ou erro fatal de renderização.
+- Busca por Saúde, expansão dos atalhos e navegação até a área conferidas após a compactação. Suíte completa executada novamente: 1.662 testes aprovados, zero falhas.
