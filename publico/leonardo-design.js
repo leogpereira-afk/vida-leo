@@ -49,15 +49,51 @@ const LeonardoDesign = (() => {
     compass:'<circle cx="12" cy="12" r="9"/><path d="m16 8-2 6-6 2 2-6Z"/>',
     settings:'<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/>'
   };
+  const descricoes = {
+    inicio:'Seu dia em foco',donboy:'Assistentes e decisões',agenda:'Compromissos e prazos',planilhas:'Dados e consultas',
+    rendimentos:'Entradas e resultados',gastos:'Despesas e recorrentes',empresas:'Negócios e planejamento',marketing:'Canais e resultados',
+    bancos:'Contas e organização',patrimonio:'Bens e investimentos',caixavgv:'Obras e recebimentos',aviao:'Voos e operação',
+    viagens:'Roteiros e reservas',demandas:'Próximos passos',saude:'Cuidados e acompanhamento',strava:'Atividades e evolução',
+    estrategia:'Objetivos e iniciativas',fortemais:'Obras e ferramentas',oportunidades:'Ideias e possibilidades',
+    'metodo-vof':'Visão, organização e foco',documentos:'Arquivos e vencimentos',drive:'Pastas e arquivos',guia:'Planos e referências',config:'Preferências e conexões'
+  };
+  const imagens=Object.fromEntries(Object.keys(areas).map(id=>[id,id==='fortemais'?'./fortemais-3d/nav-obras.webp':'./central-3d/'+id+'.webp']));
+  function icone(id){
+    if(!imagens[id])return '';
+    return '<img class="leo-icone-3d" src="'+imagens[id]+'" width="64" height="64" alt="" aria-hidden="true" decoding="async">';
+  }
+  function atalhos(modulos,abrir){
+    const principais=['agenda','demandas','donboy','empresas','rendimentos','gastos','saude','fortemais'];
+    const disponiveis=modulos.filter(m=>!m.url&&!m.oculto&&m.id!=='inicio'&&areas[m.id]);
+    const secao=document.createElement('section');secao.className='leo-areas';secao.setAttribute('aria-labelledby','leo-areas-titulo');
+    secao.innerHTML='<div class="leo-areas-topo"><div><h2 id="leo-areas-titulo">Suas áreas</h2><p>Acesse o que precisa, em um toque.</p></div><label class="leo-areas-busca"><span>Buscar área</span><input type="search" placeholder="Qual área você procura?"></label><button type="button" class="leo-areas-alternar" aria-controls="leo-areas-grade" aria-expanded="false"></button></div><nav id="leo-areas-grade" class="leo-areas-grade" aria-label="Áreas da Central"></nav><p class="leo-areas-estado" role="status" aria-live="polite"></p>';
+    const busca=secao.querySelector('input'),grade=secao.querySelector('nav'),alternar=secao.querySelector('button'),estado=secao.querySelector('[role=status]');
+    const normalizar=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+    let todas=false;
+    function pintar(){
+      const termo=normalizar(busca.value);
+      const lista=termo?disponiveis.filter(m=>normalizar(m.nome+' '+descricoes[m.id]).includes(termo)):todas?disponiveis:principais.map(id=>disponiveis.find(m=>m.id===id)).filter(Boolean);
+      grade.replaceChildren();
+      lista.forEach(m=>{
+        const bt=document.createElement('button');bt.type='button';bt.className='leo-area-card';bt.dataset.area=m.id;
+        bt.style.setProperty('--area-cor',areas[m.id][0]);bt.style.setProperty('--area-clara',areas[m.id][1]);
+        bt.innerHTML=icone(m.id)+'<span class="leo-area-texto"><strong></strong><small></small></span><span class="leo-area-seta" aria-hidden="true">↗</span>';
+        bt.querySelector('strong').textContent=m.nome;bt.querySelector('small').textContent=descricoes[m.id];bt.setAttribute('aria-label','Abrir '+m.nome);bt.onclick=()=>abrir(m.id);grade.appendChild(bt);
+      });
+      alternar.textContent=todas?'Mostrar principais':'Ver todas ('+disponiveis.length+')';alternar.setAttribute('aria-expanded',String(todas||!!termo));alternar.hidden=!!termo;
+      estado.textContent=termo?(lista.length?lista.length+(lista.length===1?' área encontrada':' áreas encontradas'):'Nenhuma área encontrada. Tente outro nome.') : '';
+    }
+    alternar.onclick=()=>{todas=!todas;pintar()};busca.oninput=pintar;pintar();return secao;
+  }
   function aplicar(id,pagina){
     const [accent,light,hero,icon]=areas[id]||areas.inicio;
     document.body.dataset.leoArea=id;
     const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">'+paths[icon]+'</svg>';
     for(const alvo of [document.body,pagina].filter(Boolean)){
       alvo.style.setProperty('--leo-accent',accent);alvo.style.setProperty('--leo-light',light);alvo.style.setProperty('--leo-hero',hero);
-      alvo.style.setProperty('--leo-icon','url("data:image/svg+xml,'+encodeURIComponent(svg)+'")');
+      alvo.style.setProperty('--leo-icon',imagens[id]?'url("'+imagens[id]+'")':'url("data:image/svg+xml,'+encodeURIComponent(svg)+'")');
     }
     if(pagina)pagina.dataset.leoArea=id;
   }
-  return {areas,aplicar};
+  return {areas,imagens,descricoes,icone,atalhos,aplicar};
 })();

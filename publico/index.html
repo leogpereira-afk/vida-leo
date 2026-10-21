@@ -676,10 +676,10 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-obras-moderno.css?v=2fbc3e7b4e73">
 <link rel="stylesheet" href="./donboy-painel.css?v=05a4255f7b34">
 <link rel="stylesheet" href="donboy-email.css?v=ed0e5b4334e2">
-<link rel="stylesheet" href="./marketing.css?v=2aabb374039e">
-<link rel="stylesheet" href="./leonardo-design.css?v=a4da4058b660">
-<link rel="stylesheet" href="./rendimentos-avancado.css?v=886adb93fed7">
-<link rel="stylesheet" href="./rendimentos-dashboards.css?v=1ed1b0637c9e">
+<link rel="stylesheet" href="./marketing.css?v=4712eec97782">
+<link rel="stylesheet" href="./leonardo-design.css?v=b342d9620eec">
+<link rel="stylesheet" href="./rendimentos-avancado.css?v=cc0d0e217c45">
+<link rel="stylesheet" href="./rendimentos-dashboards.css?v=ce16ccc09d43">
 <link rel="stylesheet" href="./gastos-painel.css?v=5715594d8373">
 <link rel="stylesheet" href="./fortemais-visual.css?v=b84fa0f93cb7">
 </head>
@@ -736,7 +736,7 @@ tr:hover .lixo{opacity:1}
 <script src="./fortemais-pdf.js?v=27455f7f3e11"></script>
 <script src="openclaw-fila.js?v=066cb079a2b5"></script>
 <script src="./saude-comparacao.js?v=b203a127c2ce"></script>
-<script src="./leonardo-design.js?v=7b814ac89101"></script>
+<script src="./leonardo-design.js?v=724c803cb14a"></script>
 <script src="./rendimentos-modelo.js?v=a2faa87ce0bd"></script>
 <script src="./rendimentos-dashboards-modelo.js?v=0987eb11dd63"></script>
 <script src="./financeiro-graficos.js?v=493dcd6ca9b6"></script>
@@ -2190,7 +2190,8 @@ function menu(){
     /* Entrada com `url` é ATALHO para outro sistema, não tela daqui: abre em
        outra aba, nunca fica marcada como ativa, e o ↗ avisa antes do clique.
        Sem isto o menu prometeria uma tela que não existe. */
-    const b=el(`<button class="${selecionado?'on':''}"><span class="ic">${m.ic}</span><span class="tx">${m.nome}</span>${m.url?'<span class="fora">↗</span>':''}</button>`);
+    const iconeArea=!m.url&&!['drive','strava'].includes(m.id)&&typeof LeonardoDesign!=='undefined'?LeonardoDesign.icone(m.id):'';
+    const b=el(`<button class="${selecionado?'on':''}"><span class="ic" aria-hidden="true">${iconeArea||m.ic}</span><span class="tx">${m.nome}</span>${m.url?'<span class="fora">↗</span>':''}</button>`);
     if(m.url){b.title='abre em outra aba — sistema com login próprio';
       b.onclick=()=>window.open(m.url,'_blank','noopener');}
     else {b.onclick=()=>irTela(m.id);if(selecionado)b.setAttribute('aria-current','page')}
@@ -2598,6 +2599,7 @@ function vInicio(m){
   [radarBloco,agendaBloco,viagemBloco].forEach(b=>{b.classList.remove('fechado');const hd=b.querySelector('header');hd.removeAttribute('role');hd.removeAttribute('tabindex');hd.removeAttribute('aria-expanded');hd.onclick=null;hd.onkeydown=null;hd.querySelector('.seta')?.remove()});
   const fila=el('<div class="inicio-agenda-viagem"></div>');fila.append(agendaBloco,viagemBloco);
   topo.after(hero);radarBloco.after(fila);
+  if(typeof LeonardoDesign!=='undefined')hero.after(LeonardoDesign.atalhos(MODS,irTela));
   if(prox)pv.appendChild(acao('Abrir viagem',()=>abrirRegistro('viagens','viagens',prox),'ghost'));
 
 }

@@ -1,7 +1,7 @@
 /* Componentes exclusivos do módulo Rendimentos. */
 .pagina.ra-app{max-width:1520px;margin-inline:auto;--ra-muted:var(--suave);font-variant-numeric:tabular-nums}
 .pagina.ra-app[data-leo-area]>.topo{margin-bottom:12px;padding:14px 18px;min-height:80px;gap:12px}
-.pagina.ra-app[data-leo-area]>.topo::before{width:36px;height:36px;border-radius:10px;background-size:22px 22px}
+.pagina.ra-app[data-leo-area]>.topo::before{width:52px;height:52px;border-radius:0;background-size:contain}
 .pagina.ra-app[data-leo-area]>.topo h1{font-size:clamp(23px,2.3vw,29px);margin-bottom:2px}
 .ra-app .ra-filtros,.ra-app .ra-tools,.ra-app .ra-dates{display:flex;align-items:end;flex-wrap:wrap;gap:10px;margin:14px 0}
 .ra-app .ra-field{display:flex;flex-direction:column;gap:6px;min-width:145px;max-width:100%;flex:0 1 auto;font-size:12px;font-weight:650}
@@ -114,8 +114,8 @@
 .ra-app .ra-matriz .ra-empresa{font-size:12px}
 @media(max-width:600px){
  .pagina.ra-app[data-leo-area]>.topo{padding:12px 14px;min-height:0;gap:10px}
- .pagina.ra-app[data-leo-area]>.topo>div:first-of-type{min-width:0;flex-basis:calc(100% - 50px)}
- .pagina.ra-app[data-leo-area]>.topo .btn{margin-left:46px;min-height:40px;padding:8px 12px}
+ .pagina.ra-app[data-leo-area]>.topo>div:first-of-type{min-width:0;flex-basis:calc(100% - 70px)}
+ .pagina.ra-app[data-leo-area]>.topo .btn{margin-left:62px;min-height:44px;padding:8px 12px}
  .ra-app .ra-filtros{display:flex;gap:6px}
  .ra-app .ra-filtros>.ra-field{min-width:0;flex:1 1 100px}
  .ra-app .ra-filtros>.ra-picks{flex:1 1 150px}
