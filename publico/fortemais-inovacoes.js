@@ -40,6 +40,7 @@ function fmInovacoesNavegacao(m,visao,recarregar) {
       }
       filtro.fmVisao=id;recarregar();
     },'');
+    const image=el('<img alt="" width="72" height="72" loading="lazy" decoding="async">');image.src='./fortemais-3d/nav-'+id+'.webp';b.prepend(image);
     b.dataset.fmVisao=id;b.setAttribute('aria-pressed',String(id===visao));
     if(id==='inovacoes'){
       const n=el('<span class="fmi-contagem"></span>');n.textContent=aAplicar;
