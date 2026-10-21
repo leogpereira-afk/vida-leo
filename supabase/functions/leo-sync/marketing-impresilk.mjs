@@ -58,7 +58,7 @@ export function detalharImpresilk(linhas,agora=Date.now()){
   const f=projetarFonte(id,raw[id],agora,marca);
   if(id==='pixel'&&pixels.length>1)f.avisos.push('Exibe somente o pixel identificado por eventos no domínio impresilk.com.br. Outros pixels não foram somados.');
   if(id==='ga4')f.avisos.push('Listagens da janela completa têm período próprio; visitantes semanais não são somados.');
-  if(['linkedin','pinterest'].includes(id))f.avisos.push('A conexão depende da aprovação do aplicativo pelo provedor. Consulte Administração para a situação conferida.');
+  if(['linkedin','pinterest'].includes(id)&&!['ok','parcial'].includes(f.estado))f.avisos.push('Confira em Administração a situação da autorização e as pendências desta fonte.');
   return f;
  }),administracao:limparAdmin(c.get('leo_marketing_impresilk_admin'),'impresilk')};
 }
