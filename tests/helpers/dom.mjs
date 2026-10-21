@@ -23,6 +23,7 @@ vm.runInContext(readFileSync(new URL('../../publico/marketing.js',import.meta.ur
 vm.runInContext(readFileSync(new URL('../../publico/saude-comparacao.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/saude-tratamentos.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/leonardo-design.js',import.meta.url),'utf8'),ctx);
+vm.runInContext(readFileSync(new URL('../../publico/inicio-google.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/rendimentos-modelo.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/rendimentos-dashboards-modelo.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/financeiro-graficos.js',import.meta.url),'utf8'),ctx);

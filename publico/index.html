@@ -682,7 +682,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./rendimentos-dashboards.css?v=ce16ccc09d43">
 <link rel="stylesheet" href="./gastos-painel.css?v=5715594d8373">
 <link rel="stylesheet" href="./fortemais-visual.css?v=4b49bedcb0e5">
-<link rel="stylesheet" href="./central-densidade.css?v=3f6974593cc3">
+<link rel="stylesheet" href="./central-densidade.css?v=5dfbc2553a75">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -716,6 +716,7 @@ tr:hover .lixo{opacity:1}
 
 <script src="./vendor/ical-2.2.1.min.js"></script>
 <script src="./google-datas.js?v=85c5d36986f3"></script>
+<script src="./inicio-google.js?v=246738c9df76"></script>
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
 <script src="./marketing-fortemais.js?v=43e087960693"></script>
 <script src="./marketing.js?v=39a86005b2ae"></script>
@@ -2521,6 +2522,15 @@ function diasViajandoNoAno(viagens,ano){
   const unidas=[];for(const f of faixas){const ultima=unidas.at(-1);if(ultima&&f[0]<=ultima[1]){if(f[1]>ultima[1])ultima[1]=f[1]}else unidas.push([...f])}return unidas.reduce((s,[a,b])=>s+diasEntre(a,b),0);
 }
 
+let inicioGooglePainel=null;
+function resumoGoogleInicio(){
+  if(!inicioGooglePainel)inicioGooglePainel=InicioGoogle.criar({
+    ler:(servico,caminho)=>googleLer(servico,caminho),conectado:servico=>googleConectado(servico),renovar:()=>googleCrachaDoServidor(),
+    conexoes:()=>{abreBloco('google-conexoes');irTela('config')},
+    abrirDrive:pasta=>{const d=prepararFiltroDrive();Object.assign(d,{modo:'pastas',pasta:pasta?.id||'root',busca:'',digitado:'',tipo:'',trilha:[{id:'root',nome:'Meu Drive'},...(pasta?[{id:pasta.id,nome:pasta.name}]:[])],trilhaPendente:''});irTela('drive')}
+  });
+  return inicioGooglePainel.montar();
+}
 function vInicio(m){
   const h=hoje();m.classList.add('inicio-fluido');
   const prox=E.viagens.filter(v=>v.ida>=h&&v.status!=='Cancelado').sort((a,b)=>a.ida.localeCompare(b.ida))[0];
@@ -2592,7 +2602,7 @@ function vInicio(m){
       <span style="color:var(--suave);font-size:12.5px">${esc(a.hora||'')} ${esc(a.local||'')}</span><button class="btn ghost mini" data-compromisso="${i}" aria-label="${esc('Abrir '+a.titulo)}">Abrir</button></div>`).join('')
     :'<div class="vazio">Agenda livre.</div>';
   ac.querySelectorAll('[data-compromisso]').forEach(bt=>bt.onclick=()=>abrirRegistro('agenda','agenda',ag[+bt.dataset.compromisso]));
-  m.appendChild(bloco('ini-agenda','Próximos compromissos','Inclui eventos em andamento; horários em ordem dentro de cada dia.',ac));
+  m.appendChild(bloco('ini-agenda','Agenda da Central','Compromissos cadastrados ou importados na Central.',ac));
   const topo=m.querySelector('.topo');topo.appendChild(acao('⌕ Buscar',abrirBusca,'ghost'));topo.appendChild(acao('Abrir agenda',()=>irTela('agenda')));
   const hero=el(`<div class="inicio-contexto"><span><small>SEU DIA, EM FOCO</small><strong>${urgentes?urgentes+(urgentes===1?' prazo para revisar':' prazos para revisar'):rd.length?'Veja o que vem pela frente':'Seu painel está pronto'}</strong><p>${ag.length?'Próximo compromisso: '+esc(ag[0].titulo||'Sem título')+' · '+fmtDataAno(ag[0].data):'Registre compromissos, decisões e planos para acompanhar por aqui.'}</p></span><div class="inicio-contexto-acoes"></div></div>`);
   hero.querySelector('.inicio-contexto-acoes').appendChild(acao('Ver demandas',()=>irTela('demandas'),'ghost'));
@@ -2601,6 +2611,7 @@ function vInicio(m){
   const fila=el('<div class="inicio-agenda-viagem"></div>');fila.append(agendaBloco,viagemBloco);
   topo.after(hero);radarBloco.after(fila);
   if(typeof LeonardoDesign!=='undefined')hero.after(LeonardoDesign.atalhos(MODS,irTela));
+  if(typeof InicioGoogle!=='undefined')hero.after(resumoGoogleInicio());
   if(prox)pv.appendChild(acao('Abrir viagem',()=>abrirRegistro('viagens','viagens',prox),'ghost'));
 
 }
@@ -8124,7 +8135,7 @@ function googleConectado(servico){return !!googleSessao[servico]?.token&&googleS
 const GOOGLE_ESCOPO_DE={gmail:'gmail.readonly',agenda:'calendar.readonly',agendaEnviar:'calendar.app.created',drive:'drive.readonly'};
 let googleCrachaPedido=null;
 let googleConexaoErro='';
-function googleLimparServidor(){for(const serv in googleSessao)if(googleSessao[serv]?.origem==='servidor'){googleSessao[serv]=null;if(serv==='gmail')_gmailToken=''}}
+function googleLimparServidor(){inicioGooglePainel?.limpar();for(const serv in googleSessao)if(googleSessao[serv]?.origem==='servidor'){googleSessao[serv]=null;if(serv==='gmail')_gmailToken=''}}
 async function googleCrachaDoServidor(){
   if(DEV)return false; // Prévia local não solicita credenciais do servidor.
   if(googleCrachaPedido)return googleCrachaPedido;
@@ -8201,13 +8212,14 @@ async function googleFetch(servico,caminho,tempo=20000,sinal=null){
 }
 async function googleLer(servico,caminho){return (await googleFetch(servico,caminho)).json()}
 async function gmailApi(caminho){return googleLer('gmail',caminho)}
-function desligarGoogle(servico){googleSessao[servico]=null;if(servico==='gmail')_gmailToken='';tela()}
+function desligarGoogle(servico){inicioGooglePainel?.limpar();googleSessao[servico]=null;if(servico==='gmail')_gmailToken='';tela()}
 function googleEstadoTexto(servico){
   if(!googleConectado(servico))return 'Aguardando autorização';
   return googleSessao[servico].origem==='servidor'?'Reconexão automática':'Acesso temporário · nesta sessão';
 }
 async function googleDesconectarTudo(){
   await apiSync('POST',{acao:'googleDesconectar'});
+  inicioGooglePainel?.limpar();
   for(const serv in googleSessao)googleSessao[serv]=null;
   _gmailToken='';googleConexaoErro='';driveLimparCache();tela();
 }

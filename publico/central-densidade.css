@@ -72,6 +72,36 @@
 }
 
 /* Conexões reunidas e cartões visuais sem áreas vazias. */
+/* Google no início: listas curtas, sem altura fixa nem rolagem dentro do card. */
+.inicio-google{margin:0 0 12px;min-width:0}
+.ig-topo{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
+.ig-topo h2{font-family:var(--fonte-titulo,inherit);font-size:15px;margin:0}
+.ig-grade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:start}
+.ig-card{min-width:0;background:var(--card);border:1px solid var(--linha);border-radius:12px;overflow:hidden}
+.ig-cab{display:flex;align-items:center;gap:8px;padding:9px 10px;border-bottom:1px solid var(--linha)}
+.ig-cab>div{flex:1;min-width:0}
+.ig-cab h3{font-weight:700;font-size:13px;line-height:1.3;margin:0}
+.ig-icone{font-size:23px;width:30px;flex:none}
+.ig-meta{font-size:11px;line-height:1.4;color:var(--suave);margin:2px 0 0;overflow-wrap:anywhere}
+.ig-atualizar{display:grid;place-items:center;flex:none;width:36px;height:36px;padding:0;border:1px solid var(--linha);border-radius:9px;background:transparent;color:var(--tinta);font-size:22px;cursor:pointer}
+.ig-atualizar:disabled{opacity:.5;cursor:wait}
+.ig-item{display:flex;width:100%;align-items:center;gap:6px;min-height:53px;padding:8px 10px;color:var(--tinta);background:transparent;border:0;border-bottom:1px solid var(--linha);text-align:left;text-decoration:none;font:inherit;box-sizing:border-box}
+.ig-item:last-child{border-bottom:0}
+a.ig-item:hover,button.ig-item:hover{background:var(--bg)}
+button.ig-item{cursor:pointer}
+.ig-texto{display:block;min-width:0;flex:1}
+.ig-texto strong{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere;font-size:12px;line-height:1.4}
+.ig-texto small{display:block;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;font-size:11px;line-height:1.5;color:var(--suave);margin-top:2px}
+.ig-selo{font-size:10px;font-weight:700;color:var(--azul);background:var(--azul-cl);padding:3px 5px;border-radius:5px;white-space:nowrap}
+.ig-status{font-size:10px;line-height:1.45;color:var(--suave);margin:0;padding:4px 10px;overflow-wrap:anywhere}
+.ig-status:empty{display:none}
+.ig-vazio{font-size:12px;line-height:1.5;color:var(--suave);margin:0;padding:14px 10px}
+.ig-rodape{padding:4px 10px 9px;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.ig-rodape .btn,.ig-topo .btn{font-size:11px;padding:6px 9px;min-height:32px}
+.inicio-google :is(a,button):focus-visible{outline:3px solid var(--azul);outline-offset:-3px}
+@media(max-width:1100px){.ig-grade{grid-template-columns:1fr}.ig-cab h3{font-size:14px}.ig-item{min-height:50px}}
+@media(max-width:700px){.ig-atualizar{width:44px;height:44px}.ig-rodape .btn,.ig-topo .btn{min-height:44px;font-size:12px}.ig-cab{padding:6px 10px}.ig-texto strong{font-size:13px}.ig-texto small{font-size:12px}.ig-status,.ig-meta{font-size:11px}}
+@media print{.inicio-google{display:none}}
 @media screen {
  body[data-leo-area] .google-servicos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
  body[data-leo-area] .google-servico{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px;border:1px solid var(--linha);border-radius:10px;min-width:0;background:var(--fundo)}
