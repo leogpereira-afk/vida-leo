@@ -34,7 +34,7 @@
 .fmf .fmf-input-panel .fmf-grid{gap:12px 14px}
 .fmf .fmf-input-panel input,.fmf .fmf-input-panel select{min-height:40px;font-size:14px}
 .fmf .fmf-input-panel input.fmf-ruler{min-height:24px;height:24px}
-.fmf .fmf-input-panel input.fmf-number{min-width:8ch;max-width:100%}
+.fmf .fmf-input-panel input.fmf-number{min-width:0;max-width:100%}
 .fmf .fmf-number-field>span{font-size:13px}
 .fmf .fmf-results{padding:16px;border-radius:16px;position:sticky;top:16px}
 .fmf .fmf-empty-result{display:grid;grid-template-columns:minmax(150px,.85fr) minmax(200px,1.15fr);gap:16px;align-items:center;padding:18px 10px}

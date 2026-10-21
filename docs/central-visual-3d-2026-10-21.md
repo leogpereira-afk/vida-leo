@@ -35,3 +35,13 @@ A publicação foi autorizada pelo usuário. A versão remota foi revisada, sem 
 - Menos preenchimento em cards, indicadores e áreas vazias; textos e ícones continuam identificando as funções. No celular, os principais controles e itens do menu mantêm 44 px de altura.
 - As 24 áreas foram novamente conferidas a 390 e 768 px: 48 verificações sem transbordamento horizontal da página, imagens quebradas ou erro fatal de renderização.
 - Busca por Saúde, expansão dos atalhos e navegação até a área conferidas após a compactação. Suíte completa executada novamente: 1.662 testes aprovados, zero falhas.
+
+## Auditoria da versão publicada — 21/10/2026
+
+- Sessão autenticada no Chrome, versão publicada 6235312: 23 áreas visíveis percorridas por cliques no menu, em desktop e em viewport de 390 px. O menu móvel recolheu após cada escolha.
+- Busca de áreas, ausência de resultados, abertura por atalho, expansão para 22 atalhos, abertura/fechamento da busca geral e quatro filtros de prioridades conferidos.
+- Marketing: carregamento concluído e 11 abas navegadas em largura móvel, sem transbordamento da página.
+- Fortemais: 25 ferramentas percorridas por Próxima; Anterior e as visualizações Medidas, 3D e Compra conferidos. Sem salvar simulações reais.
+- Encontrada uma unidade kg/m² ultrapassando em 4 px a viewport de 390 px: o campo numérico tinha largura mínima de 8ch dentro de uma coluna estreita. Correção permite o encolhimento flexível do campo sem esconder a unidade.
+- Revalidação local: alvenaria a 390, 360 e 320 px; todas as 25 ferramentas a 320 px, sem transbordamento ou imagem quebrada. Suíte completa novamente: 1.662 testes aprovados.
+- Limites: emulação de viewport, não aparelho físico. Google Drive pediu conexão; não foi concedida nova permissão. A conferência de navegação não valida gravação, exclusão, envio de mensagens nem todas as integrações externas.
