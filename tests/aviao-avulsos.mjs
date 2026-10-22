@@ -46,3 +46,15 @@ test('total desembolsado soma aquisição e pagamentos de todo o histórico, mes
  assert.match(final.textContent,/3\.120,60/);
  assert.match(final.textContent,/independentemente do filtro/);
 });
+
+test('diferença estimada desconta todos os desembolsos, permite negativo e distingue valor ausente de zero',()=>{
+ const {run,document}=setup();
+ run("E.aviao.aportes=[{valor:1000.10}];E.aviao.mensalidades=[{minhaCota:100.20,status:'Pago'},{minhaCota:800,status:'A Vencer'}];E.aviao.valorCotaAtual=1500.50");
+ assert.equal(run('gastosDashboardAviao(E.aviao).diferencaAtual'),400.20);
+ run('E.aviao.valorCotaAtual=1000');assert.equal(run('gastosDashboardAviao(E.aviao).diferencaAtual'),-100.30);
+ run('E.aviao.valorCotaAtual=null');assert.equal(run('gastosDashboardAviao(E.aviao).diferencaAtual'),null);
+ run('E.aviao.valorCotaAtual=0');assert.equal(run('gastosDashboardAviao(E.aviao).diferencaAtual'),-1100.30);
+ run("filtro.aviaoAba='visao';vAviao(document.getElementById('main'))");
+ assert.match(document.getElementById('main').textContent,/Diferença estimada sobre o total desembolsado/);
+ assert.match(document.getElementById('main').textContent,/Não é lucro realizado/);
+});
