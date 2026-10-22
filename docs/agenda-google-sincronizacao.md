@@ -23,3 +23,7 @@ A autorização nesta revisão é para atualização automática da Central pelo
 `tests/agenda-google-sync.mjs` cobre cancelamentos sem data, preservação integral, atualização de descrições e notas locais, idempotência, recorrências diferentes, aliases de calendário, duplicatas pelo mesmo ID, exclusão local, paginação, falhas parciais, concorrência e conteúdo não executável.
 
 Publicação pelo workflow de Pages (site estático, sem etapa de compilação). Dados reais e backups ficam fora do repositório público.
+
+## Cache sem perda
+
+Se o JSON não couber no armazenamento local, a Central compacta o mesmo conteúdo com LZ-String 1.5.0 (licença MIT incluída) usando prefixo versionado `lz16:`. Leitura, restauração e adoção da nuvem aceitam cache antigo e compactado. Nenhum backup é apagado para liberar espaço. Se a gravação ainda falhar, a sincronização restaura o estado anterior antes de qualquer envio. Os arquivos de backup continuam JSON legível e não dependem da compactação.

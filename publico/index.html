@@ -754,6 +754,7 @@ tr:hover .lixo{opacity:1}
 <script src="./saude-painel.js?v=7f970b4ab7d2"></script>
 <script src="./saude-tratamentos.js?v=4d93dadf2758"></script>
 <script src="donboy-email.js?v=6a1ba6d316f6"></script>
+<script src="./vendor/lz-string.min.js?v=95f4d1cbf099"></script>
 <script>
 /* ============================================================
    Central do Léo — painel pessoal, um arquivo só.
@@ -1212,9 +1213,25 @@ const CFG=k=>(E.config&&E.config[k])||SEED.config[k];
 
 /* ---------------- estado ---------------- */
 const CHAVE='centralLeo.v1';
+function lerEstadoLocal(){
+  const texto=localStorage.getItem(CHAVE);if(!texto)return null;
+  if(texto.startsWith('lz16:')){
+    if(typeof LZString==='undefined')throw Error('A compactação do cache não carregou. Recarregue a página.');
+    const json=LZString.decompressFromUTF16(texto.slice(5));if(!json)throw Error('Cache inválido; consulte a nuvem.');return JSON.parse(json);
+  }
+  return JSON.parse(texto);
+}
+function guardarEstadoLocal(dados){
+  const texto=JSON.stringify(dados);
+  try{localStorage.setItem(CHAVE,texto)}catch(e){
+    if(typeof LZString==='undefined'||!(e.name==='QuotaExceededError'||/quota/i.test(e.message||'')))throw e;
+    // Sem excluir caches ou backups: compactação reversível só quando necessário.
+    localStorage.setItem(CHAVE,'lz16:'+LZString.compressToUTF16(texto));
+  }
+}
 let E=carregar();
 function carregar(){
-  let s=null; try{s=JSON.parse(localStorage.getItem(CHAVE))}catch(e){}
+  let s=null; try{s=lerEstadoLocal()}catch(e){}
   const base=structuredClone(SEED);
   const d=(s&&s.viagens)?{...base,...s}:base;
   if(!Array.isArray(d.fortemaisLinks))d.fortemaisLinks=[];
@@ -1285,7 +1302,7 @@ function carregar(){
   prepararDesenvolvimento(d);
   return d;
 }
-const salvar=()=>{E._mt=Math.max(Date.now(),(+E._mt||0)+1);localStorage.setItem(CHAVE,JSON.stringify(E));if(typeof saudeNotificarGravacao==='function')saudeNotificarGravacao();agendaPush()};
+const salvar=()=>{E._mt=Math.max(Date.now(),(+E._mt||0)+1);guardarEstadoLocal(E);if(typeof saudeNotificarGravacao==='function')saudeNotificarGravacao();agendaPush()};
 
 /* ---------------- visual ---------------- */
 const CORES_STATUS={'Realizado':['var(--sucesso-cl)','var(--sucesso)'],'Confirmado':['var(--azul-cl)','var(--azul)'],
@@ -5899,7 +5916,7 @@ function blocoCopias(){
           if(!r2||!r2.dados)throw new Error('cópia vazia');
           guardaDescartado();                    // o estado de agora fica de lado
           validarBackup(r2.dados);
-          localStorage.setItem(CHAVE,JSON.stringify(r2.dados));
+          guardarEstadoLocal(r2.dados);
           E=carregar();
           salvar();                              // marca _mt e agenda o envio
           if(!await enviarNuvem())throw new Error('Envio não confirmado. Confira o estado e tente sincronizar.');
@@ -16785,7 +16802,7 @@ async function restaurarBackup(f){
     if(!confirm('Trazer este arquivo?\n\nEle substitui o que está no painel AGORA, em todos os '+
       'aparelhos. O estado atual fica guardado em Configurações → Versão descartada.'))return;
     guardaDescartado();
-    localStorage.setItem(CHAVE,JSON.stringify(j));
+    guardarEstadoLocal(j);
     E=carregar();salvar();
     const enviado=await enviarNuvem();
     tela();
@@ -16833,7 +16850,7 @@ function agendaPush(){if(DEV||!pegaToken())return;pintaSync('alterações penden
 let _tabBase=0;                       // em memória de propósito: cada aba corre sozinha
 const marcaBase=mt=>{if(mt)_tabBase=+mt};
 function guardaDescartado(){
-  try{localStorage.setItem('cl_descartado',JSON.stringify({em:Date.now(),dados:JSON.parse(localStorage.getItem(CHAVE))}))}catch(_){}
+  try{localStorage.setItem('cl_descartado',JSON.stringify({em:Date.now(),dados:lerEstadoLocal()}))}catch(_){}
 }
 /* Textos dos formulários ficam nesta aba quando outro acesso exige trocar a base. */
 const CHAVE_RASCUNHO_SYNC='cl_rascunho_sync_v1';
@@ -16900,7 +16917,7 @@ function adotaNuvem(r,avisar){
   guardaDescartado();
   // modal aberto sobre o estado antigo viraria órfão e comeria o que fosse digitado
   const mo=document.getElementById('modais');if(mo)mo.innerHTML='';atualizarCamadasModais();
-  localStorage.setItem(CHAVE,JSON.stringify(r.dados));marcaBase(r.mt);E=carregar();tela({baseRemota:true});mostrarRascunhoSync();
+  guardarEstadoLocal(r.dados);marcaBase(r.mt);E=carregar();tela({baseRemota:true});mostrarRascunhoSync();
   pintaSync('atualizado de outro acesso');
   if(avisar)alert('Outro acesso atualizou os dados. Esta aba adotou a versão do servidor para preservar o que foi salvo lá.\n\n'+(preservou?'Os textos dos formulários foram preservados nesta aba. Use Recuperar textos preservados para conferir e copiar o que precisar.':'A versão local anterior ficou em Configurações → Versão descartada.'));
 }

@@ -6,6 +6,7 @@
   },
   "devDependencies": {
     "ical.js": "2.2.1",
-    "linkedom": "0.18.12"
+    "linkedom": "0.18.12",
+    "lz-string": "1.5.0"
   }
 }
