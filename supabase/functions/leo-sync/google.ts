@@ -228,6 +228,7 @@ async function callback(sb: Banco, url: URL): Promise<Response> {
 async function desconectar(sb: Banco): Promise<Response> {
   await configGravar(sb, "google_token", { token: "", exp: "", em: agoraIso() });
   await configGravar(sb, "google_refresh", { token: "", em: agoraIso(), motivo: "desligado na Central" });
+  await configGravar(sb, "inicio_google_cache", {});
   return json({ ok: true });
 }
 
@@ -236,6 +237,18 @@ export async function googleAcao(
   acao: string, corpo: Registro, sb: Banco, _req: Request, url: URL,
 ): Promise<Response> {
   try {
+    if (acao === "googleResumoInicio") {
+      const refresh=await configLer(sb,"google_refresh");
+      if (!texto(refresh?.token)) return json({});
+      const cache=await configLer(sb,"inicio_google_cache")||{};
+      const scopes=new Set(texto(refresh?.escopo).split(/\s+/));
+      const resposta: Registro={};
+      for(const servico of ["gmail","drive"]){
+        const scope="https://www.googleapis.com/auth/"+(servico==="gmail"?"gmail.readonly":"drive.readonly");
+        if(scopes.has(scope)&&cache[servico])resposta[servico]=cache[servico];
+      }
+      return json(resposta);
+    }
     if (acao === "googleToken") {
       const t = await tokenAcesso(sb);
       if (!t) return json({ precisaAutorizar: true });

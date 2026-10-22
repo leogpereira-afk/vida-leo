@@ -26,6 +26,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 // O Strava mora em strava.ts: aqui só se confere o crachá e se despacha (14/09/2026).
 import { stravaAcao } from "./strava.ts";
 // O Google mora em google.ts: a autorização fica no servidor e a tela recebe só um crachá curto (14/09/2026).
+import { atualizarResumos } from "./resumos-servidor.mjs";
 import { sincronizarAgendaServidor } from "./agenda-servidor.mjs";
 import { tokenAcesso } from "./google.ts";
 import { googleAcao } from "./google.ts";
@@ -267,6 +268,11 @@ Deno.serve(async (req: Request) => {
     const corpo = await req.json().catch(() => ({}));
     const { acao, senha, senhaAtual, senhaNova, id: corpoId } = corpo;
 
+    if (acao === "resumosSincronizarCron") {
+      if (!await cronOk(req, "resumos_cron_token")) return json({erro:"Não autorizado"},401);
+      try {const resultado=await atualizarResumos(sb,()=>tokenAcesso(sb));return json(resultado,resultado.ok?200:503);}
+      catch {return json({erro:"Falha ao atualizar resumos"},503);}
+    }
     if (acao === "agendaSincronizarCron") {
       if (!await cronOk(req, "agenda_cron_token")) return json({erro:"Não autorizado"},401);
       const resultado = await sincronizarAgendaServidor(sb, () => tokenAcesso(sb));
