@@ -124,5 +124,8 @@ var SaudePainelModelo=(()=>{
       if(r.origem!==undefined&&(!r.origem||typeof r.origem!=='object'||Array.isArray(r.origem)))throw Error('Origem do documento inválida.');
     }return m;
   }
-  return{numero,data,hora,ativo,saldo,ocorrencias,registrarOcorrencia,indicadores,qualidade,hoje,episodios,resumoConsulta,documentosRefs,seriesPeso,validarMetadados};
+  function qualidadeAgrupada(E,d){
+    const grupos=new Map();for(const item of qualidade(E,d)){const chave=JSON.stringify([item.tipo,item.registroId]);if(!grupos.has(chave)){const r=item.tipo==='saudeDocumentos'?E.saudeDocumentos?.[item.registroId]:(Array.isArray(E[item.tipo])?E[item.tipo]:[]).find(r=>r.id===item.registroId);grupos.set(chave,{...item,data:r?.data||r?.inicio||r?.dataDocumento||'',fonte:r?.fonte||r?.medico||'',motivos:[]})}grupos.get(chave).motivos.push(item.motivo)}return [...grupos.values()];
+  }
+  return{numero,data,hora,ativo,saldo,ocorrencias,registrarOcorrencia,indicadores,qualidade,qualidadeAgrupada,hoje,episodios,resumoConsulta,documentosRefs,seriesPeso,validarMetadados};
 })();

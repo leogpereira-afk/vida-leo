@@ -237,3 +237,10 @@
   .pagina.saude-workbench .sui-periodo-detalhes>summary::before{content:'▸';margin-right:5px}
   .pagina.saude-workbench .sui-periodo-detalhes[open]>summary::before{content:'▾'}
 }
+
+/* Lançamentos e conferências compactos, com todos os detalhes acessíveis. */
+.sui-rapidos{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:8px 0 12px}.sui-rapidos>b{font-size:13px;margin-right:6px}.sui-form-extras{margin-top:12px;border:1px solid var(--borda,#dbe2e9);border-radius:12px;padding:10px}.sui-form-extras summary{cursor:pointer;font-weight:650;min-height:24px}.sui-form-extras[open] summary{margin-bottom:12px}.sui-motivos{padding-left:18px;margin:8px 0;font-size:13px;line-height:1.5;overflow-wrap:anywhere}.sdoc-busca-vinculo{display:grid;gap:4px;min-width:0;flex:1 1 190px}.sdoc-busca-vinculo small{font-size:12px}.sdoc-acoes>label{max-width:100%;min-width:0}.sdoc select{max-width:100%;text-overflow:ellipsis}.sdoc-busca-vinculo input{width:100%;min-height:40px;box-sizing:border-box}.sui-form-extras input,.sui-form-extras select{min-width:0;max-width:100%}@media(max-width:650px){.sdoc-acoes>label{width:100%;flex-basis:100%}.sdoc-busca-vinculo input{font-size:16px}.sui-rapidos .btn{min-height:40px}}
+
+@media(max-width:650px){.sdoc-filtros>.sdoc-busca-vinculo,.sdoc-filtros>label:has([data-sdoc=ref]),.sdoc-filtros>label:has([data-sdoc=busca]){flex:1 1 100%;min-width:0;grid-column:1/-1}.sdoc-filtros label:has([data-sdoc=ref]){max-width:100%}}
+
+.modal .sui-form{padding:12px}

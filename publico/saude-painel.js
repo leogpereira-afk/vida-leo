@@ -34,22 +34,24 @@ function saudeStatusGravacao(){
   if(typeof MutationObserver!=='undefined'){const alvo=document.getElementById('stSync');if(alvo){const o=new MutationObserver(()=>{if(!box.isConnected){o.disconnect();return}pintar()});o.observe(alvo,{childList:true,subtree:true,characterData:true})}}
   return box;
 }
-function saudeForm(titulo,defs,base,gravar,{sub='Preencha somente informações confirmadas. Os documentos originais ficam preservados.'}={}){
+function saudeForm(titulo,defs,base,gravar,{sub='Preencha somente informações confirmadas. Os documentos originais ficam preservados.',principais=null,aoFechar=null}={}){
   abrirModal(esc(titulo),esc(sub),(c,fechar)=>{
     const form=el('<form data-saude-form class="sui-form"><div class="sui-form-grid"></div><p role="alert" aria-live="polite"></p><footer><button class="btn ghost" type="button" data-cancelar>Cancelar</button><button class="btn" type="submit">Salvar</button></footer></form>'),grade=form.querySelector('.sui-form-grid');
+    const extras=el('<details class="sui-form-extras"><summary>Mais detalhes · todos os campos</summary><div class="sui-form-grid"></div></details>');if(principais)grade.after(extras);
     defs.forEach(d=>{
       const l=el('<label><span>'+esc(d.t)+(d.required?' *':'')+'</span></label>');
       const inp=d.opcoes?el('<select>'+opcoesSelect(d.opcoes,base[d.k]??'')+'</select>'):d.tipo==='textarea'?el('<textarea rows="3"></textarea>'):el('<input type="'+(d.tipo||'text')+'">');
       inp.name=d.k;if(d.tipo==='checkbox')inp.checked=base[d.k]===true;else if(d.opcoes){const escolhido=[...inp.options].find(o=>o.value===String(base[d.k]??''));if(escolhido)escolhido.selected=true}else inp.value=base[d.k]??'';
       if(d.tipo==='number'){inp.step='any';inp.inputMode='decimal';if(d.min!=null)inp.min=String(d.min);if(d.max!=null)inp.max=String(d.max)}
-      inp.required=!!d.required;if(d.full||d.tipo==='textarea')l.classList.add('sui-full');if(d.tipo==='checkbox')l.classList.add('sui-check');l.append(inp);if(d.nota)l.append(el('<small>'+esc(d.nota)+'</small>'));grade.append(l);
+      inp.required=!!d.required;if(d.full||d.tipo==='textarea')l.classList.add('sui-full');if(d.tipo==='checkbox')l.classList.add('sui-check');l.append(inp);if(d.nota)l.append(el('<small>'+esc(d.nota)+'</small>'));(principais&&!principais.includes(d.k)&&!d.required?extras.querySelector('.sui-form-grid'):grade).append(l);
     });
+    form.addEventListener('invalid',e=>{if(extras.contains(e.target))extras.open=true},true);
     form.querySelector('[data-cancelar]').onclick=fechar;let ocupado=false;
     form.onsubmit=e=>{e.preventDefault();if(ocupado)return;const erro=form.querySelector('[role=alert]');erro.textContent='';try{
       const d={};for(const f of defs){const i=form.querySelector('[name="'+f.k+'"]'),v=i.type==='checkbox'?i.checked:String(i.value??'').trim();if(f.required&&!v)throw Error('Preencha '+f.t.toLowerCase()+'.');if(f.tipo==='date'&&v&&!SaudePainelModelo.data(v))throw Error('Confira '+f.t.toLowerCase()+'.');if(f.tipo==='time'&&v&&!SaudePainelModelo.hora(v))throw Error('Confira '+f.t.toLowerCase()+'.');if(f.tipo==='number'&&v!==''&&(!Number.isFinite(+v)||(f.min!=null&&+v<f.min)||(f.max!=null&&+v>f.max)))throw Error('Confira '+f.t.toLowerCase()+'.');d[f.k]=f.tipo==='number'&&v!==''?+v:v}
       ocupado=true;gravar(d);fechar();
-    }catch(err){ocupado=false;erro.textContent=err.message}};c.append(form);
-  },null,{antesFechar:()=>true});
+    }catch(err){ocupado=false;if(principais)extras.open=true;erro.textContent=err.message}};c.append(form);
+  },aoFechar,{antesFechar:()=>true});
 }
 function saudeCampos(tipo){
   const date={k:'data',t:'Data',tipo:'date',required:true},obs={k:'obs',t:'Observações',tipo:'textarea'},fonte={k:'fonte',t:'Fonte da informação',nota:'Ex.: balança, laudo, relato ou orientação profissional.'},hora={k:'hora',t:'Horário',tipo:'time'};
@@ -67,7 +69,7 @@ function saudeCampos(tipo){
     rastreios:[{k:'oque',t:'Acompanhamento / cuidado',required:true},{k:'profissional',t:'Responsável pela orientação'},{k:'fonte',t:'Fonte / documento da orientação',required:true},{k:'data',t:'Data em que foi indicado',tipo:'date',required:true},{k:'proxima',t:'Próxima data confirmada',tipo:'date'},{k:'situacao',t:'Situação',opcoes:['A confirmar','Confirmado','Realizado','Cancelado']},obs]
   }[tipo]||[];
 }
-function saudeEditarRegistro(tipo,registro){
+function saudeEditarRegistro(tipo,registro,aoFechar=null){
   if(tipo==='tratamentos'){const plano=!registro||registro.tipo==='Plano de tratamento'||saudeListaDados('tratamentos').some(t=>t.origemTratamentoId===registro.id);if(plano)editarPlanoTratamento(registro);else editarTratamento(registro);return}
   if(tipo==='saudeDocumentos'){saudeIr('documentos');return}
   const original=registro?structuredClone(registro):{data:hoje(),situacao:tipo==='queixas'?'Ativa':['consultas','vacinas','rastreios'].includes(tipo)?'A confirmar':'',fonte:'',parente:'',doenca:''};
@@ -85,7 +87,7 @@ function saudeEditarRegistro(tipo,registro){
       if(antes)item.revisoes=[...(antes.revisoes||[]),{em:new Date().toISOString(),campos:Object.fromEntries(Object.keys(d).map(k=>[k,antes[k]??'']))}];
       if(pos<0)E[tipo].push(item);else E[tipo][pos]=item;
     });
-  });
+  },{aoFechar,principais:registro?null:({peso:['data','peso','fonte'],exames:['exame','data','valor','unidade','referenciaLaudo'],consultas:['data','hora','profissional','situacao','motivo'],vitais:['data','hora','sis','dia','fc'],queixas:['oque','data','onde','intensidade','situacao']}[tipo]||null)});
 }
 function saudeNoVazio(titulo,descricao,rotulo,fn){const x=el('<div class="sui-vazio"><b>'+esc(titulo)+'</b><p>'+esc(descricao)+'</p></div>');if(fn)x.append(acao(rotulo,fn));return x}
 function saudeCabecalho(titulo,sub,acoes=[]){const x=el('<header class="sui-section-head"><div><h2>'+esc(titulo)+'</h2><p>'+esc(sub||'')+'</p></div><div class="sui-actions"></div></header>');acoes.forEach(a=>x.lastElementChild.append(a));return x}
@@ -171,25 +173,29 @@ function saudeAbrirPrioridade(p){
   const k=p.tipo==='consulta'||p.tipo==='retorno'?'consultas':p.tipo;const r=saudeListaDados(k).find(x=>x.id===p.registroId);if(r)saudeEditarRegistro(k,r);
 }
 function saudeHoje(){
-  const box=el('<section class="sui-hoje"></section>'),prioridades=SaudePainelModelo.hoje(E,hoje()),q=SaudePainelModelo.qualidade(E,hoje()),i=SaudePainelModelo.indicadores(E,hoje());
+  const box=el('<section class="sui-hoje"></section>'),prioridades=SaudePainelModelo.hoje(E,hoje()),q=SaudePainelModelo.qualidadeAgrupada(E,hoje()),i=SaudePainelModelo.indicadores(E,hoje());
   box.append(saudeCabecalho('Seu próximo passo','Cuidados configurados, datas informadas e conferências do seu histórico.',[acao('Preparar consulta',()=>saudePrepararConsulta(),'ghost')]));
+  const atalhos=el('<div class="sui-rapidos" aria-label="Lançamentos rápidos"><b>Lançar agora</b></div>');for(const [k,t]of [['peso','Peso'],['vitais','Sinais vitais'],['consultas','Consulta'],['exames','Exame'],['queixas','Sintoma']])atalhos.append(acao('+ '+t,()=>saudeEditarRegistro(k),'ghost mini'));atalhos.append(acao('Documentos',()=>saudeIr('documentos'),'ghost mini'));box.append(atalhos);
   const kpis=el('<div class="sui-kpis"></div>');
   const usos=saudeListaDados('tratamentos').flatMap(t=>SaudePainelModelo.ocorrencias(t,hoje())),done=usos.filter(o=>o.estado==='Registrado'||o.estado==='Não utilizado').length;
-  for(const [titulo,valor,meta,fn]of[['Cuidados de hoje',usos.length?done+'/'+usos.length:'Sem plano diário',usos.length?'Registros concluídos; não é medida de adesão':'Configure quando houver orientação',()=>saudeIr('tratamentos')],['Próximas datas',prioridades.filter(p=>p.tipo!=='uso'&&p.tipo!=='reposicao').length,'Datas registradas para acompanhar',()=>saudeIr('queixas')],['Para conferir',q.length,'Campos e documentos, sem avaliação clínica',saudeQualidade],['Última pesagem',i.peso.valor===null?'Adicionar':saudeValor(i.peso.valor)+' kg',i.peso.data?saudeData(i.peso.data):'Comece seu histórico',()=>i.peso.valor===null?saudeEditarRegistro('peso'):saudeIr('medidas')]]){
+  for(const [titulo,valor,meta,fn]of[['Cuidados de hoje',usos.length?done+'/'+usos.length:'Sem plano diário',usos.length?'Registros concluídos; não é medida de adesão':'Configure quando houver orientação',()=>saudeIr('tratamentos')],['Próximas datas',prioridades.filter(p=>p.tipo!=='uso'&&p.tipo!=='reposicao').length,'Datas registradas para acompanhar',()=>saudeIr('queixas')],['Para conferir',q.length,q.reduce((n,g)=>n+g.motivos.length,0)+' itens em '+q.length+' registros; sem avaliação clínica',saudeQualidade],['Última pesagem',i.peso.valor===null?'Adicionar':saudeValor(i.peso.valor)+' kg',i.peso.data?saudeData(i.peso.data):'Comece seu histórico',()=>i.peso.valor===null?saudeEditarRegistro('peso'):saudeIr('medidas')]]){
     const k=acao('',fn,'ghost sui-kpi');k.innerHTML='<small>'+esc(titulo)+'</small><strong>'+esc(valor)+'</strong><span>'+esc(meta)+'</span>';kpis.append(k);
   }box.append(kpis);
   const lista=el('<div class="sui-prioridades"></div>');
   if(!prioridades.length)lista.append(saudeNoVazio('Nenhuma ação configurada para hoje','Novas datas, horários confirmados e avisos de reposição aparecerão aqui.','Adicionar registro',saudeAdicionar));
   prioridades.slice(0,12).forEach(p=>{const item=p.tipo==='reposicao'?E.tratamentos.find(t=>t.id===p.registroId):null,motivo=item?SaudeTratamentos.formatarNumero(SaudeTratamentos.saldo(item))+' '+SaudeTratamentos.unidadeExibida(item.unidade)+' disponíveis':p.motivo;const row=el('<article class="sui-prioridade"><span class="sui-ponto" aria-hidden="true"></span><div><small>'+esc(p.tipo==='uso'?(p.estado==='Adiado'?'Adiado pelo usuário':'Cuidado de hoje'):p.tipo==='reposicao'?'Reposição':'Data informada')+'</small><h3>'+esc(p.titulo)+'</h3><p>'+esc(motivo||'')+'</p></div><b>'+esc(p.tipo==='uso'?(p.adiadoPara||(p.hora==='dia'?'Hoje':p.hora)):saudeData(p.data))+'</b></article>');row.dataset.nivel=p.tipo==='reposicao'?'atencao':'neutro';row.append(acao(p.tipo==='uso'?'Registrar':p.tipo==='reposicao'?'Conferir estoque':'Abrir',()=>saudeAbrirPrioridade(p),'ghost mini'));lista.append(row)});box.append(lista);
   if(prioridades.length>12)box.append(el('<p class="sui-meta">Mais '+(prioridades.length-12)+' ações nas respectivas áreas.</p>'));
-  if(q.length){const pend=el('<section class="sui-pendencias"><h3>Conferências que ajudam a completar seu histórico</h3><ul></ul></section>');q.slice(0,3).forEach(a=>{const li=el('<li></li>');li.textContent=a.titulo+': '+a.motivo;pend.querySelector('ul').append(li)});pend.append(acao('Conferir '+q.length+' pendências',saudeQualidade,'ghost mini'));box.append(pend)}
+  if(q.length){const pend=el('<section class="sui-pendencias"><h3>Conferências que ajudam a completar seu histórico</h3><ul></ul></section>');q.slice(0,3).forEach(a=>{const li=el('<li></li>');li.textContent=a.titulo+' · '+saudeData(a.data)+': '+a.motivos.join('; ');pend.querySelector('ul').append(li)});pend.append(acao('Conferir '+q.length+' registros',saudeQualidade,'ghost mini'));box.append(pend)}
   return box;
 }
 function saudeQualidade(){
-  abrirModal('Conferir dados da Saúde','Pendências de cadastro e origem documental. Uma ficha pode ter mais de uma pendência.',c=>{
-    const q=SaudePainelModelo.qualidade(E,hoje());if(!q.length){c.append(saudeNoVazio('Sem pendências nas regras verificadas','Isso não representa validação clínica.'));return}
-    const filtro=el('<label class="sui-filtro-solo">Área<select><option value="">Todas as áreas</option></select></label>'),lista=el('<div class="sui-grid"></div>');[...new Set(q.map(x=>x.tipo))].forEach(k=>filtro.querySelector('select').append(el('<option value="'+esc(k)+'">'+esc(SAUDE_TIPOS[k]||k)+'</option>')));c.append(filtro,lista);
-    const pintar=()=>{lista.innerHTML='';q.filter(x=>!filtro.querySelector('select').value||x.tipo===filtro.querySelector('select').value).forEach(a=>{const r=saudeListaDados(a.tipo).find(x=>x.id===a.registroId);lista.append(saudeCard(a.titulo,'',a.motivo,'Conferir',[acao('Conferir registro',()=>r?saudeEditarRegistro(a.tipo,r):saudeIr('documentos'),'ghost mini')]))})};filtro.querySelector('select').onchange=pintar;pintar();
+  abrirModal('Conferir dados da Saúde','Cada registro reúne todos os pontos a conferir. Sem avaliação clínica.',(c,fechar)=>{
+    const filtro=el('<label class="sui-filtro-solo">Área<select><option value="">Todas as áreas</option></select></label>'),resumo=el('<p role="status"></p>'),lista=el('<div class="sui-grid"></div>');
+    [...new Set(SaudePainelModelo.qualidadeAgrupada(E,hoje()).map(x=>x.tipo))].forEach(k=>filtro.querySelector('select').append(el('<option value="'+esc(k)+'">'+esc(SAUDE_TIPOS[k]||k)+'</option>')));c.append(filtro,resumo,lista);
+    const pintar=()=>{lista.replaceChildren();const q=SaudePainelModelo.qualidadeAgrupada(E,hoje()).filter(x=>!filtro.querySelector('select').value||x.tipo===filtro.querySelector('select').value);resumo.textContent=q.length+' registros · '+q.reduce((n,g)=>n+g.motivos.length,0)+' pontos a conferir';
+      q.forEach(a=>{const r=saudeListaDados(a.tipo).find(x=>x.id===a.registroId),card=saudeCard(a.titulo,'',(SAUDE_TIPOS[a.tipo]||a.tipo)+' · '+saudeData(a.data)+' · '+(a.fonte||'Fonte não informada'),a.motivos.length+(a.motivos.length===1?' ponto':' pontos'),[acao('Conferir registro',()=>{if(r){if(a.tipo==='tratamentos')fechar();saudeEditarRegistro(a.tipo,r,pintar)}else{fechar();saudeIr('documentos')}},'ghost mini')]);const motivos=el('<ul class="sui-motivos"></ul>');a.motivos.forEach(m=>{const li=el('<li></li>');li.textContent=m;motivos.append(li)});card.querySelector('.sui-actions').before(motivos);lista.append(card)});
+      if(!q.length)lista.append(saudeNoVazio('Sem pendências nas regras verificadas','Isso não representa validação clínica.'));
+    };filtro.querySelector('select').onchange=pintar;pintar();
   });
 }
 function saudeEpisodio(q){
