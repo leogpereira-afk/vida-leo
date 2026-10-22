@@ -3093,6 +3093,11 @@ function gastosDashboardAviao(a,ano=''){
     tipos:['Mensalidades','Viagens','Avulsos'].map(tipo=>({nome:tipo,valor:soma(pagos.filter(x=>x.tipo===tipo))})),
     meses:[...meses].sort(([a],[b])=>a.localeCompare(b)).map(([mes,v])=>({nome:mes.split('-').reverse().join('/'),valor:v/100}))};
 }
+function quadroDesembolsadoAviao(a){
+  const r=gastosDashboardAviao(a);
+  return secaoPlanilhaAviao('av-desembolsado','Total desembolsado na aeronave','Todo o histórico, independentemente do filtro de ano. Somente valores pagos; despesas em aberto ficam fora.',
+    el('<div class="aviao-sheet-resumo"><div><small>Aquisição da minha cota</small><strong>'+brl(r.aquisicao)+'</strong><span>Pagamentos da aquisição</span></div><div><small>Gastos pagos</small><strong>'+brl(r.gastosPagosHistorico)+'</strong><span>Mensalidades + viagens + avulsos</span></div><div><small>Total desembolsado</small><strong>'+brl(r.desembolsado)+'</strong><span>Aquisição + gastos pagos</span></div></div>'));
+}
 function vDashboardAviao(m){
   const ano=filtro.aviaoGastosAno||'',r=gastosDashboardAviao(E.aviao,ano);
   const painel=el('<div class="aviao-planilha aviao-dashboard"></div>');
@@ -3116,8 +3121,7 @@ function vDashboardAviao(m){
   detalhes.appendChild(tabelaAviao(['Tipo','Descrição','Data de referência','Minha parte','Situação'],r.registros.slice().sort((a,b)=>(b.dataBase||'').localeCompare(a.dataBase||'')),
     x=>[esc(x.tipo),esc(x.descricao||x.competencia?.slice(0,7)||'Mensalidade'),esc(x.dataBase?fmtDataAno(x.dataBase):'Sem data'),brl(x.minhaCota),esc(x.status||'Pendente')],
     x=>modalRegistroAviao(x.colecao,E.aviao[x.colecao].find(y=>y.id===x.id)),{nome:'Gasto da aeronave',numericas:[3]}));painel.appendChild(detalhes);
-  painel.appendChild(secaoPlanilhaAviao('av-desembolsado','Total desembolsado na aeronave','Todo o histórico, independentemente do filtro de ano. Somente valores pagos; despesas em aberto ficam fora.',
-    el('<div class="aviao-sheet-resumo"><div><small>Aquisição da minha cota</small><strong>'+brl(r.aquisicao)+'</strong><span>Pagamentos da aquisição</span></div><div><small>Gastos pagos</small><strong>'+brl(r.gastosPagosHistorico)+'</strong><span>Mensalidades + viagens + avulsos</span></div><div><small>Total desembolsado</small><strong>'+brl(r.desembolsado)+'</strong><span>Aquisição + gastos pagos</span></div></div>')));
+  painel.appendChild(quadroDesembolsadoAviao(E.aviao));
   m.appendChild(painel);
 }
 function vincularViagemAviao(){
@@ -3237,6 +3241,7 @@ function vAviao(m){
       <div><small>Despesas extras</small><strong>${brl(t.extras)}</strong><span>Minha parte, sem mensalidades</span></div>
       <div><small>Viagens vinculadas</small><strong>${viagem.length}</strong><span>As mesmas viagens da Central</span></div></div>`);
     m.appendChild(ac);
+    m.appendChild(quadroDesembolsadoAviao(a));
     const ponte=el('<div class="aviao-pontes"></div>');
     ponte.append(acao('Ver planilha de custos',()=>{filtro.aviaoAba='custos';tela()},'ghost'),
       acao('Ver viagens',()=>{filtro.aviaoAba='viagens';tela()},'ghost'),
