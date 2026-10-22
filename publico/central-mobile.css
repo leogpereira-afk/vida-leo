@@ -2,6 +2,7 @@
 .central-mobile-nav,.dv-mobile-meta{display:none}
 .central-registro-abrir{border:0;background:transparent;color:var(--verde);font:inherit;font-weight:650;text-align:left;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:5px 0}
 .ag-campos :is(input,select,textarea){box-sizing:border-box;width:100%;min-width:0;min-height:44px;border:1px solid var(--linha);border-radius:8px;padding:9px 10px;background:var(--card);color:var(--tinta);font:inherit;line-height:1.45}.ag-campos textarea{min-height:90px;resize:vertical}
+.editor-lista-mobile input{font:inherit}
 @media(max-width:700px){
  body[data-leo-area] :is(.pagina:not(.saude-workbench),.modal) :is(input,select,textarea){font-size:16px}
  body[data-leo-area] :is(.pagina:not(.saude-workbench),.modal) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select){min-height:44px;box-sizing:border-box;max-width:100%;min-width:0}
@@ -20,7 +21,7 @@
  .modal .notas{flex-wrap:wrap}.modal .notas>button{min-width:44px!important;min-height:44px}
  .modal .ag-campos{grid-template-columns:minmax(0,1fr)}
  .central-registro-abrir{min-height:44px;min-width:64px;max-width:220px;white-space:normal;overflow-wrap:anywhere}
- .editor-lista-mobile input{min-height:44px}.editor-lista-mobile button{min-height:44px;min-width:44px}
+ .editor-lista-mobile input{min-height:44px;font-size:16px}.editor-lista-mobile button{min-height:44px;min-width:44px}
  body[data-leo-area] .rotina-form textarea{box-sizing:border-box;width:100%;min-width:0;min-height:90px;border:1px solid var(--linha);border-radius:9px;padding:10px;background:var(--card);color:var(--tinta);font:inherit;font-size:16px}
  body[data-leo-area] .indice-tela{max-width:100%;min-width:0}.indice-tela select{width:100%;min-width:0}
 }

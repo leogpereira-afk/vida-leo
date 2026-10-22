@@ -685,7 +685,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./gastos-painel.css?v=94e57832c4ee">
 <link rel="stylesheet" href="./fortemais-visual.css?v=4b49bedcb0e5">
 <link rel="stylesheet" href="./central-densidade.css?v=5dfbc2553a75">
-<link rel="stylesheet" href="./central-mobile.css?v=c02e146dac34">
+<link rel="stylesheet" href="./central-mobile.css?v=48cfe554c15f">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -2714,7 +2714,21 @@ function ordenarViagensRotina(lista){
   });
 }
 function buscaRotina(lista,termo,campos){const q=normaliza(termo||'');return q?lista.filter(x=>campos.some(k=>normaliza(String(x[k]||'')).includes(q))):lista}
-function buscaRotinaCampo(valor,rotulo,mudar){const cx=el('<label class="rotina-busca"><span>'+esc(rotulo)+'</span><input type="search" placeholder="'+esc(rotulo)+'"></label>');const inp=cx.querySelector('input');inp.value=valor||'';inp.onchange=()=>mudar(inp.value);return cx}
+function buscaRotinaCampo(valor,rotulo,mudar){
+  const cx=el('<label class="rotina-busca"><span>'+esc(rotulo)+'</span><input type="search" placeholder="'+esc(rotulo)+'"></label>');
+  const inp=cx.querySelector('input');inp.value=valor||'';let anterior=inp.value;
+  const atualizar=ev=>{
+    if(ev?.isComposing||inp.value===anterior)return;
+    const focado=document.activeElement===inp,inicio=inp.selectionStart,fim=inp.selectionEnd,direcao=inp.selectionDirection;
+    anterior=inp.value;mudar(anterior);
+    if(!focado)return;
+    const novo=[...document.querySelectorAll('.rotina-busca input')].find(c=>c.placeholder===rotulo);
+    novo?.focus({preventScroll:true});
+    if(inicio!=null&&fim!=null)novo?.setSelectionRange(inicio,fim,direcao||'none');
+  };
+  inp.oninput=atualizar;inp.onchange=atualizar;inp.onsearch=atualizar;inp.oncompositionend=atualizar;
+  return cx;
+}
 function metricasRotina(itens){const cx=el('<div class="rotina-metricas"></div>');itens.forEach(([nome,valor,sub])=>cx.appendChild(el('<div><span>'+esc(nome)+'</span><strong>'+esc(valor)+'</strong><small>'+esc(sub||'')+'</small></div>')));return cx}
 
 /* ===================== VIAGENS ===================== */
@@ -16262,7 +16276,7 @@ const GRUPOS_CFG=[
   {k:'relacoes',t:'Parentesco',d:'em "Minha gente"',ic:'👨‍👩‍👧'},
 ];
 function editorLista(chave,render){
-  const c=el('<div class="corpo"></div>');
+  const c=el('<div class="corpo editor-lista-mobile"></div>');
   const chips=el('<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px"></div>');
   const lista=CFG(chave);
   lista.forEach((item,i)=>{
@@ -16281,7 +16295,7 @@ function editorLista(chave,render){
   c.appendChild(chips);
   const f=el(`<form style="display:flex;gap:8px;flex-wrap:wrap">
     <input type="text" placeholder="adicionar…" style="flex:1;min-width:170px;border:1px solid var(--linha);
-      background:var(--bg);color:inherit;font:inherit;padding:8px 11px;border-radius:9px">
+      background:var(--bg);color:inherit;padding:8px 11px;border-radius:9px">
     <button class="btn mini" type="submit">+ Adicionar</button></form>`);
   f.querySelector('input').setAttribute('aria-label','Adicionar opção em '+(GRUPOS_CFG.find(g=>g.k===chave)?.t||chave));
   f.onsubmit=ev=>{ev.preventDefault();
@@ -16871,7 +16885,28 @@ function agendaPush(){if(DEV||!pegaToken())return;pintaSync('alterações penden
 // aparelho desatualizado ou dois salvamentos quase juntos: quem perde a corrida
 // adota a versão do servidor, guarda a sua de lado e avisa.
 let _tabBase=0;                       // em memória de propósito: cada aba corre sozinha
-const marcaBase=mt=>{if(mt)_tabBase=+mt};
+let _tabConteudo=null;
+// JSONB pode devolver as chaves em outra ordem. Só a marca do estado e o
+// resultado da última conferência da Agenda são metadados, no nível raiz.
+function conteudoSync(dados){
+  return JSON.stringify(dados,function(chave,valor){
+    if(valor&&typeof valor==='object'&&!Array.isArray(valor))return Object.fromEntries(Object.keys(valor).filter(k=>valor!==dados||!['_mt','agendaGoogleUltima'].includes(k)).sort().map(k=>[k,valor[k]]));
+    return valor;
+  });
+}
+const marcaBase=(mt,conteudo=null)=>{if(mt){_tabBase=+mt;_tabConteudo=conteudo}};
+function atualizarMetadadosNuvem(r){
+  if(!_tabConteudo||!r?.dados||!r.mt||conteudoSync(r.dados)!==_tabConteudo)return false;
+  validarBackup(r.dados);
+  // Compare com a base confirmada, nunca com a edição local pendente. O cron
+  // pode ter _mt maior que ela sem ter alterado nenhum cadastro.
+  const atualizado={...E,agendaGoogleUltima:r.dados.agendaGoogleUltima};
+  if(conteudoSync(E)===_tabConteudo)atualizado._mt=r.dados._mt;
+  guardarEstadoLocal(atualizado);
+  E.agendaGoogleUltima=atualizado.agendaGoogleUltima;E._mt=atualizado._mt;
+  marcaBase(r.mt,_tabConteudo);atualizarStatusAgendaGoogle();
+  return true;
+}
 function guardaDescartado(){
   try{localStorage.setItem('cl_descartado',JSON.stringify({em:Date.now(),dados:lerEstadoLocal()}))}catch(_){}
 }
@@ -16940,7 +16975,7 @@ function adotaNuvem(r,avisar){
   guardaDescartado();
   // modal aberto sobre o estado antigo viraria órfão e comeria o que fosse digitado
   const mo=document.getElementById('modais');if(mo)mo.innerHTML='';atualizarCamadasModais();
-  guardarEstadoLocal(r.dados);marcaBase(r.mt);E=carregar();tela({baseRemota:true});mostrarRascunhoSync();
+  guardarEstadoLocal(r.dados);marcaBase(r.mt,conteudoSync(r.dados));E=carregar();tela({baseRemota:true});mostrarRascunhoSync();
   pintaSync('atualizado de outro acesso');
   if(avisar)alert('Outro acesso atualizou os dados. Esta aba adotou a versão do servidor para preservar o que foi salvo lá.\n\n'+(preservou?'Os textos dos formulários foram preservados nesta aba. Use Recuperar textos preservados para conferir e copiar o que precisar.':'A versão local anterior ficou em Configurações → Versão descartada.'));
 }
@@ -16968,34 +17003,50 @@ async function executarEnvio(){if(DEV&&!window.__testeSync)return true;
       pintaSync('conferindo…');
       const r=await apiSync('GET');
       if(r&&r.dados&&(r.dados._mt||0)>(E._mt||0)){adotaNuvem(r,true);return false}
-      marcaBase(r&&r.mt||0);
+      marcaBase(r&&r.mt||0,r?.dados?conteudoSync(r.dados):null);
     }
-    pintaSync('enviando…');
-    const versaoEnviada=E._mt;
-    const p=await apiPut();
-    if(p.status===409){const r=await apiSync('GET');adotaNuvem(r,true);return false}
-    if(p.status===428){pintaSync('recarregue a página');return false}
-    if(p.status<200||p.status>=300)throw new Error('HTTP '+p.status);
-    marcaBase(p.j&&p.j.mt);pintaSync(E._mt===versaoEnviada?'sincronizado':'alterações pendentes');return true;
+    for(let tentativa=0;tentativa<2;tentativa++){
+      pintaSync('enviando…');
+      const versaoEnviada=E._mt,conteudoEnviado=conteudoSync(E);
+      const p=await apiPut();
+      if(p.status===409){
+        const r=await apiSync('GET');
+        if(atualizarMetadadosNuvem(r)){
+          if(!tentativa)continue; // Uma repetição, ainda protegida pelo CAS.
+          pintaSync('alterações pendentes — tente sincronizar');return false;
+        }
+        adotaNuvem(r,true);return false;
+      }
+      if(p.status===428){pintaSync('recarregue a página');return false}
+      if(p.status<200||p.status>=300)throw new Error('HTTP '+p.status);
+      marcaBase(p.j&&p.j.mt,conteudoEnviado);pintaSync(E._mt===versaoEnviada?'sincronizado':'alterações pendentes');return true;
+    }
   }catch(e){pintaSync('não enviado — tente sincronizar');return false}}
 async function puxarNuvem(){if(DEV&&!window.__testeSync){pintaSync('modo local');return}
   if(envioEmCurso)await envioEmCurso;
   try{pintaSync('baixando…');
     const baseDaLeitura=_tabBase;
     const r=await apiSync('GET');
+    // Um PUT desta aba pode ter começado durante o GET, e já aparecer nele
+    // antes de sua própria resposta chegar. Espere a confirmação antes de comparar.
+    if(envioEmCurso)await envioEmCurso;
     if(_tabBase!==baseDaLeitura)return; // Um envio ou outra leitura já avançou a versão.
     const remoto=r&&r.dados;
     if(remoto)validarBackup(remoto);
     // Uma leitura não pode autorizar a gravação de alterações feitas sobre outra base.
-    if(remoto&&_tabBase&&r.mt!==_tabBase){adotaNuvem(r,true);return}
-    marcaBase(r&&r.mt);
+    if(remoto&&_tabBase&&+r.mt!==_tabBase){
+      if(!atualizarMetadadosNuvem(r)){adotaNuvem(r,true);return}
+      if(conteudoSync(E)!==_tabConteudo){await enviarNuvem();return}
+      pintaSync('sincronizado');return;
+    }
+    marcaBase(r&&r.mt,remoto?conteudoSync(remoto):null);
     if(remoto&&(remoto._mt||0)>(E._mt||0)){
       adotaNuvem(r,!!document.querySelector('#modais .fundo'));
     } else if((E._mt||0)>((remoto&&remoto._mt)||0)){await enviarNuvem();return}
     else pintaSync('sincronizado');
     mostrarRascunhoSync();
   }catch(e){pintaSync('sem conexão')}}
-async function sincronizarAgora(){await puxarNuvem();tela()}
+async function sincronizarAgora(){await puxarNuvem()}
 function salvarPDF(){window.print()}
 function telaLogin(){
   limparRascunhoSync();
