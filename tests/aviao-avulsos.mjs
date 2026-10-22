@@ -34,3 +34,15 @@ test('dashboard vazio renderiza, preserva os dados e permite abrir um lançament
  document.querySelector('table button').click();assert.match(document.querySelector('[role=dialog]').textContent,/Editar custo avulso/);
  assert.equal(run('E.aviao.despesas.length'),1);
 });
+
+test('total desembolsado soma aquisição e pagamentos de todo o histórico, mesmo com filtro anual',()=>{
+ const {run,document}=setup();
+ run("E.aviao.aportes=[{valor:1000.10},{valor:2000.20}];E.aviao.valorCotaAtual=9000;E.aviao.mensalidades=[{minhaCota:100.10,status:'Pago',pagoEm:'2025-01-05'},{minhaCota:800,status:'A Vencer',vencimento:'2026-01-05'}];E.aviao.despesas=[{minhaCota:20.20,status:'Pago',pagoEm:'2026-01-06'},{minhaCota:500,status:'Cancelado'},{minhaCota:900,status:'Pendente'}]");
+ assert.equal(run("gastosDashboardAviao(E.aviao,'2026').pago"),20.20);
+ assert.equal(run("gastosDashboardAviao(E.aviao,'2026').desembolsado"),3120.60);
+ run("filtro.aviaoGastosAno='2026';vDashboardAviao(document.getElementById('main'))");
+ const final=document.querySelector('.aviao-dashboard').lastElementChild;
+ assert.match(final.textContent,/Total desembolsado na aeronave/);
+ assert.match(final.textContent,/3\.120,60/);
+ assert.match(final.textContent,/independentemente do filtro/);
+});
