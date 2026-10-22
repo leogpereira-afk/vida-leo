@@ -1,4 +1,4 @@
-/* Resumos somente de leitura. Dados privados ficam na memória desta aba,
+/* Resumos somente de leitura. Dados privados ficam no cache protegido do servidor e na memória da aba,
    nunca no backup da Central, localStorage ou arquivos do site. */
 const InicioGoogle = (() => {
   const FUSO='America/Sao_Paulo', LIMITE=4, CACHE_MS=60000;
@@ -25,7 +25,7 @@ const InicioGoogle = (() => {
       if(terminou)return false;vistos.add(e.id);return true;
     }).sort((a,b)=>inicio(a)-inicio(b));
   }
-  function criar({ler,conectado,renovar,conexoes,abrirDrive}){
+  function criar({ler,conectado,renovar,conexoes,abrirDrive,resumoServidor}){
     let geracao=0;const cache=new Map(),pedidos=new Map(),montagens=new Set();
     function limpar(){geracao++;cache.clear();pedidos.clear();for(const m of montagens){if(m.raiz.isConnected)m.apagar();else montagens.delete(m)}}
     async function consultar(servico){
@@ -58,11 +58,12 @@ const InicioGoogle = (() => {
       return{items:items.filter(f=>f.id).slice(0,LIMITE),parcial:!!token&&items.length<LIMITE};
     }
     async function dados(servico,forcar){
-      if(!conectado(servico)){cache.delete(servico);return null}
+      const servidor=!!resumoServidor&&servico!=='agenda';
+      if(!servidor&&!conectado(servico)){cache.delete(servico);return null}
       const salvo=cache.get(servico);if(!forcar&&salvo&&Date.now()-salvo.em<CACHE_MS)return salvo;
       if(pedidos.has(servico))return pedidos.get(servico);
       const g=geracao;
-      const p=consultar(servico).then(r=>{if(g!==geracao||!conectado(servico))return null;const novo={...r,em:Date.now()};cache.set(servico,novo);return novo}).finally(()=>{if(pedidos.get(servico)===p)pedidos.delete(servico)});
+      const p=(servidor?resumoServidor(servico,forcar):consultar(servico)).then(r=>{if(g!==geracao||(!servidor&&!conectado(servico)))return null;if(!r||r.precisaAutorizar)return null;if(!Array.isArray(r.items))throw Error(r.erro||'Aguardando primeira atualização automática.');const novo={...r,em:servidor?r.em:Date.now()};cache.set(servico,novo);return novo}).finally(()=>{if(pedidos.get(servico)===p)pedidos.delete(servico)});
       pedidos.set(servico,p);return p;
     }
     function montar(){
@@ -108,7 +109,7 @@ const InicioGoogle = (() => {
             linha.title=titulo;if(linha.tagName==='A')linha.setAttribute('aria-label',titulo+' (abre no Google em outra aba)');lista.append(linha);
           }
           if(!r.items.length)lista.append(criarEl('p','ig-vazio',r.parcial?'Consulta parcial. Atualize ou abra o serviço para conferir.':servico==='agenda'?'Nenhum compromisso nos próximos 30 dias.':servico==='gmail'?'Caixa de entrada vazia.':'Nenhuma pasta na raiz do Meu Drive.'));
-          status.textContent=(r.parcial?'Consulta parcial · ':'')+'Atualizado às '+dataBR(new Date(r.em),{hour:'2-digit',minute:'2-digit'});
+          status.textContent=(r.erro?r.erro+' ':Date.now()-r.em>600000?'Leitura desatualizada · ':'')+(r.parcial?'Consulta parcial · ':'')+'Atualizado às '+dataBR(new Date(r.em),{hour:'2-digit',minute:'2-digit'})+(resumoServidor&&servico!=='agenda'?' · automático a cada 5 min':'');
           if(servico==='drive'){const b=criarEl('button','btn ghost','Ver todo o Drive');b.type='button';b.onclick=()=>abrirDrive();rodape.append(b)}
           else if(servico==='agenda')rodape.append(link('https://calendar.google.com/calendar/'+(r.conta?'?authuser='+encodeURIComponent(r.conta):''),'Abrir Google Agenda ↗','btn ghost'));
           else if(r.conta)rodape.append(link('https://mail.google.com/mail/?authuser='+encodeURIComponent(r.conta)+'#inbox','Abrir Gmail ↗','btn ghost'));
@@ -118,11 +119,11 @@ const InicioGoogle = (() => {
           atualizar.disabled=true;card.setAttribute('aria-busy','true');status.textContent='Consultando…';
           try{
             if(forcar&&!conectado(servico))await renovar();
-            if(!conectado(servico)){conectar();return}
+            if(!(resumoServidor&&servico!=='agenda')&&!conectado(servico)){conectar();return}
             if(!lista.childNodes.length)lista.append(criarEl('p','ig-vazio','Carregando…'));
             const r=await dados(servico,forcar);
             if(!raiz.isConnected)return;
-            if(!r||!conectado(servico)){conectar();return}pintar(r);
+            if(!r||(!(resumoServidor&&servico!=='agenda')&&!conectado(servico))){conectar();return}pintar(r);
           }catch(e){
             if(!raiz.isConnected)return;lista.replaceChildren();rodape.replaceChildren();status.textContent=e.message||'Não foi possível consultar. Tente atualizar.';
             const b=criarEl('button','btn ghost','Ver conexão');b.type='button';b.onclick=conexoes;rodape.append(b);

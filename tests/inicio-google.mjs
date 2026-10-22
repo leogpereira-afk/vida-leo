@@ -7,13 +7,13 @@ import {setup as setupCentral} from './helpers/dom.mjs';
 
 const source=readFileSync(new URL('../publico/inicio-google.js',import.meta.url),'utf8');
 const tick=()=>new Promise(r=>setImmediate(r));
-function setup({responder,conectado=()=>true}={}){
+function setup({responder,conectado=()=>true,resumoServidor}={}){
  const {document}=parseHTML('<html><body><main></main></body></html>');
  const chamadas=[],destinos=[];
  const ctx=vm.createContext({document,URL,URLSearchParams,Date,Intl,console});
  vm.runInContext(source,ctx);
  const api=vm.runInContext('InicioGoogle',ctx).criar({
-  conectado,renovar:async()=>{},conexoes:()=>destinos.push('config'),abrirDrive:p=>destinos.push(p||'drive'),
+  resumoServidor,conectado,renovar:async()=>{},conexoes:()=>destinos.push('config'),abrirDrive:p=>destinos.push(p||'drive'),
   ler:async(s,p)=>{chamadas.push([s,p]);return responder?responder(s,p):s==='agenda'?{items:[]}:s==='drive'?{files:[]}:p.startsWith('profile')?{emailAddress:'demo@example.test'}:{messages:[]}}
  });
  const montar=()=>{const node=api.montar();document.querySelector('main').replaceChildren(node);return node};
@@ -101,3 +101,5 @@ test('tela inicial integra três resumos sem importar eventos ou guardar mensage
  run("vDrive=()=>{};googleConectado=()=>true");document.querySelector('[data-servico="drive"] .ig-item').click();
  assert.equal(run('atual'),'drive');assert.equal(run('filtro.drive.pasta'),'pasta-id');assert.equal(run('filtro.drive.trilha.at(-1).id'),'pasta-id');
 });
+
+test('cards carregam cache protegido antes de obter token Google no navegador',async()=>{const x=setup({conectado:()=>false,resumoServidor:async s=>({items:s==='drive'?[{id:'p',name:'Pasta do servidor'}]:[{id:'m',internalDate:'1000',payload:{headers:[{name:'Subject',value:'Email do servidor'}]}}],em:Date.now(),conta:'teste@example.test'})});x.montar();await tick();assert.match(x.document.body.textContent,/Pasta do servidor/);assert.match(x.document.body.textContent,/Email do servidor/);assert.match(x.document.body.textContent,/automático a cada 5 min/);assert.equal(x.chamadas.length,0)});

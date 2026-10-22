@@ -718,7 +718,7 @@ tr:hover .lixo{opacity:1}
 
 <script src="./vendor/ical-2.2.1.min.js"></script>
 <script src="./google-datas.js?v=85c5d36986f3"></script>
-<script src="./inicio-google.js?v=246738c9df76"></script>
+<script src="./inicio-google.js?v=75bfe0d51b19"></script>
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
 <script src="./marketing-fortemais.js?v=43e087960693"></script>
 <script src="./marketing.js?v=39a86005b2ae"></script>
@@ -2542,8 +2542,16 @@ function diasViajandoNoAno(viagens,ano){
 }
 
 let inicioGooglePainel=null;
+let inicioGoogleServidorPedido=null,inicioGoogleServidorEm=0;
+function lerResumoGoogleServidor(servico,forcar=false){
+  if(!inicioGoogleServidorPedido||Date.now()-inicioGoogleServidorEm>10000){
+    inicioGoogleServidorEm=Date.now();inicioGoogleServidorPedido=apiSync('POST',{acao:'googleResumoInicio'}).catch(e=>{inicioGoogleServidorPedido=null;throw e});
+  }
+  return inicioGoogleServidorPedido.then(r=>r[servico]||null);
+}
 function resumoGoogleInicio(){
   if(!inicioGooglePainel)inicioGooglePainel=InicioGoogle.criar({
+    resumoServidor:DEV?undefined:lerResumoGoogleServidor,
     ler:(servico,caminho)=>googleLer(servico,caminho),conectado:servico=>googleConectado(servico),renovar:()=>googleCrachaDoServidor(),
     conexoes:()=>{abreBloco('google-conexoes');irTela('config')},
     abrirDrive:pasta=>{const d=prepararFiltroDrive();Object.assign(d,{modo:'pastas',pasta:pasta?.id||'root',busca:'',digitado:'',tipo:'',trilha:[{id:'root',nome:'Meu Drive'},...(pasta?[{id:pasta.id,nome:pasta.name}]:[])],trilhaPendente:''});irTela('drive')}
@@ -8233,7 +8241,7 @@ function googleConectado(servico){return !!googleSessao[servico]?.token&&googleS
 const GOOGLE_ESCOPO_DE={gmail:'gmail.readonly',agenda:'calendar.readonly',agendaEnviar:'calendar.app.created',drive:'drive.readonly'};
 let googleCrachaPedido=null;
 let googleConexaoErro='';
-function googleLimparServidor(){inicioGooglePainel?.limpar();for(const serv in googleSessao)if(googleSessao[serv]?.origem==='servidor'){googleSessao[serv]=null;if(serv==='gmail')_gmailToken=''}}
+function googleLimparServidor(){inicioGoogleServidorPedido=null;inicioGooglePainel?.limpar();for(const serv in googleSessao)if(googleSessao[serv]?.origem==='servidor'){googleSessao[serv]=null;if(serv==='gmail')_gmailToken=''}}
 async function googleCrachaDoServidor(){
   if(DEV)return false; // Prévia local não solicita credenciais do servidor.
   if(googleCrachaPedido)return googleCrachaPedido;
