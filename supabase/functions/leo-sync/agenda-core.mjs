@@ -1,6 +1,8 @@
 // Espelho das funções puras do cliente; teste de paridade impede divergência.
 const dataLocal=d=>d.toISOString().slice(0,10);
 function reconciliarAgendaGoogle(agenda,historico,lotes,agora,novoId){
+  const canon=v=>v&&typeof v==='object'?(Array.isArray(v)?v.map(canon):Object.fromEntries(Object.keys(v).sort().map(k=>[k,canon(v[k])]))):v;
+  const igual=(a,b)=>JSON.stringify(canon(a))===JSON.stringify(canon(b));
   const ativos=structuredClone(agenda),arquivo=structuredClone(historico||[]);
   const cont={novos:0,atualizados:0,arquivados:0};
   const guardar=(registro,motivo)=>arquivo.push({registro:structuredClone(registro),motivo,em:agora});
@@ -30,10 +32,10 @@ function reconciliarAgendaGoogle(agenda,historico,lotes,agora,novoId){
         const oculto=arquivo.some(x=>x.motivo==='Removido nesta Central'&&chave(x.registro)===e.id);
         if(lote.adicionar&&!oculto){ativos.push({id:novoId(),...reg,...campos});cont.novos++}continue;
       }
-      if(Object.entries(campos).some(([k,v])=>JSON.stringify(atual[k])!==JSON.stringify(v))){
+      if(Object.entries(campos).some(([k,v])=>!igual(atual[k],v))){
         // Campos novos apenas enriquecem o cadastro. Arquive quando algum valor
         // já existente for substituído; não duplique tudo só por adicionar metadados.
-        if(Object.entries(campos).some(([k,v])=>Object.hasOwn(atual,k)&&JSON.stringify(atual[k])!==JSON.stringify(v)))guardar(atual,'Atualizado pelo Google');
+        if(Object.entries(campos).some(([k,v])=>Object.hasOwn(atual,k)&&!igual(atual[k],v)))guardar(atual,'Atualizado pelo Google');
         Object.assign(atual,campos);cont.atualizados++;
       }
       for(const repetido of encontrados.slice(1)){
