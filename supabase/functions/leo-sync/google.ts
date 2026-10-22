@@ -107,7 +107,7 @@ async function configGravar(sb: Banco, chave: string, valor: Registro): Promise<
    a cada abertura de tela. Vencido, renova com a chave de renovação — e se o
    Google recusar (acesso revogado pelo dono), some com tudo e pede para
    autorizar de novo, em vez de insistir com uma chave morta. */
-async function tokenAcesso(sb: Banco): Promise<{ token: string; vence: string; escopo: string } | null> {
+export async function tokenAcesso(sb: Banco): Promise<{ token: string; vence: string; escopo: string } | null> {
   const guardado = await configLer(sb, "google_token");
   const exp = guardado ? Date.parse(texto(guardado.exp)) : NaN;
   if (guardado && texto(guardado.token) && Number.isFinite(exp) && exp > Date.now() + FOLGA_SEG * 1000) {

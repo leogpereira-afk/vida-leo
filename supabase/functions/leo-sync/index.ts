@@ -26,6 +26,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 // O Strava mora em strava.ts: aqui só se confere o crachá e se despacha (14/09/2026).
 import { stravaAcao } from "./strava.ts";
 // O Google mora em google.ts: a autorização fica no servidor e a tela recebe só um crachá curto (14/09/2026).
+import { sincronizarAgendaServidor } from "./agenda-servidor.mjs";
+import { tokenAcesso } from "./google.ts";
 import { googleAcao } from "./google.ts";
 // O calendário da empresa entra pela porta da PRÓPRIA Central (15/09/2026):
 // a porta do Painel exige crachá do Painel, e crachá é por sistema.
@@ -233,10 +235,10 @@ async function crachaCurto(minutos: number): Promise<string> {
    acontece se o cabeçalho já vier com tamanho plausível, para um pedido anônimo
    não conseguir fazer o servidor bater no banco à toa. */
 const CRON_ACAO = "stravaSincronizarCron";
-async function cronOk(req: Request): Promise<boolean> {
+async function cronOk(req: Request, chave = "cron_token"): Promise<boolean> {
   const dado = (req.headers.get("x-leo-cron") ?? "").trim();
   if (dado.length < 32 || dado.length > 200) return false;
-  const { data, error } = await sb.from("leo_config").select("valor").eq("chave", "cron_token").maybeSingle();
+  const { data, error } = await sb.from("leo_config").select("valor").eq("chave", chave).maybeSingle();
   if (error || !data) return false;
   const v = data.valor as Record<string, unknown> | null;
   const esperado = v && typeof v.token === "string" ? v.token.trim() : "";
@@ -264,6 +266,12 @@ Deno.serve(async (req: Request) => {
   if (req.method === "POST") {
     const corpo = await req.json().catch(() => ({}));
     const { acao, senha, senhaAtual, senhaNova, id: corpoId } = corpo;
+
+    if (acao === "agendaSincronizarCron") {
+      if (!await cronOk(req, "agenda_cron_token")) return json({erro:"Não autorizado"},401);
+      const resultado = await sincronizarAgendaServidor(sb, () => tokenAcesso(sb));
+      return json(resultado, resultado.ok ? 200 : 503);
+    }
 
     // Porta exclusiva da fila pessoal: sessão do dono OU assinatura privada do
     // OpenClaw, vinculada a esta ação/corpo e válida por até dois minutos.

@@ -27,3 +27,21 @@ Publicação pelo workflow de Pages (site estático, sem etapa de compilação).
 ## Cache sem perda
 
 Se o JSON não couber no armazenamento local, a Central compacta o mesmo conteúdo com LZ-String 1.5.0 (licença MIT incluída) usando prefixo versionado `lz16:`. Leitura, restauração e adoção da nuvem aceitam cache antigo e compactado. Nenhum backup é apagado para liberar espaço. Se a gravação ainda falhar, a sincronização restaura o estado anterior antes de qualquer envio. Os arquivos de backup continuam JSON legível e não dependem da compactação.
+
+## Execução com a Central fechada
+
+`agendaSincronizarCron` em leo-sync executa somente Google Agenda → Central.
+Usa o token Google existente no servidor e um segredo exclusivo `agenda_cron_token`,
+sem aceitar sessão do usuário como autorização do cron. O corpo não escolhe conta,
+URL nem estado. A rotina antiga `leo-google-sync-15min` permanece desativada.
+
+A migração `20261022095000_agenda_google_servidor.sql` agenda a execução a cada
+cinco minutos. Aplicar somente depois do deploy da função. O estado é gravado por
+compare-and-swap de `mt`: concorrência adia a rodada inteira. Falha de listagem
+preserva tudo; leitura individual inconclusiva preserva aquele registro e informa
+pendência. A rotina limita consultas a 85 segundos. Nenhuma escrita no Google.
+
+`agenda_cron_status` registra horário, resultado e contagens sem dados pessoais.
+Os testes conferem paridade exata do motor servidor/cliente, preservação, falhas,
+concorrência e rejeição do segredo de outro cron. Pausar pelo cron.alter_job do
+job `leo-agenda-google-5min`, sem apagar dados ou autorização Google.
