@@ -2,3 +2,11 @@
 @media(max-width:760px){.fmdoc-cab{flex-direction:column;gap:11px}.fmdoc-item{align-items:flex-start;flex-direction:column;gap:10px}.fmdoc-item-acoes{justify-content:flex-start;max-width:none}.fmdoc-upload{grid-template-columns:1fr}.fmdoc-upload small{grid-column:auto}.fmdoc-upload .fmdoc-solta{justify-self:stretch}.fmdoc-editor-grade{grid-template-columns:1fr}.fmdoc-painel{padding:12px 0}.fmdoc-cab .fmdoc-acoes{width:100%}.fmdoc-cab .btn{flex:1}}
 @media(prefers-color-scheme:dark){.fmdoc-chips button[aria-pressed=true],.fmdoc-situacoes button[aria-pressed=true]{color:var(--marca);background:var(--marca-cl)}.fmdoc-aviso{background:#202f49;color:#b9d2ff}.fmdoc-erro{background:#43251f;color:#ffbca9}}
 @media print{.fmdoc-acoes,.fmdoc-filtros,.fmdoc-upload,.fmdoc-edicao,.fmdoc-item-acoes{display:none!important}.fmdoc-item{break-inside:avoid}.fmdoc-painel{padding:0}}
+
+@media screen and (max-width:700px){
+ .fmdoc-campo input,.fmdoc-campo textarea,.fmdoc-filtros>input{font-size:16px;min-height:44px}
+ .fmdoc-campo,.fmdoc-upload-campos,.fmdoc-item-acoes{min-width:0;width:100%}
+ .fmdoc-item-acoes .btn{flex:1 1 auto;white-space:normal}
+ .fmdoc-item-meta,.fmdoc-item-nome,.fmdoc-item-descricao,.fmdoc-contador{font-size:13px;line-height:1.5}
+ .fmdoc-painel .btn,.fmdoc-chips button,.fmdoc-situacoes button{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+}

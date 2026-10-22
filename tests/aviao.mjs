@@ -125,7 +125,8 @@ test('custos: linhas importadas aparecem no livro do avião com edição',()=>{
   assert.match(document.getElementById('main').textContent,/5\.000,00/);
   run("document.getElementById('main').replaceChildren();filtro.aviaoPlanilha='viagens';vAviao(document.getElementById('main'))");
   assert.equal(document.querySelectorAll('[data-bid="av-extras"] tbody tr').length,1);
-  assert.equal(document.querySelectorAll('[data-bid="av-extras"] tbody button').length,1);
+  assert.equal(document.querySelectorAll('[data-bid="av-extras"] tbody td:last-child button').length,1);
+  assert.equal(document.querySelectorAll('[data-bid="av-extras"] tbody td:first-child .central-registro-abrir').length,1);
 });
 
 test('resumo da planilha reconcilia aquisição, referência, mensalidades e despesas sem cancelados',()=>{

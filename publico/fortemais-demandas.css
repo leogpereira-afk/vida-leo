@@ -8,3 +8,14 @@
 .fmd-check-alvo{display:grid;place-items:center;min-width:30px;min-height:36px;cursor:pointer}.fmd-resumo{--fmd-resumo-cor:var(--fmd-azul);--fmd-resumo-fundo:var(--fmd-azul-fundo)}.fmd-resumo[data-resumo=atrasadas]{--fmd-resumo-cor:var(--fmd-amarelo);--fmd-resumo-fundo:var(--fmd-amarelo-fundo)}.fmd-resumo[data-resumo=bloqueadas]{--fmd-resumo-cor:var(--fmd-vermelho);--fmd-resumo-fundo:var(--fmd-vermelho-fundo)}.fmd-resumo[data-resumo=resolvidas]{--fmd-resumo-cor:var(--fmd-verde);--fmd-resumo-fundo:var(--fmd-verde-fundo)}.fmd-resumo b{color:var(--fmd-resumo-cor);background:var(--fmd-resumo-fundo);padding:3px 9px;border-radius:7px;min-width:34px;text-align:center}.fmd-resumo[aria-pressed=true]{background:var(--fmd-resumo-fundo);color:var(--fmd-resumo-cor);border-color:var(--fmd-resumo-cor);box-shadow:inset 0 0 0 1px var(--fmd-resumo-cor)}.fm-projeto>.fmd-obra-resumo{margin:0;padding:9px 20px;border-top:1px solid var(--linha,#dce1e7)}
 @media(max-width:700px){.fmd-check-alvo{min-width:44px;min-height:44px}.fortemais-fluida .fm-tabs:has(button[data-pagina=demandas]){display:flex;flex-wrap:wrap}.fortemais-fluida .fm-tabs:has(button[data-pagina=demandas]) button{flex:1 1 auto;min-height:44px;padding:10px 12px}.fm-projeto>.fmd-obra-resumo{padding:8px 14px}}
 @media(prefers-reduced-motion:reduce){.fmd-card{transition:none}}@media print{.fmd-cab .fmd-acoes,.fmd-filtros,.fmd-card-acoes,.fmd-aviso{display:none!important}.fmd-card{break-inside:avoid}.fmd-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+@media screen and (max-width:700px){
+ .fmd-campo input,.fmd-campo select,.fmd-campo textarea,.fmd-check-linha input[type=text],.fmd-etapa-linha input{font-size:16px;min-height:44px;box-sizing:border-box}
+ .fmd-editor-principal>.fmd-campo input{font-size:16px}
+ .fmd-editor :is(.fmd-form-grid,.fmd-check-linha,.fmd-link-linha,.fmd-etapa-linha){min-width:0}
+ .fmd-editor .fmd-acoes,.fmd-editor-acoes{flex-wrap:wrap}
+ .fmd-editor .btn{min-height:44px;white-space:normal;overflow-wrap:anywhere}
+ .fmd-editor .fmd-nota,.fmd-editor .fmd-historico small,.fmd-editor .fmd-campo{font-size:12px;line-height:1.5}
+ .fmd-editor .fmd-check-linha .fmd-remover,.fmd-editor .fmd-etapa-linha .btn{font-size:12px}
+ .fmd-painel .fmd-card-meta,.fmd-painel .fmd-badge,.fmd-painel .fmd-prioridade,.fmd-painel .fmd-atrasada{font-size:12px;line-height:1.45}
+}

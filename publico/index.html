@@ -663,28 +663,29 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./rotina-fluida.css?v=a202a5abe674">
 <link rel="stylesheet" href="./planos-fluidos.css?v=1f6fdc37af07">
 <link rel="stylesheet" href="./central-fluida.css?v=25438d2d9ef6">
-<link rel="stylesheet" href="./documentos-revisao.css?v=90d5f0ab4afe">
+<link rel="stylesheet" href="./documentos-revisao.css?v=d5f854cb1895">
 <link rel="stylesheet" href="./painel-compacto.css?v=4baf1a7c4d03">
 <link rel="stylesheet" href="./saude-painel.css?v=64c322f2e74e">
 <link rel="stylesheet" href="./saude-visual.css?v=a6af9ad6f2c6">
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
 <link rel="stylesheet" href="./aviao.css?v=44fae810ca9e">
 <link rel="stylesheet" href="./fortemais-previsao.css?v=cdb9222e7265">
-<link rel="stylesheet" href="./fortemais-demandas.css?v=fafdab59a91c">
-<link rel="stylesheet" href="./fortemais-compacto.css?v=6899567e34c1">
+<link rel="stylesheet" href="./fortemais-demandas.css?v=3c85c613e3d8">
+<link rel="stylesheet" href="./fortemais-compacto.css?v=0a97e1fae61a">
 <link rel="stylesheet" href="./fortemais-inovacoes.css?v=be85f228f8ae">
 <link rel="stylesheet" href="./fortemais-ferramentas.css?v=b73b01e6fcca">
-<link rel="stylesheet" href="./fortemais-documentos.css?v=dac3ec0db7f9">
+<link rel="stylesheet" href="./fortemais-documentos.css?v=c4422b74e990">
 <link rel="stylesheet" href="./fortemais-obras-moderno.css?v=2fbc3e7b4e73">
 <link rel="stylesheet" href="./donboy-painel.css?v=05a4255f7b34">
 <link rel="stylesheet" href="donboy-email.css?v=ed0e5b4334e2">
-<link rel="stylesheet" href="./marketing.css?v=4712eec97782">
+<link rel="stylesheet" href="./marketing.css?v=58f36e2795bf">
 <link rel="stylesheet" href="./leonardo-design.css?v=b342d9620eec">
-<link rel="stylesheet" href="./rendimentos-avancado.css?v=cc0d0e217c45">
-<link rel="stylesheet" href="./rendimentos-dashboards.css?v=ce16ccc09d43">
-<link rel="stylesheet" href="./gastos-painel.css?v=5715594d8373">
+<link rel="stylesheet" href="./rendimentos-avancado.css?v=d3935d407276">
+<link rel="stylesheet" href="./rendimentos-dashboards.css?v=b83506bd9cc8">
+<link rel="stylesheet" href="./gastos-painel.css?v=94e57832c4ee">
 <link rel="stylesheet" href="./fortemais-visual.css?v=4b49bedcb0e5">
 <link rel="stylesheet" href="./central-densidade.css?v=5dfbc2553a75">
+<link rel="stylesheet" href="./central-mobile.css?v=c02e146dac34">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -745,7 +746,7 @@ tr:hover .lixo{opacity:1}
 <script src="./rendimentos-dashboards-modelo.js?v=0987eb11dd63"></script>
 <script src="./financeiro-graficos.js?v=493dcd6ca9b6"></script>
 <script src="./rendimentos-dashboards.js?v=defdf1766d9f"></script>
-<script src="./rendimentos-avancado.js?v=aaf868370b35"></script>
+<script src="./rendimentos-avancado.js?v=19a1188d85bb"></script>
 <script src="./gastos-modelo.js?v=363d272a4e23"></script>
 <script src="./gastos-painel.js?v=f343dab93ace"></script>
 <script src="./saude-modelo.js?v=f650c3b090e1"></script>
@@ -755,6 +756,7 @@ tr:hover .lixo{opacity:1}
 <script src="./saude-tratamentos.js?v=3b156043f5b6"></script>
 <script src="donboy-email.js?v=6a1ba6d316f6"></script>
 <script src="./vendor/lz-string.min.js?v=95f4d1cbf099"></script>
+<script src="./central-mobile.js?v=ad526ea7b610"></script>
 <script>
 /* ============================================================
    Central do Léo — painel pessoal, um arquivo só.
@@ -2352,7 +2354,7 @@ function prepararTabelas(pagina){
       tr.tabIndex=0;tr.setAttribute('role','button');tr.setAttribute('aria-label','Abrir '+tr.textContent.trim().replace(/\s+/g,' ').slice(0,100));
       tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tr.click()}};
     }});
-    if(pagina.classList.contains('financeiro')||pagina.classList.contains('saude-layout')||(pagina.dataset.saudeWorkbench&&t.closest('.sui-tabela-scroll,.sui-evolucao-tabela,.trat-usos-tabela'))||t.classList.contains('aviao-tabela')||t.classList.contains('fm-orcamento')||t.parentElement.closest('table'))return;
+    if(pagina.classList.contains('financeiro')||pagina.classList.contains('saude-layout')||(pagina.dataset.saudeWorkbench&&t.closest('.sui-tabela-scroll,.sui-evolucao-tabela,.trat-usos-tabela'))||t.classList.contains('aviao-tabela')||t.classList.contains('dv-tab')||t.classList.contains('fm-orcamento')||t.parentElement.closest('table'))return;
     const ths=[...t.querySelectorAll('thead>tr>th')].filter(x=>x.closest('table')===t);
     if(!ths.length||!linhas.length||linhas.some(tr=>tr.children.length!==ths.length||tr.querySelector('[colspan],table')))return;
     t.classList.add('tabela-adaptavel');
@@ -2394,7 +2396,7 @@ function tela(opcoes={}){
   if(atual==='rendimentos'&&typeof RendimentosUI!=='undefined')RendimentosUI.destino(alvo);
   if(atual==='gastos'&&typeof GastosUI!=='undefined')GastosUI.destino(alvo);
   const mod=MODS.find(x=>x.id===atual&&!x.url);document.title=mod.nome+' · Central do Léo';
-  const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else if(atual==='caixavgv')organizarCaixaVGV(pagina,alvo);else if(atual==='config')organizarConfig(pagina,alvo);else if(atual==='demandas')organizarDemandasTopo(pagina);else indiceDaTela(pagina);prepararTabelas(pagina);if(typeof docIntegrarTela==='function')docIntegrarTela(pagina,atual);organizarPainelCompacto(pagina,atual);if(alvo)rolaAlvo(pagina,alvo)};
+  const finalizar=()=>{if(!pagina.isConnected)return;if(['gastos','rendimentos'].includes(atual))organizarFinanceiro(pagina,atual,alvo);else if(atual==='saude')organizarSaude(pagina,alvo);else if(atual==='agenda')organizarAgenda(pagina,alvo);else if(atual==='caixavgv')organizarCaixaVGV(pagina,alvo);else if(atual==='config')organizarConfig(pagina,alvo);else if(atual==='demandas')organizarDemandasTopo(pagina);else indiceDaTela(pagina);prepararTabelas(pagina);if(typeof docIntegrarTela==='function')docIntegrarTela(pagina,atual);organizarPainelCompacto(pagina,atual);if(typeof prepararCentralMobile==='function')prepararCentralMobile(pagina);if(alvo)rolaAlvo(pagina,alvo)};
   const falhou=()=>{if(pagina.isConnected)pagina.appendChild(el('<p class="aviso" role="alert">Não foi possível concluir o carregamento. Abra esta seção novamente.</p>'))};
   try{const resultado=mod.render(pagina);if(resultado?.then)resultado.then(finalizar).catch(falhou);else finalizar()}catch(erro){if(atual==='rendimentos')console.error('Falha ao renderizar Rendimentos',erro);falhou()}
   return !!alvo;
@@ -3000,6 +3002,7 @@ function tabelaAviao(titulos,registros,linha,editar,{nome='',rodape=[],numericas
     const b=acao('Editar',()=>editar(x),'ghost');
     b.setAttribute('aria-label','Editar '+nome.toLowerCase()+' · '+(x.descricao||x.competencia||x.data||''));
     tr.lastElementChild.appendChild(b);
+    const primeira=tr.firstElementChild;if(primeira&&!primeira.querySelector('button,a,input')){const atalho=acao('',()=>editar(x),'central-registro-abrir');atalho.setAttribute('aria-label','Abrir registro de '+(nome||'avião')+' · '+(x.descricao||x.competencia||x.data||''));while(primeira.firstChild)atalho.append(primeira.firstChild);primeira.append(atalho)}
     tb.appendChild(tr);
   });
   if(rodape.length){
@@ -7606,7 +7609,7 @@ function vCaixaVGV(m){
      É a diferença entre "sei os valores" e "entendi a situação". */
   const maxb=Math.max(...[c.caixaLivre,c.receber,c.pagar,c.saldo].map(Math.abs),1);
   const barra=(rot,val,cor,expl)=>`<div style="margin-bottom:9px">
-    <div style="display:flex;align-items:baseline;gap:8px;font-size:12.5px">
+    <div class="cx-composicao-linha" style="display:flex;align-items:baseline;gap:8px;font-size:12.5px">
       <b style="min-width:132px">${rot}</b>
       <span style="font-variant-numeric:tabular-nums;font-weight:600;color:${cor}">${brl(val)}</span>
       <span style="color:var(--suave);font-size:11.5px">${expl}</span>
@@ -9543,7 +9546,7 @@ function agendarOportunidade(o){
 }
 function novaOportunidade(){
   abrirModal('Nova oportunidade','Comece pela ideia e pelo próximo passo.',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');
-    devFormulario(b,[{k:'titulo',t:'Qual é a oportunidade?',req:true,full:true},{k:'tipo',t:'Tipo',opcoes:CFG('tipoOportunidade')},{k:'porque',t:'Por que vale estudar?',tipo:'textarea',full:true},{k:'proximoPasso',t:'Primeiro passo',full:true},{k:'ate',t:'Revisar até',tipo:'date'}],{},'Criar oportunidade',v=>{const o={id:uid(),...v,estagio:'Semente',links:[],obs:'',mexido:hoje(),criada:hoje()};E.oportunidades.push(o);salvar();fechar();modalOport(o)});c.appendChild(b)},rr('oportunidades'));
+    devFormulario(b,[{k:'titulo',t:'Qual é a oportunidade?',req:true,full:true},{k:'tipo',t:'Tipo',opcoes:CFG('tipoOportunidade')},{k:'porque',t:'Por que vale estudar?',tipo:'textarea',full:true},{k:'proximoPasso',t:'Primeiro passo',full:true},{k:'ate',t:'Revisar até',tipo:'date'}],{},'Criar oportunidade',v=>{const o={id:uid(),...v,estagio:'Semente',links:[],obs:'',mexido:hoje(),criada:hoje()};const tamanho=E.oportunidades.length,mt=Object.getOwnPropertyDescriptor(E,'_mt');E.oportunidades.push(o);try{salvar()}catch(e){E.oportunidades.splice(tamanho);if(mt)Object.defineProperty(E,'_mt',mt);else delete E._mt;throw e}fechar();modalOport(o)});c.appendChild(b)},rr('oportunidades'));
 }
 const diasParado=o=>o.mexido?Math.round((new Date(hoje()+'T12:00')-new Date(String(o.mexido).slice(0,10)+'T12:00'))/864e5):null;
 // esfriou: parada há mais de 45 dias sem estar arquivada nem tocando
@@ -9617,12 +9620,13 @@ function modalOport(o,novoReg){
         </div>
         <div class="notas" style="display:flex;gap:5px"></div>
       </div>`);
-      const box=linha.querySelector('.notas');
+      const box=linha.querySelector('.notas');box.setAttribute('role','group');box.setAttribute('aria-label',cr.t);
       [0,1,2,3,4,5].forEach(v=>{
         const b=el(`<button class="btn mini ${(+o[cr.k]||0)===v&&o[cr.k]!=null&&o[cr.k]!==''?'':'ghost'}" style="min-width:30px">${v}</button>`);
+        b.setAttribute('aria-label',cr.t+' · nota '+v+' de 5');b.setAttribute('aria-pressed',String(o[cr.k]!==''&&o[cr.k]!=null&&+o[cr.k]===v));
         b.onclick=()=>{
           o[cr.k]=v;marcarMexido(o);salvar();
-          [...box.children].forEach((x,i)=>x.className='btn mini '+(i===v?'':'ghost'));
+          [...box.children].forEach((x,i)=>{x.className='btn mini '+(i===v?'':'ghost');x.setAttribute('aria-pressed',String(i===v))});
           pintaNota();
         };
         box.appendChild(b);
@@ -11290,8 +11294,14 @@ function financeiroFormulario(c,defs,obj,gravar,fechar){
       valores[d.k]=v;if(String(v)!==String(base[d.k])){if(String(obj[d.k]??'')!==String(base[d.k]))throw new Error('Este registro mudou desde que você o abriu. Feche e abra novamente para conferir.');patch[d.k]=v}
     }
     gravar(valores,patch);fechar();
-  }catch(e){erro.textContent=e.message;erro.hidden=false;erro.focus?.()}};
+  }catch(e){const detalhes=form.querySelector('.ff-more-fields');if(detalhes)detalhes.open=true;erro.textContent=e.message;erro.hidden=false;erro.focus?.()}};
   c.appendChild(form);return {form,controles};
+}
+function recolherDetalhesFormulario(editor,principais){
+  const form=editor.form,detalhes=el('<details class="ff-more-fields"><summary>Mais detalhes</summary><div class="ff-fields"></div></details>'),grade=detalhes.querySelector('.ff-fields');
+  for(const [k,input]of Object.entries(editor.controles))if(!principais.includes(k)&&!input.required)grade.append(input.closest('.ff-field'));
+  if(!grade.children.length)return;form.querySelector('.ff-fields').after(detalhes);for(const grupo of form.querySelectorAll('.empresa-form-grupo'))if(!grupo.querySelector('.ff-field'))grupo.remove();
+  const atualizar=()=>{const campos=[...grade.querySelectorAll('input,select,textarea')],n=campos.filter(i=>String(i.value??'').trim()!=='').length;detalhes.querySelector('summary').textContent='Mais detalhes · '+campos.length+' campos'+(n?' · '+n+(n===1?' preenchido':' preenchidos'):'')};form.addEventListener('input',atualizar);form.addEventListener('change',atualizar);form.addEventListener('invalid',e=>{if(detalhes.contains(e.target))detalhes.open=true},true);atualizar();
 }
 function financeiroSalvarRegistro(lista,obj,valores,patch){
   const existe=lista.find(x=>x.id===obj.id);
@@ -11351,6 +11361,7 @@ function bancoModal(b,origem){
      ajuda:(E.contabilidades||[]).length?'Cadastre na aba Contabilidade para aparecer aqui.':'Nenhuma cadastrada ainda: use a aba Contabilidade.'},
     {k:'obs',t:'Observações',tipo:'textarea',full:true}];
   const aoAbrir=editor=>{
+    recolherDetalhesFormulario(editor,['banco','titular','tipo','agencia','conta','pix']);
     /* O select guarda o ID e mostra o NOME: id manda, nome só exibe. Vínculo
        para uma contabilidade apagada aparece dito, nunca em branco. */
     const sel=editor&&editor.controles&&editor.controles.contabilidadeId;
@@ -12817,6 +12828,7 @@ function modalBem(x,novo=false){
       {k:'documento',t:'Documento / matrícula',full:true,ph:'Número da matrícula, cartório'},
       {k:'obs',t:'Observações',tipo:'textarea',full:true},
     ],x,(v,patch)=>financeiroSalvarRegistro(E.patrimonio,x,v,patch),fechar);
+    recolherDetalhesFormulario(editor,['nome','tipo','valor','falta','situacao']);
     const resumo=el('<output class="ff-equity-preview" aria-live="polite"></output>');editor.form.querySelector('.ff-actions').before(resumo);const atualizarResumo=()=>{try{const v=financeiroNumero(editor.controles.valor.value||'0'),d=financeiroNumero(editor.controles.falta.value||'0');resumo.textContent='Parcela líquida: '+brl(v-d)+' · avaliação menos saldo devedor.'}catch{resumo.textContent='Confira os valores para calcular a parcela líquida.'}};editor.controles.valor.oninput=atualizarResumo;editor.controles.falta.oninput=atualizarResumo;atualizarResumo();
     if(!novo){
       c.appendChild(secaoAvaliacoesBem(x));
@@ -13461,6 +13473,7 @@ function driveLinhaArquivo(f,{caminho=false}={}){
   const t=driveTipo(f),ehPasta=f.mimeType===DRIVE_PASTA;
   // <tr> não nasce via el(): fora de <table> o navegador o descarta calado
   const tr=document.createElement('tr');tr.innerHTML=`<td style="width:28px;font-size:17px" title="${esc(t.rot)}">${t.ic}</td><td class="nm"><button class="nome" title="${esc(f.name)}">${esc(f.name)}</button>${f.owners?.[0]?.displayName&&f.ownedByMe===false?`<div class="cam">de ${esc(f.owners[0].displayName)}</div>`:''}</td>${caminho?`<td class="cam"></td>`:''}<td class="num">${driveData(f.modifiedTime)}</td><td class="num">${esc(driveTam(f))}</td><td><div class="dv-acoes"></div></td>`;
+  const metaMobile=el('<span class="dv-mobile-meta"></span>');metaMobile.textContent='Modificado: '+driveData(f.modifiedTime)+' · Tamanho: '+driveTam(f);tr.querySelector('.nm').append(metaMobile);
   tr.querySelector('.nome').onclick=()=>ehPasta?driveIr(f.id,f.name,{filho:filtro.drive.modo==='pastas'}):verArquivoDrive(f);
   if(caminho){const c=tr.querySelector('.cam');const pai=(f.parents||[])[0];const txt=driveCaminho(f);
     if(pai){const b=el(`<button title="Abrir a pasta onde está">${esc(txt||'Abrir pasta')}</button>`);b.onclick=()=>driveIr(pai,driveCache.nomes[pai]||'');c.appendChild(b)}else c.textContent=f.ownedByMe===false?'compartilhado':''}

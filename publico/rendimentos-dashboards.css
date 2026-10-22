@@ -33,3 +33,13 @@
 @media(max-width:600px){.db-area[data-compacto=true] .db-heading>div:first-child{flex-basis:100%;gap:6px}.db-area[data-compacto=true] .db-heading .db-tools{flex:1 1 140px}.db-area[data-compacto=true] .db-heading .db-tools .ra-field{flex:1 1 130px}}
 
 @media(max-width:600px){.pagina.ra-app:has(.db-area[data-compacto=true])>.topo{flex-wrap:nowrap;padding:9px 12px;gap:8px;min-height:54px}.pagina.ra-app:has(.db-area[data-compacto=true])>.topo::before{display:block;width:32px;height:32px;background-size:contain}.pagina.ra-app:has(.db-area[data-compacto=true])>.topo>div:first-of-type{flex:1 1 auto;min-width:0}.pagina.ra-app:has(.db-area[data-compacto=true])>.topo h1{font-size:20px;margin:0;overflow-wrap:normal}.pagina.ra-app:has(.db-area[data-compacto=true])>.topo>.btn{flex:none;font-size:11px;padding:7px 8px;min-height:44px;margin:0}}
+
+@media(max-width:600px){
+ .db-area[data-compacto=true] .db-kpi span{font-size:12px;line-height:1.35}
+ .db-area[data-compacto=true] .db-kpi strong{font-size:clamp(15px,4.2vw,18px)}
+ .db-card header p,.db-note,.db-heading p,.db-origem,.db-metodo,.db-legenda{font-size:12px;line-height:1.5}
+ .db-card-acoes .btn,.db-menu-card>summary,.db-export-painel>summary,.db-export>summary,.db-acoes .btn,.db-config>summary{min-height:44px;font-size:12px}
+ .db-tools .ra-field select,.db-area[data-compacto=true] .db-heading .db-tools select{font-size:16px;min-height:44px}
+ .db-tools .ra-field{min-width:0;max-width:100%}
+ .db-heading>div,.db-card>header>div:first-child{min-width:0;max-width:100%}
+}

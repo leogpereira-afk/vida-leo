@@ -121,3 +121,11 @@
   .fortemais-fluida .fm-orcamento { min-width:410px; }
   .fortemais-fluida .fm-orcamento th:nth-child(3),.fortemais-fluida .fm-orcamento td:nth-child(3) { display:table-cell; }
 }
+
+@media screen and (max-width:700px) {
+  .fortemais-fluida>.painel :is(input,select),
+  .fm-previsao-editor :is(input,select,textarea) { font-size:16px; min-height:44px; box-sizing:border-box; max-width:100%; }
+  .fm-previsao-editor .campo { min-width:0; }
+  .fm-previsao-editor .fm-acoes { display:flex; flex-wrap:wrap; gap:6px; }
+  .fm-previsao-editor .fm-acoes .btn { min-height:44px; flex:1 1 auto; white-space:normal; }
+}

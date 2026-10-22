@@ -2,3 +2,16 @@
 .ga-app .ga-cadastros{min-width:0}.ga-app .ga-cadastros>.bloco{margin:8px 0;border-radius:12px}.ga-app .ga-cadastros .bloco>header{padding:12px 14px}.ga-app .ga-cadastros .bloco>header h2{font-size:15px}.ga-app .ga-cadastros .bloco>header p{font-size:11px}.ga-app .ga-cadastros .conteudo{padding:10px 12px}.ga-app .ga-detalhamento{font-size:12px;margin:10px 0}.ga-app .ga-detalhamento>summary{color:var(--leo-accent);padding:9px 0}.ga-app .finance-insight{padding:10px 12px;font-size:12px;margin:10px 0}.ga-app .finance-insight summary{font-weight:600}.ga-app .finance-insight p{font-size:12px;line-height:1.6;margin:8px 0}.ga-app .ga-cadastros .grade{grid-template-columns:repeat(2,minmax(0,1fr))}.ga-app .ga-cadastros .grade .kpi{padding:12px;min-height:0}.ga-app .ga-cadastros .grade .val{font-size:20px}.ga-app .db-card-body>.ra-table-wrap{max-height:270px;overflow:auto}.ga-app .db-dados :is(th,td){font-size:11px;padding:8px}.ga-app [hidden]{display:none!important}.ga-app .finance-pane{min-width:0}.ga-app .db-card p{max-width:80ch}.ga-app .gastos-categorias{gap:8px}.ga-app .gasto-categoria>summary{padding:10px 12px}.ga-app .gasto-categoria-itens{padding:0 8px}.ga-app .finance-expense-row{padding:4px 0}.ga-app .finance-expense-open{min-height:44px}.ga-app .db-heading .db-tools{flex:1;min-width:0}.ga-app .db-card-body .db-viz{max-height:260px}.ga-app .ga-resumo .db-grid{margin-top:10px}.ga-app .db-metodo{margin-top:12px}.ga-app .db-area>.db-note{padding:9px 12px}.ga-app .db-kpi strong{overflow-wrap:anywhere}
 @media(max-width:600px){.ga-app .ra-filtros-extra>div{width:min(360px,calc(100vw - 46px));left:auto;right:0}.ga-app .ga-cadastros .grade{grid-template-columns:1fr}.ga-app .ga-cadastros .bloco>header{padding:10px}.ga-app .finance-expense-row{gap:4px}.ga-app .finance-expense-open{font-size:12px}.ga-app .finance-expense-open b{font-size:12px}.ga-app .db-card-body{padding:6px}.ga-app .ra-field select{max-width:100%}.ga-app .ga-cadastros .ff-list-filter{flex-wrap:wrap}}
 @media print{.ga-app .ga-detalhamento>summary{display:none}}
+
+@media(max-width:600px){
+ .ga-app .ra-filtros-extra>div{position:static;width:100%;left:auto;right:auto}
+ .ga-app .gasto-categoria>summary{gap:8px;align-items:flex-start;min-height:44px;font-size:14px}
+ .ga-app .gasto-categoria>summary>span{min-width:0;overflow-wrap:anywhere}
+ .ga-app .gasto-categoria>summary>b{flex:none;font-size:13px}
+ .ga-app .finance-expense-row{align-items:flex-start;gap:6px}
+ .ga-app .finance-expense-open{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;gap:4px;font-size:14px;line-height:1.4}
+ .ga-app .finance-expense-open small{font-size:12px;line-height:1.45}
+ .ga-app .finance-expense-open b{font-size:14px;white-space:normal;overflow-wrap:anywhere}
+ .ga-app .finance-expense-row>.btn{min-height:44px;min-width:44px;font-size:12px;margin-top:4px}
+ .ga-app .ga-cadastros .bloco>header p,.ga-app .finance-insight,.ga-app .ga-detalhamento{font-size:12px;line-height:1.5}
+}

@@ -1,0 +1,33 @@
+/* Ajustes comuns para telas pequenas: preservar conteúdo e facilitar o toque. */
+.central-mobile-nav,.dv-mobile-meta{display:none}
+.central-registro-abrir{border:0;background:transparent;color:var(--verde);font:inherit;font-weight:650;text-align:left;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:5px 0}
+.ag-campos :is(input,select,textarea){box-sizing:border-box;width:100%;min-width:0;min-height:44px;border:1px solid var(--linha);border-radius:8px;padding:9px 10px;background:var(--card);color:var(--tinta);font:inherit;line-height:1.45}.ag-campos textarea{min-height:90px;resize:vertical}
+@media(max-width:700px){
+ body[data-leo-area] :is(.pagina:not(.saude-workbench),.modal) :is(input,select,textarea){font-size:16px}
+ body[data-leo-area] :is(.pagina:not(.saude-workbench),.modal) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select){min-height:44px;box-sizing:border-box;max-width:100%;min-width:0}
+ .central-mobile-nav-origin{display:none!important}
+ .central-mobile-nav{display:grid;gap:4px;min-width:0;width:100%;margin:7px 0 10px;font-size:12px;font-weight:650;color:var(--suave)}
+ .central-mobile-nav select{width:100%;min-width:0;max-width:100%;min-height:44px;padding:9px 10px;border:1px solid var(--linha);border-radius:9px;background:var(--card);color:var(--tinta);font:inherit;font-size:16px;box-sizing:border-box}
+ .central-mobile-nav:focus-within{outline:2px solid var(--azul);outline-offset:2px;border-radius:9px}
+ body[data-leo-area] .dv-pastas .dv-cel{height:auto;min-height:92px}
+ body[data-leo-area] .dv-pastas .dv-pasta{height:auto;min-height:92px;align-items:start}
+ body[data-leo-area] .dv-pastas .dv-pasta .nm{-webkit-line-clamp:unset;display:block;max-height:none;white-space:normal;overflow:visible;overflow-wrap:anywhere}
+ body[data-leo-area] .dv-pasta .sub{white-space:normal}
+ .cx-composicao-linha{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px!important}
+ .cx-composicao-linha>b{min-width:0!important}.cx-composicao-linha>span:last-child{grid-column:1/-1;font-size:12px!important;line-height:1.5}
+ .cx-composicao-linha>span:nth-child(2){font-size:14px;overflow-wrap:anywhere}
+ .modal :is(.chip,.notas>button){min-height:44px;box-sizing:border-box}
+ .modal .notas{flex-wrap:wrap}.modal .notas>button{min-width:44px!important;min-height:44px}
+ .modal .ag-campos{grid-template-columns:minmax(0,1fr)}
+ .central-registro-abrir{min-height:44px;min-width:64px;max-width:220px;white-space:normal;overflow-wrap:anywhere}
+ .editor-lista-mobile input{min-height:44px}.editor-lista-mobile button{min-height:44px;min-width:44px}
+ body[data-leo-area] .rotina-form textarea{box-sizing:border-box;width:100%;min-width:0;min-height:90px;border:1px solid var(--linha);border-radius:9px;padding:10px;background:var(--card);color:var(--tinta);font:inherit;font-size:16px}
+ body[data-leo-area] .indice-tela{max-width:100%;min-width:0}.indice-tela select{width:100%;min-width:0}
+}
+
+@media(max-width:640px){.dv-mobile-meta{display:block;font-size:12px;font-weight:400;line-height:1.5;color:var(--suave);white-space:normal;margin-top:3px;overflow-wrap:anywhere}}
+
+.ff-more-fields{margin:10px 0;padding:8px 11px;border:1px solid var(--linha);border-radius:10px;background:var(--card)}.ff-more-fields>summary{cursor:pointer;min-height:30px;line-height:1.5;font-size:13px;font-weight:650;color:var(--tinta);padding:5px 0}.ff-more-fields[open]>.ff-fields{margin-top:10px}
+@media(max-width:700px){.ff-more-fields>summary{min-height:44px;box-sizing:border-box;padding:11px 0}}
+
+@media(max-width:640px){body[data-leo-area] .dv-tab td.nm{width:auto;min-width:0;max-width:none}.dv-tab .nome{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;min-height:44px;line-height:1.45;font-size:13px}.dv-tab th:first-child{width:28px}.dv-tab th:last-child{width:66px}.dv-tab .cam,.dv-tab .cam button{max-width:100%;white-space:normal;overflow:visible;overflow-wrap:anywhere}.dv-tab .dv-acoes button{min-height:44px;min-width:44px}.dv-tab td{padding:6px}.dv-tab .num{display:none}}

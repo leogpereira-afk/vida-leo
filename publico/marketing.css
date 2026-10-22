@@ -49,3 +49,28 @@
 @media(max-width:900px){.mkt-painel .fmkt-tabs{display:flex;overflow-x:auto;flex-wrap:nowrap}.mkt-painel .fmkt-tabs button{flex-shrink:0;padding:8px 12px}.mkt-painel .fmkt-visao .fmkt-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(max-width:600px){.mkt-painel .mkt-filtros{gap:10px}.mkt-painel .mkt-filtros label{width:100%;justify-content:space-between}.mkt-painel .mkt-filtros select{min-width:0;flex:1}.mkt-painel .mkt-filtros .mkt-chip{font-size:10px}.mkt-painel .fmkt-kpis,.mkt-painel .fmkt-visao .fmkt-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.mkt-painel .fmkt-fonte{padding:14px}.fmkt-identidade .mkt-nota{display:none}.fmkt-fonte .mkt-origem{display:block}.fmkt-fonte .mkt-origem span{display:block}.fmkt-cobertura{margin-right:auto}.fmkt-resumo h2{font-size:20px}.fmkt-table-wrap{max-width:100%}.mkt-painel .fmkt-tabs button{min-height:44px}.fmkt-tabs .mkt-canal-img{width:24px;height:24px}}
 @media(prefers-reduced-motion:reduce){.mkt-painel *{scroll-behavior:auto;transition:none!important}}
+
+/* Celular: todos os canais ficam visíveis e os campos não provocam zoom ao digitar. */
+@media screen and (max-width:600px){
+ .mkt-painel,.fmkt-corpo,.fmkt-identidade>div{min-width:0}
+ .mkt-painel .fmkt-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible;gap:4px;padding:4px;margin-bottom:10px}
+ .mkt-painel .fmkt-tabs button{min-width:0;min-height:44px;padding:8px;justify-content:flex-start;text-align:left;white-space:normal;overflow-wrap:anywhere}
+ .mkt-painel .fmkt-tabs button span{min-width:0}
+ .mkt-painel .fmkt-identidade .mkt-nota{display:block;line-height:1.45;margin-top:3px}
+ .mkt-painel button,.mkt-painel summary,.mkt-painel .fmkt-link{min-height:44px;box-sizing:border-box}
+ .mkt-painel .fmkt-fonte .mkt-alerta button,.mkt-painel .fmkt-proximos li button{min-height:44px}
+ .mkt-painel :is(input,select,textarea){font-size:16px;min-height:44px;max-width:100%;box-sizing:border-box}
+ .mkt-painel .fmkt-periodo select{width:100%;min-width:0;font-size:16px;min-height:44px}
+ .mkt-painel .mkt-filtros label{flex-wrap:wrap;gap:6px}
+ .mkt-painel .mkt-filtros select{flex:1 1 100%;width:100%}
+ .mkt-painel :is(.fmkt-extra,.fmkt-table) summary{gap:8px;flex-wrap:wrap;line-height:1.45}
+ .mkt-painel .mkt-chip{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+ .mkt-painel .mkt-numeros strong{overflow-wrap:anywhere}
+ .mkt-painel .mkt-barra{font-size:12px;overflow-wrap:anywhere}
+ .mkt-painel .mkt-barra small{font-size:11px}
+ .mkt-painel .fmkt-admin dl{grid-template-columns:100px minmax(0,1fr);gap:7px 9px}
+ .mkt-painel .fmkt-admin dt{overflow-wrap:anywhere}
+ .mkt-painel .fmkt-link{display:inline-flex;align-items:center;overflow-wrap:anywhere}
+ .mkt-painel .fmkt-acoes{gap:6px}
+ .mkt-painel .fmkt-acoes button{flex:1 1 auto;white-space:normal}
+}
