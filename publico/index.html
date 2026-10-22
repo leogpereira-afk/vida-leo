@@ -12900,6 +12900,7 @@ function modalLancamentoGasto(g,novo=false){
       {k:'natureza',t:'Natureza',opcoes:['Despesa pessoal','Estorno'],inicial:(+g.valor<0?'Estorno':'Despesa pessoal')},
       {k:'obs',t:'Observações',tipo:'textarea',full:true}],
       g,(v,patch)=>{financeiroValidarGasto(v);if(Object.hasOwn(patch,'empresaId')){if(v.empresaId==='__sem_empresa__')patch.empresaId=v.empresaId='';const empresa=(E.empresasPJ||[]).find(e=>String(e.id)===v.empresaId);if(v.empresaId&&!empresa)throw Error('A empresa não está mais no cadastro. Confira o vínculo.');if(g.empresa!==empresaAnterior||g.empresaNome!==empresaNomeAnterior)throw Error('O vínculo mudou em outra sessão. Reabra a ficha.');patch.empresa=v.empresa=empresa?.nome||'';if(g.empresaNome!==undefined)patch.empresaNome=v.empresaNome=empresa?.nome||'';}financeiroSalvarRegistro(E.gastos,g,v,patch)},fechar);
+    if(novo)camposGasto.form.dataset.gastoNovoSync='';
     for(const o of camposGasto.controles.empresaId.options)o.textContent=o.value==='__sem_empresa__'?'Despesa pessoal (remover vínculo)':o.value?(E.empresasPJ||[]).find(e=>String(e.id)===o.value)?.nome||'Vínculo a conferir: '+o.value:'Sem empresa / pessoal';
     c.appendChild(el('<p class="ff-note">Confira se este lançamento já existe. Os gráficos usam os lançamentos; recorrentes atuais são estimativas apresentadas separadamente. Evite duplicar a mesma despesa.</p>'));
     if(!novo){const arqs=el('<details class="ff-attachments"><summary>Comprovantes</summary></details>');arqs.appendChild(areaArquivos('gasto:'+g.id,'Nota fiscal, recibo, comprovante'));c.appendChild(arqs)}
@@ -16918,7 +16919,7 @@ function lerRascunhoSync(){
   try{const salvo=JSON.parse(sessionStorage.getItem(CHAVE_RASCUNHO_SYNC)||'null');if(salvo&&Array.isArray(salvo.formularios))return salvo}catch(_){}
   return null;
 }
-function guardarRascunhoSync(){
+function guardarRascunhoSync(ignorar=null){
   const formularios=[];
   const fontes=[...document.querySelectorAll('#modais .fundo'),...document.querySelectorAll('#main [data-uso-direto]'),
     ...[...document.querySelectorAll('#main [data-fm-pagina]')].filter(p=>p._fmDirty===true)].map(f=>({f,soAlterados:false}));
@@ -16926,7 +16927,7 @@ function guardarRascunhoSync(){
   fontes.push(...[...document.querySelectorAll(seletor)].map(f=>({f,soAlterados:true})));
   const capturados=new Set();
   fontes.forEach(({f,soAlterados})=>{
-    if(f.querySelector('[data-recuperacao-sync]'))return;
+    if(f===ignorar||f.querySelector('[data-recuperacao-sync]'))return;
     const campos=[];
     const entradas=[...(f.matches('input,textarea,select')?[f]:[]),...f.querySelectorAll('input,textarea,select')];
     entradas.forEach(inp=>{
@@ -16980,15 +16981,16 @@ function mostrarRascunhoSync(){
   bt.style.cssText='position:fixed;right:18px;bottom:18px;max-width:calc(100vw - 36px);white-space:normal;z-index:90;box-shadow:0 4px 20px #0002';
   document.body.appendChild(bt);
 }
-function adotaNuvem(r,avisar){
+function adotaNuvem(r,avisar,manterNovoGasto=false){
   validarBackup(r.dados);
   // Receber uma mudança remota só é conflito quando há edição ou formulário
   // local a preservar. Uma aba limpa acompanha o servidor sem interromper.
   const edicaoLocal=_tabConteudo===null||conteudoSync(E)!==_tabConteudo;
-  const preservou=guardarRascunhoSync();
+  const novoGasto=manterNovoGasto?document.querySelector('[data-gasto-novo-sync]')?.closest('.fundo'):null;
+  const preservou=guardarRascunhoSync(novoGasto);
   guardaDescartado();
   // modal aberto sobre o estado antigo viraria órfão e comeria o que fosse digitado
-  const mo=document.getElementById('modais');if(mo)mo.innerHTML='';atualizarCamadasModais();
+  const mo=document.getElementById('modais');if(mo)for(const filho of [...mo.children])if(filho!==novoGasto)filho.remove();atualizarCamadasModais();
   guardarEstadoLocal(r.dados);marcaBase(r.mt,conteudoSync(r.dados));E=carregar();tela({baseRemota:true});mostrarRascunhoSync();
   pintaSync('atualizado de outro acesso');
   if((avisar&&edicaoLocal)||preservou)alert('Outro acesso atualizou os dados. Esta aba adotou a versão do servidor para preservar o que foi salvo lá.\n\n'+(preservou?'Os textos dos formulários foram preservados nesta aba. Use Recuperar textos preservados para conferir e copiar o que precisar.':'A versão local anterior ficou em Configurações → Versão descartada.'));
@@ -17001,9 +17003,47 @@ async function apiPut(){
   const j=await r.json().catch(()=>({}));
   return {status:r.status,j};
 }
+// A primeira leitura e o primeiro envio compartilham a mesma base. Horários
+// do aparelho não comprovam que um cache contém as mudanças do servidor.
+let leituraInicialEmCurso=null,estadoAntesPrimeiraLeitura=null;
+function novosGastosDuranteLeitura(antes,agora,remoto){
+  const ids=new Set((antes.gastos||[]).map(g=>g.id));
+  const novos=(agora.gastos||[]).filter(g=>!ids.has(g.id));
+  if(!novos.length||novos.some(g=>!g.id)||new Set(novos.map(g=>g.id)).size!==novos.length)return null;
+  if(conteudoSync({...agora,gastos:agora.gastos.filter(g=>ids.has(g.id))})!==conteudoSync(antes))return null;
+  if(novos.some(g=>(remoto.gastos||[]).some(r=>r.id===g.id)))return null;
+  return novos;
+}
+function conferirBaseInicial(){
+  if(leituraInicialEmCurso)return leituraInicialEmCurso;
+  if(!estadoAntesPrimeiraLeitura)estadoAntesPrimeiraLeitura=structuredClone(E);
+  leituraInicialEmCurso=(async()=>{
+    pintaSync('conferindo…');
+    const r=await apiSync('GET');
+    if(!r?.dados||!r.mt)throw Error('Não foi possível confirmar a base do servidor.');
+    validarBackup(r.dados);
+    const antes=estadoAntesPrimeiraLeitura,conteudoAntes=conteudoSync(antes);
+    if(conteudoSync(r.dados)===conteudoAntes){
+      marcaBase(r.mt,conteudoAntes);atualizarMetadadosNuvem(r);return true;
+    }
+    const novos=novosGastosDuranteLeitura(antes,E,r.dados);
+    if(novos){
+      // Somente inclusões novas, sem edição/remoção de qualquer outro dado.
+      // O restante vem integralmente da versão remota que autoriza este CAS.
+      const unido={...r.dados,gastos:[...(r.dados.gastos||[]),...novos],_mt:Date.now()};
+      guardaDescartado(); // Mantém recuperável também o cache anterior à primeira leitura.
+      guardarEstadoLocal(unido);marcaBase(r.mt,conteudoSync(r.dados));E=carregar();tela({baseRemota:true});return true;
+    }
+    const mudouDuranteLeitura=conteudoSync(E)!==conteudoAntes;
+    const cachePendente=(antes._mt||0)>(r.dados._mt||0);
+    adotaNuvem(r,mudouDuranteLeitura||cachePendente,!mudouDuranteLeitura&&!cachePendente);
+    return !mudouDuranteLeitura&&!cachePendente;
+  })().finally(()=>{leituraInicialEmCurso=null;if(_tabBase)estadoAntesPrimeiraLeitura=null});
+  return leituraInicialEmCurso;
+}
 let envioEmCurso=null;
 function enviarNuvem(){
-  if(envioEmCurso)return envioEmCurso.then(()=>enviarNuvem());
+  if(envioEmCurso)return envioEmCurso.then(ok=>conteudoSync(E)===_tabConteudo?ok:enviarNuvem());
   envioEmCurso=executarEnvio().finally(()=>{envioEmCurso=null});
   return envioEmCurso;
 }
@@ -17011,13 +17051,8 @@ async function executarEnvio(){if(DEV&&!window.__testeSync)return true;
   clearTimeout(syncTimer);
   try{
     if(!_tabBase){
-      // esta aba ainda não viu o servidor (abriu offline, resposta perdida):
-      // olha antes de gravar — se o CONTEÚDO remoto é mais novo, adota; se o
-      // daqui é mais novo (edição offline), segue para o PUT protegido
-      pintaSync('conferindo…');
-      const r=await apiSync('GET');
-      if(r&&r.dados&&(r.dados._mt||0)>(E._mt||0)){adotaNuvem(r,true);return false}
-      marcaBase(r&&r.mt||0,r?.dados?conteudoSync(r.dados):null);
+      if(!await conferirBaseInicial())return false;
+      if(conteudoSync(E)===_tabConteudo){pintaSync('sincronizado');return true}
     }
     for(let tentativa=0;tentativa<2;tentativa++){
       pintaSync('enviando…');
@@ -17038,7 +17073,13 @@ async function executarEnvio(){if(DEV&&!window.__testeSync)return true;
   }catch(e){pintaSync('não enviado — tente sincronizar');return false}}
 async function puxarNuvem(){if(DEV&&!window.__testeSync){pintaSync('modo local');return}
   if(envioEmCurso)await envioEmCurso;
-  try{pintaSync('baixando…');
+  try{
+    if(!_tabBase){
+      if(!await conferirBaseInicial())return;
+      if(conteudoSync(E)!==_tabConteudo)await enviarNuvem();else pintaSync('sincronizado');
+      mostrarRascunhoSync();return;
+    }
+    pintaSync('baixando…');
     const baseDaLeitura=_tabBase;
     const r=await apiSync('GET');
     // Um PUT desta aba pode ter começado durante o GET, e já aparecer nele
