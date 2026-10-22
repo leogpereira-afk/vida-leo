@@ -244,3 +244,34 @@
 @media(max-width:650px){.sdoc-filtros>.sdoc-busca-vinculo,.sdoc-filtros>label:has([data-sdoc=ref]),.sdoc-filtros>label:has([data-sdoc=busca]){flex:1 1 100%;min-width:0;grid-column:1/-1}.sdoc-filtros label:has([data-sdoc=ref]){max-width:100%}}
 
 .modal .sui-form{padding:12px}
+
+/* Revisão móvel: navegação completa, abertura da ficha pela primeira coluna útil
+   e campos opcionais recolhidos sem apagar seu conteúdo. */
+.sui-area-mobile,.trat-secao-mobile{display:none}
+.pagina.saude-workbench .sui-abrir-registro{display:block;text-align:left;color:var(--sui-verde);text-decoration:underline;text-underline-offset:3px;padding:4px 0;border:0;background:transparent;font:inherit;font-weight:650;min-height:36px;min-width:64px;max-width:220px;white-space:normal;overflow-wrap:anywhere}
+.sdoc-filtros-extras,.sdoc-anexar{border:1px solid var(--linha);border-radius:10px;background:var(--card);padding:7px 10px;margin:8px 0}
+.sdoc-filtros-extras>summary,.sdoc-anexar>summary{cursor:pointer;font-size:13px;font-weight:650;min-height:30px;display:list-item;line-height:1.5;padding:4px 0;color:var(--tinta)}
+.sdoc-filtros-extras[open]>.sdoc-filtros,.sdoc-anexar[open]>.sdoc-acoes{margin:8px 0 2px}
+.sdoc>.sdoc-filtros{align-items:end}.sdoc>.sdoc-filtros>label:has([data-sdoc=busca]){flex:1;min-width:180px}
+.trat-form-extras{margin:10px 0;padding:9px 11px;border:1px solid var(--linha);border-radius:10px;background:var(--card)}
+.trat-form-extras>summary{cursor:pointer;font-size:13px;font-weight:650;min-height:30px;line-height:1.5;padding:4px 0;color:var(--tinta)}
+.trat-form-extras[open]>.rotina-form-campos{margin-top:10px}
+.rotina-form .trat-campo-longo{grid-column:1/-1}.rotina-form .trat-campo-longo textarea{box-sizing:border-box;width:100%;min-width:0;min-height:90px;padding:10px 12px;border:1px solid var(--linha);border-radius:9px;background:var(--card);color:var(--tinta);font:inherit;font-size:15px;line-height:1.5;resize:vertical}
+@media(max-width:650px){
+  .pagina.saude-workbench .sui-nav{display:none}
+  .sui-area-mobile,.trat-secao-mobile{display:grid;gap:4px;font-size:12px;font-weight:650;color:var(--sui-suave,var(--suave));margin:7px 0;min-width:0;width:100%}
+  .sui-area-mobile select,.trat-secao-mobile select{box-sizing:border-box;max-width:100%;width:100%;min-width:0;min-height:44px;border:1px solid var(--linha);border-radius:9px;padding:8px 10px;background:var(--card);color:var(--tinta);font:inherit;font-size:16px}
+  .pagina.saude-workbench .trat-subtabs{display:none}
+  .pagina.saude-workbench :is(.sui-filtros,.sui-periodo,.sui-evolucao-controles,.sdoc,.trat-corpo) :is(input,select,textarea),.sdoc :is(input,select,textarea),.rotina-form .trat-campo-longo textarea{font-size:16px}
+  .sui-lista[data-formato=linhas] .sui-filtros :is(input,select){font-size:16px;min-height:44px}
+  .pagina.saude-workbench .sui-filtros{gap:6px}.pagina.saude-workbench .sui-filtros label{max-width:100%;min-width:0}
+  .pagina.saude-workbench .sui-abrir-registro{min-height:44px;max-width:180px;font-size:13px}
+  .sui-tabela{font-size:13px}.sui-tabela td[data-coluna=Exame]{min-width:135px}.sui-tabela caption{font-size:12px;line-height:1.5}
+  .sui-tabela caption::after{content:' · Toque no valor ou nome para abrir; deslize para ver todas as colunas'}
+  .sui-form-extras>summary,.trat-form-extras>summary,.sdoc-filtros-extras>summary,.sdoc-anexar>summary{min-height:44px;box-sizing:border-box;display:list-item;padding:11px 0;line-height:1.5}
+  .pagina.saude-workbench .sui-footer .btn,.pagina.saude-workbench .sui-rapidos .btn,.pagina.saude-workbench .sui-card .btn,.pagina.saude-workbench .trat-corpo .btn{min-height:44px}
+  .sdoc>.sdoc-filtros>label:has([data-sdoc=busca]){flex:1 1 100%;min-width:0}.sdoc-atualizar{margin-left:auto}
+  .trat-form-extras .rotina-form-campos{gap:10px}.rotina-form .trat-campo-longo textarea{font-size:16px}
+}
+
+@media(max-width:650px){.sui-tipos-registro{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sui-tipos-registro .btn{min-height:48px;line-height:1.4;overflow-wrap:anywhere}.sui-form footer,.trat-form .rotina-form-acoes{position:sticky;bottom:0;z-index:2;background:var(--card);padding-bottom:4px}}

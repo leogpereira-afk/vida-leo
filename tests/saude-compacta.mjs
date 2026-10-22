@@ -129,3 +129,22 @@ test('abertura em linhas e alternância de evolução preservam filtros, gráfic
   box.querySelector('[data-saude-visao=linhas]').onclick();assert.equal(grafico.hidden,true);assert.equal(box.querySelector('input[type=search]').value,'Marcador');
   assert.equal(a.run('JSON.stringify(E)'),antes,'trocar visualização não grava preferências nem cadastros');
 });
+
+test('seletor móvel oferece as sete áreas e usa a mesma navegação sem gravar registros',()=>{
+  const a=app();a.run("var navegacoes=[];saudeIr=id=>navegacoes.push(id);tratamentoAbrirVisaoGeral=()=>navegacoes.push('tratamentos');saudePainel(document.getElementById('main'))");
+  const select=a.document.querySelector('[aria-label="Área da Saúde"]');
+  assert.deepEqual([...select.options].map(o=>o.value),['resumo','exames','medidas','queixas','tratamentos','cuidados','documentos']);
+  const antes=a.run('JSON.stringify(E)');for(const id of ['resumo','exames','medidas','queixas','tratamentos','cuidados','documentos']){select.value=id;select.onchange()}
+  assert.deepEqual(JSON.parse(a.run('JSON.stringify(navegacoes)')),['resumo','exames','medidas','queixas','tratamentos','cuidados','documentos']);assert.equal(a.run('JSON.stringify(E)'),antes);
+});
+test('abertura pelo valor ou nome conserva identidade e edição em todos os históricos',()=>{
+  const a=app();a.run("var abertos=[];saudeEditarRegistro=(tipo,r)=>abertos.push([tipo,r.id])");
+  for(const [tipo,r]of Object.entries(fixtures)){const box=lista(a,tipo,[r]),b=box.querySelector('.sui-abrir-registro');assert.ok(b);assert.ok(b.closest('td').dataset.coluna);assert.match(b.getAttribute('aria-label'),/Abrir registro/);b.onclick();assert.equal(box.querySelectorAll('tbody>tr').length,1)}
+  assert.deepEqual(JSON.parse(a.run('JSON.stringify(abertos)')),Object.keys(fixtures).map(k=>[k,fixtures[k].id]));
+});
+test('todos os lançamentos simples mantêm campos originais e obrigatórios fora dos detalhes',()=>{
+  for(const tipo of ['peso','vitais','exames','consultas','queixas','fisio','vacinas','histFamiliar','rastreios']){const a=app();a.run('saudeEditarRegistro('+JSON.stringify(tipo)+')');const f=a.document.querySelector('[data-saude-form]');assert.ok(f.querySelector('details'));assert.equal(f.querySelectorAll('[name]').length,a.run('saudeCampos('+JSON.stringify(tipo)+').length'));for(const i of f.querySelectorAll('[required]'))assert.equal(i.closest('details'),null,tipo+' obrigatório recolhido');}
+});
+test('escolher lançamento fecha o seletor e cancelar devolve a página sem modal acumulado',()=>{
+  const a=app();a.run('saudeAdicionar()');botao(a.document,'Peso e medidas').onclick();assert.equal(a.document.querySelectorAll('[role=dialog]').length,1);assert.ok(a.document.querySelector('[data-saude-form]'));botao(a.document,'Cancelar').onclick();assert.equal(a.document.querySelector('[role=dialog]'),null);assert.equal(a.run('E.peso.length'),0);
+});
