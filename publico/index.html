@@ -3089,7 +3089,8 @@ function gastosDashboardAviao(a,ano=''){
   const aquisicaoCentavos=(a.aportes||[]).reduce((s,x)=>s+Math.round((+x.valor||0)*100),0);
   const gastosPagosCentavos=registros.filter(x=>x.status==='Pago').reduce((s,x)=>s+x.centavos,0);
   const diferencaAtual=a.valorCotaAtual!=null&&Number.isFinite(+a.valorCotaAtual)?(Math.round(+a.valorCotaAtual*100)-aquisicaoCentavos-gastosPagosCentavos)/100:null;
-  return {diferencaAtual,aquisicao:aquisicaoCentavos/100,gastosPagosHistorico:gastosPagosCentavos/100,desembolsado:(aquisicaoCentavos+gastosPagosCentavos)/100,registros:selecionados,anos,pago:soma(pagos),aberto:soma(abertos),total:soma(selecionados),
+  const percentualDiferenca=diferencaAtual!=null&&aquisicaoCentavos+gastosPagosCentavos>0?diferencaAtual*10000/(aquisicaoCentavos+gastosPagosCentavos):null;
+  return {percentualDiferenca,diferencaAtual,aquisicao:aquisicaoCentavos/100,gastosPagosHistorico:gastosPagosCentavos/100,desembolsado:(aquisicaoCentavos+gastosPagosCentavos)/100,registros:selecionados,anos,pago:soma(pagos),aberto:soma(abertos),total:soma(selecionados),
     semData:registros.filter(x=>x.status==='Pago'&&!dataISOValida(x.pagoEm)).length,
     tipos:['Mensalidades','Viagens','Avulsos'].map(tipo=>({nome:tipo,valor:soma(pagos.filter(x=>x.tipo===tipo))})),
     meses:[...meses].sort(([a],[b])=>a.localeCompare(b)).map(([mes,v])=>({nome:mes.split('-').reverse().join('/'),valor:v/100}))};
@@ -3097,7 +3098,7 @@ function gastosDashboardAviao(a,ano=''){
 function quadroDesembolsadoAviao(a,mostrarDiferenca=false){
   const r=gastosDashboardAviao(a);
   return secaoPlanilhaAviao('av-desembolsado','Total desembolsado na aeronave','Todo o histórico, independentemente do filtro de ano. Somente valores pagos; despesas em aberto ficam fora.',
-    el('<div class="aviao-sheet-resumo"><div><small>Aquisição da minha cota</small><strong>'+brl(r.aquisicao)+'</strong><span>Pagamentos da aquisição</span></div><div><small>Gastos pagos</small><strong>'+brl(r.gastosPagosHistorico)+'</strong><span>Mensalidades + viagens + avulsos</span></div><div><small>Total desembolsado</small><strong>'+brl(r.desembolsado)+'</strong><span>Aquisição + gastos pagos</span></div>'+(mostrarDiferenca?'<div><small>Diferença estimada sobre o total desembolsado</small><strong style="color:'+(r.diferencaAtual==null?'inherit':r.diferencaAtual<0?'var(--vermelho)':'var(--verde)')+'">'+(r.diferencaAtual==null?'—':brl(r.diferencaAtual))+'</strong><span>Valor atual da cota − total desembolsado. Não é lucro realizado.</span></div>':'')+'</div>'));
+    el('<div class="aviao-sheet-resumo"><div><small>Aquisição da minha cota</small><strong>'+brl(r.aquisicao)+'</strong><span>Pagamentos da aquisição</span></div><div><small>Gastos pagos</small><strong>'+brl(r.gastosPagosHistorico)+'</strong><span>Mensalidades + viagens + avulsos</span></div><div><small>Total desembolsado</small><strong>'+brl(r.desembolsado)+'</strong><span>Aquisição + gastos pagos</span></div>'+(mostrarDiferenca?'<div><small>Diferença estimada sobre o total desembolsado</small><strong style="color:'+(r.diferencaAtual==null?'inherit':r.diferencaAtual<0?'var(--vermelho)':'var(--verde)')+'">'+(r.diferencaAtual==null?'—':brl(r.diferencaAtual))+'</strong><span><b>'+(r.percentualDiferenca==null?'Percentual indisponível':r.percentualDiferenca.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'% sobre o total desembolsado')+'</b></span><span>Valor atual da cota − total desembolsado. Não é lucro realizado.</span></div>':'')+'</div>'));
 }
 function vDashboardAviao(m){
   const ano=filtro.aviaoGastosAno||'',r=gastosDashboardAviao(E.aviao,ano);

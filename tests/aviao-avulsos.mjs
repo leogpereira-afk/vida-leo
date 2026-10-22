@@ -58,3 +58,14 @@ test('diferença estimada desconta todos os desembolsos, permite negativo e dist
  assert.match(document.getElementById('main').textContent,/Diferença estimada sobre o total desembolsado/);
  assert.match(document.getElementById('main').textContent,/Não é lucro realizado/);
 });
+
+test('percentual usa desembolso histórico e não divide por base zero',()=>{
+ const {run,document}=setup();
+ run("E.aviao.aportes=[{valor:800}];E.aviao.despesas=[{minhaCota:200,status:'Pago'},{minhaCota:900,status:'Pendente'}];E.aviao.valorCotaAtual=1250");
+ assert.equal(run('gastosDashboardAviao(E.aviao).percentualDiferenca'),25);
+ run("filtro.aviaoAba='visao';vAviao(document.getElementById('main'))");
+ assert.match(document.getElementById('main').textContent,/25,00% sobre o total desembolsado/);
+ run('E.aviao.valorCotaAtual=500');assert.equal(run('gastosDashboardAviao(E.aviao).percentualDiferenca'),-50);
+ run('E.aviao.valorCotaAtual=null');assert.equal(run('gastosDashboardAviao(E.aviao).percentualDiferenca'),null);
+ run('E.aviao.valorCotaAtual=100;E.aviao.aportes=[];E.aviao.despesas=[]');assert.equal(run('gastosDashboardAviao(E.aviao).percentualDiferenca'),null);
+});
