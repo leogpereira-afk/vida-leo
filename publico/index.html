@@ -4200,6 +4200,8 @@ function apagarCompromissoAgenda(ref,depois){
   const titulo=ref.titulo||'compromisso';
   const tirar=lista=>{
     const fora=new Set(lista);
+    E.agendaGoogleHistorico=E.agendaGoogleHistorico||[];
+    lista.filter(a=>a.googleId).forEach(a=>E.agendaGoogleHistorico.push({registro:structuredClone(a),motivo:'Removido nesta Central',em:new Date().toISOString()}));
     for(let i=E.agenda.length-1;i>=0;i--)if(fora.has(E.agenda[i]))E.agenda.splice(i,1);
     salvar();
   };
@@ -4330,7 +4332,11 @@ function modalCompromisso(a){
       {k:'hora',t:'Hora',tipo:'time'},{k:'ate',t:'Último dia (opcional)',tipo:'date'},
       {k:'local',t:'Onde'},{k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposCompromisso')},
       {k:'obs',t:'Observações',tipo:'textarea',full:true}]));
-    if(a.googleId)sec.appendChild(el('<p class="aviso">A edição altera apenas a cópia na Central. Uma nova importação pode substituir estes campos.</p>'));
+    if(a.googleId){
+      sec.appendChild(el('<p class="aviso">Data, título e local acompanham o Google automaticamente. Observações e tipo são mantidos nesta Central; versões anteriores ficam no histórico.</p>'));
+      if(a.googleDescricao)sec.appendChild(el('<details open><summary>Informações do Google</summary><div style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(a.googleDescricao)+'</div></details>'));
+      if(a.googleLink)sec.appendChild(el('<a class="btn ghost" target="_blank" rel="noopener" href="'+esc(urlSegura(a.googleLink))+'">Abrir no Google Agenda ↗</a>'));
+    }
     const pronto=el('<button class="btn">Pronto</button>');pronto.onclick=fechar;sec.appendChild(pronto);c.appendChild(sec);
   });
 }
@@ -4484,6 +4490,7 @@ function vAgenda(m){
   const nova=()=>novoCompromissoRotina();
   m.appendChild(cab('Agenda','Tudo que tem data nesta Central, num lugar só.'));
   m.appendChild(barraGoogleAgenda(r));
+  m.appendChild(painelSincronizacaoAgenda());
   m.appendChild(blocoHojeAgenda(r));
   /* Só re-renderiza quando dado NOVO chega (o `em` muda). Com o cache válido a
      promessa devolve o mesmo objeto, e o laço morre aí. */
@@ -4728,7 +4735,7 @@ async function importarIcs(file){
       sec.appendChild(el('<p>Confira os eventos e marque somente os que deseja importar. Atualizações substituem os campos importados da cópia local.</p>'));
       const importar=acao('Importar selecionados',()=>{
         if(concluido||!selecionados.size)return;concluido=true;
-        let quantidade=0;for(const item of selecionados){const existente=E.agenda.find(x=>x.gid===item.reg.gid);if(existente?.googleId)continue;if(existente)Object.assign(existente,item.reg);else E.agenda.push({id:uid(),...item.reg});quantidade++}
+        let quantidade=0;for(const item of selecionados){const existente=E.agenda.find(x=>x.gid===item.reg.gid);if(existente?.googleId)continue;if(existente){E.agendaGoogleHistorico=E.agendaGoogleHistorico||[];E.agendaGoogleHistorico.push({registro:structuredClone(existente),motivo:'Reimportado manualmente',em:new Date().toISOString()});const {obs,tipo,...dados}=item.reg;Object.assign(existente,dados)}else E.agenda.push({id:uid(),...item.reg});quantidade++}
         if(quantidade)salvar();fechar();abreBloco('ag-lista');irTela('agenda');
       });importar.disabled=true;
       resultado.plano.forEach(item=>{
@@ -8418,7 +8425,7 @@ function revisarConvitesGmail(resultado,aoFechar){
       if([...selecionados].some(x=>!LeoGoogleDatas.dateOK(x.reg.data)||x.reg.data<hoje())){alert('Confirme uma data válida de hoje em diante para cada item selecionado.');return;}
       const aprovados=new Set();
       let n=0;for(const item of selecionados){const atualPlano=planejarConvitesAgenda([item],E.agenda)[0];if(!atualPlano||!['adicionar','atualizar'].includes(atualPlano.acao))continue;
-        const existente=E.agenda.find(a=>a.gid===item.gid);if(existente)Object.assign(existente,item.reg);else E.agenda.push({id:uid(),...item.reg});aprovados.add(item.gid);n++}
+        const existente=E.agenda.find(a=>a.gid===item.gid);if(existente){E.agendaGoogleHistorico=E.agendaGoogleHistorico||[];E.agendaGoogleHistorico.push({registro:structuredClone(existente),motivo:'Reimportado manualmente',em:new Date().toISOString()});const {obs,tipo,...dados}=item.reg;Object.assign(existente,dados)}else E.agenda.push({id:uid(),...item.reg});aprovados.add(item.gid);n++}
       if(n){E.gmailPendentes=(E.gmailPendentes||[]).filter(x=>!aprovados.has(x.gid));salvar();}fechar();abreBloco('ag-lista');irTela('agenda');
     });importar.disabled=true;
     const PESO={particular:0,duvida:1,empresa:2},SELO={particular:'🏠 particular',duvida:'? não tenho certeza',empresa:'🏢 parece da empresa'};
@@ -8557,7 +8564,7 @@ function barraGoogleAgenda(r){
   fazer('📧 Buscar no Gmail',buscarNoGmailParticular);
   fazer('📅 Buscar no Google Agenda',buscarNoCalendarioParticular);
   cx.appendChild(botoes);
-  cx.appendChild(el('<span class="agenda-google-nota">últimos '+(LeoGoogleDatas.JANELA_DIAS||7)+' dias · só coisa particular · nada entra sem você marcar</span>'));
+  cx.appendChild(el('<span class="agenda-google-nota">últimos '+(LeoGoogleDatas.JANELA_DIAS||7)+' dias · Gmail: nada entra sem você marcar; Google Agenda acompanha automaticamente</span>'));
   cx.appendChild(status);
   return cx;
 }
@@ -8668,13 +8675,135 @@ async function escolherCalendarioGoogle(){
     const status=el('<p role="status"></p>');cx.appendChild(status);c.appendChild(cx);
   });
 }
+/* Google é a origem dos campos do compromisso. A Central mantém IDs locais,
+   anexos e notas; toda atualização/cancelamento guarda o registro anterior. */
+function reconciliarAgendaGoogle(agenda,historico,lotes,agora,novoId){
+  const ativos=structuredClone(agenda),arquivo=structuredClone(historico||[]);
+  const cont={novos:0,atualizados:0,arquivados:0};
+  const guardar=(registro,motivo)=>arquivo.push({registro:structuredClone(registro),motivo,em:agora});
+  for(const lote of lotes){
+    const cal=lote.id,aliases=new Set(lote.aliases||[cal]);aliases.add(cal);
+    const chave=a=>a.googleId&&[...aliases].some(c=>a.googleId.startsWith(c+':'))?a.googleId.slice(a.googleId.indexOf(':')+1):null;
+    const vistos=new Set();
+    for(const e of lote.eventos){
+      if(!e.id||vistos.has(e.id))continue;vistos.add(e.id);
+      const encontrados=ativos.filter(a=>chave(a)===e.id);
+      const recusado=e.attendees?.some(a=>a.self&&a.responseStatus==='declined');
+      if(e.status==='cancelled'||recusado){
+        for(const a of encontrados){guardar(a,e.status==='cancelled'?'Cancelado no Google':'Recusado no Google');ativos.splice(ativos.indexOf(a),1);cont.arquivados++}continue;
+      }
+      const reg=normalizarEventoGoogle(e,cal);if(!reg)continue;
+      const {obs,tipo,...campos}=reg;
+      campos.googleDescricao=e.description||'';
+      campos.googleRecorrencia=e.recurringEventId||'';
+      campos.googleDados={...e};
+      const atual=encontrados[0];
+      if(!atual){
+        // Calendários secundários só atualizam o que já foi escolhido. A principal
+        // acompanha eventos novos na janela exibida; não revive exclusões locais.
+        const oculto=arquivo.some(x=>x.motivo==='Removido nesta Central'&&chave(x.registro)===e.id);
+        if(lote.adicionar&&!oculto){ativos.push({id:novoId(),...reg,...campos});cont.novos++}continue;
+      }
+      if(Object.entries(campos).some(([k,v])=>JSON.stringify(atual[k])!==JSON.stringify(v))){guardar(atual,'Atualizado pelo Google');Object.assign(atual,campos);cont.atualizados++}
+      for(const repetido of encontrados.slice(1)){
+        guardar(repetido,'Cópia do mesmo ID Google');
+        // Mantém as notas de cada cópia, além do registro completo no histórico.
+        if(repetido.obs&&repetido.obs!==atual.obs)atual.obs=[atual.obs,repetido.obs].filter(Boolean).join('\n\n');
+        ativos.splice(ativos.indexOf(repetido),1);cont.arquivados++;
+      }
+    }
+  }
+  return {agenda:ativos,historico:arquivo,cont,mudou:Object.values(cont).some(Boolean)};
+}
+async function consultarSincronizacaoAgenda(agenda,ler,agora=new Date()){
+  const principal=await ler('agenda','calendars/primary?fields=id');
+  if(!principal.id)throw Error('Não foi possível identificar a agenda principal.');
+  const calendarios=[...new Set([principal.id,...agenda.filter(a=>a.googleId&&a.googleCalendar&&a.googleCalendar!=='gmail').map(a=>a.googleCalendar==='primary'?principal.id:a.googleCalendar)])];
+  const inicio=new Date(agora);inicio.setDate(inicio.getDate()-7);const fim=new Date(agora);fim.setFullYear(fim.getFullYear()+1);
+  const lotes=[],pendencias=[];
+  for(const id of calendarios){
+    const aliases=id===principal.id?[id,'primary']:[id];const eventos=[];let pagina='',n=0;
+    do{const q=new URLSearchParams({singleEvents:'true',showDeleted:'true',maxResults:'250',timeMin:inicio.toISOString(),timeMax:fim.toISOString(),timeZone:'America/Sao_Paulo'});if(pagina)q.set('pageToken',pagina);
+      const r=await ler('agenda','calendars/'+encodeURIComponent(id)+'/events?'+q);
+      if(!Array.isArray(r.items))throw Error('Resposta incompleta do Google. Nenhum compromisso foi alterado.');
+      eventos.push(...r.items);pagina=r.nextPageToken||'';
+      if(++n>=20&&pagina)throw Error('Consulta incompleta. Nenhum compromisso foi alterado.');
+    }while(pagina);
+    // Ausência em uma janela não é cancelamento. Confira individualmente os IDs
+    // importados que ficaram fora dela (inclusive datas antigas e eventos movidos).
+    const vistos=new Set(eventos.map(e=>e.id));
+    const faltantes=[...new Set(agenda.filter(a=>a.googleId&&aliases.some(c=>a.googleId.startsWith(c+':'))).map(a=>a.googleId.slice(a.googleId.indexOf(':')+1)))].filter(e=>!vistos.has(e));
+    for(let i=0;i<faltantes.length;i+=5){
+      const bloco=await Promise.all(faltantes.slice(i,i+5).map(async eid=>{
+        try{const e=await ler('agenda','calendars/'+encodeURIComponent(id)+'/events/'+encodeURIComponent(eid));if(e.id!==eid)throw Error('ID divergente');return e}
+        catch(_){pendencias.push({calendario:id,id:eid});return null}
+      }));eventos.push(...bloco.filter(Boolean));
+    }
+    lotes.push({id,aliases,adicionar:id===principal.id,eventos});
+  }
+  return {lotes,pendencias};
+}
+let agendaGoogleEmCurso=null,agendaGoogleTentativa=0,agendaGoogleErro='';
+function agendaGooglePodeAplicar(){return !document.querySelector('#modais .fundo')&&!/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||'')}
+async function sincronizarAgendaGoogle(forcar=false){
+  if(agendaGoogleEmCurso)return agendaGoogleEmCurso;
+  if(DEV||!temSessao()||!_tabBase||!agendaGooglePodeAplicar())return;
+  if(!forcar&&Date.now()-agendaGoogleTentativa<300000)return;
+  agendaGoogleTentativa=Date.now();
+  agendaGoogleEmCurso=(async()=>{
+    try{
+      if(!googleConectado('agenda'))await googleCrachaDoServidor();
+      if(!googleConectado('agenda'))throw Error('Conecte o Google Agenda para atualizar.');
+      const estado=E,versao=E._mt,base=_tabBase;
+      const resultado=await consultarSincronizacaoAgenda(E.agenda,googleLer);
+      if(E!==estado||E._mt!==versao||_tabBase!==base||!agendaGooglePodeAplicar())throw Error('Atualização adiada para preservar sua edição.');
+      const plano=reconciliarAgendaGoogle(E.agenda,E.agendaGoogleHistorico,resultado.lotes,new Date().toISOString(),uid);
+      E.agenda=plano.agenda;E.agendaGoogleHistorico=plano.historico;
+      E.agendaGoogleUltima={em:new Date().toISOString(),...plano.cont,pendencias:resultado.pendencias.length};
+      salvar();if(!await enviarNuvem())throw Error('Alterações ainda não confirmadas na nuvem. Confira a sincronização da Central.');
+      agendaGoogleErro='';inicioGooglePainel?.limpar();
+      if(['agenda','inicio'].includes(atual)&&agendaGooglePodeAplicar())tela();
+      return resultado;
+    }catch(e){agendaGoogleErro=e.message;atualizarStatusAgendaGoogle();return null}
+  })().finally(()=>{agendaGoogleEmCurso=null;atualizarStatusAgendaGoogle()});
+  return agendaGoogleEmCurso;
+}
+function atualizarStatusAgendaGoogle(){
+  document.querySelectorAll('[data-agenda-sync-status]').forEach(n=>{const u=E.agendaGoogleUltima;
+    n.textContent=agendaGoogleEmCurso?'Conferindo Google…':agendaGoogleErro|| (u?'Conferido em '+new Date(u.em).toLocaleString('pt-BR')+(u.pendencias?' · '+u.pendencias+' vínculo(s) sem confirmação; preservados.':' · atualizado.'):'Aguardando primeira conferência.');
+  });
+}
+function painelSincronizacaoAgenda(){
+  const p=el('<div class="secao"><div class="agenda-google"><strong>Google → Central</strong><span class="agenda-google-nota">Automático ao abrir e a cada 5 minutos com a Central aberta · próximos 12 meses. Notas e histórico preservados.</span></div><p data-agenda-sync-status aria-live="polite"></p></div>');
+  p.appendChild(acao('Atualizar agenda agora',()=>sincronizarAgendaGoogle(true),'ghost mini'));
+  p.appendChild(acao('Histórico preservado ('+(E.agendaGoogleHistorico||[]).length+')',abrirHistoricoAgendaGoogle,'ghost mini'));
+  setTimeout(atualizarStatusAgendaGoogle,0);return p;
+}
+function abrirHistoricoAgendaGoogle(){
+  abrirModal('Histórico da sincronização','Versões anteriores e compromissos retirados da agenda ativa. Nada foi apagado no Google.',(c,fechar)=>{
+    const lista=el('<div class="secao"></div>');
+    for(const h of [...(E.agendaGoogleHistorico||[])].reverse()){
+      const a=h.registro;const d=el('<details><summary>'+esc(a.titulo||'Compromisso')+' · '+esc(h.motivo)+' · '+esc(fmtDataAno(a.data))+'</summary><p>'+esc([a.data,a.hora,a.local].filter(Boolean).join(' · '))+'</p><p style="white-space:pre-wrap">'+esc(a.obs||'Sem observações locais.')+'</p><p style="white-space:pre-wrap">'+esc(a.googleDescricao||'')+'</p><details><summary>Registro completo preservado</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit">'+esc(JSON.stringify(a,null,2))+'</pre></details></details>');lista.appendChild(d);
+    }
+    if(!lista.children.length)lista.appendChild(el('<p>Nenhuma alteração registrada.</p>'));c.appendChild(lista);
+    c.appendChild(acao('Baixar histórico',()=>baixar(new Blob([JSON.stringify(E.agendaGoogleHistorico||[],null,2)],{type:'application/json'}),'historico-agenda-google.json'),'ghost'));
+    c.appendChild(acao('Fechar',fechar));
+  });
+}
+let agendaGoogleIniciada=false;
+function iniciarSincronizacaoAgenda(){
+  if(DEV||agendaGoogleIniciada)return;agendaGoogleIniciada=true;
+  const rodada=async()=>{await sincronizarAgendaGoogle();setTimeout(rodada,300000)};rodada();
+  window.addEventListener('focus',()=>sincronizarAgendaGoogle());
+}
+
 function normalizarEventoGoogle(e,calId,fuso='America/Sao_Paulo'){
   if(!e.id||e.status==='cancelled'||!e.start)return null;
   let data,hora='',ate;
   if(e.start.date){data=e.start.date;const fim=new Date((e.end?.date||e.start.date)+'T12:00');if(e.end?.date)fim.setDate(fim.getDate()-1);ate=dataLocal(fim)}
   else{const inicio=new Date(e.start.dateTime);if(!Number.isFinite(inicio.getTime()))return null;
     const partes=new Intl.DateTimeFormat('en-CA',{timeZone:fuso,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(inicio);const p=Object.fromEntries(partes.map(x=>[x.type,x.value]));data=p.year+'-'+p.month+'-'+p.day;hora=p.hour+':'+p.minute;}
-  return {googleId:calId+':'+e.id,googleCalendar:calId,googleAtualizado:e.updated||'',gid:e.iCalUID||'',data,hora,ate:ate||data,titulo:e.summary||'(sem título)',local:e.location||'',tipo:'Pessoal',obs:'Importado do Google Agenda',googleLink:e.htmlLink||'',googleInicio:e.start.dateTime||e.start.date,googleFim:e.end?.dateTime||e.end?.date||''};
+  return {googleId:calId+':'+e.id,googleCalendar:calId,googleAtualizado:e.updated||'',gid:e.iCalUID||'',data,hora,ate:ate||data,titulo:e.summary||'(sem título)',local:e.location||'',tipo:'Pessoal',obs:'Importado do Google Agenda',googleLink:e.htmlLink||'',googleInicio:e.start.dateTime||e.start.date,googleFim:e.end?.dateTime||e.end?.date||'',googleDescricao:e.description||''};
 }
 function prepararAgendaGoogle(eventos,calId,fuso,agenda){
   const vistos=new Set();return eventos.map(e=>normalizarEventoGoogle(e,calId,fuso)).filter(x=>{if(!x||vistos.has(x.googleId))return false;vistos.add(x.googleId);return true}).map(reg=>{
@@ -8695,7 +8824,7 @@ async function revisarAgendaGoogle(cal,aoFechar){
   const plano=prepararAgendaGoogle(eventos,cal.id,'America/Sao_Paulo',E.agenda);
   abrirModal('Revisar compromissos',esc(cal.summary||'Google Agenda')+' · horários de Brasília',(c,fechar)=>{
     const cx=el('<div class="secao"></div>');
-    cx.appendChild(el('<p>Escolha o que trazer. Eventos já importados podem ser atualizados; isso substitui data, título e local da cópia na Central. Nada será alterado no Google. Eventos cancelados ou ausentes no Google não são apagados automaticamente daqui.</p>'));
+    cx.appendChild(el('<p>Escolha o que trazer. Eventos já importados podem ser atualizados; isso substitui data, título e local da cópia na Central. Nada será alterado no Google. A sincronização automática arquiva os cancelamentos confirmados, preservando o histórico. Ausência em uma consulta não apaga registros.</p>'));
     const selecionados=new Set();
     /* A mesma régua do Gmail: o que tem cara de empresa desce, com o motivo.
        Separar e explicar — nunca descartar. */
@@ -8706,7 +8835,7 @@ async function revisarAgendaGoogle(cal,aoFechar){
     if(!plano.length)cx.appendChild(el('<p class="vazio">Nenhum compromisso no período.</p>'));
     const todos=acao('Selecionar todos',()=>{cx.querySelectorAll('input[type=checkbox]').forEach((b,i)=>{b.checked=true;selecionados.add(i)});atualizar()},'ghost');cx.appendChild(todos);
     const aplicar=acao('Importar selecionados',()=>{
-      for(const i of selecionados){const item=plano[i];const existente=E.agenda.find(a=>a.googleId===item.reg.googleId);if(existente)Object.assign(existente,item.reg);else E.agenda.push({id:uid(),...item.reg})}
+      for(const i of selecionados){const item=plano[i];const existente=E.agenda.find(a=>a.googleId===item.reg.googleId);if(existente){E.agendaGoogleHistorico=E.agendaGoogleHistorico||[];E.agendaGoogleHistorico.push({registro:structuredClone(existente),motivo:'Reimportado manualmente',em:new Date().toISOString()});const {obs,tipo,...dados}=item.reg;Object.assign(existente,dados)}else E.agenda.push({id:uid(),...item.reg})}
       salvar();fechar();
     });const atualizar=()=>{aplicar.disabled=!selecionados.size;aplicar.textContent='Importar '+selecionados.size+' selecionado(s)'};atualizar();cx.appendChild(aplicar);c.appendChild(cx);
   },aoFechar);
@@ -16852,7 +16981,7 @@ function telaLogin(){
       limparRascunhoSync();
       (manter.checked?localStorage:sessionStorage).setItem(T_CHAVE,token);
       f.remove();document.querySelector('.app').style.display='';
-      menu();tela();puxarNuvem().then(()=>{tela();arqSubirPendentes().then(r=>{if(r.subiu)tela()})});
+      menu();tela();puxarNuvem().then(()=>{iniciarSincronizacaoAgenda();tela();arqSubirPendentes().then(r=>{if(r.subiu)tela()})});
     }catch(e){erroEl.textContent='Não consegui falar com o servidor. Tente de novo.'}finally{entrar.disabled=false;entrar.textContent='Entrar'}
   };
   document.body.appendChild(f);
@@ -16869,7 +16998,7 @@ document.addEventListener('keydown',ev=>{
   ev.preventDefault();abrirBusca();
 });
 
-if(temSessao()){menu();tela();puxarNuvem().then(()=>{tela();arqSubirPendentes().then(r=>{if(r.subiu)tela()})});
+if(temSessao()){menu();tela();puxarNuvem().then(()=>{iniciarSincronizacaoAgenda();tela();arqSubirPendentes().then(r=>{if(r.subiu)tela()})});
   /* UMA tentativa, na abertura. Se a autorização já foi dada, Gmail, Agenda e
      Drive nascem conectados e nenhuma tela pede clique. Falhou, fica como
      estava: o botão "Conectar" de cada tela continua lá. Sem laço — isto roda
