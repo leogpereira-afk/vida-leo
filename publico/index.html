@@ -8696,7 +8696,10 @@ function reconciliarAgendaGoogle(agenda,historico,lotes,agora,novoId){
       const {obs,tipo,...campos}=reg;
       campos.googleDescricao=e.description||'';
       campos.googleRecorrencia=e.recurringEventId||'';
-      campos.googleDados={...e};
+      campos.googleOrganizador=e.organizer||null;
+      campos.googleConferencia=e.conferenceData||null;
+      campos.googleLembretes=e.reminders||null;
+      campos.googleAnexos=e.attachments||[];
       const atual=encontrados[0];
       if(!atual){
         // Calendários secundários só atualizam o que já foi escolhido. A principal
@@ -8704,7 +8707,12 @@ function reconciliarAgendaGoogle(agenda,historico,lotes,agora,novoId){
         const oculto=arquivo.some(x=>x.motivo==='Removido nesta Central'&&chave(x.registro)===e.id);
         if(lote.adicionar&&!oculto){ativos.push({id:novoId(),...reg,...campos});cont.novos++}continue;
       }
-      if(Object.entries(campos).some(([k,v])=>JSON.stringify(atual[k])!==JSON.stringify(v))){guardar(atual,'Atualizado pelo Google');Object.assign(atual,campos);cont.atualizados++}
+      if(Object.entries(campos).some(([k,v])=>JSON.stringify(atual[k])!==JSON.stringify(v))){
+        // Campos novos apenas enriquecem o cadastro. Arquive quando algum valor
+        // já existente for substituído; não duplique tudo só por adicionar metadados.
+        if(Object.entries(campos).some(([k,v])=>Object.hasOwn(atual,k)&&JSON.stringify(atual[k])!==JSON.stringify(v)))guardar(atual,'Atualizado pelo Google');
+        Object.assign(atual,campos);cont.atualizados++;
+      }
       for(const repetido of encontrados.slice(1)){
         guardar(repetido,'Cópia do mesmo ID Google');
         // Mantém as notas de cada cópia, além do registro completo no histórico.
@@ -8758,9 +8766,14 @@ async function sincronizarAgendaGoogle(forcar=false){
       const resultado=await consultarSincronizacaoAgenda(E.agenda,googleLer);
       if(E!==estado||E._mt!==versao||_tabBase!==base||!agendaGooglePodeAplicar())throw Error('Atualização adiada para preservar sua edição.');
       const plano=reconciliarAgendaGoogle(E.agenda,E.agendaGoogleHistorico,resultado.lotes,new Date().toISOString(),uid);
+      const anterior={agenda:E.agenda,historico:E.agendaGoogleHistorico,ultima:E.agendaGoogleUltima,mt:E._mt};
       E.agenda=plano.agenda;E.agendaGoogleHistorico=plano.historico;
       E.agendaGoogleUltima={em:new Date().toISOString(),...plano.cont,pendencias:resultado.pendencias.length};
-      salvar();if(!await enviarNuvem())throw Error('Alterações ainda não confirmadas na nuvem. Confira a sincronização da Central.');
+      try{salvar()}catch(e){
+        E.agenda=anterior.agenda;E.agendaGoogleHistorico=anterior.historico;E.agendaGoogleUltima=anterior.ultima;E._mt=anterior.mt;
+        throw Error(e.name==='QuotaExceededError'?'Sem espaço no navegador. Estado anterior preservado; nenhuma alteração aplicada.':e.message);
+      }
+      if(!await enviarNuvem())throw Error('Alterações ainda não confirmadas na nuvem. Confira a sincronização da Central.');
       agendaGoogleErro='';inicioGooglePainel?.limpar();
       if(['agenda','inicio'].includes(atual)&&agendaGooglePodeAplicar())tela();
       return resultado;
