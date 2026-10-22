@@ -57,7 +57,7 @@ const SaudeTratamentos = (() => {
     validarValorSaude(d.valor);const anterior=(t.compras||[]).find(c=>c.id===compraId);if(anterior&&gastoSaude('saude:compra:'+compraId)&&SaudeTratamentos.numero(d.valor)!==valorSaude('saude:compra:'+compraId,anterior))throw Error('Altere o valor no gasto vinculado.');
     if(!controlaEstoque(t))throw Error('Defina a unidade no tratamento primeiro.');
     if((d.quantidade!==''&&d.quantidade!=null&&!(numero(d.quantidade)>0))||!String(d.marca||'').trim())throw Error('Informe a marca e uma quantidade positiva, se conhecida.');
-    const item={...d,quantidade:numero(d.quantidade),id:compraId||uid(),atualizadoEm:new Date().toISOString()};
+    const item={...(anterior||{}),...d,quantidade:numero(d.quantidade),id:compraId||uid(),atualizadoEm:new Date().toISOString()};
     const compras=(t.compras||[]).map(x=>({...x})),i=compras.findIndex(x=>x.id===compraId);
     if(compraId&&i<0)throw Error('Compra não encontrada. Reabra o histórico.');
     if(i>=0)compras[i]=item;else compras.push(item);
@@ -188,8 +188,9 @@ function quadroItensTratamento(itens,grupo,{selecionarPrimeiro=true}={}){
   function pintar(){
     const ativos=itens.filter(t=>!['Encerrado','Pausado'].includes(t.status));
     const lista=tratamentoFiltro==='ativos'?ativos:tratamentoFiltro==='compras'?ativos.filter(t=>SaudeTratamentos.controlaEstoque(t)&&['Sem estoque','Comprar mais','Não informado'].includes(SaudeTratamentos.estoque(t))):itens;
-    const filtros=sec.querySelector('.trat-filtros');filtros.innerHTML='';[['ativos','Em acompanhamento',ativos.length],['compras','Compras',ativos.filter(t=>SaudeTratamentos.controlaEstoque(t)&&['Sem estoque','Comprar mais','Não informado'].includes(SaudeTratamentos.estoque(t))).length],['todos','Todos',itens.length]].forEach(([k,n,q])=>{const b=acao(n+' · '+q,()=>{tratamentoFiltro=k;pintar()},'ghost mini');b.setAttribute('aria-pressed',String(tratamentoFiltro===k));filtros.append(b)});
+    const filtros=sec.querySelector('.trat-filtros');filtros.innerHTML='';[['ativos','Em acompanhamento',ativos.length],['compras','Compras',linhasComprasSaude(itens).length],['todos','Todos',itens.length]].forEach(([k,n,q])=>{const b=acao(n+' · '+q,()=>{tratamentoFiltro=k;pintar()},'ghost mini');b.setAttribute('aria-pressed',String(tratamentoFiltro===k));filtros.append(b)});
     const l=sec.querySelector('.trat-lista'),d=sec.querySelector('.trat-detalhe');l.innerHTML='';d.innerHTML='';
+    sec.classList.toggle('trat-modo-compras',tratamentoFiltro==='compras');if(tratamentoFiltro==='compras'){d.append(quadroComprasSaude(itens));return}
     if(!lista.length){d.append(el('<div class="trat-empty"><h3>Nenhum item neste filtro</h3><p>Adicione os medicamentos e cuidados prescritos para este tratamento.</p></div>'));return}
     const t=lista.find(x=>x.id===tratamentoSelecionado)||(selecionarPrimeiro?lista[0]:null);if(t)tratamentoSelecionado=t.id;
     lista.forEach(x=>{const b=el('<button type="button" class="trat-item"><strong>'+esc(x.oque||'Sem nome')+'</strong><small>'+esc(x.tipo||'Tratamento')+' · '+esc(x.status||'A confirmar')+'</small><span>'+esc(SaudeTratamentos.controlaEstoque(x)?SaudeTratamentos.estoque(x):'Acompanhamento')+'</span></button>');b.setAttribute('aria-pressed',String(x===t));b.onclick=()=>{tratamentoSelecionado=x.id;pintar()};l.append(b)});
@@ -454,4 +455,102 @@ function custosTratamento(grupo){
     if(!r.custos.length)c.append(el('<p>Registre uma consulta ou compra para acompanhar seus custos.</p>'));
     r.custos.forEach(x=>{const v=valorSaude(x.ref,x.registro),g=gastoSaude(x.ref),row=el('<article class="trat-historico"><b>'+esc(x.nome)+'</b><p>'+esc(x.registro.data?fmtDataAno(x.registro.data):'Data a informar')+' · '+esc(x.registro.local||'Local a informar')+'</p><p>'+esc(v===null?'Valor a informar':brl(v))+' · '+esc(g?(g.situacao||'Pagamento não informado'):'Sem vínculo financeiro')+'</p></article>');row.append(acao(g?'Ver gasto vinculado':'Vincular a Gastos',()=>vincularGastoSaude(x.ref,x.registro),'ghost mini'));c.append(row)});
   });
+}
+
+/* Compras pessoais: uma referência estável liga recebimento e lançamento. */
+function linhasComprasSaude(itens){
+  return itens.flatMap(t=>{
+    const compras=(t.compras||[]).map(c=>({t,c,comprado:true}));
+    if(t.pedidoCompra)compras.unshift({t,c:t.pedidoCompra,comprado:false});
+    else if(!compras.length&&!['Encerrado','Pausado'].includes(t.status)&&(SaudeTratamentos.controlaEstoque(t)||['Medicamento','Suplemento'].includes(t.tipo)))compras.unshift({t,c:{id:'pedido-'+t.id},comprado:false});
+    return compras;
+  });
+}
+function compraSaudeTransacao(t,fn){
+  const antes=structuredClone(t),gastos=structuredClone(E.gastos),mt=Object.getOwnPropertyDescriptor(E,'_mt');
+  try{fn();salvar()}catch(e){Object.keys(t).forEach(k=>delete t[k]);Object.assign(t,antes);E.gastos=gastos;if(mt)Object.defineProperty(E,'_mt',mt);else delete E._mt;throw e}
+}
+function salvarCompraListaSaude(t,id,d,comprado){
+  if(!id)throw Error('Reabra a compra para continuar.');
+  const anterior=(t.compras||[]).find(c=>c.id===id),ref='saude:compra:'+id;
+  const num=SaudeTratamentos.numero;
+  validarValorSaude(d.valor);
+  if(d.quantidade!==''&&d.quantidade!=null&&!(num(d.quantidade)>0))throw Error('Informe uma quantidade positiva ou deixe em branco.');
+  if(num(d.quantidade)!==null&&!SaudeTratamentos.controlaEstoque(t))throw Error('Defina a unidade no item antes de informar a quantidade.');
+  if(comprado&&(!dataISOValida(d.data)||d.data>hoje()))throw Error('Informe a data em que recebeu a compra.');
+  if(!comprado&&anterior)throw Error('Use Voltar a pendente para desfazer esta compra.');
+  const atual=gastoSaude(ref),escolhido=d.existente?E.gastos.find(g=>g.id===d.existente):null;
+  if(d.existente&&(!escolhido||(escolhido.origemRef&&escolhido.origemRef!==ref)))throw Error('Gasto indisponível ou vinculado a outra compra.');
+  if(atual&&escolhido&&atual.id!==escolhido.id)throw Error('Esta compra já tem um gasto. Edite o vínculo atual.');
+  if(comprado&&!escolhido&&!(num(d.valor)>0))throw Error('Informe o valor total da compra para vincular aos gastos, ou escolha um gasto existente.');
+  if(comprado&&!escolhido&&d.situacao==='Pago'&&(!dataISOValida(d.pagoEm)||d.pagoEm>hoje()))throw Error('Informe a data do pagamento realizado.');
+  compraSaudeTransacao(t,()=>{
+    const c={...(anterior||t.pedidoCompra||{}),...d,id,quantidade:num(d.quantidade),valor:num(d.valor),atualizadoEm:new Date().toISOString()};delete c.existente;
+    if(!comprado){t.pedidoCompra=c;return}
+    const gastos=E.gastos.filter(g=>g.origemRef===ref);if(gastos.length>1)throw Error('Há mais de um gasto vinculado. Confira os lançamentos antes de continuar.');
+    let g=atual||escolhido;
+    if(escolhido&&!atual){c.valor=num(escolhido.valor);if(!(c.valor>0))throw Error('Escolha uma despesa com valor positivo.');g.origemRef=ref;c.gastoCriadoPelaLista=false;}
+    else{
+      if(!g){
+        const guardado=t.pedidoCompra?.gastoRetirado;
+        const gid=guardado?.id||'gasto-'+id;
+        if(E.gastos.some(x=>x.id===gid))throw Error('O gasto foi alterado. Reabra a lista antes de confirmar.');
+        g={...(guardado||{}),id:gid,oque:'Compra de saúde · '+t.oque,classe:'Saúde',natureza:'Despesa pessoal',origemRef:ref};E.gastos.push(g);c.gastoCriadoPelaLista=true;
+      }
+      Object.assign(g,{valor:num(d.valor),data:d.data,mes:d.data.slice(0,7),situacao:['Pago','Pendente'].includes(d.situacao)?d.situacao:'Não informado',pagoEm:d.situacao==='Pago'?d.pagoEm:''});
+    }
+    delete c.gastoRetirado;
+    const compras=(t.compras||[]).filter(x=>x.id!==id);compras.push(c);
+    const saldo=SaudeTratamentos.saldo({...t,compras});if(saldo!==null&&saldo<0)throw Error('A quantidade ficaria abaixo do consumo registrado. Confira os movimentos.');
+    t.compras=compras;if(t.pedidoCompra?.id===id||!anterior)delete t.pedidoCompra;
+  });
+}
+function desfazerCompraListaSaude(t,id){
+  const c=(t.compras||[]).find(x=>x.id===id);if(!c)throw Error('Compra não encontrada.');
+  if(t.pedidoCompra&&t.pedidoCompra.id!==id)throw Error('Já existe outra compra pendente para este item.');
+  const compras=t.compras.filter(x=>x.id!==id),restante=SaudeTratamentos.saldo({...t,compras});
+  if((restante!==null&&restante<0)||(restante===null&&(t.usos||[]).some(u=>!u.desfeitoEm)))throw Error('Não é possível desfazer sem conferir o estoque já consumido.');
+  compraSaudeTransacao(t,()=>{
+    const g=gastoSaude('saude:compra:'+id);t.pedidoCompra={...c};t.compras=compras;
+    if(g&&c.gastoCriadoPelaLista){t.pedidoCompra.gastoRetirado=structuredClone(g);E.gastos=E.gastos.filter(x=>x.id!==g.id)}
+    else if(g){delete g.origemRef; t.pedidoCompra.existente=g.id;}
+  });
+}
+function formularioCompraListaSaude(linha,confirmar=false){
+  const {t,c,comprado}=linha,g=gastoSaude('saude:compra:'+c.id);
+  abrirModal(comprado?'Editar compra':confirmar?'Confirmar compra':'Planejar compra','Comprado registra o recebimento. O pagamento é informado separadamente.',(box,fechar)=>{
+    const f=el('<form class="compra-saude-form"><label>Quantidade ('+esc(SaudeTratamentos.unidadeExibida(t.unidade)||'unidade não definida')+')<input name="quantidade" type="number" min="0.0001" step="any" inputmode="decimal"></label><label>Valor total (R$)<input name="valor" inputmode="decimal" placeholder="0,00"></label><label>Data da compra<input name="data" type="date"></label><label>Marca / fornecedor<input name="marca"></label><label>Pagamento<select name="situacao"><option>Não informado</option><option>Pendente</option><option>Pago</option></select></label><label>Data do pagamento<input name="pagoEm" type="date"></label><label class="compra-saude-amplo">Gasto<select name="existente"><option value="">'+(g?'Atualizar gasto já vinculado':'Criar gasto ao confirmar a compra')+'</option></select></label><p class="compra-saude-amplo compra-saude-nota">'+(g?'A edição atualiza o mesmo lançamento em Gastos.':'Se já lançou esta despesa, selecione o gasto existente para não duplicar. Planejar não lança despesas.')+'</p><p role="alert" class="compra-saude-amplo"></p><div class="compra-saude-amplo trat-actions"><button type="button" class="btn ghost" data-cancelar>Cancelar</button><button class="btn" type="submit">'+(comprado?'Salvar alterações':confirmar?'Confirmar comprado':'Salvar pendente')+'</button></div></form>');
+    const bases={...c,data:c.data||hoje(),valor:g?g.valor:c.valor,situacao:g?.situacao||c.situacao||'Não informado',pagoEm:g?.pagoEm||c.pagoEm||''};
+    for(const k of ['quantidade','valor','data','marca','situacao','pagoEm'])f.querySelector('[name='+k+']').value=k==='valor'&&bases[k]!=null?Number(bases[k]).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}):bases[k]??'';
+    const sel=f.querySelector('[name=existente]');
+    if(!g)for(const x of E.gastos.filter(x=>!x.origemRef&&+x.valor>0))sel.append(el('<option value="'+esc(x.id)+'">'+esc((x.data||x.mes||'')+' · '+x.oque+' · '+brl(x.valor))+'</option>'));
+    sel.value=c.existente||'';sel.disabled=!!g||!(comprado||confirmar);
+    const vinculo=()=>{const usando=!!sel.value;for(const k of ['valor','situacao','pagoEm'])f.querySelector('[name='+k+']').disabled=usando};sel.onchange=vinculo;vinculo();
+    f.querySelector('[data-cancelar]').onclick=fechar;
+    f.onsubmit=e=>{e.preventDefault();const b=f.querySelector('[type=submit]');if(b.disabled)return;b.disabled=true;try{
+      const d={};for(const k of ['quantidade','valor','data','marca','situacao','pagoEm','existente'])d[k]=f.querySelector('[name='+k+']').value;
+      if(d.valor.trim())d.valor=financeiroNumero(d.valor);
+      salvarCompraListaSaude(t,c.id,d,comprado||confirmar);fechar();
+    }catch(e){f.querySelector('[role=alert]').textContent=e.message;b.disabled=false}};
+    box.append(el('<h3>'+esc(t.oque)+'</h3>'),f);
+  });
+}
+function quadroComprasSaude(itens){
+  const box=el('<section class="compra-saude"><header class="trat-toolbar"><div><h3>🛒 Lista de compras</h3><p class="compra-saude-nota">Marque o que recebeu e acompanhe o custo nos seus gastos.</p></div></header><div class="compra-saude-totais"></div><div class="trat-filtros" aria-label="Situação da compra"></div><div class="compra-saude-linhas"></div></section>');let filtro='todos';
+  const nova=()=>abrirModal('Adicionar à lista','Escolha o item que deseja comprar.',(b,fechar)=>{const s=el('<select aria-label="Item da compra">'+itens.filter(t=>!t.pedidoCompra).map(t=>'<option value="'+esc(t.id)+'">'+esc(t.oque)+'</option>').join('')+'</select>');const ok=acao('Adicionar pendente',()=>{const t=itens.find(t=>t.id===s.value);if(!t)return;try{tratamentoCommit(t,()=>{if(!t.pedidoCompra)t.pedidoCompra={id:uid()}});fechar()}catch(e){alert(e.message)}});ok.disabled=!s.options.length;b.append(s,ok)});
+  box.querySelector('header').append(acao('+ Adicionar compra',nova,'ghost mini'));
+  function pintar(){
+    const linhas=linhasComprasSaude(itens),pend=linhas.filter(l=>!l.comprado),feitas=linhas.filter(l=>l.comprado);
+    const total=ls=>ls.reduce((n,l)=>n+(SaudeTratamentos.numero(l.comprado?valorSaude('saude:compra:'+l.c.id,l.c):l.c.valor)||0),0);
+    box.querySelector('.compra-saude-totais').innerHTML='<div><small>Pendentes · '+pend.length+'</small><b>'+brl(total(pend))+'</b><span>Estimativa informada</span></div><div><small>Comprados · '+feitas.length+'</small><b>'+brl(total(feitas))+'</b><span>Valores registrados</span></div><div><small>Valores a informar</small><b>'+linhas.filter(l=>SaudeTratamentos.numero(l.comprado?valorSaude('saude:compra:'+l.c.id,l.c):l.c.valor)===null).length+'</b><span>Não entram nos totais</span></div>';
+    const filtros=box.querySelector('.trat-filtros');filtros.replaceChildren();for(const [k,n,q] of [['todos','Todos',linhas.length],['pendente','Pendentes',pend.length],['comprado','Comprados',feitas.length]]){const b=acao(n+' · '+q,()=>{filtro=k;pintar()},'ghost mini');b.setAttribute('aria-pressed',String(filtro===k));filtros.append(b)}
+    const lista=box.querySelector('.compra-saude-linhas');lista.replaceChildren();
+    for(const l of linhas.filter(l=>filtro==='todos'||(filtro==='comprado')===l.comprado)){
+      const {t,c,comprado}=l,g=gastoSaude('saude:compra:'+c.id),v=comprado?valorSaude('saude:compra:'+c.id,c):SaudeTratamentos.numero(c.valor);
+      const row=el('<article class="compra-saude-linha '+(comprado?'comprada':'pendente')+'"><label class="compra-saude-check"><input type="checkbox" aria-label="Comprado: '+esc(t.oque)+'"><span>'+ (comprado?'✓ Comprado':'Pendente')+'</span></label><div class="compra-saude-item"><strong>'+esc(t.oque)+'</strong><small>'+esc((c.quantidade==null?'Quantidade a informar':SaudeTratamentos.formatarNumero(c.quantidade)+' '+SaudeTratamentos.unidadeExibida(t.unidade))+(c.marca?' · '+c.marca:''))+'</small></div><div class="compra-saude-valor"><b>'+esc(v===null?'Valor a informar':brl(v))+'</b><small>'+esc(comprado?(g?'Vinculado a Gastos · '+(g.situacao||'Pagamento não informado'):'Sem vínculo financeiro'):'Compra pendente')+'</small></div><div class="trat-actions"></div></article>');
+      const check=row.querySelector('input');check.checked=comprado;check.onchange=()=>{check.checked=comprado;if(!comprado){formularioCompraListaSaude(l,true);return}if(confirm('Voltar esta compra a pendente? A quantidade sai do estoque. O gasto criado por esta lista sai dos totais e pode ser restaurado; um gasto preexistente será apenas desvinculado.')){try{desfazerCompraListaSaude(t,c.id);pintar()}catch(e){alert(e.message)}}};
+      const a=row.querySelector('.trat-actions');a.append(acao(comprado?'Editar':'Informar valor',()=>formularioCompraListaSaude(l),'ghost mini'));if(comprado)a.append(acao(g?'Ver gasto':'Vincular gasto',()=>vincularGastoSaude('saude:compra:'+c.id,c),'ghost mini'));lista.append(row);
+    }
+    if(!lista.children.length)lista.append(el('<p class="trat-empty">Nenhuma compra neste filtro.</p>'));
+  }pintar();return box;
 }
