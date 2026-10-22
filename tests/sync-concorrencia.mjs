@@ -181,3 +181,156 @@ test('Sync: PUT 409 com alteração real adota servidor e preserva rascunho sem 
   assert.notEqual(a.document.querySelector('#modais .fundo'),modal);
   assert.match(a.run('JSON.stringify(lerRascunhoSync())'),/Texto ainda em edição/);
 });
+
+const demandasDuasAbas="E.demandas=[{id:'teste',titulo:'Cadastro sintético de sincronização',status:'Aberta',obs:'Conferência encerrada'},{id:'preservar',titulo:'Outra demanda sintética',status:'Aberta'}];E.agendaGoogleHistorico=[]";
+function exclusaoEmOutraAba(a){
+  const remoto=metadados(a);remoto.dados.demandas=remoto.dados.demandas.filter(d=>d.id!=='teste');return remoto;
+}
+
+test('Sync: aba sem edição adota exclusão remota por GET sem alerta, mesmo com busca focada',async()=>{
+  const a=await app(demandasDuasAbas),remoto=exclusaoEmOutraAba(a);
+  a.run("atual='demandas';filtro.demandasBusca='sintética';tela()");
+  const busca=a.document.querySelector('.rotina-busca input');
+  Object.defineProperty(a.document,'activeElement',{configurable:true,value:busca});
+  let puts=0;
+  a.ctx.fetch=async(_,op)=>{if(op.method==='PUT')puts++;return resposta(remoto)};
+  await a.run('puxarNuvem()');
+  assert.equal(a.alertas.length,0,'Uma aba sem edição apenas acompanha o que mudou no servidor');
+  assert.equal(puts,0);assert.equal(a.run('E.demandas.length'),1);
+  assert.equal(a.run('E.demandas[0].id'),'preservar');assert.equal(a.run('_tabBase'),20);
+  assert.equal(a.run('filtro.demandasBusca'),'sintética');assert.equal(a.run('lerRascunhoSync()'),null);
+});
+
+test('Sync: PUT automático só de metadados recebe exclusão remota sem alerta nem nova gravação',async()=>{
+  const a=await app(demandasDuasAbas),remoto=exclusaoEmOutraAba(a);let puts=0;
+  a.run("E.agendaGoogleUltima={em:'2026-10-22T12:05:00Z',novos:0,atualizados:0};salvar()");
+  a.ctx.fetch=async(_,op)=>op.method==='GET'?resposta(remoto):(puts++,resposta({erro:'conflito'},409));
+  assert.equal(await a.run('enviarNuvem()'),false,'O PUT recusado não passa a ser uma gravação confirmada');
+  assert.equal(a.alertas.length,0,'Metadados locais não transformam atualização remota em conflito de edição');
+  assert.equal(puts,1);assert.equal(a.run('E.demandas.length'),1);
+  assert.equal(a.run('E.demandas[0].id'),'preservar');assert.equal(a.run('_tabBase'),20);
+});
+
+for(const caminho of ['GET','PUT 409'])test('Sync: conflito de conteúdo local sem modal continua avisando por '+caminho,async()=>{
+  const a=await app(demandasDuasAbas),remoto=exclusaoEmOutraAba(a);
+  a.run("E.demandas[0].obs='Nota local ainda não enviada';salvar()");
+  let puts=0;
+  a.ctx.fetch=async(_,op)=>op.method==='GET'?resposta(remoto):(puts++,resposta({erro:'conflito'},409));
+  await a.run(caminho==='GET'?'puxarNuvem()':'enviarNuvem()');
+  assert.equal(a.alertas.length,1);assert.match(a.alertas[0],/Outro acesso/);
+  assert.equal(a.run("JSON.parse(localStorage.getItem('cl_descartado')).dados.demandas[0].obs"),'Nota local ainda não enviada');
+  assert.equal(a.run('E.demandas.length'),1);assert.equal(a.run('E.demandas[0].id'),'preservar');
+  assert.equal(puts,caminho==='GET'?0:1);
+});
+
+test('Sync: base de conteúdo desconhecida continua avisando ao adotar alteração remota',async()=>{
+  const a=await app(demandasDuasAbas),remoto=exclusaoEmOutraAba(a);
+  a.run('_tabConteudo=null');a.ctx.fetch=async()=>resposta(remoto);await a.run('puxarNuvem()');
+  assert.equal(a.alertas.length,1);assert.equal(a.run('_tabBase'),20);
+});
+
+for(const origem of ['data-uso-direto','fortemais'])test('Sync: formulário inline '+origem+' mantém aviso e recuperação mesmo com conteúdo local igual à base',async()=>{
+  const a=await app(demandasDuasAbas),remoto=exclusaoEmOutraAba(a);
+  a.ctx.origemFormulario=origem;
+  a.run(`var formPendente=el('<section><h3>Formulário sintético</h3><label>Nota<textarea>Texto inline não gravado</textarea></label></section>');
+    if(origemFormulario==='data-uso-direto')formPendente.setAttribute('data-uso-direto','');
+    else{formPendente.setAttribute('data-fm-pagina','roi');formPendente._fmDirty=true}
+    document.getElementById('main').appendChild(formPendente)`);
+  a.ctx.fetch=async()=>resposta(remoto);await a.run('puxarNuvem()');
+  assert.equal(a.alertas.length,1);assert.match(a.run('JSON.stringify(lerRascunhoSync())'),/Texto inline não gravado/);
+  assert.equal(a.run('_tabBase'),20);assert.equal(a.run('E.demandas.length'),1);
+});
+
+// Linkedom não separa value de seu atributo como um campo digitado no browser.
+function digitarSemGravar(campo,valor){
+  Object.defineProperty(campo,'defaultValue',{configurable:true,writable:true,value:campo.defaultValue??(campo.tagName==='TEXTAREA'?campo.textContent:campo.getAttribute('value')||'')});
+  Object.defineProperty(campo,'value',{configurable:true,writable:true,value:valor});
+}
+async function campoDeEscopo(a,origem){
+  if(origem==='agente'){
+    await a.run("atual='donboy';agentesUI.editando='agente-sintetico';vAgentes(document.getElementById('main'))");
+    return a.document.querySelector('.ag-form [name=descricao]');
+  }
+  if(origem==='opção'){
+    a.run("document.getElementById('main').appendChild(editorLista('areasDemanda',()=>{}))");
+    return a.document.querySelector('.editor-lista-mobile form input');
+  }
+  if(origem==='célula'){
+    a.run("document.getElementById('main').appendChild(tabela(E.demandas,[{k:'titulo',t:'Demanda'}],()=>{}))");
+    return a.document.querySelector('table input[data-i="1"][data-k=titulo]');
+  }
+  await a.run("atual='config';vConfig(document.getElementById('main'))");
+  return [...a.document.querySelectorAll('.bNome')].find(c=>c.value==='Empresa sintética');
+}
+const fontesRascunho=demandasDuasAbas+";E.agentes=[{id:'agente-sintetico',nome:'Analista sintético',ambiente:'Local',descricao:'Descrição inicial'}];E.empresasPJ=[{id:'empresa-sintetica',nome:'Empresa sintética'}]";
+for(const origem of ['agente','opção','célula','empresa'])test('Sync: preserva rascunho real de '+origem+' antes de submit/change, incluindo campo raiz e vazio',async()=>{
+  const a=await app(fontesRascunho),campo=await campoDeEscopo(a,origem),remoto=exclusaoEmOutraAba(a);
+  assert.ok(campo);const valor=origem==='agente'?'':'Texto pendente de '+origem;
+  digitarSemGravar(campo,valor);
+  assert.equal(a.run('conteudoSync(E)===_tabConteudo'),true,'Digitar ainda não gravou o estado');
+  a.ctx.fetch=async()=>resposta(remoto);await a.run('puxarNuvem()');
+  assert.equal(a.alertas.length,1,'O formulário pendente precisa ser comunicado');
+  const salvo=JSON.parse(a.run('JSON.stringify(lerRascunhoSync())'));
+  assert.ok(salvo?.formularios.some(f=>f.campos.some(c=>c.valor===valor)),'O valor digitado fica recuperável');
+  a.run('abrirRascunhoSync()');assert.match(a.document.querySelector('[data-recuperacao-sync] textarea').value,origem==='agente'?/\(vazio\)/:new RegExp(valor));
+});
+
+test('Sync: os quatro escopos sem alteração não geram rascunho nem alerta',async()=>{
+  for(const origem of ['agente','opção','célula','empresa']){
+    const a=await app(fontesRascunho);await campoDeEscopo(a,origem);
+    assert.equal(a.run('guardarRascunhoSync()'),false,origem+' continua sem edição');
+    const remoto=exclusaoEmOutraAba(a);a.ctx.fetch=async()=>resposta(remoto);await a.run('puxarNuvem()');
+    assert.equal(a.alertas.length,0,origem+' sem edição acompanha o servidor');
+  }
+});
+
+test('Sync: célula salva por change e PUT não vira rascunho falso numa atualização posterior',async()=>{
+  const a=await app(fontesRascunho),campo=await campoDeEscopo(a,'célula');
+  digitarSemGravar(campo,'Título confirmado');campo.dispatchEvent(new a.document.defaultView.Event('change',{bubbles:true}));
+  assert.ok(a.document.querySelector('table input[data-i="1"]')===campo,'A tabela pode salvar sem substituir o campo');
+  a.ctx.fetch=async(_,op)=>{a.remoto={mt:11,dados:JSON.parse(op.body).dados};return resposta({mt:11})};
+  assert.equal(await a.run('enviarNuvem()'),true);
+  const remoto=exclusaoEmOutraAba(a);a.ctx.fetch=async()=>resposta(remoto);await a.run('puxarNuvem()');
+  assert.equal(a.alertas.length,0);assert.equal(a.run('lerRascunhoSync()'),null);
+  assert.equal(a.run('E.demandas[0].titulo'),'Título confirmado');
+});
+
+test('Sync: nome de empresa confirmado renderiza outro campo com o novo valor inicial',async()=>{
+  const a=await app(fontesRascunho),campo=await campoDeEscopo(a,'empresa');
+  digitarSemGravar(campo,'Empresa confirmada');campo.onchange();await rodada();
+  const novo=[...a.document.querySelectorAll('.bNome')].find(c=>c.value==='Empresa confirmada');
+  assert.ok(novo&&novo!==campo);assert.equal(novo.getAttribute('value'),'Empresa confirmada');
+  a.ctx.fetch=async(_,op)=>{a.remoto={mt:11,dados:JSON.parse(op.body).dados};return resposta({mt:11})};
+  assert.equal(await a.run('enviarNuvem()'),true);
+  const remoto=exclusaoEmOutraAba(a);a.ctx.fetch=async()=>resposta(remoto);await a.run('puxarNuvem()');
+  assert.equal(a.alertas.length,0);assert.equal(a.run('lerRascunhoSync()'),null);
+});
+
+for(const [nome,valor,avisos] of [['foco sem edição',null,0],['alteração financeira','2345,67',1],['valor inválido','valor inválido',1]])test('Sync: moeda em tabela distingue '+nome+' da formatação inicial',async()=>{
+  const a=await app(demandasDuasAbas+';E.demandas[1].valor=1234');
+  a.run("document.getElementById('main').appendChild(tabela(E.demandas,[{k:'valor',t:'Valor',tipo:'moeda'}],()=>{}))");
+  const campo=a.document.querySelector('input.moeda[data-i="1"]');
+  digitarSemGravar(campo,campo.value);
+  campo.dispatchEvent(new a.document.defaultView.Event('focusin',{bubbles:true}));
+  assert.equal(campo.value,'1234','O foco muda somente o formato do mesmo valor');
+  if(valor!==null)campo.value=valor;
+  const remoto=exclusaoEmOutraAba(a);a.ctx.fetch=async()=>resposta(remoto);await a.run('puxarNuvem()');
+  assert.equal(a.alertas.length,avisos);
+  if(avisos)assert.ok(JSON.parse(a.run('JSON.stringify(lerRascunhoSync())')).formularios.some(f=>f.campos.some(c=>c.valor===valor)));
+  else assert.equal(a.run('lerRascunhoSync()'),null);
+});
+
+test('Sync: primeira leitura sem base avisa e preserva rascunho inline sem modal aberto',async()=>{
+  const a=await app(demandasDuasAbas),remoto=exclusaoEmOutraAba(a);
+  a.run("_tabBase=0;_tabConteudo=null;document.getElementById('main').appendChild(editorLista('areasDemanda',()=>{}))");
+  digitarSemGravar(a.document.querySelector('.editor-lista-mobile input'),'Texto anterior à primeira leitura');
+  a.ctx.fetch=async()=>resposta(remoto);await a.run('puxarNuvem()');
+  assert.equal(a.alertas.length,1);assert.match(a.run('JSON.stringify(lerRascunhoSync())'),/Texto anterior à primeira leitura/);
+  assert.equal(a.run('_tabBase'),20);
+});
+
+test('Sync: primeira leitura sem base continua silenciosa quando não existe formulário pendente',async()=>{
+  const a=await app(demandasDuasAbas),remoto=exclusaoEmOutraAba(a);
+  a.run('_tabBase=0;_tabConteudo=null');a.ctx.fetch=async()=>resposta(remoto);await a.run('puxarNuvem()');
+  assert.equal(a.alertas.length,0);assert.equal(a.run('_tabBase'),20);assert.equal(a.run('lerRascunhoSync()'),null);
+});

@@ -1560,7 +1560,7 @@ function tabela(lista,colunas,aoMudar,rodape,alvo,abrir){
     }catch(e){erroCampoEntrada(a,e.message);return}
     if(coluna?.aoGravar&&coluna.aoGravar(novoValor,it)===false){a.value=a.classList?.contains('moeda')?brl2(it[a.dataset.k]):it[a.dataset.k]??'';erroCampoEntrada(a,'');return}
     it[a.dataset.k]=novoValor;if(a.classList?.contains('moeda'))a.value=novoValor?brl2(novoValor):'';
-    erroCampoEntrada(a,'');salvar();aoMudar&&aoMudar(true)});
+    erroCampoEntrada(a,'');salvar();if(['INPUT','TEXTAREA'].includes(a.tagName))a.defaultValue=a.value;aoMudar&&aoMudar(true)});
   t.addEventListener('click',async ev=>{const b=ev.target.closest('[data-del]');if(!b||b.disabled)return;
     const it=lista[+b.dataset.del],base=alvo||lista,estadoAoExcluir=E;
     if(!it||!base.includes(it)||!confirm('Apagar este registro?'))return;
@@ -16921,20 +16921,31 @@ function lerRascunhoSync(){
 function guardarRascunhoSync(){
   const formularios=[];
   const fontes=[...document.querySelectorAll('#modais .fundo'),...document.querySelectorAll('#main [data-uso-direto]'),
-    ...[...document.querySelectorAll('#main [data-fm-pagina]')].filter(p=>p._fmDirty===true)];
-  fontes.forEach(f=>{
+    ...[...document.querySelectorAll('#main [data-fm-pagina]')].filter(p=>p._fmDirty===true)].map(f=>({f,soAlterados:false}));
+  const seletor='#main .ag-form,#main .editor-lista-mobile form,#main table input[data-i][data-k],#main table textarea[data-i][data-k],#main input.bNome';
+  fontes.push(...[...document.querySelectorAll(seletor)].map(f=>({f,soAlterados:true})));
+  const capturados=new Set();
+  fontes.forEach(({f,soAlterados})=>{
     if(f.querySelector('[data-recuperacao-sync]'))return;
     const campos=[];
-    f.querySelectorAll('input,textarea,select').forEach(inp=>{
+    const entradas=[...(f.matches('input,textarea,select')?[f]:[]),...f.querySelectorAll('input,textarea,select')];
+    entradas.forEach(inp=>{
+      if(capturados.has(inp)||soAlterados&&inp.tagName==='SELECT')return;
       const tipo=String(inp.type||'').toLowerCase();
-      const label=inp.closest('label')?.textContent||[...f.querySelectorAll('label')].find(l=>l.htmlFor===inp.id)?.textContent||inp.getAttribute('aria-label')||inp.name||'Campo';
+      const inicial=inp.defaultValue??(inp.tagName==='TEXTAREA'?inp.textContent:inp.getAttribute('value')||'');
+      let alterado=String(inp.value??'')!==String(inicial);
+      if(soAlterados&&inp.classList.contains('moeda')){
+        try{alterado=financeiroNumero(inp.value||'0')!==financeiroNumero(inicial||'0')}catch(_){} // Inválido continua recuperável.
+      }
+      if(soAlterados&&!alterado)return;
+      const label=inp.closest('label')?.textContent||[...f.querySelectorAll('label')].find(l=>l.htmlFor===inp.id)?.textContent||inp.getAttribute('aria-label')||inp.name||(inp.classList.contains('bNome')?'Nome da empresa':'Campo');
       const identificacao=[label,inp.id,inp.name,inp.autocomplete,inp.placeholder].join(' ');
       if(['password','hidden','file','submit','button'].includes(tipo)||/senha|password|passphrase|token|segredo|secret|api.?key|chave|credencial|authorization/i.test(identificacao))return;
       if(['checkbox','radio'].includes(tipo)&&!inp.checked)return;
       const valor=['checkbox','radio'].includes(tipo)?'Marcado':String(inp.value??'');
-      if(valor.trim())campos.push({campo:String(label).trim(),valor});
+      if(valor.trim()||soAlterados&&alterado){campos.push({campo:String(label).trim(),valor});capturados.add(inp)}
     });
-    const aba=f.querySelector('h3')?.textContent||f.dataset.fmPagina||'Formulário';
+    const aba=f.querySelector('h3,h2')?.textContent||f.getAttribute('aria-label')||f.dataset.fmPagina||f.closest('[data-bid]')?.querySelector('h2')?.textContent||'Formulário';
     const obra=f.closest('.fm-projeto')?.querySelector('.fm-projeto-abre strong')?.textContent||'Obra';
     if(campos.length)formularios.push({titulo:f.hasAttribute('data-fm-pagina')?aba+' · '+obra:aba,campos});
   });
@@ -16954,7 +16965,7 @@ function abrirRascunhoSync(){
   abrirModal('Textos preservados nesta aba','Confira e copie o que precisar. Nenhum cadastro será alterado automaticamente.',(c,fechar)=>{
     const sec=el('<div class="secao" data-recuperacao-sync></div>');
     const texto=el('<textarea readonly aria-label="Textos dos formulários preservados" style="width:100%;box-sizing:border-box;min-height:280px;padding:12px;font:inherit"></textarea>');
-    texto.value=salvo.formularios.map(f=>f.titulo+'\n'+f.campos.map(x=>x.campo+': '+x.valor).join('\n')).join('\n\n');sec.appendChild(texto);
+    texto.value=salvo.formularios.map(f=>f.titulo+'\n'+f.campos.map(x=>x.campo+': '+(x.valor===''?'(vazio)':x.valor)).join('\n')).join('\n\n');sec.appendChild(texto);
     sec.appendChild(el('<p>Estes textos ficam somente nesta aba do navegador. Guarde o que precisar antes de fechá-la.</p>'));c.appendChild(sec);
     const acoes=el('<div class="secao modal-acoes"></div>');
     acoes.appendChild(acao('Apagar textos preservados',()=>{limparRascunhoSync();fechar()},'ghost'));
@@ -16971,13 +16982,16 @@ function mostrarRascunhoSync(){
 }
 function adotaNuvem(r,avisar){
   validarBackup(r.dados);
+  // Receber uma mudança remota só é conflito quando há edição ou formulário
+  // local a preservar. Uma aba limpa acompanha o servidor sem interromper.
+  const edicaoLocal=_tabConteudo===null||conteudoSync(E)!==_tabConteudo;
   const preservou=guardarRascunhoSync();
   guardaDescartado();
   // modal aberto sobre o estado antigo viraria órfão e comeria o que fosse digitado
   const mo=document.getElementById('modais');if(mo)mo.innerHTML='';atualizarCamadasModais();
   guardarEstadoLocal(r.dados);marcaBase(r.mt,conteudoSync(r.dados));E=carregar();tela({baseRemota:true});mostrarRascunhoSync();
   pintaSync('atualizado de outro acesso');
-  if(avisar)alert('Outro acesso atualizou os dados. Esta aba adotou a versão do servidor para preservar o que foi salvo lá.\n\n'+(preservou?'Os textos dos formulários foram preservados nesta aba. Use Recuperar textos preservados para conferir e copiar o que precisar.':'A versão local anterior ficou em Configurações → Versão descartada.'));
+  if((avisar&&edicaoLocal)||preservou)alert('Outro acesso atualizou os dados. Esta aba adotou a versão do servidor para preservar o que foi salvo lá.\n\n'+(preservou?'Os textos dos formulários foram preservados nesta aba. Use Recuperar textos preservados para conferir e copiar o que precisar.':'A versão local anterior ficou em Configurações → Versão descartada.'));
 }
 async function apiPut(){
   const r=await fetch(API_SYNC,{method:'PUT',
