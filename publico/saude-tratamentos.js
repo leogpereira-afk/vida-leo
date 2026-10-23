@@ -198,28 +198,87 @@ function configurarProgramacaoTratamento(t,d){
   Object.assign(t,{programacaoTipo:d.programacaoTipo,diasUso:d.programacaoTipo==='semanal'?dias:[],horariosUso:horarios,inicio:d.inicio,fim:d.fim||'',consumoPorCiclo:q,unidade,frequencia:String(d.frequencia||'').trim(),usoDiario:d.programacaoTipo==='diario',intervaloConsumoDias:d.programacaoTipo==='diario'?1:d.programacaoTipo==='intervalo'?intervalo:'',proximaData:d.inicio});
   if(!SaudeTratamentos.ativo(t)){t.status='Em andamento';t.usoConfirmadoEm=new Date().toISOString()}
 }
+// Prévia sem gravação: valida uma cópia e reutiliza o gerador da tabela de doses.
+function preverProgramacaoTratamento(t,d,referencia=hoje()){
+  const copia={...t};
+  configurarProgramacaoTratamento(copia,{...d,confirmarEmUso:true});
+  copia.usos=[];copia.ocorrencias=[];
+  const inicio=copia.inicio>referencia?copia.inicio:referencia;
+  let data=new Date(inicio+'T12:00:00Z');
+  if(copia.programacaoTipo==='intervalo'){
+    const distancia=Math.round((data-new Date(copia.inicio+'T12:00:00Z'))/864e5),resto=distancia%copia.intervaloConsumoDias;
+    if(resto)data.setUTCDate(data.getUTCDate()+copia.intervaloConsumoDias-resto);
+  }
+  const doses=[];
+  for(let n=0;n<42&&doses.length<6&&Number.isFinite(+data);n++){
+    const dia=data.toISOString().slice(0,10);if(copia.fim&&dia>copia.fim)break;
+    doses.push(...SaudePainelModelo.ocorrencias(copia,dia));
+    data.setUTCDate(data.getUTCDate()+(copia.programacaoTipo==='intervalo'?copia.intervaloConsumoDias:1));
+  }
+  return doses.slice(0,6);
+}
 function programarTratamento(t,aoSalvar){
-  abrirModal('Dias e horários · '+t.oque,'Configure conforme sua receita. Depois, marque cada dose com Tomei.',(c,fechar)=>{
-    const form=el('<form class="rotina-form trat-programar"><label>Como tomar<textarea name="frequencia" rows="2"></textarea></label><div class="trat-programar-grade"><label>Quantidade por dose<input name="consumoPorCiclo" type="number" min="0.0001" step="any" required inputmode="decimal"></label><label>Unidade<input name="unidade" required placeholder="Ex.: cápsula, mL"></label><label>Início<input name="inicio" type="date" required></label><label>Término (opcional)<input name="fim" type="date"></label><label>Repetir<select name="programacaoTipo"><option value="diario">Todos os dias</option><option value="semanal">Dias da semana</option><option value="intervalo">A cada X dias</option></select></label><label data-intervalo>A cada quantos dias?<input name="intervaloConsumoDias" type="number" min="1" step="1"></label></div><fieldset data-dias><legend>Dias da semana</legend><div class="trat-dias-semana"></div></fieldset><fieldset><legend>Horários de cada dose</legend><div data-horarios></div><button type="button" class="btn ghost mini" data-adicionar-hora>+ Horário</button></fieldset><p class="trat-muted">A quantidade informada vale para cada horário. Alterações no planejamento preservam os usos já registrados no histórico.</p><p role="alert" aria-live="polite"></p><div class="rotina-form-acoes"><button type="button" class="btn ghost" data-cancelar>Cancelar</button><button type="submit" class="btn">Salvar programação</button></div></form>');
+  abrirModal('Dias e horários · '+t.oque,'Monte sua rotina conforme a receita. Depois, basta tocar em Tomei.',(c,fechar)=>{
+    const form=el(`<form class="rotina-form trat-programar">
+      <fieldset><legend>1 · Quando repetir</legend>
+        <select name="programacaoTipo" hidden aria-label="Repetir"><option value="diario">Todos os dias</option><option value="semanal">Dias da semana</option><option value="intervalo">A cada X dias</option></select>
+        <div class="trat-chips" data-repeticao role="group" aria-label="Repetição"></div>
+        <div data-dias class="trat-programar-dias"><p>Toque nos dias da sua receita</p><div class="trat-dias-semana"></div></div>
+        <label data-intervalo>A cada quantos dias?<input name="intervaloConsumoDias" type="number" min="1" step="1" inputmode="numeric"><small>O intervalo começa na data de início abaixo.</small></label>
+      </fieldset>
+      <fieldset><legend>2 · Em quais horários</legend><p class="trat-muted">Toque em um horário para editar.</p><div data-horarios class="trat-chips"></div><button type="button" class="btn ghost mini" data-adicionar-hora>+ Adicionar horário</button></fieldset>
+      <fieldset><legend>3 · Dose e período</legend><div class="trat-programar-grade">
+        <label>Quantidade por dose<input name="consumoPorCiclo" type="number" min="0.0001" step="any" required inputmode="decimal"></label>
+        <label>Unidade<input name="unidade" required placeholder="Ex.: cápsula, mL"></label>
+        <label>Início<input name="inicio" type="date" required></label><label>Término (opcional)<input name="fim" type="date"></label>
+      </div><details class="trat-orientacao"><summary>Como tomar · orientação da receita</summary><label>Como tomar<textarea name="frequencia" rows="2"></textarea></label></details></fieldset>
+      <section class="trat-previa" aria-label="Prévia das doses"><h4>Sua programação</h4><div data-previa aria-live="polite"></div><small>Prévia a partir de hoje ou do início escolhido. Nada muda até você salvar.</small></section>
+      <p class="trat-muted">A quantidade vale para cada horário. Seu histórico de doses será preservado.</p>
+      <p role="alert" aria-live="polite"></p><div class="rotina-form-acoes"><button type="button" class="btn ghost" data-cancelar>Cancelar</button><button type="submit" class="btn">Salvar programação</button></div>
+    </form>`);
     const campo=n=>form.querySelector('[name="'+n+'"]');
     for(const k of ['frequencia','unidade','fim'])campo(k).value=t[k]||'';
     campo('consumoPorCiclo').value=SaudeTratamentos.numeroCampo(t.consumoPorCiclo);campo('inicio').value=t.inicio||hoje();campo('intervaloConsumoDias').value=t.intervaloConsumoDias||'';
     const tipo=t.programacaoTipo||(SaudeTratamentos.diario(t)?'diario':SaudeTratamentos.numero(t.intervaloConsumoDias)>1?'intervalo':'diario');
     [...campo('programacaoTipo').options].find(o=>o.value===tipo).selected=true;
     if((t.usos||[]).length||(t.compras||[]).length)campo('unidade').readOnly=true;
-    ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach((nome,n)=>{const l=el('<label><input type="checkbox" name="diaUso" value="'+n+'"><span>'+nome+'</span></label>');l.querySelector('input').checked=(t.diasUso||[]).includes(n);form.querySelector('.trat-dias-semana').append(l)});
-    const atualizar=()=>{form.querySelector('[data-dias]').hidden=campo('programacaoTipo').value!=='semanal';form.querySelector('[data-intervalo]').hidden=campo('programacaoTipo').value!=='intervalo';campo('intervaloConsumoDias').required=campo('programacaoTipo').value==='intervalo'};campo('programacaoTipo').onchange=atualizar;atualizar();
-    function hora(valor=''){
-      const row=el('<div class="trat-hora-linha"><input type="time" name="horaUso" required aria-label="Horário da dose"><button type="button" class="btn ghost mini">Remover</button></div>');row.querySelector('input').value=valor;row.querySelector('button').onclick=()=>row.remove();form.querySelector('[data-horarios]').append(row);
-    }
-    const horas=t.horariosUso?.length?t.horariosUso:t.horario?[t.horario]:[''];horas.forEach(hora);form.querySelector('[data-adicionar-hora]').onclick=()=>hora();
-    if(!SaudeTratamentos.ativo(t)){const check=el('<label class="trat-uso-confirmar"><input type="checkbox" name="confirmarEmUso"> Confirmo que este medicamento está em uso e quero ativar a programação</label>');form.querySelector('[role=alert]').before(check)}
-    form.querySelector('[data-cancelar]').onclick=fechar;
-    form.onsubmit=e=>{e.preventDefault();try{
+    const nomes=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    [1,2,3,4,5,6,0].forEach(n=>{const l=el('<label class="trat-dia-chip"><input type="checkbox" name="diaUso" value="'+n+'"><span>'+nomes[n]+'</span></label>');l.querySelector('input').checked=(t.diasUso||[]).includes(n);form.querySelector('.trat-dias-semana').append(l)});
+    [['diario','Todos os dias'],['semanal','Dias da semana'],['intervalo','A cada X dias']].forEach(([valor,nome])=>{
+      const b=el('<button type="button" class="trat-chip" aria-pressed="false"></button>');b.textContent=nome;b.dataset.tipo=valor;
+      b.onclick=()=>{[...campo('programacaoTipo').options].find(o=>o.value===valor).selected=true;atualizar()};form.querySelector('[data-repeticao]').append(b);
+    });
+    function dados(){
       const d={};for(const k of ['frequencia','unidade','consumoPorCiclo','inicio','fim','programacaoTipo','intervaloConsumoDias'])d[k]=campo(k).value;
-      d.horariosUso=[...form.querySelectorAll('[name=horaUso]')].map(i=>i.value);d.diasUso=[...form.querySelectorAll('[name=diaUso]')].filter(i=>i.checked).map(i=>Number(i.value));d.confirmarEmUso=!!campo('confirmarEmUso')?.checked;
-      tratamentoCommit(t,()=>configurarProgramacaoTratamento(t,d));fechar();aoSalvar();
-    }catch(e){form.querySelector('[role=alert]').textContent=e.message}};
+      d.horariosUso=[...form.querySelectorAll('[name=horaUso]')].map(i=>i.value);d.diasUso=[...form.querySelectorAll('[name=diaUso]')].filter(i=>i.checked).map(i=>Number(i.value));d.confirmarEmUso=!!campo('confirmarEmUso')?.checked;return d;
+    }
+    function previa(){
+      const box=form.querySelector('[data-previa]');box.replaceChildren();
+      try{
+        const d=dados(),doses=preverProgramacaoTratamento(t,d);
+        const repeticao=d.programacaoTipo==='diario'?'Todos os dias':d.programacaoTipo==='intervalo'?'A cada '+d.intervaloConsumoDias+' dias':[1,2,3,4,5,6,0].filter(n=>d.diasUso.includes(n)).map(n=>nomes[n]).join(', ');
+        box.append(el('<p><strong>'+esc(repeticao)+'</strong> · '+esc(SaudeTratamentos.formatarNumero(d.consumoPorCiclo)+' '+d.unidade)+' por dose</p>'));
+        if(!doses.length){box.append(el('<p>Nenhuma dose neste período. Confira as datas e os dias selecionados.</p>'));return}
+        const lista=el('<ol class="trat-previa-doses"></ol>');
+        doses.forEach(o=>{const dia=nomes[new Date(o.data+'T12:00:00Z').getUTCDay()];lista.append(el('<li><span>'+dia+' · '+esc(fmtDataAno(o.data))+'</span><strong>'+esc(o.hora)+'</strong></li>'))});box.append(lista);
+      }catch(e){box.append(el('<p>'+esc(e.message)+'</p>'))}
+    }
+    function atualizar(){
+      const tipo=campo('programacaoTipo').value;
+      form.querySelector('[data-dias]').hidden=tipo!=='semanal';form.querySelector('[data-intervalo]').hidden=tipo!=='intervalo';campo('intervaloConsumoDias').required=tipo==='intervalo';
+      form.querySelectorAll('[data-tipo]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tipo===tipo)));previa();
+    }
+    campo('programacaoTipo').onchange=atualizar;
+    function hora(valor='',foco=false){
+      const row=el('<div class="trat-hora-chip"><input type="time" name="horaUso" required aria-label="Horário da dose"><button type="button" title="Remover horário">×</button></div>'),input=row.querySelector('input'),remover=row.querySelector('button');
+      input.value=valor;const nome=()=>remover.setAttribute('aria-label','Remover horário'+(input.value?' '+input.value:''));nome();input.oninput=nome;
+      remover.onclick=()=>{const proximo=row.nextElementSibling?.querySelector('input')||row.previousElementSibling?.querySelector('input')||form.querySelector('[data-adicionar-hora]');row.remove();previa();proximo.focus()};form.querySelector('[data-horarios]').append(row);if(foco)input.focus();
+    }
+    const horas=t.horariosUso?.length?t.horariosUso:t.horario?[t.horario]:[''];horas.forEach(h=>hora(h));form.querySelector('[data-adicionar-hora]').onclick=()=>{hora('',true);previa()};
+    if(!SaudeTratamentos.ativo(t)){const check=el('<label class="trat-uso-confirmar"><input type="checkbox" name="confirmarEmUso"> Confirmo que este medicamento está em uso e quero ativar a programação</label>');form.querySelector('[role=alert]').before(check)}
+    form.oninput=previa;form.onchange=previa;atualizar();
+    form.querySelector('[data-cancelar]').onclick=fechar;
+    form.onsubmit=e=>{e.preventDefault();try{tratamentoCommit(t,()=>configurarProgramacaoTratamento(t,dados()));fechar();aoSalvar()}catch(e){form.querySelector('[role=alert]').textContent=e.message}};
     c.append(form);
   });
 }
