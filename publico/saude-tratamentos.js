@@ -28,7 +28,7 @@ const SaudeTratamentos = (() => {
     if(!(numero(uso.quantidade)>0))throw Error('Informe a quantidade consumida na unidade do estoque.');
     if(numero(uso.quantidade)<0.0001)throw Error('A quantidade mínima para registro é 0,0001 na unidade do estoque.');
     if(!String(t.unidade||'').trim())throw Error('Defina a unidade do estoque antes de registrar o uso.');
-    if((t.usos||[]).some(u=>!u.desfeitoEm&&u.data===uso.data&&u.hora===uso.hora))throw Error('Já existe um uso nesse horário. Confira o histórico.');
+    if((t.usos||[]).some(u=>!u.desfeitoEm&&u.data===uso.data&&u.hora===uso.hora&&(!uso.ocorrenciaId||!u.ocorrenciaId||u.ocorrenciaId===uso.ocorrenciaId)))throw Error('Já existe um uso nesse horário. Confira o histórico.');
     const n=saldo(t);if(n!==null&&uso.quantidade>n)throw Error('Quantidade maior que o estoque informado. Registre a compra ou corrija o estoque.');
     // Uma única ocorrência diária representa o mesmo uso no check, em Hoje
     // e no formulário avulso. O callback já traz o vínculo e não entra de novo.
@@ -42,7 +42,7 @@ const SaudeTratamentos = (() => {
     }
     t.usos=t.usos||[];t.usos.push({...uso,id:uid(),registradoEm:new Date().toISOString()});
   }
-  const diario=t=>t.usoDiario===true||(t.usoDiario!==false&&numero(t.intervaloConsumoDias)===1);
+  const diario=t=>t.programacaoTipo?t.programacaoTipo==='diario':t.usoDiario===true||(t.usoDiario!==false&&numero(t.intervaloConsumoDias)===1);
   const usoHoje=t=>(t.usos||[]).find(u=>!u.desfeitoEm&&u.data===hoje());
   function registrarUsoDiario(t){
     if(!ativo(t))throw Error('Confirme que o medicamento está em andamento antes de marcar o uso diário.');
@@ -100,6 +100,7 @@ function editarTratamento(t,grupo){
   ],{...t,usoDiario:SaudeTratamentos.diario(t),horariosUsoTexto:(t.horariosUso||[]).join(', ')},d=>{
     const horarios=String(d.horariosUsoTexto||'').split(/[,;\s]+/).filter(Boolean);if(horarios.some(h=>!/^([01]\d|2[0-3]):[0-5]\d$/.test(h)))throw Error('Informe horários como 08:00 e 20:00, separados por vírgula.');d.horariosUso=[...new Set(horarios)].sort();delete d.horariosUsoTexto;
     if(d.usoDiario)d.intervaloConsumoDias=1;
+    if(t.programacaoTipo){d.programacaoTipo=d.usoDiario?'diario':t.programacaoTipo==='diario'?'intervalo':t.programacaoTipo;if(!d.horariosUso.length)throw Error('Mantenha ao menos um horário ou ajuste em Dias e horários.');}
     if(!d.oque)throw Error('Informe o nome do tratamento.');
     for(const k of ['inicio','fim','proximaData'])if(d[k]&&!dataISOValida(d[k]))throw Error('Confira a data informada.');
     if(d.inicio&&d.fim&&d.fim<d.inicio)throw Error('O término deve ser posterior ao início.');
@@ -182,6 +183,81 @@ function agendaTratamento(t){
     }catch(e){status.textContent=e.message}finally{b.disabled=false}});c.append(status,b);
   });
 }
+// A programação usa somente os dias, horários e quantidades confirmados pela pessoa.
+function configurarProgramacaoTratamento(t,d){
+  if(!['diario','semanal','intervalo'].includes(d.programacaoTipo))throw Error('Escolha como repetir as doses.');
+  if(!dataISOValida(d.inicio)||d.fim&&(!dataISOValida(d.fim)||d.fim<d.inicio))throw Error('Confira as datas de início e término.');
+  const horarios=[...new Set(d.horariosUso||[])].sort(),dias=[...new Set(d.diasUso||[])].sort();
+  if(!horarios.length||horarios.some(h=>!/^([01]\d|2[0-3]):[0-5]\d$/.test(h)))throw Error('Adicione pelo menos um horário válido.');
+  if(d.programacaoTipo==='semanal'&&(!dias.length||dias.some(n=>!Number.isInteger(n)||n<0||n>6)))throw Error('Selecione os dias da semana.');
+  const intervalo=Number(d.intervaloConsumoDias),q=Number(d.consumoPorCiclo),unidade=String(d.unidade||'').trim();
+  if(d.programacaoTipo==='intervalo'&&(!Number.isInteger(intervalo)||intervalo<1))throw Error('Informe um intervalo de dias inteiros, a partir de 1.');
+  if(!Number.isFinite(q)||q<0.0001||!unidade)throw Error('Informe a quantidade por dose e a unidade.');
+  if(((t.usos||[]).length||(t.compras||[]).length)&&unidade!==t.unidade)throw Error('Preserve a unidade dos movimentos já registrados.');
+  if(!SaudeTratamentos.ativo(t)&&!d.confirmarEmUso)throw Error('Confirme que este medicamento está em uso para ativar a programação.');
+  Object.assign(t,{programacaoTipo:d.programacaoTipo,diasUso:d.programacaoTipo==='semanal'?dias:[],horariosUso:horarios,inicio:d.inicio,fim:d.fim||'',consumoPorCiclo:q,unidade,frequencia:String(d.frequencia||'').trim(),usoDiario:d.programacaoTipo==='diario',intervaloConsumoDias:d.programacaoTipo==='diario'?1:d.programacaoTipo==='intervalo'?intervalo:'',proximaData:d.inicio});
+  if(!SaudeTratamentos.ativo(t)){t.status='Em andamento';t.usoConfirmadoEm=new Date().toISOString()}
+}
+function programarTratamento(t,aoSalvar){
+  abrirModal('Dias e horários · '+t.oque,'Configure conforme sua receita. Depois, marque cada dose com Tomei.',(c,fechar)=>{
+    const form=el('<form class="rotina-form trat-programar"><label>Como tomar<textarea name="frequencia" rows="2"></textarea></label><div class="trat-programar-grade"><label>Quantidade por dose<input name="consumoPorCiclo" type="number" min="0.0001" step="any" required inputmode="decimal"></label><label>Unidade<input name="unidade" required placeholder="Ex.: cápsula, mL"></label><label>Início<input name="inicio" type="date" required></label><label>Término (opcional)<input name="fim" type="date"></label><label>Repetir<select name="programacaoTipo"><option value="diario">Todos os dias</option><option value="semanal">Dias da semana</option><option value="intervalo">A cada X dias</option></select></label><label data-intervalo>A cada quantos dias?<input name="intervaloConsumoDias" type="number" min="1" step="1"></label></div><fieldset data-dias><legend>Dias da semana</legend><div class="trat-dias-semana"></div></fieldset><fieldset><legend>Horários de cada dose</legend><div data-horarios></div><button type="button" class="btn ghost mini" data-adicionar-hora>+ Horário</button></fieldset><p class="trat-muted">A quantidade informada vale para cada horário. Alterações no planejamento preservam os usos já registrados no histórico.</p><p role="alert" aria-live="polite"></p><div class="rotina-form-acoes"><button type="button" class="btn ghost" data-cancelar>Cancelar</button><button type="submit" class="btn">Salvar programação</button></div></form>');
+    const campo=n=>form.querySelector('[name="'+n+'"]');
+    for(const k of ['frequencia','unidade','fim'])campo(k).value=t[k]||'';
+    campo('consumoPorCiclo').value=SaudeTratamentos.numeroCampo(t.consumoPorCiclo);campo('inicio').value=t.inicio||hoje();campo('intervaloConsumoDias').value=t.intervaloConsumoDias||'';
+    const tipo=t.programacaoTipo||(SaudeTratamentos.diario(t)?'diario':SaudeTratamentos.numero(t.intervaloConsumoDias)>1?'intervalo':'diario');
+    [...campo('programacaoTipo').options].find(o=>o.value===tipo).selected=true;
+    if((t.usos||[]).length||(t.compras||[]).length)campo('unidade').readOnly=true;
+    ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].forEach((nome,n)=>{const l=el('<label><input type="checkbox" name="diaUso" value="'+n+'"><span>'+nome+'</span></label>');l.querySelector('input').checked=(t.diasUso||[]).includes(n);form.querySelector('.trat-dias-semana').append(l)});
+    const atualizar=()=>{form.querySelector('[data-dias]').hidden=campo('programacaoTipo').value!=='semanal';form.querySelector('[data-intervalo]').hidden=campo('programacaoTipo').value!=='intervalo';campo('intervaloConsumoDias').required=campo('programacaoTipo').value==='intervalo'};campo('programacaoTipo').onchange=atualizar;atualizar();
+    function hora(valor=''){
+      const row=el('<div class="trat-hora-linha"><input type="time" name="horaUso" required aria-label="Horário da dose"><button type="button" class="btn ghost mini">Remover</button></div>');row.querySelector('input').value=valor;row.querySelector('button').onclick=()=>row.remove();form.querySelector('[data-horarios]').append(row);
+    }
+    const horas=t.horariosUso?.length?t.horariosUso:t.horario?[t.horario]:[''];horas.forEach(hora);form.querySelector('[data-adicionar-hora]').onclick=()=>hora();
+    if(!SaudeTratamentos.ativo(t)){const check=el('<label class="trat-uso-confirmar"><input type="checkbox" name="confirmarEmUso"> Confirmo que este medicamento está em uso e quero ativar a programação</label>');form.querySelector('[role=alert]').before(check)}
+    form.querySelector('[data-cancelar]').onclick=fechar;
+    form.onsubmit=e=>{e.preventDefault();try{
+      const d={};for(const k of ['frequencia','unidade','consumoPorCiclo','inicio','fim','programacaoTipo','intervaloConsumoDias'])d[k]=campo(k).value;
+      d.horariosUso=[...form.querySelectorAll('[name=horaUso]')].map(i=>i.value);d.diasUso=[...form.querySelectorAll('[name=diaUso]')].filter(i=>i.checked).map(i=>Number(i.value));d.confirmarEmUso=!!campo('confirmarEmUso')?.checked;
+      tratamentoCommit(t,()=>configurarProgramacaoTratamento(t,d));fechar();aoSalvar();
+    }catch(e){form.querySelector('[role=alert]').textContent=e.message}};
+    c.append(form);
+  });
+}
+function quadroProgramacaoTratamento(t,aoAlterar){
+  const box=el('<section class="trat-programacao"><div class="trat-toolbar"><h4>Dias e horários</h4></div><div data-programacao-conteudo></div></section>');
+  box.querySelector('.trat-toolbar').append(acao(t.programacaoTipo?'Editar programação':'Programar dias e horários',()=>programarTratamento(t,aoAlterar),'ghost mini'));
+  const conteudo=box.querySelector('[data-programacao-conteudo]');
+  if(!t.programacaoTipo){conteudo.append(el('<p>Defina os dias, horários e a quantidade de cada dose. Depois, é só clicar em <b>Tomei</b>.</p>'));return box}
+  const nomes=['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+  const repeticao=t.programacaoTipo==='semanal'?(t.diasUso||[]).map(n=>nomes[n]).join(', '):t.programacaoTipo==='intervalo'?'A cada '+t.intervaloConsumoDias+' dias':'Todos os dias';
+  conteudo.append(el('<p>'+esc(repeticao)+' · '+esc(SaudeTratamentos.formatarNumero(t.consumoPorCiclo)+' '+SaudeTratamentos.unidadeExibida(t.unidade))+' por dose · '+esc((t.horariosUso||[]).join(' / '))+'</p>'));
+  if(!SaudeTratamentos.ativo(t)){conteudo.append(el('<p>Programação pausada. Confira a situação do medicamento antes de registrar novas doses.</p>'));return box}
+  const controles=el('<div class="trat-programacao-navegar"><label>Mostrar a partir de <input type="date" aria-label="Primeiro dia da tabela"></label></div>'),inicio=controles.querySelector('input');inicio.value=hoje();
+  const diasDepois=(d,n)=>{const data=new Date(d+'T12:00:00Z');data.setUTCDate(data.getUTCDate()+n);return data.toISOString().slice(0,10)};
+  controles.append(acao('Hoje',()=>{inicio.value=hoje();pintar()},'ghost mini'),acao('Próximos 7 dias',()=>{if(dataISOValida(inicio.value)){inicio.value=diasDepois(inicio.value,7);pintar()}},'ghost mini'));
+  const tabela=el('<div class="trat-programacao-tabela"></div>'),aviso=el('<p role="status" aria-live="polite"></p>');conteudo.append(controles,tabela,aviso);inicio.onchange=pintar;
+  function pintar(){
+    tabela.innerHTML='';aviso.textContent='';if(!dataISOValida(inicio.value)){aviso.textContent='Escolha uma data válida.';return}
+    const table=el('<table><caption>Doses programadas · 7 dias</caption><thead><tr><th scope="col">Dia</th><th scope="col">Horário</th><th scope="col">Dose</th><th scope="col">Situação</th></tr></thead><tbody></tbody></table>');let total=0;
+    for(let n=0;n<7;n++)for(const o of SaudePainelModelo.ocorrencias(t,diasDepois(inicio.value,n))){
+      total++;const uso=(t.usos||[]).find(u=>!u.desfeitoEm&&(u.id===o.evento?.usoId||u.ocorrenciaId===o.id))||(o.estado==='Registrado'?(t.usos||[]).find(u=>!u.desfeitoEm&&u.data===o.data&&!u.ocorrenciaId):null);
+      const row=document.createElement('tr');row.innerHTML='<td>'+esc(fmtDataAno(o.data))+'<small>'+esc(nomes[new Date(o.data+'T12:00:00Z').getUTCDay()])+(o.data===hoje()?' · Hoje':'')+'</small></td><td>'+esc(o.hora)+'</td><td>'+esc(SaudeTratamentos.formatarNumero(uso?.quantidade??o.quantidade)+' '+SaudeTratamentos.unidadeExibida(t.unidade))+'</td><td></td>';const cel=row.lastElementChild;
+      if(o.estado==='Registrado'){
+        cel.append(el('<span class="trat-dose-tomada">✓ Tomado'+(uso?.hora?' às '+esc(uso.hora):'')+'</span>'));
+        if(uso)cel.append(acao('Desfazer',()=>desfazerUsoTratamento(t,uso.id,aoAlterar),'ghost mini'));
+      }else if(o.data===hoje()&&o.estado!=='Não utilizado'){
+        const b=acao('Tomei',()=>{b.disabled=true;try{
+          registrarUsoTratamento(t,{data:o.data,hora:new Date().toTimeString().slice(0,5),quantidade:o.quantidade,ocorrenciaId:o.id});aoAlterar();
+        }catch(e){aviso.textContent=e.message;b.disabled=false}},'mini');b.dataset.tomei=o.id;b.setAttribute('aria-label','Tomei a dose das '+o.hora+' de '+t.oque);cel.append(b);
+        if(o.estado==='Adiado')cel.append(el('<small>Adiado para '+esc(o.adiadoPara)+'</small>'));
+      }else cel.textContent=o.estado==='Não utilizado'?'Não utilizado':o.data>hoje()?'Programado':'Sem registro';
+      table.querySelector('tbody').append(row);
+    }
+    tabela.append(total?table:el('<p>Nenhuma dose programada neste período.</p>'));
+  }
+  pintar();conteudo.append(el('<p class="trat-muted">Tomei registra o horário real do clique. Para uma dose de outro dia, use Registrar outro uso abaixo.</p>'));return box;
+}
+
 function quadroItensTratamento(itens,grupo,{selecionarPrimeiro=true}={}){
   const sec=el('<section class="tratamentos-itens"><div class="trat-toolbar"><h2>Medicamentos e cuidados</h2><div class="trat-actions"></div></div><div class="trat-filtros"></div><div class="trat-split"><aside class="trat-lista" aria-label="Itens prescritos do tratamento"></aside><div class="trat-detalhe"></div></div></section>');
   const actions=sec.querySelector('.trat-actions');actions.append(acao('+ Medicamento / cuidado',()=>editarTratamento(null,grupo),'ghost mini'));
@@ -199,8 +275,11 @@ function quadroItensTratamento(itens,grupo,{selecionarPrimeiro=true}={}){
     d.append(el('<header><small>'+esc(t.tipo||'Tratamento')+'</small><h3>'+esc(t.oque||'Tratamento')+'</h3><p>'+esc(t.status||'A confirmar')+(t.inicio?' · início '+fmtDataAno(t.inicio):' · início não confirmado')+'</p></header>'));
     const mostrarUso=id=>{pintar();const linha=[...d.querySelectorAll('[data-uso-id]')].find(r=>r.dataset.usoId===id);if(linha?.closest('details'))linha.closest('details').open=true;const alvo=linha||d.querySelector('.trat-usos-recentes');alvo?.focus({preventScroll:true});alvo?.scrollIntoView({block:'nearest'})};
     const usoDireto=SaudeTratamentos.controlaEstoque(t)||['Medicamento','Suplemento'].includes(t.tipo)?quadroUsoDireto(t,mostrarUso):null;
-    const a=el('<div class="trat-actions"></div>');a.append(acao('✏️ Editar',()=>editarTratamento(t),'ghost mini'));if(SaudeTratamentos.controlaEstoque(t))a.append(acao('🛒 Compra',()=>comprarTratamento(t),'ghost mini'));a.append(acao('📈 Evolução',()=>evolucaoTratamento(t),'ghost mini'),acao('📅 Lembrete',()=>agendaTratamento(t),'ghost mini'));d.append(a);if(usoDireto)d.append(usoDireto);
-    if(SaudeTratamentos.diario(t)&&!(t.horariosUso?.length>1)){
+    const a=el('<div class="trat-actions"></div>');a.append(acao('✏️ Editar',()=>editarTratamento(t),'ghost mini'));if(SaudeTratamentos.controlaEstoque(t))a.append(acao('🛒 Compra',()=>comprarTratamento(t),'ghost mini'));a.append(acao('📈 Evolução',()=>evolucaoTratamento(t),'ghost mini'),acao('📅 Lembrete',()=>agendaTratamento(t),'ghost mini'));d.append(a);
+    d.append(el('<section class="trat-info trat-como-tomar"><h4>Como tomar</h4><p class="trat-texto">'+esc(t.frequencia||'Cadastre a orientação da sua receita em Dias e horários.')+'</p></section>'));
+    if(typeof SaudePainelModelo!=='undefined')d.append(quadroProgramacaoTratamento(t,pintar));
+    if(usoDireto){if(t.programacaoTipo){const manual=el('<details class="trat-info"><summary>Registrar outro uso ou corrigir data e horário</summary></details>');manual.append(usoDireto);d.append(manual)}else d.append(usoDireto);}
+    if(!t.programacaoTipo&&SaudeTratamentos.diario(t)&&!(t.horariosUso?.length>1)){
       const feito=!!SaudeTratamentos.usoHoje(t),configurado=SaudeTratamentos.controlaEstoque(t)&&SaudeTratamentos.numero(t.consumoPorCiclo)>0;
       const bloco=el('<section class="trat-diario"><label><input type="checkbox" data-uso-diario><span></span></label><p></p><p role="status" data-erro-uso-diario></p></section>'),check=bloco.querySelector('input');
       check.checked=feito;check.disabled=feito||!SaudeTratamentos.ativo(t)||!configurado;
@@ -209,19 +288,19 @@ function quadroItensTratamento(itens,grupo,{selecionarPrimeiro=true}={}){
       check.onchange=()=>{if(!check.checked)return;try{tratamentoCommit(t,()=>SaudeTratamentos.registrarUsoDiario(t));mostrarUso(t.usos?.at(-1)?.id)}catch(e){check.checked=false;bloco.querySelector('[data-erro-uso-diario]').textContent=e.message}};
       d.append(bloco);
     }
-    if(t.horariosUso?.length>1)d.append(el('<p class="trat-uso-nota">Tomadas configuradas: '+esc(t.horariosUso.join(' · '))+'. Registre cada ocorrência na tela Hoje ou selecione o horário no formulário acima.</p>'));
+    if(!t.programacaoTipo&&t.horariosUso?.length>1)d.append(el('<p class="trat-uso-nota">Tomadas configuradas: '+esc(t.horariosUso.join(' · '))+'. Registre cada ocorrência na tela Hoje ou selecione o horário no formulário acima.</p>'));
     if(usoDireto||usos.length)d.append(quadroUsosRecentes(t,mostrarUso));
     const resumo=el('<div class="trat-resumo"></div>'),resumoCards=[];
     if(SaudeTratamentos.controlaEstoque(t)&&!usoDireto)resumoCards.push(['Estoque',saldo===null?'Quantidade a confirmar':SaudeTratamentos.formatarNumero(saldo)+' '+SaudeTratamentos.unidadeExibida(t.unidade),saldo===null?'Complete a quantidade em Editar ou Compra.':SaudeTratamentos.estoque(t)]);
     if(compras.at(-1)?.data)resumoCards.push(['Última compra',fmtDataAno(compras.at(-1).data),compras.at(-1).marca||'Marca não informada']);
     if(previsao.data)resumoCards.push(['Previsão de acabar',fmtDataAno(previsao.data),previsao.motivo]);
-    if(t.proximaData)resumoCards.push(['Próximo cuidado',fmtDataAno(t.proximaData),t.horario||'Horário a definir']);
+    if(t.proximaData&&!t.programacaoTipo)resumoCards.push(['Próximo cuidado',fmtDataAno(t.proximaData),t.horario||'Horário a definir']);
     resumoCards.forEach(([titulo,valor,nota])=>resumo.append(el('<div><small>'+esc(titulo)+'</small><b>'+esc(valor)+'</b><span>'+esc(nota)+'</span></div>')));
     if(!SaudeTratamentos.controlaEstoque(t))resumo.append(el('<p class="trat-previsao-pendente">Estoque: Não se aplica · sem controle de material.</p>'));
     if(!previsao.data){const nota=el('<p class="trat-previsao-pendente"></p>');nota.textContent='Previsão de duração: '+previsao.motivo;resumo.append(nota)}
     d.append(resumo);
 
-    d.append(el('<section class="trat-info"><h4>📋 Orientação registrada</h4><p class="trat-texto">'+esc(t.frequencia||'Consulte a receita e registre a orientação.')+'</p>'+(t.obs?'<p class="trat-texto trat-aviso">'+esc(t.obs)+'</p>':'')+'<p class="trat-muted">O estoque considera apenas os usos registrados.</p></section>'));
+    if(t.obs)d.append(el('<section class="trat-info"><h4>Orientações adicionais</h4><p class="trat-texto">'+esc(t.obs)+'</p></section>'));
     d.append(el('<details class="trat-info"><summary>🩺 Médico e consultório</summary><p>'+esc(t.medico||'Profissional a informar')+'</p><p>'+esc(t.especialidade||'')+'</p><p>'+esc(t.contatoMedico||'Telefone a informar')+'</p><p>'+esc(t.enderecoMedico||'Endereço a informar')+'</p></details>'));
     const arquivos=el('<details class="trat-info"><summary>📎 Receitas e documentos</summary></details>');arquivos.append(areaArquivos('tratamento:'+t.id,'Adicionar foto ou PDF do tratamento'));if(t.origemTratamentoId&&E.tratamentos.some(x=>x.id===t.origemTratamentoId)){arquivos.append(el('<p>Documentos do plano de origem:</p>'));arquivos.append(areaArquivos('tratamento:'+t.origemTratamentoId,'',true))}d.append(arquivos);
     const hist=el('<details class="trat-info"><summary>🕒 Histórico · '+(compras.length+usos.length+evolucao.length+(t.ocorrencias||[]).filter(o=>!o.desfeitoEm&&o.estado!=='Registrado').length)+' registros</summary></details>');

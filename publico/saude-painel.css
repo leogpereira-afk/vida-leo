@@ -275,3 +275,20 @@
 }
 
 @media(max-width:650px){.sui-tipos-registro{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sui-tipos-registro .btn{min-height:48px;line-height:1.4;overflow-wrap:anywhere}.sui-form footer,.trat-form .rotina-form-acoes{position:sticky;bottom:0;z-index:2;background:var(--card);padding-bottom:4px}}
+
+/* Programação pessoal: orientação, dias e check por dose no mesmo lugar. */
+.trat-como-tomar{border-left:4px solid #247565;background:#eff7f4;padding:14px;border-radius:12px}
+.trat-programacao{padding:16px;border:1px solid #c5dcd4;border-radius:14px;margin:12px 0;background:var(--card,#fff)}
+.trat-programacao h4,.trat-como-tomar h4{margin:0 0 8px}.trat-programacao .trat-toolbar{gap:10px;flex-wrap:wrap}
+.trat-programacao-navegar{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin:14px 0}
+.trat-programacao-navegar label{display:grid;gap:4px}.trat-programacao-tabela{overflow-x:auto}
+.trat-programacao table{width:100%;border-collapse:collapse;font-size:14px}.trat-programacao caption{text-align:left;padding:8px 0;font-weight:700}
+.trat-programacao th,.trat-programacao td{text-align:left;padding:10px 6px;border-bottom:1px solid #dce6e1;vertical-align:middle}
+.trat-programacao td small{display:block;color:#67756f}.trat-programacao td:last-child{min-width:100px}.trat-programacao td .btn{min-height:42px}
+.trat-dose-tomada{display:block;color:#196750;font-weight:700;margin-bottom:4px}
+.trat-programar{display:grid;gap:14px}.trat-programar label{display:grid;gap:5px}.trat-programar input,.trat-programar select,.trat-programar textarea,.trat-programacao input{font:inherit;padding:10px;border:1px solid #ccd8d3;border-radius:8px;min-width:0;width:100%;box-sizing:border-box}
+.trat-programar-grade{display:grid;grid-template-columns:1fr 1fr;gap:12px}.trat-programar fieldset{min-width:0;border:1px solid #ccd8d3;border-radius:10px;padding:12px}.trat-programar [hidden]{display:none!important}
+.trat-dias-semana{display:flex;flex-wrap:wrap;gap:8px}.trat-dias-semana label{display:flex;align-items:center;gap:6px;padding:9px;border:1px solid #ccd8d3;border-radius:8px;cursor:pointer}.trat-dias-semana input{width:auto;accent-color:#247565}
+.trat-hora-linha{display:flex;gap:8px;margin-bottom:8px}.trat-hora-linha input{max-width:170px}.trat-programar .trat-uso-confirmar{display:flex;align-items:center}.trat-programar .trat-uso-confirmar input{width:auto}
+.trat-programar [role=alert],.trat-programacao [role=status]{color:#a12b26}
+@media(max-width:600px){.trat-programacao{padding:10px}.trat-programar-grade{grid-template-columns:1fr}.trat-programacao th,.trat-programacao td{padding:9px 4px;font-size:12px}.trat-programacao .trat-toolbar .btn{width:100%}}

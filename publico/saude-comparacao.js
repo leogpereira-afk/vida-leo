@@ -107,6 +107,7 @@ function previsaoEstoqueTratamento(t){
   if(saldo===null)return nao('Confirme a quantidade disponível');
   if(saldo<=0)return nao('Sem estoque disponível');
   if(!SaudeTratamentos.ativo(t))return nao('Início do uso não confirmado');
+  if(t.programacaoTipo==='semanal')return nao('Consulte o saldo e as doses na tabela de dias e horários');
   if(!(q>0)||!(dias>=1)||!Number.isInteger(dias))return nao('Informe o consumo e o intervalo confirmados');
   if(!dataISOValida(t.proximaData)||t.proximaData<hoje())return nao('Atualize a próxima data confirmada');
   if((t.usos||[]).some(u=>!u.desfeitoEm&&u.data>=t.proximaData))return nao('Há uso registrado nesta data; confirme a próxima ocorrência');

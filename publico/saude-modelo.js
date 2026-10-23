@@ -13,12 +13,16 @@ var SaudePainelModelo=(()=>{
     if(!data(d)||!ativo(t)||t.inicio&&d<t.inicio||t.fim&&d>t.fim)return[];
     const diario=t.usoDiario===true||(t.usoDiario!==false&&numero(t.intervaloConsumoDias)===1);
     const ciclo=numero(t.intervaloConsumoDias);
-    if(!diario&&!(data(t.proximaData)&&d>=t.proximaData&&(d===t.proximaData||ciclo>0&&Number.isInteger(ciclo)&&distancia(d,t.proximaData)%ciclo===0)))return[];
+    if(t.programacaoTipo==='semanal'){
+      if(!lista(t,'diasUso').includes(new Date(d+'T12:00:00Z').getUTCDay()))return[];
+    }else if(t.programacaoTipo==='intervalo'){
+      if(!data(t.inicio)||!(ciclo>0&&Number.isInteger(ciclo))||distancia(d,t.inicio)<0||distancia(d,t.inicio)%ciclo!==0)return[];
+    }else if(t.programacaoTipo!=='diario'&&!diario&&!(data(t.proximaData)&&d>=t.proximaData&&(d===t.proximaData||ciclo>0&&Number.isInteger(ciclo)&&distancia(d,t.proximaData)%ciclo===0)))return[];
     const horarios=[...new Set(lista(t,'horariosUso').filter(hora))].sort();
     const slots=horarios.length?horarios:[hora(t.horario)?t.horario:'dia'];
     return slots.map(h=>{
       const id=t.id+'|'+d+'|'+h,evento=lista(t,'ocorrencias').filter(x=>x.ocorrenciaId===id&&!x.desfeitoEm&&(!x.usoId||!lista(t,'usos').find(u=>u.id===x.usoId)?.desfeitoEm)).at(-1);
-      const legado=slots.length===1&&lista(t,'usos').find(u=>u.data===d&&!u.desfeitoEm);
+      const legado=slots.length===1&&lista(t,'usos').find(u=>u.data===d&&!u.desfeitoEm&&(!u.ocorrenciaId||u.ocorrenciaId===id));
       return{id,data:d,hora:h,registroId:t.id,titulo:t.oque||'Cuidado',quantidade:numero(t.consumoPorCiclo),unidade:t.unidade||'',estado:evento?.estado||(legado?'Registrado':'Sem registro'),adiadoPara:evento?.adiadoPara||'',evento};
     });
   }
