@@ -685,7 +685,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./gastos-painel.css?v=94e57832c4ee">
 <link rel="stylesheet" href="./fortemais-visual.css?v=4b49bedcb0e5">
 <link rel="stylesheet" href="./central-densidade.css?v=5dfbc2553a75">
-<link rel="stylesheet" href="./documentos-armas.css?v=ed785164fe12">
+<link rel="stylesheet" href="./documentos-armas.css?v=7991eeac16d7">
 <link rel="stylesheet" href="./central-mobile.css?v=48cfe554c15f">
 </head>
 <body>
@@ -724,7 +724,7 @@ tr:hover .lixo{opacity:1}
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
 <script src="./marketing-fortemais.js?v=43e087960693"></script>
 <script src="./marketing.js?v=39a86005b2ae"></script>
-<script src="./documentos-armas.js?v=2f8b5477461c"></script>
+<script src="./documentos-armas.js?v=c8400f3c232a"></script>
 <script src="./documentos-revisao.js?v=f54d2ba958f9"></script>
 <script src="./organograma.js?v=3a5db1c22c87"></script>
 <script src="./fortemais-financeiro.js?v=48296dd2f793"></script>
@@ -2499,7 +2499,7 @@ function radar(){
   const dias=d=>d?Math.round((new Date(d+'T12:00')-new Date(h+'T12:00'))/864e5):null;
   const add=(g,ic,txt,quando,secao,col=null,ref=null)=>out.push({g,ic,txt,quando,secao,col,ref});
   // documentos vencendo
-  E.documentos.forEach(d=>{const n=dias(d.validade);
+  E.documentos.forEach(d=>{if(d.grupo==='armas'&&d.tipoRegistro==='guia'&&d.classificacao==='historico')return;const n=dias(d.validade);
     if(n!=null&&n<180) add(n<0?0:1,'🪪',`${d.nome||'Documento'}${d.dono&&d.dono!=='Léo'?' de '+d.dono:''} ${n<0?'venceu':'vence'} ${fmtDataAno(d.validade)}`,n,'documentos','documentos',d)});
   // seguros renovando (cotar antes da renovação automática)
   (E.seguros||[]).filter(s=>s.status!=='Cancelado').forEach(s=>{const n=dias(s.renova);
@@ -4464,7 +4464,7 @@ function eventosDoEcossistema(){
     sub:[e.tipo,e.descricao].filter(Boolean).join(' · '),
     fonte:'painel',ic:'🗓️',cor:e.cor||'',ref:e});});
 
-  if(on('documentos')) (E.documentos||[]).forEach(d=>{if(d.validade)ev.push({
+  if(on('documentos')) (E.documentos||[]).forEach(d=>{if(d.grupo==='armas'&&d.tipoRegistro==='guia'&&d.classificacao==='historico')return;if(d.validade)ev.push({
     data:d.validade,hora:'',titulo:(d.nome||'Documento')+' vence',
     sub:'de '+(d.dono||'Léo')+(d.numero?' · '+d.numero:''),fonte:'documentos',ic:'🪪',ir:'documentos',col:'documentos',ref:d});
     const renovacao=typeof DocumentosArmas!=='undefined'&&d.grupo==='armas'&&d.tipoRegistro==='clube'?DocumentosArmas.proximaRenovacao(d):'';
@@ -16803,6 +16803,7 @@ function validarBackup(j){
   for(const [col,camposLista] of Object.entries(listasInternas))for(const x of j[col]||[])for(const k of camposLista){
     if(x[k]!==undefined&&(!Array.isArray(x[k])||x[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))throw new Error('Lista inválida: '+col+'.'+k);
   }
+  for(const d of j.documentos||[])if(d.anexosIds!==undefined&&(!Array.isArray(d.anexosIds)||d.anexosIds.some(v=>typeof v!=='string'||!v.trim())))throw new Error('Lista inválida: documentos.anexosIds');
   if(j.aviao)for(const k of ['aportes','mensalidades','despesas'])
     if(j.aviao[k]!==undefined&&(!Array.isArray(j.aviao[k])||j.aviao[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))
       throw new Error('Lista inválida: aviao.'+k);
