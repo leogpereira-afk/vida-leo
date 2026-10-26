@@ -727,7 +727,7 @@ tr:hover .lixo{opacity:1}
 <script src="./marketing-fortemais.js?v=43e087960693"></script>
 <script src="./marketing.js?v=39a86005b2ae"></script>
 <script src="./documentos-agenda.js?v=7a2af59b4227"></script>
-<script src="./documentos-habitualidade.js?v=e717d7d9fcd5"></script>
+<script src="./documentos-habitualidade.js?v=b8ee1a4d60ba"></script>
 <script src="./documentos-armas.js?v=72b63ecaa8b8"></script>
 <script src="./documentos-revisao.js?v=f54d2ba958f9"></script>
 <script src="./organograma.js?v=3a5db1c22c87"></script>
@@ -4481,7 +4481,7 @@ function eventosDoEcossistema(){
     if(renovacao)ev.push({id:'renovacao-clube:'+d.id,data:renovacao,hora:'',titulo:(d.nome||'Clube de tiro')+' · renovação anual',sub:'Data de acompanhamento da filiação · '+(d.dono||'Léo'),fonte:'documentos',ic:'🏅',ir:'documentos',col:'documentos',ref:d});});
   if(on('documentos')&&typeof DocumentosHabitualidade!=='undefined'){
     const visitas=DocumentosHabitualidade.eventos(E.documentos,h);
-    ev.push(...(typeof DocumentosAgenda!=='undefined'?DocumentosAgenda.eventosVisitas(visitas):visitas));
+    ev.push(...(typeof DocumentosAgenda!=='undefined'?DocumentosAgenda.eventosVisitas(visitas):visitas).filter(e=>!e.somenteAvisos||e.avisoDocumento));
   }
 
   // A viagem é um PERÍODO, não dois pontos soltos: sai um evento só, com começo
