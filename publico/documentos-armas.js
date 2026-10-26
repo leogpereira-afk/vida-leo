@@ -154,6 +154,7 @@ const DocumentosArmas = (() => {
     const p=pendencias(d),c=el('<article class="da-card da-card-'+d.tipoRegistro+'"></article>');
     const h=el('<div class="da-card-top"><span class="da-symbol" aria-hidden="true">'+({arma:'🗂️',cr:'📜',clube:'🏅'}[d.tipoRegistro])+'</span><div><span class="da-kicker">'+esc(titulos[d.tipoRegistro])+'</span><h3>'+esc(d.nome||titulos[d.tipoRegistro])+'</h3></div><span class="da-status">'+(p.length?'◷ '+p.length+' pendências':'◷ Conferir situação atual')+'</span></div>');
     c.appendChild(h);const fotos=galeria(d,1);if(fotos)c.appendChild(fotos);c.appendChild(detalhes(d));
+    if(typeof DocumentosHabitualidade!=='undefined'){const resumo=DocumentosHabitualidade.renderResumo(d);if(resumo)c.appendChild(resumo)}
     const anexos=anexosPrivados(d).length;
     const rodape=el('<div class="da-card-footer"><span>'+totalFontes(d)+' documento(s)-fonte'+(anexos?' · '+anexos+' arquivo(s) privado(s)':'')+'</span></div>');
     const abrir=acao('Abrir ficha →',()=>editar(d.id),'ghost');rodape.appendChild(abrir);c.appendChild(rodape);
@@ -194,6 +195,7 @@ const DocumentosArmas = (() => {
       if(encontrado){const p=pendencias(encontrado);if(p.length)c.appendChild(el('<p class="da-warning">◷ A completar: '+esc(p.join(' · '))+'.</p>'))}
       const fotos=galeria(base);if(fotos)c.appendChild(fotos);
       const refs=referencias(base);if(refs)c.appendChild(refs);
+      if(id&&tipo==='arma'&&typeof DocumentosHabitualidade!=='undefined')c.appendChild(DocumentosHabitualidade.render(id));
       if(tipo==='clube')c.appendChild(el('<p class="da-note da-renovacao-resumo">'+esc(resumoRenovacao(base))+'. A data anual serve para acompanhamento; não confirma renovação concluída nem altera a validade informada.</p>'));
       if(tipo==='guia')c.appendChild(el('<p class="da-note da-guia-contexto">'+(base.classificacao==='historico'?'Arquivo histórico: preserva o documento e seu titular original. Não representa uma autorização atual.':'Confira a situação atual no emissor.')+' Copie a data de vencimento da própria guia; um prazo em texto não gera vencimento automaticamente.</p>'));
       const body=el('<div class="secao"></div>');

@@ -686,6 +686,8 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-visual.css?v=4b49bedcb0e5">
 <link rel="stylesheet" href="./central-densidade.css?v=5dfbc2553a75">
 <link rel="stylesheet" href="./documentos-armas.css?v=7991eeac16d7">
+<link rel="stylesheet" href="./documentos-agenda.css?v=74800a54925c">
+<link rel="stylesheet" href="./documentos-habitualidade.css?v=5bfb4043be18">
 <link rel="stylesheet" href="./central-mobile.css?v=48cfe554c15f">
 </head>
 <body>
@@ -724,7 +726,9 @@ tr:hover .lixo{opacity:1}
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
 <script src="./marketing-fortemais.js?v=43e087960693"></script>
 <script src="./marketing.js?v=39a86005b2ae"></script>
-<script src="./documentos-armas.js?v=c8400f3c232a"></script>
+<script src="./documentos-agenda.js?v=7a2af59b4227"></script>
+<script src="./documentos-habitualidade.js?v=e717d7d9fcd5"></script>
+<script src="./documentos-armas.js?v=72b63ecaa8b8"></script>
 <script src="./documentos-revisao.js?v=f54d2ba958f9"></script>
 <script src="./organograma.js?v=3a5db1c22c87"></script>
 <script src="./fortemais-financeiro.js?v=48296dd2f793"></script>
@@ -2499,8 +2503,12 @@ function radar(){
   const dias=d=>d?Math.round((new Date(d+'T12:00')-new Date(h+'T12:00'))/864e5):null;
   const add=(g,ic,txt,quando,secao,col=null,ref=null)=>out.push({g,ic,txt,quando,secao,col,ref});
   // documentos vencendo
-  E.documentos.forEach(d=>{if(d.grupo==='armas'&&d.tipoRegistro==='guia'&&d.classificacao==='historico')return;const n=dias(d.validade);
+  E.documentos.forEach(d=>{if(d.grupo==='armas'&&d.tipoRegistro==='guia'&&d.classificacao==='historico')return;if(typeof DocumentosAgenda!=='undefined'&&DocumentosAgenda.acompanhado(d))return;if(!dataISOValida(d.validade))return;const n=dias(d.validade);
     if(n!=null&&n<180) add(n<0?0:1,'🪪',`${d.nome||'Documento'}${d.dono&&d.dono!=='Léo'?' de '+d.dono:''} ${n<0?'venceu':'vence'} ${fmtDataAno(d.validade)}`,n,'documentos','documentos',d)});
+  if(typeof DocumentosAgenda!=='undefined'){
+    out.push(...DocumentosAgenda.alertas(E.documentos,h));
+    if(typeof DocumentosHabitualidade!=='undefined')out.push(...DocumentosAgenda.alertasVisitas(DocumentosHabitualidade.eventos(E.documentos,h),h));
+  }
   // seguros renovando (cotar antes da renovação automática)
   (E.seguros||[]).filter(s=>s.status!=='Cancelado').forEach(s=>{const n=dias(s.renova);
     if(n!=null&&n<60) add(n<0?0:1,'🛡️',`Seguro ${s.item||s.tipo||''} ${n<0?'venceu':'renova'} ${fmtDataAno(s.renova)}`,n,'gastos','seguros',s)});
@@ -4365,6 +4373,7 @@ function eventoNoMes(e,mes){
   return e.data<=dataLocal(fim)&&(e.ate&&e.ate>=e.data?e.ate:e.data)>=inicio;
 }
 function eventoPendenteVencido(e,data=hoje()){
+  if(e.avisoDocumento)return false;
   return ['documentos','acoes','oportunidades','demandas','seguros','empresas'].includes(e.fonte)&&!!e.data&&e.data<data;
 }
 function proximosCompromissos(lista,data=hoje()){
@@ -4464,11 +4473,16 @@ function eventosDoEcossistema(){
     sub:[e.tipo,e.descricao].filter(Boolean).join(' · '),
     fonte:'painel',ic:'🗓️',cor:e.cor||'',ref:e});});
 
-  if(on('documentos')) (E.documentos||[]).forEach(d=>{if(d.grupo==='armas'&&d.tipoRegistro==='guia'&&d.classificacao==='historico')return;if(d.validade)ev.push({
+  if(on('documentos')&&typeof DocumentosAgenda!=='undefined')ev.push(...DocumentosAgenda.eventos(E.documentos,h));
+  else if(on('documentos')) (E.documentos||[]).forEach(d=>{if(d.grupo==='armas'&&d.tipoRegistro==='guia'&&d.classificacao==='historico')return;if(dataISOValida(d.validade))ev.push({
     data:d.validade,hora:'',titulo:(d.nome||'Documento')+' vence',
     sub:'de '+(d.dono||'Léo')+(d.numero?' · '+d.numero:''),fonte:'documentos',ic:'🪪',ir:'documentos',col:'documentos',ref:d});
     const renovacao=typeof DocumentosArmas!=='undefined'&&d.grupo==='armas'&&d.tipoRegistro==='clube'?DocumentosArmas.proximaRenovacao(d):'';
     if(renovacao)ev.push({id:'renovacao-clube:'+d.id,data:renovacao,hora:'',titulo:(d.nome||'Clube de tiro')+' · renovação anual',sub:'Data de acompanhamento da filiação · '+(d.dono||'Léo'),fonte:'documentos',ic:'🏅',ir:'documentos',col:'documentos',ref:d});});
+  if(on('documentos')&&typeof DocumentosHabitualidade!=='undefined'){
+    const visitas=DocumentosHabitualidade.eventos(E.documentos,h);
+    ev.push(...(typeof DocumentosAgenda!=='undefined'?DocumentosAgenda.eventosVisitas(visitas):visitas));
+  }
 
   // A viagem é um PERÍODO, não dois pontos soltos: sai um evento só, com começo
   // e fim, e o calendário pinta a faixa de ponta a ponta. Ver "ida dia 12" e
@@ -4613,6 +4627,9 @@ function vAgenda(m){
   // A grade é o retrato do mês; a lista logo abaixo é o mesmo mês escrito, em
   // ordem de data — dá para ler o detalhe que não cabe na célula.
   const visiveis=so?todosEv.filter(e=>e.fonte===so):todosEv;
+  if((!so||so==='documentos')&&typeof DocumentosAgenda!=='undefined'){
+    const prazos=DocumentosAgenda.painel(E.documentos,hoje(),abrirEventoCentral);if(prazos)m.appendChild(prazos);
+  }
   m.appendChild(bloco('ag-mes','🗓️ Calendário','clique num dia para abrir o que tem nele',
     gradeMes(visiveis,r)));
 
@@ -16804,6 +16821,10 @@ function validarBackup(j){
     if(x[k]!==undefined&&(!Array.isArray(x[k])||x[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))throw new Error('Lista inválida: '+col+'.'+k);
   }
   for(const d of j.documentos||[])if(d.anexosIds!==undefined&&(!Array.isArray(d.anexosIds)||d.anexosIds.some(v=>typeof v!=='string'||!v.trim())))throw new Error('Lista inválida: documentos.anexosIds');
+  for(const d of j.documentos||[])if(d.habitualidade!==undefined){
+    if(typeof DocumentosHabitualidade==='undefined')throw new Error('Atualize a página para conferir a habitualidade antes de restaurar.');
+    DocumentosHabitualidade.validarEstrutura(d.habitualidade);
+  }
   if(j.aviao)for(const k of ['aportes','mensalidades','despesas'])
     if(j.aviao[k]!==undefined&&(!Array.isArray(j.aviao[k])||j.aviao[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))
       throw new Error('Lista inválida: aviao.'+k);
