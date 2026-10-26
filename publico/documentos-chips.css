@@ -1,0 +1,72 @@
+/* Documentos pessoais: uma pessoa por card, um documento por chip. */
+.documentos-workspace .documentos-pessoas{gap:12px}
+.documentos-pessoa{min-width:0;padding:16px 18px;border:1px solid var(--linha);border-radius:16px;background:var(--card)}
+.documentos-pessoa-cab{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.documentos-avatar{display:grid;place-items:center;flex:none;width:38px;height:38px;border:1px solid var(--linha);border-radius:12px;background:var(--leo-tint,var(--verde-cl));color:var(--leo-ui,var(--verde));font:700 13px/1 Arial,sans-serif}
+.documentos-pessoa-identidade{flex:1;min-width:0}
+.documentos-pessoa h2{font-size:15px;font-weight:600;line-height:1.4;overflow-wrap:anywhere}
+.documentos-pessoa-total{display:block;margin-top:2px;font-size:12px;color:var(--suave)}
+.documentos-pessoa-cab>.btn{flex:none;min-height:40px;font-size:12px}
+.documentos-chips{display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px;margin:0;padding:0;list-style:none}
+.documentos-chips>li{min-width:0;max-width:100%}
+.documento-chip{display:flex;align-items:center;gap:9px;min-height:58px;max-width:100%;padding:10px 17px 10px 13px;border:1px solid var(--linha);border-radius:22px;background:var(--bg);color:var(--tinta);font:inherit;text-align:left;cursor:pointer;transition:background .15s,border-color .15s}
+.documento-chip:hover{background:var(--leo-tint,var(--verde-cl));border-color:var(--leo-ui,var(--verde))}
+.documento-chip:focus-visible{outline:3px solid var(--leo-ui,var(--verde));outline-offset:3px}
+.documento-chip-icone{flex:none;width:20px;height:20px;color:var(--suave)}
+.documento-chip-texto{display:grid;gap:3px;min-width:0}
+.documento-chip strong{font-size:13px;font-weight:650;line-height:1.4;overflow-wrap:anywhere}
+.documento-chip-situacao{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;font-size:11px;line-height:1.4;color:var(--suave)}
+.documento-chip-situacao>span{font-weight:600}
+.documento-chip-situacao time{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--suave)}
+.documento-chip-vencido .documento-chip-situacao>span{color:var(--vermelho)}
+.documento-chip-vencendo .documento-chip-situacao>span{color:color-mix(in srgb,var(--areia) 65%,var(--tinta))}
+.documento-chip-emdia .documento-chip-situacao>span{color:var(--sucesso)}
+.documento-chip-referencia{font-size:11px;line-height:1.4;color:var(--suave);overflow-wrap:anywhere}
+.documento-chip-titulo{display:flex;align-items:center;justify-content:space-between;gap:9px;min-width:0}
+.documento-chip-percentual{flex:none;padding:2px 5px;border-radius:6px;background:var(--card);color:var(--leo-ui,var(--verde));font-size:10px;font-weight:700;font-variant-numeric:tabular-nums}
+.documentos-preenchimento-geral{display:grid;grid-template-columns:minmax(0,1fr) minmax(145px,220px) auto;align-items:center;gap:9px 18px;padding:14px 16px;margin-bottom:12px;background:var(--card);border:1px solid var(--linha);border-radius:14px}
+.documentos-preenchimento-titulo h2{font-size:14px;font-weight:600;margin:0 0 3px}
+.documentos-preenchimento-titulo p{font-size:11px;color:var(--suave)}
+.documentos-preenchimento-criterio{grid-column:1/-1;grid-row:2;font-size:11px;color:var(--suave)}
+.documentos-preenchimento-criterio summary{width:fit-content;cursor:pointer;padding:5px 0;color:var(--leo-ui,var(--verde))}
+.documentos-preenchimento-criterio p{max-width:90ch;line-height:1.6;margin:5px 0}
+.documentos-filtrar-incompletos{grid-column:3;grid-row:1;min-height:40px}
+.documentos-filtrar-incompletos[aria-pressed=true]{border-color:var(--leo-ui,var(--verde));color:var(--leo-ui,var(--verde));background:var(--leo-tint,var(--verde-cl));font-weight:700}
+.documentos-progresso{display:grid;gap:4px;min-width:0}
+.documentos-progresso-valor{font-size:11px;color:var(--suave);white-space:nowrap}
+.documentos-progresso-valor b{font-size:16px;color:var(--leo-ui,var(--verde));font-variant-numeric:tabular-nums}
+.documentos-progresso-contagem,.documentos-progresso-vazio{font-size:10px;color:var(--suave)}
+.documentos-progresso progress{display:block;width:100%;height:5px;border:0;border-radius:5px;overflow:hidden;appearance:none;background:var(--linha);accent-color:var(--leo-ui,var(--verde))}
+.documentos-progresso progress::-webkit-progress-bar{background:var(--linha);border-radius:5px}
+.documentos-progresso progress::-webkit-progress-value{background:var(--leo-ui,var(--verde));border-radius:5px}
+.documentos-progresso progress::-moz-progress-bar{background:var(--leo-ui,var(--verde));border-radius:5px}
+.documentos-pessoa-preenchimento{flex:0 0 126px;margin:0 12px}
+.documentos-pessoa-preenchimento .documentos-progresso-valor b{font-size:14px}
+.documento-preenchimento-editor{padding:14px 18px;border-bottom:1px solid var(--linha);background:var(--bg)}
+.documento-preenchimento-editor .documentos-progresso{max-width:250px}
+.documento-preenchimento-editor p{margin:10px 0 7px;font-size:12px;color:var(--tinta)}
+.documento-preenchimento-editor small{display:block;margin-top:9px;font-size:11px;color:var(--suave)}
+.documento-preenchimento-pendencias{display:flex;flex-wrap:wrap;gap:6px}
+.documento-preenchimento-pendencias .btn{min-height:40px}
+@media(max-width:620px){
+ .documentos-pessoa{padding:13px;border-radius:14px}
+ .documentos-pessoa-cab{gap:8px;margin-bottom:12px;flex-wrap:wrap}
+ .documentos-avatar{width:34px;height:34px;font-size:12px}
+ .documentos-pessoa h2{font-size:14px}
+ .documentos-pessoa-identidade{min-width:100px}
+ .documentos-pessoa-cab>.btn{min-height:44px;padding:7px 10px}
+ .documentos-pessoa-preenchimento{order:4;flex-basis:100%;margin:2px 0 0;grid-template-columns:1fr auto;align-items:center;gap:4px 10px}
+ .documentos-pessoa-preenchimento progress{grid-row:2;grid-column:1/-1}
+ .documentos-preenchimento-geral{grid-template-columns:minmax(0,1fr) auto;padding:12px;gap:10px}
+ .documentos-preenchimento-geral>.documentos-progresso{min-width:100px}
+ .documentos-preenchimento-criterio{grid-row:3}
+ .documentos-preenchimento-criterio summary{min-height:40px;display:flex;align-items:center;gap:5px}
+ .documentos-preenchimento-criterio summary:before{content:'+'}
+ .documentos-preenchimento-criterio[open] summary:before{content:'−'}
+ .documentos-filtrar-incompletos{grid-column:1/-1;grid-row:2;min-height:44px;justify-self:start}
+ .documento-preenchimento-pendencias .btn{min-height:44px}
+ .documento-chip{padding:9px 13px 9px 11px;border-radius:19px;min-height:58px}
+ .documento-chip strong{font-size:12px}
+}
+@media(prefers-reduced-motion:reduce){.documento-chip{transition:none}}
+@media print{.documentos-pessoa{break-inside:avoid}.documentos-pessoa-cab>.btn{display:none}.documento-chip{background:none}}

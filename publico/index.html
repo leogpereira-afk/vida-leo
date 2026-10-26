@@ -689,6 +689,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./documentos-agenda.css?v=74800a54925c">
 <link rel="stylesheet" href="./documentos-habitualidade.css?v=5bfb4043be18">
 <link rel="stylesheet" href="./central-mobile.css?v=48cfe554c15f">
+<link rel="stylesheet" href="./documentos-chips.css?v=5ed1e3ee6eeb">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -15493,12 +15494,30 @@ function stvGrafDonut({fatias=[],centro='',fmt=null}={}){
   return `<svg class="stv-graf stv-donut" viewBox="0 0 ${S} ${S}" role="img" aria-label="Distribuição${centro?' · '+esc(centro):''}">${s}</svg>`;
 }
 /* ================== FIM STRAVA ================== */
+function documentoPreenchimento(d){
+  const campos=[{k:'nome',t:'Nome do documento'},{k:'dono',t:'Titular'},{k:'numero',t:'Número ou referência'},{k:'onde',t:'Local do original'}];
+  const informado=v=>(typeof v==='string'&&v.trim().length>0)||(typeof v==='number'&&Number.isFinite(v));
+  const faltantes=campos.filter(c=>!informado(d[c.k])),preenchidos=campos.length-faltantes.length;
+  return {preenchidos,total:campos.length,percentual:Math.floor(preenchidos/campos.length*100),faltantes};
+}
+function documentosPreenchimento(lista){
+  const resumos=lista.map(documentoPreenchimento),preenchidos=resumos.reduce((s,r)=>s+r.preenchidos,0),total=resumos.reduce((s,r)=>s+r.total,0);
+  const completos=resumos.filter(r=>r.preenchidos===r.total).length;
+  return {preenchidos,total,percentual:total?Math.floor(preenchidos/total*100):null,completos,incompletos:lista.length-completos};
+}
+function documentosProgressoHTML(resumo,rotulo){
+  if(resumo.percentual===null)return '<span class="documentos-progresso-vazio">Nenhum cadastro para avaliar</span>';
+  return '<span class="documentos-progresso-valor"><b>'+resumo.percentual+'%</b> preenchido</span><progress value="'+resumo.preenchidos+'" max="'+resumo.total+'" aria-label="'+esc(rotulo)+'">'+resumo.percentual+'%</progress><span class="documentos-progresso-contagem">'+resumo.preenchidos+' de '+resumo.total+' campos</span>';
+}
 function vDocumentos(m){
   m.classList.add('workspace-layout','documentos-workspace','planos-documents');
-  const lista=E.documentos.filter(d=>typeof DocumentosArmas==='undefined'||!DocumentosArmas.ehRegistro(d)),donos=[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...lista.map(d=>d.dono||'Léo'),...(filtro.docPessoa&&filtro.docPessoa!=='Todos'?[filtro.docPessoa]:[])])];
+  const lista=E.documentos.filter(d=>typeof DocumentosArmas==='undefined'||!DocumentosArmas.ehRegistro(d));
+  const nomes=['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...lista.map(d=>d.dono||'Léo'),...(filtro.docPessoa&&filtro.docPessoa!=='Todos'?[filtro.docPessoa]:[])];
+  const donos=nomes.filter((nome,i)=>nomes.findIndex(outro=>mesmaPessoa(outro,nome))===i);
+  const donoSelecionado=donos.find(nome=>mesmaPessoa(nome,filtro.docPessoa))||'Todos';
   const armas=typeof DocumentosArmas!=='undefined'&&filtro.docAba==='armas';
   const novo=()=>armas?DocumentosArmas.editar(null,'arma'):novoDocumento();
-  const topo=cab('Documentos','Encontre o que precisa e acompanhe as validades da família.');topo.appendChild(acao(armas?'+ Nova arma':'+ Novo documento',novo));m.appendChild(topo);
+  const topo=cab('Documentos',armas?'Encontre o que precisa e acompanhe as validades da família.':'Organizados por pessoa. Toque em um documento para consultar ou editar.');topo.appendChild(acao(armas?'+ Nova arma':'+ Novo documento',novo));m.appendChild(topo);
   if(typeof DocumentosArmas!=='undefined'){
     m.appendChild(DocumentosArmas.nav(armas?'armas':'documentos',aba=>{filtro.docAba=aba;rr('documentos')()}));
     if(armas){DocumentosArmas.render(m);return}
@@ -15506,18 +15525,44 @@ function vDocumentos(m){
   const total=s=>lista.filter(d=>statusDocumento(d)===s).length;
   const filtrar=s=>{filtro.docStatus=s;situacao.value=s;pintar()};
   m.appendChild(ligaKpis(el(`<div class="grade workspace-metrics">${kpi('Guardados',lista.length,'documentos cadastrados',null,'todos')}${kpi('Vencidos',total('Vencido'),'precisam de revisão',total('Vencido')?'r':'','vencidos')}${kpi('Vencem em até 180 dias',total('Vencendo'),'planeje a renovação',total('Vencendo')?'a':'','vencendo')}${kpi('Validade a conferir',total('Validade não informada')+total('Data inválida'),'data ausente ou inválida',null,'sem')}</div>`),{todos:()=>filtrar('Todos'),vencidos:()=>filtrar('Vencido'),vencendo:()=>filtrar('Vencendo'),sem:()=>filtrar('Conferir validade')}));
+  const resumo=documentosPreenchimento(lista);
+  const progresso=el('<section class="documentos-preenchimento-geral"><div class="documentos-preenchimento-titulo"><h2>Preenchimento dos cadastros</h2><p>Todos os documentos pessoais, mesmo com filtros ativos.</p></div><div class="documentos-progresso">'+documentosProgressoHTML(resumo,'Preenchimento de todos os cadastros')+'</div><details class="documentos-preenchimento-criterio"><summary>Como é calculado</summary><p>Quatro campos por documento: nome, titular, número ou referência e local do original (físico ou digital). Validade, observações e anexos não entram no percentual. O indicador mede os cadastros existentes, sem avaliar quais documentos cada pessoa precisa ter.</p></details></section>');
+  const incompletos=acao('Só cadastros incompletos',()=>{filtro.docCadastro=!filtro.docCadastro;pintar()},'ghost');incompletos.classList.add('documentos-filtrar-incompletos');progresso.appendChild(incompletos);m.appendChild(progresso);
   const filtros=el('<div class="workspace-filters"></div>');
   const busca=el('<input type="search" aria-label="Buscar documento" placeholder="Buscar documento, número ou local…">');busca.value=filtro.docBusca||'';busca.oninput=()=>{filtro.docBusca=busca.value;pintar()};filtros.appendChild(busca);
-  filtros.appendChild(seletor(filtro.docPessoa||'Todos',[['Todos','Todas as pessoas'],...donos.map(d=>[d,d])],v=>{filtro.docPessoa=v;pintar()},'Pessoa do documento'));
+  filtros.appendChild(seletor(donoSelecionado,[['Todos','Todas as pessoas'],...donos.map(d=>[d,d])],v=>{filtro.docPessoa=v;pintar()},'Pessoa do documento'));
   const situacao=seletor(filtro.docStatus||'Todos',[['Todos','Todas as validades'],...['Vencido','Vencendo','Em dia','Validade não informada','Data inválida','Conferir validade'].map(s=>[s,s])],v=>{filtro.docStatus=v;pintar()},'Situação do documento');filtros.appendChild(situacao);m.appendChild(filtros);
-  const resultado=el('<p class="workspace-note" role="status" aria-live="polite"></p>');m.appendChild(resultado);const limpar=acao('Limpar filtros',()=>{filtro.docBusca='';filtro.docStatus='Todos';filtro.docPessoa='Todos';rr('documentos')()},'ghost');limpar.classList.add('planos-clear');filtros.appendChild(limpar);
-  const grid=el('<div class="workspace-grid" data-bid="dc-lista"></div>');m.appendChild(grid);
+  const limparFiltros=()=>{filtro.docBusca='';filtro.docStatus='Todos';filtro.docPessoa='Todos';filtro.docCadastro=false;rr('documentos')()};
+  const resultado=el('<p class="workspace-note" role="status" aria-live="polite"></p>');m.appendChild(resultado);const limpar=acao('Limpar filtros',limparFiltros,'ghost');limpar.classList.add('planos-clear');filtros.appendChild(limpar);
+  const grid=el('<div class="workspace-grid documentos-pessoas" data-bid="dc-lista"></div>');m.appendChild(grid);
   function pintar(){
-    const vis=lista.filter(d=>(!filtro.docPessoa||filtro.docPessoa==='Todos'||mesmaPessoa(d.dono||'Léo',filtro.docPessoa))&&(!filtro.docStatus||filtro.docStatus==='Todos'||(filtro.docStatus==='Conferir validade'?['Validade não informada','Data inválida'].includes(statusDocumento(d)):statusDocumento(d)===filtro.docStatus))&&normaliza([d.nome,d.dono||'Léo',d.numero,d.onde].join(' ')).includes(normaliza(filtro.docBusca||'')))
+    incompletos.setAttribute('aria-pressed',String(!!filtro.docCadastro));
+    const vis=lista.filter(d=>(!filtro.docCadastro||documentoPreenchimento(d).faltantes.length>0)&&(!filtro.docPessoa||filtro.docPessoa==='Todos'||mesmaPessoa(d.dono||'Léo',filtro.docPessoa))&&(!filtro.docStatus||filtro.docStatus==='Todos'||(filtro.docStatus==='Conferir validade'?['Validade não informada','Data inválida'].includes(statusDocumento(d)):statusDocumento(d)===filtro.docStatus))&&normaliza([d.nome,d.dono||'Léo',d.numero,d.onde].join(' ')).includes(normaliza(filtro.docBusca||'')))
       .sort((a,b)=>(a.validade||'9999').localeCompare(b.validade||'9999')||String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'));
-    resultado.textContent=vis.length+' de '+lista.length+' documento(s) · vencimentos mais próximos primeiro';grid.replaceChildren();
-    vis.forEach(d=>{const s=statusDocumento(d);const b=el(`<button class="workspace-document"><span class="workspace-document-top"><span class="workspace-document-icon" aria-hidden="true">▤</span>${chip(s)}</span><b class="workspace-item-title">${esc(d.nome||'Documento sem nome')}</b><span class="workspace-owner">${esc(d.dono||'Léo')}</span><span class="workspace-document-data"><span>Validade<b>${d.validade?fmtDataAno(d.validade):'Não informada'}</b></span><span>Referência<b>${esc(d.numero||'Não informada')}</b></span></span><span class="workspace-document-footer">${esc(d.onde||'Local do original não informado')}<span> Abrir →</span></span></button>`);b.onclick=()=>modalDoc(d);grid.appendChild(b)});
-    if(!vis.length){const vazio=el('<div class="workspace-empty"><h2>'+(!lista.length?'Seus documentos, em um só lugar.':'Nenhum documento neste filtro.')+'</h2><p>'+(!lista.length?'Cadastre o documento e anexe a foto ou o PDF para consultar quando precisar.':'Tente outro nome, pessoa ou situação.')+'</p></div>');vazio.appendChild(acao(!lista.length?'+ Novo documento':'Limpar filtros',!lista.length?novo:()=>{filtro.docBusca='';filtro.docStatus='Todos';filtro.docPessoa='Todos';rr('documentos')()},'ghost'));grid.appendChild(vazio)}
+    const grupos=donos.map(nome=>({nome,documentos:vis.filter(d=>mesmaPessoa(d.dono||'Léo',nome)),todos:lista.filter(d=>mesmaPessoa(d.dono||'Léo',nome))})).filter(g=>g.documentos.length)
+      .sort((a,b)=>Number(mesmaPessoa(b.nome,'Léo'))-Number(mesmaPessoa(a.nome,'Léo'))||a.nome.localeCompare(b.nome,'pt-BR'));
+    resultado.textContent=vis.length+' de '+lista.length+' documento(s) em '+grupos.length+' pessoa(s). Validades mais próximas primeiro em cada pessoa.';grid.replaceChildren();
+    for(const grupo of grupos){
+      const {nome,documentos,todos}=grupo,heading=uid();
+      const card=el('<section class="documentos-pessoa" aria-labelledby="'+heading+'"><header class="documentos-pessoa-cab"><span class="documentos-avatar" aria-hidden="true">'+esc(nome.trim().split(/\s+/).map(n=>n[0]).slice(0,2).join('').toUpperCase())+'</span><div class="documentos-pessoa-identidade"><h2 id="'+heading+'">'+esc(nome)+'</h2><span class="documentos-pessoa-total">'+(documentos.length===todos.length?todos.length:documentos.length+' de '+todos.length)+' documento(s)</span></div></header><ul class="documentos-chips"></ul></section>');
+      card.querySelector('header').appendChild(el('<div class="documentos-pessoa-preenchimento documentos-progresso" title="Todos os cadastros desta pessoa">'+documentosProgressoHTML(documentosPreenchimento(todos),'Preenchimento dos cadastros de '+nome)+'</div>'));
+      const adicionar=acao('+ Documento',()=>novoDocumento(nome),'ghost mini');adicionar.setAttribute('aria-label','Adicionar documento para '+nome);card.querySelector('header').appendChild(adicionar);
+      for(const d of documentos){
+        const status=statusDocumento(d),titulo=d.nome||'Documento sem nome',cadastro=documentoPreenchimento(d);
+        const repetidos=todos.filter(outro=>normaliza(outro.nome||'Documento sem nome')===normaliza(titulo));
+        const referencia=repetidos.length>1?(d.numero?'Ref. '+d.numero:'Documento '+(repetidos.indexOf(d)+1)):'';
+        const tom=({'Vencido':'vencido','Vencendo':'vencendo','Em dia':'emdia'})[status]||'conferir';
+        const validade=dataISOValida(d.validade)?fmtDataAno(d.validade):'';
+        const item=el('<li></li>');
+        const botao=el('<button type="button" class="documento-chip documento-chip-'+tom+'"><svg class="documento-chip-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M8 12h8M8 16h6"/></svg><span class="documento-chip-texto"><strong>'+esc(titulo)+'</strong>'+(referencia?'<span class="documento-chip-referencia">'+esc(referencia)+'</span>':'')+'<span class="documento-chip-situacao"><span>'+esc(status)+'</span>'+(validade?'<time datetime="'+esc(d.validade)+'">'+validade+'</time>':'')+'</span></span></button>');
+        const tituloChip=botao.querySelector('strong'),linhaTitulo=el('<span class="documento-chip-titulo"></span>');tituloChip.before(linhaTitulo);linhaTitulo.appendChild(tituloChip);linhaTitulo.appendChild(el('<span class="documento-chip-percentual" title="Preenchimento do cadastro">'+cadastro.percentual+'%</span>'));
+        botao.setAttribute('aria-label','Abrir '+titulo+' de '+nome+(referencia?', '+referencia:'')+'. '+status+(validade?', '+validade:'')+'. Cadastro '+cadastro.percentual+'% preenchido');
+        botao.title=[titulo,referencia,status,validade,d.onde,cadastro.faltantes.length?'Falta: '+cadastro.faltantes.map(c=>c.t).join(', '):'Cadastro preenchido'].filter(Boolean).join(' · ');
+        botao.onclick=()=>modalDoc(d);item.appendChild(botao);card.querySelector('.documentos-chips').appendChild(item);
+      }
+      grid.appendChild(card);
+    }
+    if(!vis.length){const vazio=el('<div class="workspace-empty"><h2>'+(!lista.length?'Seus documentos, em um só lugar.':'Nenhum documento neste filtro.')+'</h2><p>'+(!lista.length?'Cadastre o documento e anexe a foto ou o PDF para consultar quando precisar.':'Tente outro nome, pessoa ou situação, ou limpe os filtros.')+'</p></div>');vazio.appendChild(acao(!lista.length?'+ Novo documento':'Limpar filtros',!lista.length?novo:limparFiltros,'ghost'));grid.appendChild(vazio)}
   }
   pintar();
 }
@@ -15526,20 +15571,36 @@ function vDocumentos(m){
 function novoDocumento(donoInicial='',nomeInicial=''){
   filtro.docAba='documentos';
   abrirModal('Novo documento','Identifique o documento. Depois você poderá anexar a foto ou o PDF.',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');
-    devFormulario(b,[{k:'nome',t:'Nome do documento',req:true,full:true,ph:'Passaporte, certidão, contrato…'},{k:'dono',t:'De quem é?',req:true,opcoes:[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...E.documentos.map(d=>d.dono).filter(Boolean)])]},{k:'numero',t:'Número ou referência'},{k:'validade',t:'Válido até (se houver)',tipo:'date'},{k:'onde',t:'Onde está o original?',full:true}],{nome:nomeInicial,dono:donoInicial||(filtro.docPessoa&&filtro.docPessoa!=='Todos'?filtro.docPessoa:'Léo')},'Criar documento',v=>{const d={id:uid(),...v,obs:''};E.documentos.push(d);salvar();fechar();modalDoc(d)});c.appendChild(b)},rr('documentos'));
+    devFormulario(b,[{k:'nome',t:'Nome do documento',req:true,full:true,ph:'Passaporte, certidão, contrato…'},{k:'dono',t:'De quem é?',req:true,opcoes:[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...E.documentos.map(d=>d.dono).filter(Boolean)])]},{k:'numero',t:'Número ou referência'},{k:'validade',t:'Válido até (se houver)',tipo:'date'},{k:'onde',t:'Onde está o original?',full:true}],{nome:nomeInicial,dono:donoInicial||(filtro.docPessoa&&filtro.docPessoa!=='Todos'?filtro.docPessoa:'Léo')},'Criar documento',v=>{const d={id:uid(),...v,obs:''};E.documentos.push(d);salvar();filtro.docBusca='';filtro.docStatus='Todos';filtro.docPessoa=d.dono;filtro.docCadastro=false;fechar();modalDoc(d)});c.appendChild(b)},rr('documentos'));
 }
 function modalDoc(d){
   if(typeof DocumentosArmas!=='undefined'&&DocumentosArmas.ehRegistro(d)){filtro.docAba='armas';DocumentosArmas.editar(d.id);return}
   filtro.docAba='documentos';
   abrirModal(esc(d.nome||'Novo documento'),esc(d.dono||''),(c,fechar)=>{
+    const preenchimento=el('<section class="documento-preenchimento-editor" aria-label="Preenchimento do cadastro"></section>');c.appendChild(preenchimento);
     const s1=el('<div class="secao"><h4>Dados</h4></div>');
-    s1.appendChild(campos(d,[
+    const defsDoc=[
       {k:'nome',t:'Documento',ph:'Nome ou tipo do documento',full:true},
       {k:'dono',t:'De quem',ph:'Léo, esposa, filho…'},
-      {k:'numero',t:'Número / referência'},{k:'validade',t:'Válido até',tipo:'date'},
-      {k:'onde',t:'Onde está o original',ph:'ex.: cofre, gaveta'},
+      {k:'numero',t:'Número / referência',ph:'Número ou referência que identifique o documento'},{k:'validade',t:'Válido até',tipo:'date'},
+      {k:'onde',t:'Onde está o original',ph:'Ex.: cofre, gaveta ou pasta digital'},
       {k:'obs',t:'Observações',tipo:'textarea',full:true},
-    ]));
+    ];
+    const dados=campos(d,defsDoc);s1.appendChild(dados);
+    const controles=[...dados.querySelectorAll('input,textarea')];controles.forEach((input,i)=>{input.name=defsDoc[i].k});
+    let assinaturaPreenchimento=null;
+    const atualizarPreenchimento=()=>{
+      const resumo=documentoPreenchimento(d),assinatura=resumo.faltantes.map(campo=>campo.k).join('|');
+      // O change no blur não pode remover o atalho que está recebendo o clique.
+      if(assinatura===assinaturaPreenchimento)return;
+      assinaturaPreenchimento=assinatura;
+      preenchimento.innerHTML='<div class="documentos-progresso">'+documentosProgressoHTML(resumo,'Preenchimento deste cadastro')+'</div><p>'+(resumo.faltantes.length?'Complete os campos que faltam:':'Os quatro campos do cadastro estão preenchidos.')+'</p><div class="documento-preenchimento-pendencias"></div><small>Validade, observações e anexos são conferidos separadamente.</small>';
+      for(const campo of resumo.faltantes){
+        const botao=acao('Informar '+campo.t,()=>{const input=controles.find(i=>i.name===campo.k);input?.focus();input?.scrollIntoView({block:'center',behavior:'auto'})},'ghost mini');
+        preenchimento.querySelector('.documento-preenchimento-pendencias').appendChild(botao);
+      }
+    };
+    s1.addEventListener('input',atualizarPreenchimento);s1.addEventListener('change',atualizarPreenchimento);atualizarPreenchimento();
     c.appendChild(s1);
     const s2=el('<div class="secao"><h4>Documento digitalizado</h4></div>');
     s2.appendChild(areaArquivos('documento:'+d.id,'PDF ou foto do documento (frente e verso)'));
