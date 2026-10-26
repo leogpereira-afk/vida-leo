@@ -685,6 +685,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./gastos-painel.css?v=94e57832c4ee">
 <link rel="stylesheet" href="./fortemais-visual.css?v=4b49bedcb0e5">
 <link rel="stylesheet" href="./central-densidade.css?v=5dfbc2553a75">
+<link rel="stylesheet" href="./documentos-armas.css?v=ed785164fe12">
 <link rel="stylesheet" href="./central-mobile.css?v=48cfe554c15f">
 </head>
 <body>
@@ -723,6 +724,7 @@ tr:hover .lixo{opacity:1}
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
 <script src="./marketing-fortemais.js?v=43e087960693"></script>
 <script src="./marketing.js?v=39a86005b2ae"></script>
+<script src="./documentos-armas.js?v=2f8b5477461c"></script>
 <script src="./documentos-revisao.js?v=f54d2ba958f9"></script>
 <script src="./organograma.js?v=3a5db1c22c87"></script>
 <script src="./fortemais-financeiro.js?v=48296dd2f793"></script>
@@ -2170,7 +2172,7 @@ async function vAgentes(m){
 }
 
 /* ---------------- navegação ---------------- */
-// logos de verdade na lateral (o emoji não faz jus)
+// Logos oficiais disponíveis nas telas; a lateral usa os emojis escolhidos pelo usuário.
 const LOGO_DRIVE='<svg viewBox="0 0 87.3 78" aria-hidden="true"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>';
 const LOGO_STRAVA='<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#FC4C02" d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/></svg>';
 const MODS=[
@@ -2207,14 +2209,15 @@ let atual=MODS.some(m=>!m.url&&m.id===location.hash.slice(1))?location.hash.slic
 function alternarMenu(forcar){const aberto=typeof forcar==='boolean'?forcar:!document.querySelector('.side').classList.contains('menu-aberto');document.querySelector('.side').classList.toggle('menu-aberto',aberto);document.querySelector('.menu-mobile').setAttribute('aria-expanded',String(aberto))}
 function menu(){
   const nav=document.getElementById('nav');nav.innerHTML='';
+  // A lateral usa emojis; imagens 3D continuam nos cards e cabeçalhos das áreas.
+  const emojis={donboy:'🤖',marketing:'📣','metodo-vof':'🎯',drive:'📁',strava:'🏃'};
   MODS.filter(m=>!m.oculto).forEach(m=>{
     const selecionado=!m.url&&(m.id===atual||(atual==='estrategia'&&m.id==='empresas'));
     if(m.grupo)nav.appendChild(el(`<div class="sep">${m.grupo}</div>`));
     /* Entrada com `url` é ATALHO para outro sistema, não tela daqui: abre em
        outra aba, nunca fica marcada como ativa, e o ↗ avisa antes do clique.
        Sem isto o menu prometeria uma tela que não existe. */
-    const iconeArea=!m.url&&!['drive','strava'].includes(m.id)&&typeof LeonardoDesign!=='undefined'?LeonardoDesign.icone(m.id):'';
-    const b=el(`<button class="${selecionado?'on':''}"><span class="ic" aria-hidden="true">${iconeArea||m.ic}</span><span class="tx">${m.nome}</span>${m.url?'<span class="fora">↗</span>':''}</button>`);
+    const b=el(`<button class="${selecionado?'on':''}"><span class="ic" aria-hidden="true">${emojis[m.id]||m.ic}</span><span class="tx">${m.nome}</span>${m.url?'<span class="fora">↗</span>':''}</button>`);
     if(m.url){b.title='abre em outra aba — sistema com login próprio';
       b.onclick=()=>window.open(m.url,'_blank','noopener');}
     else {b.onclick=()=>irTela(m.id);if(selecionado)b.setAttribute('aria-current','page')}
@@ -4463,7 +4466,9 @@ function eventosDoEcossistema(){
 
   if(on('documentos')) (E.documentos||[]).forEach(d=>{if(d.validade)ev.push({
     data:d.validade,hora:'',titulo:(d.nome||'Documento')+' vence',
-    sub:'de '+(d.dono||'Léo')+(d.numero?' · '+d.numero:''),fonte:'documentos',ic:'🪪',ir:'documentos',col:'documentos',ref:d});});
+    sub:'de '+(d.dono||'Léo')+(d.numero?' · '+d.numero:''),fonte:'documentos',ic:'🪪',ir:'documentos',col:'documentos',ref:d});
+    const renovacao=typeof DocumentosArmas!=='undefined'&&d.grupo==='armas'&&d.tipoRegistro==='clube'?DocumentosArmas.proximaRenovacao(d):'';
+    if(renovacao)ev.push({id:'renovacao-clube:'+d.id,data:renovacao,hora:'',titulo:(d.nome||'Clube de tiro')+' · renovação anual',sub:'Data de acompanhamento da filiação · '+(d.dono||'Léo'),fonte:'documentos',ic:'🏅',ir:'documentos',col:'documentos',ref:d});});
 
   // A viagem é um PERÍODO, não dois pontos soltos: sai um evento só, com começo
   // e fim, e o calendário pinta a faixa de ponta a ponta. Ver "ida dia 12" e
@@ -15470,9 +15475,14 @@ function stvGrafDonut({fatias=[],centro='',fmt=null}={}){
 /* ================== FIM STRAVA ================== */
 function vDocumentos(m){
   m.classList.add('workspace-layout','documentos-workspace','planos-documents');
-  const lista=E.documentos,donos=[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...lista.map(d=>d.dono||'Léo'),...(filtro.docPessoa&&filtro.docPessoa!=='Todos'?[filtro.docPessoa]:[])])];
-  const novo=()=>novoDocumento();
-  const topo=cab('Documentos','Encontre o que precisa e acompanhe as validades da família.');topo.appendChild(acao('+ Novo documento',novo));m.appendChild(topo);
+  const lista=E.documentos.filter(d=>typeof DocumentosArmas==='undefined'||!DocumentosArmas.ehRegistro(d)),donos=[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...lista.map(d=>d.dono||'Léo'),...(filtro.docPessoa&&filtro.docPessoa!=='Todos'?[filtro.docPessoa]:[])])];
+  const armas=typeof DocumentosArmas!=='undefined'&&filtro.docAba==='armas';
+  const novo=()=>armas?DocumentosArmas.editar(null,'arma'):novoDocumento();
+  const topo=cab('Documentos','Encontre o que precisa e acompanhe as validades da família.');topo.appendChild(acao(armas?'+ Nova arma':'+ Novo documento',novo));m.appendChild(topo);
+  if(typeof DocumentosArmas!=='undefined'){
+    m.appendChild(DocumentosArmas.nav(armas?'armas':'documentos',aba=>{filtro.docAba=aba;rr('documentos')()}));
+    if(armas){DocumentosArmas.render(m);return}
+  }
   const total=s=>lista.filter(d=>statusDocumento(d)===s).length;
   const filtrar=s=>{filtro.docStatus=s;situacao.value=s;pintar()};
   m.appendChild(ligaKpis(el(`<div class="grade workspace-metrics">${kpi('Guardados',lista.length,'documentos cadastrados',null,'todos')}${kpi('Vencidos',total('Vencido'),'precisam de revisão',total('Vencido')?'r':'','vencidos')}${kpi('Vencem em até 180 dias',total('Vencendo'),'planeje a renovação',total('Vencendo')?'a':'','vencendo')}${kpi('Validade a conferir',total('Validade não informada')+total('Data inválida'),'data ausente ou inválida',null,'sem')}</div>`),{todos:()=>filtrar('Todos'),vencidos:()=>filtrar('Vencido'),vencendo:()=>filtrar('Vencendo'),sem:()=>filtrar('Conferir validade')}));
@@ -15494,10 +15504,13 @@ function vDocumentos(m){
 
 
 function novoDocumento(donoInicial='',nomeInicial=''){
+  filtro.docAba='documentos';
   abrirModal('Novo documento','Identifique o documento. Depois você poderá anexar a foto ou o PDF.',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');
     devFormulario(b,[{k:'nome',t:'Nome do documento',req:true,full:true,ph:'Passaporte, certidão, contrato…'},{k:'dono',t:'De quem é?',req:true,opcoes:[...new Set(['Léo',...E.pessoas.map(p=>p.nome).filter(Boolean),...E.documentos.map(d=>d.dono).filter(Boolean)])]},{k:'numero',t:'Número ou referência'},{k:'validade',t:'Válido até (se houver)',tipo:'date'},{k:'onde',t:'Onde está o original?',full:true}],{nome:nomeInicial,dono:donoInicial||(filtro.docPessoa&&filtro.docPessoa!=='Todos'?filtro.docPessoa:'Léo')},'Criar documento',v=>{const d={id:uid(),...v,obs:''};E.documentos.push(d);salvar();fechar();modalDoc(d)});c.appendChild(b)},rr('documentos'));
 }
 function modalDoc(d){
+  if(typeof DocumentosArmas!=='undefined'&&DocumentosArmas.ehRegistro(d)){filtro.docAba='armas';DocumentosArmas.editar(d.id);return}
+  filtro.docAba='documentos';
   abrirModal(esc(d.nome||'Novo documento'),esc(d.dono||''),(c,fechar)=>{
     const s1=el('<div class="secao"><h4>Dados</h4></div>');
     s1.appendChild(campos(d,[
@@ -16786,7 +16799,7 @@ function validarBackup(j){
       if(!Array.isArray(j[k])||j[k].some(x=>k==='obraM2Fora'?typeof x!=='string':(!x||typeof x!=='object'||Array.isArray(x))))throw new Error('Lista inválida: '+k);
     }else if(v&&typeof v==='object'&&(!j[k]||typeof j[k]!=='object'||Array.isArray(j[k])))throw new Error('Seção inválida: '+k);
   }
-  const listasInternas={acervoDocumental:['registros'],empresasPJ:['documentosEmpresa','obrigacoesEmpresa','contatosEmpresa','sistemasEmpresa'],liderancas:['vinculos','registros'],viagens:['custos','passagens','hoteis','tickets','roteiro','lugares'],metas:['passos'],oportunidades:['links'],planejamentoEmpresas:['objetivos','valores','zonas','pecas']};
+  const listasInternas={documentos:['fontes','historico','fotos','referencias'],acervoDocumental:['registros'],empresasPJ:['documentosEmpresa','obrigacoesEmpresa','contatosEmpresa','sistemasEmpresa'],liderancas:['vinculos','registros'],viagens:['custos','passagens','hoteis','tickets','roteiro','lugares'],metas:['passos'],oportunidades:['links'],planejamentoEmpresas:['objetivos','valores','zonas','pecas']};
   for(const [col,camposLista] of Object.entries(listasInternas))for(const x of j[col]||[])for(const k of camposLista){
     if(x[k]!==undefined&&(!Array.isArray(x[k])||x[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))throw new Error('Lista inválida: '+col+'.'+k);
   }

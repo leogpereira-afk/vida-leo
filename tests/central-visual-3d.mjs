@@ -42,16 +42,24 @@ test('Central 3D: atalho abre a área correta e conserva menu e identificação 
  assert.ok(document.querySelector('#main h1'));
 });
 
-test('Central 3D: marcas de integrações e links de outros sistemas continuam distintos',()=>{
+test('Central: lateral usa emojis sem alterar os atalhos externos nem os cards 3D',()=>{
  const {run,document}=setup();run("menu();var destinosTeste=[];window.open=(...a)=>destinosTeste.push(a)");
- for(const nome of ['Google Drive','Strava']){
-  const bt=[...document.querySelectorAll('#nav button')].find(x=>x.querySelector('.tx').textContent===nome);
-  assert.ok(bt.querySelector('svg'));assert.equal(bt.querySelector('img'),null);
+ const botoes=[...document.querySelectorAll('#nav button')];
+ for(const bt of botoes){
+  const ic=bt.querySelector('.ic');
+  assert.equal(ic.getAttribute('aria-hidden'),'true');
+  assert.equal(ic.querySelector('img,svg'),null);
+  assert.match(ic.textContent,/\p{Extended_Pictographic}/u,bt.querySelector('.tx').textContent);
  }
+ assert.equal(botoes.find(x=>x.querySelector('.tx').textContent==='Google Drive').querySelector('.ic').textContent,'📁');
+ assert.equal(botoes.find(x=>x.querySelector('.tx').textContent==='Strava').querySelector('.ic').textContent,'🏃');
  const externos=JSON.parse(run('JSON.stringify(MODS.filter(m=>m.url).map(m=>({nome:m.nome,url:m.url})))'));
  externos.forEach(m=>{
   const bt=[...document.querySelectorAll('#nav button')].find(x=>x.querySelector('.tx').textContent===m.nome);
   assert.ok(bt.querySelector('.fora'));assert.equal(bt.hasAttribute('aria-current'),false);bt.click();
  });
  assert.deepEqual(JSON.parse(run('JSON.stringify(destinosTeste)')),externos.map(m=>[m.url,'_blank','noopener']));
+ run("irTela('inicio')");
+ assert.ok(document.querySelector('.leo-area-card img.leo-icone-3d'));
+ assert.equal(document.querySelector('#nav [aria-current=page] .tx').textContent,'Início');
 });
