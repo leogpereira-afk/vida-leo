@@ -55,10 +55,10 @@ test('Agenda abre a ficha original pelo cartão e filtra prazos junto com docume
 test('Radar integrado emite apenas um alerta por validade e exclui datas impossíveis',()=>{
   const a=app();a.run(`E.documentos[0].validade=hoje();E.documentos.push({id:'inválida',grupo:'armas',tipoRegistro:'cr',validade:'2026-02-30'});const rads=radar()`);assert.equal(a.run(`rads.filter(e=>e.ref?.id==='arma-exemplo').length`),1);assert.equal(a.run(`rads.some(e=>e.ref?.id==='inválida')`),false);
 });
-test('documentos com mesmo nome preservam titular e referência nos eventos e titular nos cards',()=>{
+test('passaportes com mesmo nome distinguem o titular sem expor número nos eventos e cards',()=>{
   const a=app();a.run(`E.documentos=[{id:'doc-alfa',nome:'Passaporte',dono:'Pessoa Alfa',numero:'EXEMPLO-A',validade:'2027-06-01'},{id:'doc-beta',nome:'Passaporte',dono:'Pessoa Beta',numero:'EXEMPLO-B',validade:'2027-06-01'}];const eventosTitulares=DocumentosAgenda.eventos(E.documentos,'2026-10-26')`);
-  const ev=json(a,'eventosTitulares');assert.equal(ev.length,2);assert.match(ev[0].sub,/de Pessoa Alfa.*EXEMPLO-A/);assert.match(ev[1].sub,/de Pessoa Beta.*EXEMPLO-B/);
-  a.run(`E.documentos=E.documentos.map(d=>({...d,grupo:'armas',tipoRegistro:'cr',nome:'CR pessoal'}));document.body.appendChild(DocumentosAgenda.painel(E.documentos,'2026-10-26',()=>{}))`);
+  const todos=json(a,'eventosTitulares'),ev=todos.filter(e=>!e.avisoDocumento);assert.equal(todos.length,8);assert.equal(ev.length,2);assert.match(ev[0].sub,/de Pessoa Alfa/);assert.match(ev[1].sub,/de Pessoa Beta/);assert.equal(todos.some(e=>/EXEMPLO-[AB]/.test(e.sub)),false);
+  a.run(`document.body.appendChild(DocumentosAgenda.painel(E.documentos,'2026-10-26',()=>{}))`);
   const cards=[...a.document.querySelectorAll('.documentos-agenda-prazo')];assert.match(cards[0].querySelector('strong').textContent,/Pessoa Alfa/);assert.match(cards[1].querySelector('strong').textContent,/Pessoa Beta/);assert.match(cards[0].getAttribute('aria-label'),/Pessoa Alfa/);assert.equal(cards[0].textContent.includes('EXEMPLO-A'),false);
 });
 test('habitualidade integra visitas e avisos sem mudar agenda; backup revalida estrutura aninhada',()=>{
