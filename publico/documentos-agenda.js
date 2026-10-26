@@ -10,6 +10,32 @@ const DocumentosAgenda = (() => {
   const nomeComTitular = d => (d.nome||'Documento')+' · '+titular(d);
   const historico = d => d?.grupo==='armas' && d.tipoRegistro==='guia' && d.classificacao==='historico';
   const acompanhado = d => d?.grupo==='armas' && ['arma','cr','clube','guia'].includes(d.tipoRegistro) && !historico(d);
+  const objeto=v=>v&&typeof v==='object'&&!Array.isArray(v);
+  function urlGoogle(v){try{const u=new URL(v);return u.protocol==='https:'&&!u.username&&!u.password?u.href:''}catch{return ''}}
+  function validarAgendaGoogle(g){
+    const erro=()=>{throw Error('documentos.agendaGoogle: vínculo ou referência inválidos.');};
+    if(!objeto(g))erro();
+    for(const tipo of ['validade','renovacao']){
+      const v=g[tipo];if(v===undefined)continue;if(!objeto(v))erro();
+      for(const k of ['googleCalendarId','googleEventId'])if(typeof v[k]!=='string'||!v[k].trim()||v[k]!==v[k].trim()||v[k].length>1024||/[\x00-\x1f]/.test(v[k]))erro();
+      if(v.googleHtmlLink!==undefined&&(typeof v.googleHtmlLink!=='string'||v.googleHtmlLink&&!urlGoogle(v.googleHtmlLink)))erro();
+      if(tipo==='validade'?!dataValida(v.dataReferencia):typeof v.diaMesReferencia!=='string'||!dataValida('2000-'+v.diaMesReferencia))erro();
+    }
+    return true;
+  }
+  function resolverGoogle(d,tipo,data,agenda=[],arquivo=[]){
+    const v=d?.agendaGoogle?.[tipo];if(v===undefined)return null;
+    try{validarAgendaGoogle({[tipo]:v})}catch{return {situacao:'invalido',texto:'Vínculo Google a conferir',link:'',googleId:''}}
+    const link=urlGoogle(v.googleHtmlLink),chave=v.googleCalendarId+':'+v.googleEventId;
+    const pertence=a=>a&&a.googleCalendar===v.googleCalendarId&&(tipo==='renovacao'?a.googleRecorrencia===v.googleEventId||a.googleId===chave:a.googleId===chave);
+    const candidatos=(agenda||[]).filter(pertence),registro=tipo==='renovacao'?candidatos.find(a=>a.data===data)||candidatos.find(a=>dataValida(a.data)&&a.data.slice(0,4)===data.slice(0,4)):candidatos[0];
+    const resultado=(situacao,texto)=>({situacao,texto,link:urlGoogle(registro?.googleLink)||link,googleId:registro?.googleId||''});
+    const referenciaConfere=tipo==='renovacao'?data.slice(5)===v.diaMesReferencia:data===v.dataReferencia;
+    if(!referenciaConfere)return resultado('alterado','Data da ficha mudou · revisar o lembrete no Google');
+    if(registro&&dataValida(registro.data))return registro.data===data?resultado('alinhado','Google vinculado · mesma data da ficha'):resultado('divergente','Google está em '+formatar(registro.data)+' · conferir divergência');
+    const removido=[...(arquivo||[])].reverse().find(h=>pertence(h.registro)&&(tipo!=='renovacao'||h.registro.data===data)&&['Cancelado no Google','Recusado no Google','Removido nesta Central'].includes(h.motivo));
+    return resultado(removido?'cancelado':'aguardando',removido?'Lembrete cancelado ou retirado · prazo da ficha mantido':'Aguardando conferir o Google · prazo da ficha mantido');
+  }
   function proximaRenovacao(d,referencia){
     if(!acompanhado(d)||d.tipoRegistro!=='clube'||!dataValida(referencia))return '';
     const dia=String(d.renovacaoDia??'').trim(),mes=String(d.renovacaoMes??'').trim();
@@ -20,7 +46,7 @@ const DocumentosAgenda = (() => {
     for(let y=ano;y<=Math.min(ano+8,9999);y++){const data=String(y).padStart(4,'0')+'-'+sufixo;if(data>=referencia&&dataValida(data))return data}
     return '';
   }
-  function eventos(documentos,referencia){
+  function eventos(documentos,referencia,agenda=[],arquivo=[]){
     if(!Array.isArray(documentos)||!dataValida(referencia))return [];
     const saida=[],vistos=new Set();
     const adicionar=(d,data,tipo)=>{
@@ -29,6 +55,8 @@ const DocumentosAgenda = (() => {
       const base={id:renovacao?'renovacao-clube:'+identidade:'validade-documento:'+identidade+':'+data,ocorrenciaId:chave,data,hora:'',titulo,
         sub:[titular(d),!acompanhado(d)&&d.numero?d.numero:'',renovacao?'Data anual de acompanhamento da filiação':'Validade informada no documento · situação atual a conferir no emissor'].filter(Boolean).join(' · '),
         fonte:'documentos',ic:renovacao?'🏅':'🪪',ir:'documentos',col:'documentos',ref:d,tipoDocumentoAgenda:tipo,dataAlvo:data};
+      const google=resolverGoogle(d,tipo,data,agenda,arquivo);
+      if(google){base.googleAgenda=google;base.sub+=' · '+google.texto;}
       saida.push(base);
       if(!acompanhado(d)||!d.id)return;
       for(const antes of renovacao?avisosRenovacao:avisosValidade){
@@ -41,7 +69,8 @@ const DocumentosAgenda = (() => {
     for(const d of documentos){if(!d||historico(d))continue;if(dataValida(d.validade))adicionar(d,d.validade,'validade');const anual=proximaRenovacao(d,referencia);if(anual)adicionar(d,anual,'renovacao')}
     return saida.sort((a,b)=>a.data.localeCompare(b.data)||a.id.localeCompare(b.id));
   }
-  function prazos(documentos,referencia){return eventos(documentos,referencia).filter(e=>!e.avisoDocumento&&acompanhado(e.ref))}
+  function prazos(documentos,referencia,agenda=[],arquivo=[]){return eventos(documentos,referencia,agenda,arquivo).filter(e=>!e.avisoDocumento&&acompanhado(e.ref))}
+  function copiasGoogle(documentos,referencia,agenda=[],arquivo=[]){return new Set(prazos(documentos,referencia,agenda,arquivo).filter(e=>e.googleAgenda?.situacao==='alinhado').map(e=>e.googleAgenda.googleId));}
   function alertas(documentos,referencia){
     return prazos(documentos,referencia).flatMap(e=>{
       const dias=diasEntre(referencia,e.data),renovacao=e.tipoDocumentoAgenda==='renovacao',limite=renovacao?30:60;
@@ -66,8 +95,8 @@ const DocumentosAgenda = (() => {
       return [{g:dias<0?1:2,ic:'🏅',txt:(dias<0?'Presença a confirmar':'Visita ao clube')+' · '+(e.ref?.nome||'Documento')+' · '+formatar(e.data)+(e.hora?' às '+e.hora:''),quando:dias,secao:'documentos',col:'documentos',ref:e.ref,id:e.id}];
     });
   }
-  function painel(documentos,referencia,abrir){
-    const lista=prazos(documentos,referencia);if(!lista.length)return null;
+  function painel(documentos,referencia,abrir,agenda=[],arquivo=[]){
+    const lista=prazos(documentos,referencia,agenda,arquivo);if(!lista.length)return null;
     const raiz=document.createElement('section');raiz.className='documentos-agenda';raiz.setAttribute('aria-label','Carteirinhas e clube na agenda');
     const titulo=document.createElement('h2');titulo.textContent='🪪 Carteirinhas e clube';raiz.appendChild(titulo);
     const texto=document.createElement('p');texto.textContent='Validades: avisos 60, 30 e 7 dias antes. Renovação anual: 30, 7 e 1 dia antes. Avisos na Agenda e no Radar da Central.';raiz.appendChild(texto);
@@ -81,11 +110,14 @@ const DocumentosAgenda = (() => {
       const data=document.createElement('time');data.dateTime=e.data;data.textContent=formatar(e.data);b.appendChild(data);
       const proximo=(renovacao?avisosRenovacao:avisosValidade).map(n=>deslocar(e.data,-n)).find(d=>d>=referencia);
       const aviso=document.createElement('small');aviso.textContent=dias<0?'Prazo impresso ultrapassado · conferir':dias===0?'É hoje · conferir o registro':dias<=(renovacao?30:60)?'Aviso ativo · faltam '+dias+' dia(s)':proximo?'Primeiro aviso: '+formatar(proximo):'Abra para conferir';b.appendChild(aviso);
+      if(e.googleAgenda){const estado=document.createElement('small');estado.textContent=e.googleAgenda.texto;b.appendChild(estado);}
       b.onclick=()=>{if(typeof abrir==='function')abrir(e)};b.setAttribute('aria-label',nomeComTitular(e.ref)+' · '+rotulo.textContent+' '+formatar(e.data)+' · abrir ficha');grade.appendChild(b);
     }
     raiz.appendChild(grade);
+    const vinculados=lista.filter(e=>e.googleAgenda?.link);
+    if(vinculados.length){const links=document.createElement('p');links.appendChild(document.createTextNode('Abrir no Google: '));vinculados.forEach((e,i)=>{if(i)links.appendChild(document.createTextNode(' · '));const a=document.createElement('a');a.href=e.googleAgenda.link;a.target='_blank';a.rel='noopener noreferrer';a.textContent=e.ref.nome||'Documento';links.appendChild(a)});raiz.appendChild(links);}
     const nota=document.createElement('small');nota.className='documentos-agenda-nota';nota.textContent='As datas acompanham as fichas, sem duplicar compromissos. Documentos históricos ficam fora dos avisos. A situação atual deve ser conferida no emissor.';raiz.appendChild(nota);
     return raiz;
   }
-  return {dataValida,deslocar,diasEntre,proximaRenovacao,eventos,prazos,alertas,eventosVisitas,alertasVisitas,painel,acompanhado};
+  return {dataValida,deslocar,diasEntre,proximaRenovacao,eventos,prazos,alertas,eventosVisitas,alertasVisitas,painel,acompanhado,validarAgendaGoogle,resolverGoogle,copiasGoogle};
 })();

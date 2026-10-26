@@ -726,7 +726,7 @@ tr:hover .lixo{opacity:1}
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
 <script src="./marketing-fortemais.js?v=43e087960693"></script>
 <script src="./marketing.js?v=39a86005b2ae"></script>
-<script src="./documentos-agenda.js?v=7a2af59b4227"></script>
+<script src="./documentos-agenda.js?v=b2503849d4d4"></script>
 <script src="./documentos-habitualidade.js?v=b8ee1a4d60ba"></script>
 <script src="./documentos-armas.js?v=72b63ecaa8b8"></script>
 <script src="./documentos-revisao.js?v=f54d2ba958f9"></script>
@@ -4420,14 +4420,17 @@ function empresaDatasCarregar(forcar){
   return empresaDatasPedido;
 }
 
-function eventosDoEcossistema(){
+function eventosDoEcossistema({preservarCopiasGoogle=false}={}){
   const ev=[];
   const h=hoje();
   // devolve tudo: quem escolhe o que mostrar é a tela, e as contagens dos chips
   // precisam do número REAL de cada categoria, não do que sobrou de um filtro
   const on=()=>true;
+  // Documento é a fonte do prazo. No filtro só Compromissos o espelho Google
+  // permanece visível, pois os documentos ficam fora dessa visualização.
+  const copiasDocumentos=!preservarCopiasGoogle&&typeof DocumentosAgenda!=='undefined'?DocumentosAgenda.copiasGoogle(E.documentos,h,E.agenda,E.agendaGoogleHistorico):new Set();
 
-  if(on('compromissos')) (E.agenda||[]).forEach(a=>{if(a.data)ev.push({
+  if(on('compromissos')) (E.agenda||[]).forEach(a=>{if(a.data&&!copiasDocumentos.has(a.googleId))ev.push({
     data:a.data,ate:a.ate||a.data,hora:a.hora||'',titulo:a.titulo||'(sem título)',
     sub:[a.local,a.tipo].filter(Boolean).join(' · '),fonte:'compromissos',ic:'📅',proprio:true,ref:a});});
 
@@ -4473,7 +4476,7 @@ function eventosDoEcossistema(){
     sub:[e.tipo,e.descricao].filter(Boolean).join(' · '),
     fonte:'painel',ic:'🗓️',cor:e.cor||'',ref:e});});
 
-  if(on('documentos')&&typeof DocumentosAgenda!=='undefined')ev.push(...DocumentosAgenda.eventos(E.documentos,h));
+  if(on('documentos')&&typeof DocumentosAgenda!=='undefined')ev.push(...DocumentosAgenda.eventos(E.documentos,h,E.agenda,E.agendaGoogleHistorico));
   else if(on('documentos')) (E.documentos||[]).forEach(d=>{if(d.grupo==='armas'&&d.tipoRegistro==='guia'&&d.classificacao==='historico')return;if(dataISOValida(d.validade))ev.push({
     data:d.validade,hora:'',titulo:(d.nome||'Documento')+' vence',
     sub:'de '+(d.dono||'Léo')+(d.numero?' · '+d.numero:''),fonte:'documentos',ic:'🪪',ir:'documentos',col:'documentos',ref:d});
@@ -4585,7 +4588,7 @@ function vAgenda(m){
      era preciso desligar as outras sete. Agora clicar isola; clicar de novo na
      mesma volta para tudo. É o gesto que a pessoa faz esperando ver, não sumir. */
   const empresaAgenda=filtro.agSo==='empresas'?empresaPorId(filtro.agEmpresaId):null;
-  const todosEv=eventosDoEcossistema().filter(e=>!empresaAgenda||e.fonte==='empresas'&&e.ref?.empresaId===empresaAgenda.id);
+  const todosEv=eventosDoEcossistema({preservarCopiasGoogle:filtro.agSo==='compromissos'}).filter(e=>!empresaAgenda||e.fonte==='empresas'&&e.ref?.empresaId===empresaAgenda.id);
   if(empresaAgenda){const aviso=el('<div class="empresa-agenda-contexto">Empresa: <b>'+esc(empresaAgenda.nome)+'</b></div>');aviso.appendChild(acao('Todas as empresas',()=>{filtro.agEmpresaId='';r()},'ghost mini'));m.appendChild(aviso)}
   const mesChip=filtro.agMes||hoje().slice(0,7);
   const noMes=todosEv.filter(e=>eventoNoMes(e,mesChip));
@@ -4628,7 +4631,7 @@ function vAgenda(m){
   // ordem de data — dá para ler o detalhe que não cabe na célula.
   const visiveis=so?todosEv.filter(e=>e.fonte===so):todosEv;
   if((!so||so==='documentos')&&typeof DocumentosAgenda!=='undefined'){
-    const prazos=DocumentosAgenda.painel(E.documentos,hoje(),abrirEventoCentral);if(prazos)m.appendChild(prazos);
+    const prazos=DocumentosAgenda.painel(E.documentos,hoje(),abrirEventoCentral,E.agenda,E.agendaGoogleHistorico);if(prazos)m.appendChild(prazos);
   }
   m.appendChild(bloco('ag-mes','🗓️ Calendário','clique num dia para abrir o que tem nele',
     gradeMes(visiveis,r)));
@@ -16821,6 +16824,10 @@ function validarBackup(j){
     if(x[k]!==undefined&&(!Array.isArray(x[k])||x[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))throw new Error('Lista inválida: '+col+'.'+k);
   }
   for(const d of j.documentos||[])if(d.anexosIds!==undefined&&(!Array.isArray(d.anexosIds)||d.anexosIds.some(v=>typeof v!=='string'||!v.trim())))throw new Error('Lista inválida: documentos.anexosIds');
+  for(const d of j.documentos||[])if(d.agendaGoogle!==undefined){
+    if(typeof DocumentosAgenda==='undefined')throw new Error('Atualize a página para conferir os vínculos dos documentos com o Google.');
+    DocumentosAgenda.validarAgendaGoogle(d.agendaGoogle);
+  }
   for(const d of j.documentos||[])if(d.habitualidade!==undefined){
     if(typeof DocumentosHabitualidade==='undefined')throw new Error('Atualize a página para conferir a habitualidade antes de restaurar.');
     DocumentosHabitualidade.validarEstrutura(d.habitualidade);
