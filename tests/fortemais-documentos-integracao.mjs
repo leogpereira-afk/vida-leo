@@ -132,3 +132,27 @@ test('Documentos: categorias rápidas preenchem classificação e marcam rascunh
 test('Documentos: anexo da compra identifica a lista e mantém referência original',async()=>{
   const a=app({nuvem:[arquivo('cotacao','obra:o:compra:lista')]});a.run("obra.fmCompras={versao:1,listas:[{id:'lista',titulo:'Lista sintética'}]}");await tick();assert.match(a.run('painel.textContent'),/Compra: Lista sintética/);assert.equal(a.run('mockNuvem[0].ref'),'obra:o:compra:lista');
 });
+test('Documentos: edição devolve foco ao mesmo arquivo e falha anuncia erro mantendo os campos',async()=>{
+  const a=app({nuvem:[arquivo(),arquivo('b')]});await tick();let foco;
+  a.document.defaultView.HTMLElement.prototype.focus=function(){foco=this};
+  const classificar=()=>a.document.querySelector('[data-arquivo-id=b] .fmdoc-classificar').click();
+  classificar();preencher(a,'titulo','Revisão sintética');enviar(a);
+  assert.equal(foco.closest('[data-arquivo-id]')?.dataset.arquivoId,'b');assert.equal(foco.textContent,'Classificar');assert.equal(foco.isConnected,true);
+  classificar();preencher(a,'descricao','Rascunho completo');a.ctx.localStorage.setItem=()=>{throw Error('quota')};enviar(a);
+  assert.equal(foco.getAttribute('role'),'alert');assert.equal(foco.hidden,false);assert.equal(a.document.querySelector('[name=descricao]').value,'Rascunho completo');assert.equal(a.run('obra.fmArquivosMetadados.b.titulo'),'Revisão sintética');
+});
+test('Documentos: detalhes separados mantêm categoria, origem, formato, datas e estado visíveis',async()=>{
+  const a=app({nuvem:[{...arquivo('revisao','obra:o:compra:lista'),nome:'Projeto_'+('longo_'.repeat(25))+'.pdf'}]});a.run("obra.fmArquivosMetadados={revisao:{categoria:'Estrutural',revisao:'R03',dataDocumento:'2026-10-01'}};obra.fmCompras={versao:1,listas:[{id:'lista',titulo:'Lista sintética'}]}");await tick();
+  const item=a.document.querySelector('.fmdoc-item');assert.equal(item.querySelector('h4').textContent,a.run('mockNuvem[0].nome'));assert.equal(item.querySelectorAll('.fmdoc-item-meta>span').length,7);
+  for(const texto of ['Estrutural','Revisão R03','Documento de 01/10/2026','Anexado em 14/10/2026','Compra: Lista sintética','application/pdf','Na nuvem'])assert.ok(item.textContent.includes(texto),texto);
+});
+test('Documentos no celular: categoria compacta sincroniza botões, busca e arquivados sem mudar dados',async()=>{
+  const a=app({nuvem:[arquivo(),arquivo('b'),arquivo('c')]});a.run("obra.fmArquivosMetadados={a:{categoria:'Personalizada sintética',titulo:'Projeto ativo'},b:{categoria:'Personalizada sintética',titulo:'Projeto anterior',arquivado:true},c:{categoria:'Estrutural',titulo:'Projeto estrutural'}}");await tick();const antes=a.run('JSON.stringify(E)');
+  const seletor=a.document.querySelector('[aria-label="Categoria dos documentos · celular"]');assert.ok([...seletor.options].some(o=>o.value==='Personalizada sintética'));
+  const selecionar=valor=>{for(const op of seletor.options)op.removeAttribute('selected');[...seletor.options].find(op=>op.value===valor).setAttribute('selected','');seletor.onchange()};
+  const busca=a.document.querySelector('[aria-label="Buscar documentos"]');busca.value='projeto';busca.oninput();selecionar('Personalizada sintética');
+  assert.equal(a.document.querySelectorAll('.fmdoc-item').length,1);assert.equal(a.document.querySelector('.fmdoc-item').dataset.arquivoId,'a');assert.equal(botao(a,'Personalizada sintética').getAttribute('aria-pressed'),'true');assert.equal(busca.value,'projeto');
+  botao(a,'Arquivados').click();assert.equal(seletor.value,'Personalizada sintética');assert.equal(a.document.querySelector('.fmdoc-item').dataset.arquivoId,'b');
+  botao(a,'Estrutural').click();assert.equal(seletor.value,'Estrutural');assert.equal(botao(a,'Arquivados').getAttribute('aria-pressed'),'true');assert.equal(busca.value,'projeto');
+  botao(a,'Em acompanhamento').click();assert.equal(a.document.querySelector('.fmdoc-item').dataset.arquivoId,'c');selecionar('');assert.equal(botao(a,'Todas').getAttribute('aria-pressed'),'true');assert.equal(a.document.querySelectorAll('.fmdoc-item').length,2);assert.equal(a.run('JSON.stringify(E)'),antes);
+});

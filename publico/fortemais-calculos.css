@@ -96,3 +96,22 @@
 @media(prefers-color-scheme:dark){.fmf .fmf-material-unidentified{color:#f3c67a}}
 .fmf .fmf-mobile-views button[aria-pressed=true],.fmf .fmf-mobile-views button[aria-pressed=true]:hover{background:#25272b;color:#fff;border-color:#25272b}
 @media(prefers-color-scheme:dark){.fmf .fmf-mobile-views button[aria-pressed=true],.fmf .fmf-mobile-views button[aria-pressed=true]:hover{background:#e3e7ec;color:#24272d;border-color:#e3e7ec}}
+
+/* No telefone, a medida continua inteira entre controles fáceis de tocar. */
+@media screen and (max-width:700px){
+ .fmf .fmf-number-line .fmf-step-button{flex-basis:44px;min-width:44px;min-height:44px}
+ .fmf .fmf-mobile-views button,.fmf .fmf-sequence button,.fmf .fmf-editor-actions>[data-action=salvar],.fmf .fmf-editor-actions>details>summary{min-height:44px}
+ .fmf .fmf-tool-library summary,.fmf .fmf-results summary,.fmf .fmf-identity>summary{min-height:44px;display:flex;align-items:center;line-height:1.45}
+ .fmf .fmf-tool-cards .fmf-tool-card{grid-template-rows:auto;display:flex;align-items:center;text-align:left;min-height:58px}
+}
+@media screen and (max-width:480px){
+ .fmf .fmf-input-panel .fmf-grid{grid-template-columns:minmax(0,1fr);gap:10px}
+ .fmf .fmf-number-line>small{max-width:48px;overflow-wrap:anywhere}
+ .fmf .fmf-tool-cards{grid-template-columns:minmax(0,1fr);max-height:300px}
+ .fmf .fmf-model-grid{grid-template-columns:minmax(0,1fr)}
+ .fmf .fmf-empty-result{grid-template-columns:minmax(0,1fr)}
+ .fmf .fmf-reference-art{display:flex;align-items:center;justify-content:flex-start;gap:8px}
+ .fmf .fmf-reference-art img{width:64px;height:60px}.fmf .fmf-reference-art small{text-align:left;margin:0}
+ .fmf .fmf-results .fmf-kpis{gap:6px}.fmf .fmf-results .fmf-kpis>div{padding:9px}
+ .fmf .fmf-results .fmf-kpis strong{font-size:17px}
+}

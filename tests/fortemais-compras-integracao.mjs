@@ -58,3 +58,29 @@ test('Compras: anexos usam referência exata da lista e mantêm proteção enqua
 test('Compras: arquivo com erro de envio mantém aviso e não altera dados da compra',async()=>{
   const a=app();salva(a);const antes=a.run('JSON.stringify(obra.fmCompras)');a.run('arqPor=async()=>[];arqAdd=async()=>{throw Error("Falha sintética de envio")}');const d=a.document.querySelector('.fmc-lista-detalhes');d.open=true;d.dispatchEvent(new a.document.defaultView.Event('toggle'));await tick();const input=a.document.querySelector('.fmc-anexos input');Object.defineProperty(input,'files',{value:[{name:'ficticio.pdf'}]});await input.onchange();assert.match(a.document.querySelector('.fmc-anexos [role=alert]').textContent,/Falha sintética/);assert.equal(a.run('JSON.stringify(obra.fmCompras)'),antes);assert.equal(a.run('painel._fmDirty'),false);
 });
+test('Compras no celular: preço inválido abre o material recolhido e conserva os outros campos até corrigir',()=>{
+  const a=app();nova(a);preencher(a,'solicitante','Solicitante fictício');preencher(a,'estimado','25,10');botao(a,'+ Adicionar item').click();
+  const materiais=a.document.querySelectorAll('.fmc-item-editor'),segundo=materiais[1],preco=segundo.querySelector('[name=cotado]');
+  segundo.querySelector('[name=descricao]').value='Segundo material com especificação';segundo.querySelector('[name=especificacao]').value='Texto que deve continuar no rascunho';preco.value='12,345';
+  assert.equal(Boolean(segundo.querySelector('details').open),false);enviar(a);
+  assert.equal(a.run('obra.fmCompras'),undefined);assert.equal(segundo.querySelector('details').open,true);assert.equal(preco.getAttribute('aria-invalid'),'true');
+  const ajuda=a.document.getElementById(preco.getAttribute('aria-describedby'));assert.match(ajuda.textContent,/cotado do material 2/);assert.equal(a.run('painel._fmDirty'),true);
+  assert.equal(materiais[0].querySelector('[name=estimado]').value,'25,10');assert.equal(a.document.querySelector('[name=solicitante]').value,'Solicitante fictício');
+  preco.value='12,34';preco.dispatchEvent(new a.document.defaultView.Event('input',{bubbles:true}));assert.equal(preco.hasAttribute('aria-invalid'),false);assert.equal(segundo.querySelector('.fmc-campo-erro'),null);enviar(a);
+  assert.equal(a.run('obra.fmCompras.listas[0].itens.length'),2);assert.equal(a.run('obra.fmCompras.listas[0].itens[1].cotado'),1234);assert.equal(a.run('obra.fmCompras.listas[0].itens[1].especificacao'),'Texto que deve continuar no rascunho');assert.equal(a.run('obra.fmCompras.listas[0].itens[0].estimado'),2510);
+});
+test('Compras no celular: aponta campos obrigatórios e mantém a numeração após remover material',()=>{
+  const a=app();botao(a,'Nova lista').click();enviar(a);assert.equal(a.document.querySelector('[name=titulo]').getAttribute('aria-invalid'),'true');
+  preencher(a,'titulo','Lista sintética');enviar(a);assert.equal(a.document.querySelector('[name=descricao]').getAttribute('aria-invalid'),'true');
+  preencher(a,'descricao','Primeiro material');botao(a,'+ Adicionar item').click();botao(a,'+ Adicionar item').click();
+  assert.deepEqual([...a.document.querySelectorAll('.fmc-item-editor legend')].map(x=>x.textContent),['Material 1','Material 2','Material 3']);
+  a.document.querySelectorAll('.fmc-item-editor')[1].querySelector('button').click();assert.deepEqual([...a.document.querySelectorAll('.fmc-item-editor legend')].map(x=>x.textContent),['Material 1','Material 2']);
+  const segundo=a.document.querySelectorAll('.fmc-item-editor')[1];segundo.querySelector('[name=descricao]').value='Último material preservado';enviar(a);
+  assert.equal(a.run('obra.fmCompras.listas[0].itens.length'),2);assert.equal(a.run('obra.fmCompras.listas[0].itens[1].descricao'),'Último material preservado');
+});
+test('Compras no celular: valores da lista têm rótulos próprios e preservam totais parciais, zero e não informado',()=>{
+  const a=app();nova(a);preencher(a,'estimado','0');preencher(a,'cotado','12,50');botao(a,'+ Adicionar item').click();a.document.querySelectorAll('.fmc-item-editor')[1].querySelector('[name=descricao]').value='Material sem preços';enviar(a);
+  const totais=[...a.document.querySelectorAll('.fmc-lista-totais>div')].map(x=>[x.querySelector('dt').textContent,x.querySelector('dd').textContent]);
+  assert.equal(totais.length,3);assert.equal(totais[0][0],'Estimado');assert.match(totais[0][1],/Parcial:.*0,00/);assert.equal(totais[1][0],'Cotado');assert.match(totais[1][1],/Parcial:.*25,00/);assert.deepEqual(totais[2],['Comprado','Não informado']);
+  assert.match(a.document.querySelector('.fmc-lista-resumo').textContent,/2 item\(ns\).*Solicitação:/);
+});

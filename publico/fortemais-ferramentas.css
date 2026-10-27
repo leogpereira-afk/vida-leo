@@ -24,3 +24,20 @@
 
 .fmf .fmf-editor-actions>[data-action=salvar],.fmf .fmf-editor-actions>[data-action=salvar]:hover{color:#fff!important;background:#a82025!important;border-color:#a82025!important}
 .fmf-editor-actions>details[open]{position:static}.fmf-editor-actions>details[open]>div{right:0;left:0;width:auto;bottom:58px;z-index:5}.fmf-editor-actions>details[open]>div button{color:#343840!important}
+
+/* Editor da dica perto do comando que o abriu; vínculos são escolhidos pelo nome. */
+.fmf .fmf-tip-editor{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px;scroll-margin-top:110px}
+.fmf .fmf-tip-editor>h3,.fmf .fmf-tip-note,.fmf .fmf-tip-editor>.fmf-message,.fmf .fmf-tip-links,.fmf .fmf-tip-actions{grid-column:1/-1}
+.fmf .fmf-tip-editor>h3,.fmf .fmf-tip-note{margin:0}.fmf .fmf-tip-note{font-size:12px;line-height:1.5;color:var(--suave,#616772)}
+.fmf .fmf-tip-editor textarea{resize:vertical;min-height:76px;line-height:1.5}.fmf .fmf-tip-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.fmf .fmf-tip-actions{display:flex;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--fm-line)}
+@media screen and (max-width:700px){
+ .fmf .fmf-tip-editor,.fmf .fmf-tip-links{grid-template-columns:minmax(0,1fr)}
+ .fmf .fmf-tip-editor .fmf-field{font-size:13px}.fmf .fmf-tip-actions .btn{min-height:44px;flex:1}
+ .fmf .fmf-tip-editor :is(input,select,textarea){font-size:16px;min-height:44px}
+ .fmf[data-fm-pagina=dicas] .fmf-toolbar{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+ .fmf[data-fm-pagina=dicas] .fmf-toolbar>*{min-width:0;width:100%;max-width:none}
+ .fmf[data-fm-pagina=dicas] .fmf-check{min-height:44px;align-items:center;line-height:1.45;margin:3px 0}
+ .fmf[data-fm-pagina=dicas] .fmf-check input{flex:0 0 20px;height:20px;margin:0}
+ .fmf[data-fm-pagina=dicas] .fmf-tips .fmf-card>button{min-height:44px;white-space:normal;line-height:1.4;margin:3px 4px 0 0}
+}

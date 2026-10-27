@@ -19,3 +19,12 @@
  .fmd-editor .fmd-check-linha .fmd-remover,.fmd-editor .fmd-etapa-linha .btn{font-size:12px}
  .fmd-painel .fmd-card-meta,.fmd-painel .fmd-badge,.fmd-painel .fmd-prioridade,.fmd-painel .fmd-atrasada{font-size:12px;line-height:1.45}
 }
+
+@media screen and (max-width:480px){
+ .fmd-form-grid{grid-template-columns:minmax(0,1fr)}
+ .fmd-check-linha{display:grid;grid-template-columns:44px minmax(0,1fr);gap:6px}
+ .fmd-check-linha .fmd-remover{grid-column:2;justify-self:end;min-height:44px}
+ .fmd-etapa-linha{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
+ .fmd-etapa-linha input{grid-column:1/-1}
+ .fmd-etapa-linha .btn{min-width:44px}
+}

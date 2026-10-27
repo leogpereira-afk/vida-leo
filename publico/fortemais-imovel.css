@@ -2,3 +2,27 @@
 .fmim-textos{border-top:1px solid var(--linha,#dce5dc);margin-top:14px;padding-top:12px;font-size:13px}.fmim-textos>summary{cursor:pointer;font-weight:600}.fmim-textos>summary:focus-visible{outline:3px solid #6b9b77;outline-offset:3px}
 
 .fmim-painel .btn{min-height:40px}.fmim-painel button:disabled{opacity:.5;cursor:default}@media(max-width:640px){.fmim-painel .btn{min-height:44px}.fmim-campo input,.fmim-campo textarea,.fmim-campo select{font-size:16px}}
+
+/* Keep numeric inputs together and allow long originals/errors to wrap. */
+.fmim-grade>.fmim-largo,.fmim-numeros{grid-column:1/-1}
+.fmim-numeros{min-width:0;margin:0;padding:0;border:0}
+.fmim-numeros>legend{padding:0;margin-bottom:8px;font-size:12px;font-weight:600}
+.fmim-numeros>div{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.fmim-nota,.fmim-erro,.fmim-aviso,.fmim-cab>div,.fmim-cab h3,.fmim-campo>span{min-width:0;overflow-wrap:anywhere}
+.fmim-painel .btn{max-width:100%;white-space:normal;overflow-wrap:anywhere;line-height:1.3}
+.fmim-textos>summary{display:flex;align-items:center;min-height:44px;gap:6px}
+.fmim-textos>summary::before{content:'▸';font-size:12px}.fmim-textos[open]>summary::before{content:'▾'}
+@media screen and (max-width:640px){
+ .fmim-painel{gap:12px}.fmim-cadastro,.fmim-galeria,.fmim-editor{padding:11px}
+ .fmim-cab h3{font-size:16px;line-height:1.35}.fmim-cab p,.fmim-nota,.fmim-campo,.fmim-numeros>legend{font-size:13px;line-height:1.4}
+ .fmim-ficha{gap:10px;margin-top:12px}.fmim-ficha dt{font-size:12px}.fmim-ficha dd{font-size:14px;line-height:1.4}
+ .fmim-grade,.fmim-editor{gap:10px}.fmim-numeros>div{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+ .fmim-campo input,.fmim-campo select{min-height:44px}.fmim-campo textarea{min-height:88px}
+ .fmim-painel .btn{font-size:13px;padding:8px 10px}
+ .fmim-cab .fmim-acoes>.btn,.fmim-editor>.fmim-acoes>.btn{flex:1 1 120px}
+ .fmim-upload{padding:10px;margin:10px 0;gap:8px}.fmim-upload .fmim-acoes>.btn{width:100%}
+ .fmim-foto-corpo{padding:11px;gap:7px}.fmim-foto h4{font-size:14px;line-height:1.4}.fmim-foto p{font-size:13px;line-height:1.45}
+ .fmim-foto .fmim-acoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+ .fmim-foto .fmim-acoes>.btn{width:100%;min-width:0}.fmim-selo{font-size:11px}
+ .fmim-textos{margin-top:10px;padding-top:6px}
+}

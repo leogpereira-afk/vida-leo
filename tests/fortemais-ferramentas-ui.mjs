@@ -151,3 +151,71 @@ test('composição mostra embalagem de cimento editável e mantém unidade de co
  p.querySelector('[data-action="salvar"]').click();const saved=c.E.fortemaisApoio.simulacoes[0].versoes[0];assert.equal(saved.inputs.embalagemCimentoKg,'25');assert.equal(saved.result.materiais[0].embalagem,25);
  field().value='';field().oninput();p.querySelector('[data-action="calcular"]').click();assert.equal(p.querySelector('[data-action="salvar"]').disabled,true);assert.match(p.querySelector('.fmf-message').textContent,/Embalagem de cimento/);
 });
+
+
+function dicaEditorSetup(tip){
+ const {c,document}=setup();c.E.fortemaisInovacoes=[{id:'inovacao-1',titulo:'Ideia fictícia de vedação'}];
+ if(tip){c.E.fortemaisApoio=c.FortemaisApoioModelo.vazio();c.E.fortemaisApoio.dicas.push(tip)}
+ const p=c.fmDicasObraPainel();document.body.append(p);
+ const click=text=>[...p.querySelectorAll('button')].find(b=>b.textContent===text).click();
+ click(tip?'Editar':'Adicionar dica própria');
+ return {c,document,p,click,form:p.querySelector('.fmf-tip-editor')};
+}
+const dicaLegada=()=>({id:'dica-legada',titulo:'Orientação fictícia',etapa:'pisos',quando:'Antes da compra',checklist:['Conferir projeto'],erros:'Não improvisar medidas',url:'https://example.org/referencia',notes:'Manter texto anterior',obraId:'obra-ausente',inovacaoId:'inovacao-ausente',version:2,tipo:'Dica própria'});
+test('dica: seleciona obra e inovação por nome e salva IDs, checklist e descrição completos',()=>{
+ const {c,form,click}=dicaEditorSetup();
+ assert.equal(form.querySelector('[name=obraId]').tagName,'SELECT');assert.equal(form.querySelector('[name=inovacaoId]').tagName,'SELECT');
+ assert.match(form.querySelector('[name=obraId]').textContent,/Obra fictícia/);assert.match(form.querySelector('[name=inovacaoId]').textContent,/Ideia fictícia/);
+ for(const [name,value] of Object.entries({titulo:'Dica sintética no celular',etapa:'pisos',quando:'Antes de iniciar\nConferir todo o ambiente',checklist:'Conferir o projeto\nAnotar as medidas',erros:'Não arredondar antes da conferência',notes:'Observação completa com acentos',url:'https://example.org/fonte'}))form.querySelector('[name='+name+']').value=value;
+ form.querySelector('[name=obraId] [value="obra-1"]').selected=true;form.querySelector('[name=inovacaoId] [value="inovacao-1"]').selected=true;click('Salvar dica');
+ const tip=c.E.fortemaisApoio.dicas[0];assert.equal(tip.obraId,'obra-1');assert.equal(tip.inovacaoId,'inovacao-1');assert.equal(tip.quando,'Antes de iniciar\nConferir todo o ambiente');assert.equal(tip.notes,'Observação completa com acentos');assert.deepEqual([...tip.checklist],['Conferir o projeto','Anotar as medidas']);assert.equal(form.isConnected,false);
+});
+test('dica: edição preserva vínculos legados ausentes e todas as observações',()=>{
+ const {c,form,click}=dicaEditorSetup(dicaLegada());
+ for(const name of ['obraId','inovacaoId'])assert.match(form.querySelector('[name='+name+']').textContent,/anterior não encontrada · manter vínculo/);
+ form.querySelector('[name=titulo]').value='Orientação revisada';click('Salvar dica');
+ const tip=c.E.fortemaisApoio.dicas[0];assert.equal(tip.obraId,'obra-ausente');assert.equal(tip.inovacaoId,'inovacao-ausente');assert.equal(tip.notes,'Manter texto anterior');assert.equal(tip.version,3);assert.equal(tip.titulo,'Orientação revisada');
+});
+test('dica: alterar seleção marca rascunho e favoritar não libera saída com edição pendente',()=>{
+ const {document,p,form,click}=dicaEditorSetup();
+ const select=form.querySelector('[name=obraId]');select.querySelector('[value="obra-1"]').selected=true;select.dispatchEvent(new document.defaultView.Event('change',{bubbles:true}));
+ assert.equal(p._fmDirty,true);click('☆ Favoritar');assert.equal(p._fmDirty,true);assert.equal(form.querySelector('[name=obraId]').value,'obra-1');
+ click('Adicionar dica própria');assert.equal(p.querySelectorAll('.fmf-tip-editor').length,1);assert.equal(form.querySelector('[name=obraId]').value,'obra-1');
+});
+test('dica: erro de salvamento mantém o editor, vínculos e dados anteriores',()=>{
+ const {c,document,p,form,click}=dicaEditorSetup(dicaLegada());const before=JSON.stringify(c.E.fortemaisApoio);c.salvar=()=>{throw Error('quota')};
+ const title=form.querySelector('[name=titulo]');title.value='Texto ainda não salvo';title.dispatchEvent(new document.defaultView.Event('input',{bubbles:true}));click('Salvar dica');
+ assert.equal(JSON.stringify(c.E.fortemaisApoio),before);assert.equal(form.isConnected,true);assert.equal(title.value,'Texto ainda não salvo');assert.equal(p._fmDirty,true);assert.match(form.querySelector('[role=alert]').textContent,/Dados anteriores e rascunho mantidos/);
+});
+test('dica: remoção concorrente do vínculo selecionado impede gravação e mantém o formulário',()=>{
+ const {c,form,click}=dicaEditorSetup(dicaLegada());form.querySelector('[name=obraId] [value="obra-1"]').selected=true;c.E.obras=[];click('Salvar dica');
+ assert.equal(c.E.fortemaisApoio.dicas[0].obraId,'obra-ausente');assert.equal(form.isConnected,true);assert.match(form.querySelector('[role=alert]').textContent,/obra escolhida mudou/);
+});
+
+
+test('dica: cancelar formulário intacto fecha sem pedir descarte',()=>{
+ const {c,p,form,click}=dicaEditorSetup(dicaLegada());let confirmations=0;c.confirm=()=>{confirmations++;return false};const before=JSON.stringify(c.E.fortemaisApoio);
+ click('Cancelar');assert.equal(confirmations,0);assert.equal(form.isConnected,false);assert.equal(p._fmDirty,false);assert.equal(JSON.stringify(c.E.fortemaisApoio),before);
+});
+test('dica: cancelar edição alterada preserva rascunho até confirmar descarte',()=>{
+ const {c,document,p,form,click}=dicaEditorSetup(dicaLegada());const before=JSON.stringify(c.E.fortemaisApoio),title=form.querySelector('[name=titulo]');
+ title.value='Revisão ainda não salva';title.dispatchEvent(new document.defaultView.Event('input',{bubbles:true}));let confirmations=0;c.confirm=text=>{confirmations++;assert.match(text,/Descartar.*dica/);return false};
+ click('Cancelar');assert.equal(confirmations,1);assert.equal(form.isConnected,true);assert.equal(title.value,'Revisão ainda não salva');assert.equal(p._fmDirty,true);assert.equal(JSON.stringify(c.E.fortemaisApoio),before);
+ c.confirm=()=>true;click('Cancelar');assert.equal(form.isConnected,false);assert.equal(p._fmDirty,false);assert.equal(JSON.stringify(c.E.fortemaisApoio),before);
+});
+
+
+test('mobile: salvar resultado revela medidas e identificação e foca primeiro campo faltante',()=>{
+ const {c}=setup();const p=c.fmFerramentasPainel();p.querySelector('[data-action=exemplo]').click();p.querySelector('[name=nome]').value='Simulação fictícia';
+ p.dataset.view='3d';const identity=p.querySelector('.fmf-identity');identity.open=false;identity.removeAttribute('open');const ambiente=p.querySelector('[name=ambiente]');let focused=false;ambiente.focus=()=>{focused=true};
+ p.querySelector('[data-action=salvar]').click();assert.equal(p.dataset.view,'medidas');assert.ok(identity.hasAttribute('open'));assert.equal(focused,true);assert.equal(ambiente.getAttribute('aria-invalid'),'true');assert.equal(p.querySelector('.fmf-mobile-views button').getAttribute('aria-pressed'),'true');assert.equal(c.E.fortemaisApoio,undefined);
+});
+test('mobile: erro numérico manual revela o campo sem transferir foco durante recálculo automático',()=>{
+ const {c}=setup();vm.runInContext(fs.readFileSync(new URL('../publico/fortemais-ferramentas-modelo.js',import.meta.url),'utf8'),c);const p=c.fmFerramentasPainel();p.querySelector('[data-action=exemplo]').click();const width=p.querySelector('[name=largura]');let focused=0;width.focus=()=>{focused++};
+ width.value='';width.oninput();c.flushUpdates();assert.equal(focused,0);assert.equal(width.getAttribute('aria-invalid'),'true');
+ p.dataset.view='3d';p.querySelector('[data-action=calcular]').click();assert.equal(focused,1);assert.equal(p.dataset.view,'medidas');assert.equal(p.querySelector('[data-action=salvar]').disabled,true);
+});
+test('dicas: etapas exibem nomes legíveis sem alterar identificadores dos filtros',()=>{
+ const {c}=setup();const p=c.fmDicasObraPainel();const select=p.querySelector('[name=etapa]');assert.equal(select.querySelector('[value=eletrica]').textContent,'Elétrica');assert.equal(select.querySelector('[value=hidraulica]').textContent,'Hidráulica');
+ select.querySelector('[value=eletrica]').selected=true;select.onchange({target:select});assert.ok(p.querySelectorAll('article').length>0);for(const article of p.querySelectorAll('article'))assert.match(article.querySelector('small').textContent,/^Elétrica ·/);
+});

@@ -74,3 +74,21 @@ test('Imóvel: descarte libera URLs locais e invalida prévias assíncronas',asy
   const a=app({nuvem:[arquivo()]});const revogadas=[];a.ctx.URL=class extends URL{static revokeObjectURL(url){revogadas.push(url)}};a.run("arqUrlDe=async()=> 'blob:foto-sintetica'");await tick();assert.equal(a.document.querySelectorAll('.fmim-foto img').length,1);assert.equal(a.run('painel._fmDispose===painel.descartar'),true);a.run('painel._fmDispose()');assert.deepEqual(revogadas,['blob:foto-sintetica']);
   a.run('var resolverImagem;arqUrlDe=()=>new Promise(r=>resolverImagem=r)');await a.run('painel.atualizar()');a.run('painel._fmDispose();resolverImagem("blob:foto-atrasada")');await tick();assert.equal(a.document.querySelectorAll('.fmim-foto img').length,0);assert.ok(revogadas.includes('blob:foto-atrasada'));
 });
+test('Imóvel: composição compacta conserva todos os campos e devolve o foco após salvar',async()=>{
+  const a=app();await tick();let foco;a.document.defaultView.HTMLElement.prototype.focus=function(){foco=this};botao(a,'Editar características').click();
+  assert.deepEqual([...a.document.querySelectorAll('.fmim-numeros input')].map(i=>i.name),['quartos','suites','banheiros','vagas']);
+  for(const [nome,valor] of Object.entries({responsavel:'Responsável sintético',quartos:'3',suites:'1',banheiros:'2',vagas:'0',ambientes:'Sala e cozinha',acabamentos:'Acabamento sintético',diferenciais:'Descrição sintética',descricaoComercial:'Descrição pública sintética',observacoesInternas:'Observação interna sintética'}))preencher(a,nome,valor);
+  enviar(a);assert.equal(foco.textContent,'Editar características');assert.equal(foco.isConnected,true);assert.equal(a.run('obra.fmImovel.vagas'),0);assert.equal(a.run('obra.fmImovel.observacoesInternas'),'Observação interna sintética');assert.equal(a.run('obra.fmImovel.descricaoComercial'),'Descrição pública sintética');
+});
+test('Imóvel: classificar volta para a imagem certa e erro de salvamento preserva a legenda',async()=>{
+  const a=app({nuvem:[arquivo(),arquivo('b')]});await tick();let foco;a.document.defaultView.HTMLElement.prototype.focus=function(){foco=this};
+  a.document.querySelector('[data-foto-id=b] .fmim-classificar').click();preencher(a,'legenda','Imagem sintética B');enviar(a);
+  assert.equal(foco.closest('[data-foto-id]')?.dataset.fotoId,'b');assert.equal(foco.textContent,'Classificar');assert.equal(foco.isConnected,true);
+  foco.click();preencher(a,'legenda','Rascunho conservado');a.ctx.localStorage.setItem=()=>{throw Error('quota')};enviar(a);
+  assert.equal(foco.getAttribute('role'),'alert');assert.equal(foco.hidden,false);assert.equal(a.document.querySelector('[name=legenda]').value,'Rascunho conservado');assert.equal(a.run('obra.fmImovel.fotos.b.legenda'),'Imagem sintética B');
+});
+test('Imóvel: envio de fotos indica progresso e impede envio duplo até terminar',async()=>{
+  const a=app();await tick();a.ctx.file={name:'Original.jpg',type:'image/jpeg',size:12};a.run("var resolverEnvio;var totalEnvios=0;arqAdd=(ref,file)=>{totalEnvios++;return new Promise(r=>resolverEnvio=()=>{const reg={id:'novo',ref,nome:file.name,tipo:file.type,tam:file.size};mockNuvem.push(reg);r(reg)})};var enviandoFoto=painel.receber([file])");
+  const enviar=botao(a,'Enviando imagens…');assert.ok(enviar);assert.equal(enviar.disabled,true);assert.equal(enviar.getAttribute('aria-busy'),'true');await a.run('painel.receber([file])');assert.equal(a.run('totalEnvios'),1);
+  await a.run('resolverEnvio();enviandoFoto');assert.equal(enviar.textContent,'Adicionar imagens');assert.equal(enviar.disabled,false);assert.equal(enviar.getAttribute('aria-busy'),'false');assert.equal(a.run('obra.fmImovel.fotos.novo.tipo'),undefined);assert.equal(a.document.querySelectorAll('[data-foto-id=novo]').length,1);
+});

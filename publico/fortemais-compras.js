@@ -19,6 +19,21 @@ function fmComprasDecimal(valor,casas,rotulo,ausente=false){
   if(!new RegExp('^\\d+(?:[.,]\\d{1,'+casas+'})?$').test(v))throw Error('Confira '+rotulo+': use número não negativo com até '+casas+' casas decimais.');
   const n=Number(v.replace(',','.'));if(!Number.isFinite(n))throw Error('Confira '+rotulo+'.');return n;
 }
+function fmComprasLerDecimal(campo,casas,rotulo,ausente=false){
+  try{return fmComprasDecimal(campo.value,casas,rotulo,ausente);}catch(erro){erro.campo=campo;throw erro;}
+}
+function fmComprasObrigatorio(campo,rotulo){
+  if(!campo.value.trim()){const erro=Error('Preencha '+rotulo+'.');erro.campo=campo;throw erro;}
+}
+function fmComprasMostrarErro(form,aviso,erro){
+  aviso.textContent=erro.message;aviso.hidden=false;
+  const campo=erro.campo;
+  if(campo&&form.contains(campo)){
+    for(let pai=campo.parentElement;pai&&pai!==form;pai=pai.parentElement)if(pai.tagName==='DETAILS')pai.open=true;
+    const ajuda=el('<small class="fmc-campo-erro"></small>');ajuda.id=aviso.id+'-campo';ajuda.textContent=erro.message;campo.parentElement.appendChild(ajuda);
+    campo.setAttribute('aria-invalid','true');campo.setAttribute('aria-describedby',ajuda.id);campo.focus();campo.scrollIntoView({block:'nearest'});
+  }else{aviso.focus();aviso.scrollIntoView({block:'nearest'});}
+}
 function fmComprasValor(v){return v==null?'':(v/100).toFixed(2).replace('.',',');}
 function fmComprasMoeda(v){return v==null?'Não informado':brl(v/100);}
 function fmComprasTotalTexto(t){return t.centavos===null?'Não informado':(t.completo?'':'Parcial: ')+fmComprasMoeda(t.centavos);}
@@ -51,21 +66,22 @@ function fmComprasPainel(o){
   function nova(){return {titulo:'',solicitante:'',data:hoje(),prioridade:'normal',prazo:'',obs:'',fornecedor:'',situacao:'solicitado',itens:[],ajustes:Object.fromEntries(M.BASES.map(b=>[b,{frete:0,desconto:0}]))};}
   function editar(item,recebimento=false){
     if(bloqueado())return;erro('');const base=fmComprasBase(o),estado=structuredClone(item||nova()),form=el('<form class="fmc-editor"></form>'),titulo=el('<h4></h4>');titulo.textContent=recebimento?'Conferir recebimento':item?'Editar lista':'Nova lista de compras';form.appendChild(titulo);
-    const e=el('<p class="fmc-erro" role="alert" hidden></p>');let ler;
+    const e=el('<p class="fmc-erro" role="alert" tabindex="-1" hidden></p>');e.id='fmc-erro-'+uid();let ler;
     if(recebimento){
       const orientacao=el('<p class="fmc-nota">Informe a quantidade total já recebida de cada item. A situação será atualizada ao salvar.</p>');form.appendChild(orientacao);
       for(const i of estado.itens){const linha=el('<div class="fmc-recebimento"></div>'),nome=el('<p></p>');nome.textContent=i.descricao+' · Solicitado: '+i.quantidade+' '+i.unidade;const campo=fmComprasCampo(i.id,'Total recebido',i.recebido);campo.querySelector('input').inputMode='decimal';linha.append(nome,campo);form.appendChild(linha);}
-      ler=()=>Object.fromEntries(estado.itens.map(i=>[i.id,fmComprasDecimal(form.querySelector('[name="'+i.id+'"]').value,3,'a quantidade recebida')]));
+      ler=()=>Object.fromEntries(estado.itens.map(i=>{const campo=form.querySelector('[name="'+i.id+'"]'),valor=fmComprasLerDecimal(campo,3,'a quantidade recebida');if(valor>i.quantidade){const erro=Error('O recebimento de '+i.descricao+' não pode superar '+i.quantidade+' '+i.unidade+' solicitados.');erro.campo=campo;throw erro;}return[i.id,valor];}));
     }else{
       const principal=el('<div class="fmc-grade"></div>');
       principal.append(fmComprasCampo('titulo','Título da lista',estado.titulo),fmComprasCampo('solicitante','Solicitante',estado.solicitante),fmComprasCampo('data','Data da solicitação',estado.data,'date'),fmComprasCampo('prazo','Prazo de entrega',estado.prazo,'date'),fmComprasCampo('prioridade','Prioridade',estado.prioridade,'select',M.PRIORIDADES.map(x=>[x,x==='alta'?'Alta':x==='baixa'?'Baixa':'Normal'])),fmComprasCampo('situacao','Situação',estado.situacao,'select',M.SITUACOES.filter(s=>!['parcial','recebido'].includes(s)||s===estado.situacao).map(s=>[s,M.ROTULOS[s]])));
       form.appendChild(principal);const itens=el('<div class="fmc-itens-editor"></div>');form.appendChild(itens);
+      const numerar=()=>[...itens.children].forEach((linha,n)=>linha.querySelector('legend').textContent='Material '+(n+1));
       const adicionar=(i={id:uid(),descricao:'',especificacao:'',quantidade:1,unidade:'un',recebido:0,estimado:null,cotado:null,comprado:null})=>{
         const linha=el('<fieldset class="fmc-item-editor"><legend>Material</legend><div class="fmc-item-principal"></div><details class="fmc-detalhes"><summary>Especificação e preços opcionais</summary><div class="fmc-item-complemento"></div></details></fieldset>');linha.dataset.id=i.id;linha._recebido=i.recebido;
         linha.querySelector('.fmc-item-principal').append(fmComprasCampo('descricao','Descrição',i.descricao),fmComprasCampo('quantidade','Quantidade',i.quantidade),fmComprasCampo('unidade','Unidade',i.unidade));linha.querySelector('[name=quantidade]').inputMode='decimal';
         const complemento=linha.querySelector('.fmc-item-complemento');complemento.appendChild(fmComprasCampo('especificacao','Especificação',i.especificacao,'textarea'));
         const precos=el('<div class="fmc-precos"></div>');for(const b of M.BASES){const campo=fmComprasCampo(b,'Unitário '+b+' (R$)',fmComprasValor(i[b]));campo.querySelector('input').inputMode='decimal';precos.appendChild(campo);}complemento.appendChild(precos);
-        const remover=fmComprasBotao('Remover item',()=>{if(linha._recebido){e.textContent='Este item já tem recebimento. Ajuste a conferência antes de removê-lo.';e.hidden=false;return;}linha.remove();sec._fmDirty=true;});remover.disabled=i.recebido>0;linha.appendChild(remover);itens.appendChild(linha);return linha;
+        const remover=fmComprasBotao('Remover item',()=>{if(linha._recebido){e.textContent='Este item já tem recebimento. Ajuste a conferência antes de removê-lo.';e.hidden=false;return;}linha.remove();numerar();sec._fmDirty=true;});remover.disabled=i.recebido>0;linha.appendChild(remover);itens.appendChild(linha);numerar();return linha;
       };
       (estado.itens.length?estado.itens:[undefined]).forEach(i=>adicionar(i));
       form.appendChild(fmComprasBotao('+ Adicionar item',()=>{adicionar().querySelector('input').focus();sec._fmDirty=true;}));
@@ -74,15 +90,16 @@ function fmComprasPainel(o){
       for(const b of M.BASES){const grupo=el('<fieldset class="fmc-ajustes"><legend></legend><div class="fmc-grade"></div></fieldset>');grupo.querySelector('legend').textContent='Base '+b;const grade=grupo.querySelector('.fmc-grade');for(const k of ['frete','desconto']){const c=fmComprasCampo(b+'_'+k,(k==='frete'?'Frete (+)':'Desconto (−)')+' R$',fmComprasValor(estado.ajustes[b][k]));c.querySelector('input').inputMode='decimal';grade.appendChild(c);}ec.appendChild(grupo);}
       ec.appendChild(fmComprasCampo('obs','Observações',estado.obs,'textarea'));form.appendChild(extra);
       ler=()=>{
+        fmComprasObrigatorio(form.querySelector('[name=titulo]'),'o título da lista');
         const valor=k=>form.querySelector('[name='+k+']').value.trim(),l={};for(const k of ['titulo','solicitante','data','prazo','prioridade','situacao','fornecedor','obs'])l[k]=valor(k);
-        l.itens=[...itens.children].map(linha=>{const v=k=>linha.querySelector('[name='+k+']').value.trim(),i={id:linha.dataset.id,descricao:v('descricao'),especificacao:v('especificacao'),quantidade:fmComprasDecimal(v('quantidade'),3,'a quantidade'),unidade:v('unidade'),recebido:linha._recebido};for(const b of M.BASES){const n=fmComprasDecimal(v(b),2,'o preço '+b,true);i[b]=n===null?null:Math.round(n*100);}return i;});
-        l.ajustes=Object.fromEntries(M.BASES.map(b=>[b,Object.fromEntries(['frete','desconto'].map(k=>[k,Math.round(fmComprasDecimal(valor(b+'_'+k),2,k+' '+b)*100)]))]));return l;
+        l.itens=[...itens.children].map((linha,n)=>{const campo=k=>linha.querySelector('[name='+k+']'),v=k=>campo(k).value.trim();fmComprasObrigatorio(campo('descricao'),'a descrição do material '+(n+1));fmComprasObrigatorio(campo('unidade'),'a unidade do material '+(n+1));const i={id:linha.dataset.id,descricao:v('descricao'),especificacao:v('especificacao'),quantidade:fmComprasLerDecimal(campo('quantidade'),3,'a quantidade do material '+(n+1)),unidade:v('unidade'),recebido:linha._recebido};for(const b of M.BASES){const num=fmComprasLerDecimal(campo(b),2,'o preço '+b+' do material '+(n+1),true);i[b]=num===null?null:Math.round(num*100);}return i;});
+        l.ajustes=Object.fromEntries(M.BASES.map(b=>[b,Object.fromEntries(['frete','desconto'].map(k=>[k,Math.round(fmComprasLerDecimal(form.querySelector('[name='+b+'_'+k+']'),2,k+' '+b)*100)]))]));return l;
       };
     }
     const retrato=()=>JSON.stringify([...form.querySelectorAll('input,select,textarea')].map(i=>[i.name,i.value]));const inicial=retrato();
-    form.addEventListener('input',()=>{sec._fmDirty=retrato()!==inicial;});form.addEventListener('change',()=>{sec._fmDirty=retrato()!==inicial;});
+    form.addEventListener('input',evento=>{evento.target.removeAttribute('aria-invalid');evento.target.removeAttribute('aria-describedby');evento.target.parentElement.querySelector('.fmc-campo-erro')?.remove();sec._fmDirty=retrato()!==inicial;});form.addEventListener('change',()=>{sec._fmDirty=retrato()!==inicial;});
     const acoes=el('<div class="fmc-acoes"></div>');acoes.append(el('<button type="submit" class="btn">Salvar '+(recebimento?'recebimento':'lista')+'</button>'),fmComprasBotao('Cancelar edição',()=>{if(!sec._fmDirty||confirm('Descartar as alterações não salvas?'))fechar();}));form.append(e,acoes);
-    form.onsubmit=evento=>{evento.preventDefault();e.hidden=true;try{const entrada=ler(),novos=recebimento?M.receber(dados(),item.id,entrada):M.salvar(dados(),entrada,item?.id,()=>uid());fmComprasGravar(o,novos,base);}catch(ex){e.textContent=ex.message;e.hidden=false;sec._fmDirty=true;return;}fechar();notificarSalvo();};
+    form.onsubmit=evento=>{evento.preventDefault();e.hidden=true;for(const campo of form.querySelectorAll('[aria-invalid]')){campo.removeAttribute('aria-invalid');campo.removeAttribute('aria-describedby');}form.querySelectorAll('.fmc-campo-erro').forEach(ajuda=>ajuda.remove());try{const entrada=ler(),novos=recebimento?M.receber(dados(),item.id,entrada):M.salvar(dados(),entrada,item?.id,()=>uid());fmComprasGravar(o,novos,base);}catch(ex){fmComprasMostrarErro(form,e,ex);sec._fmDirty=true;return;}fechar();notificarSalvo();};
     editor=form;edicao.replaceChildren(form);form.querySelector('input')?.focus();pintar();
   }
   function anexos(l){
@@ -109,7 +126,8 @@ function fmComprasPainel(o){
     visiveis=d.listas.filter(l=>(!s||l.situacao===s)&&(!texto||[l.titulo,l.solicitante,l.fornecedor,...l.itens.map(i=>i.descricao+' '+i.especificacao)].join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes(texto)));
     corpo.replaceChildren();if(!visiveis.length)corpo.appendChild(el('<p class="fmc-vazio">'+(d.listas.length?'Nenhuma lista corresponde aos filtros.':'Crie uma lista com materiais e quantidades. Os preços podem ser preenchidos depois.')+'</p>'));
     for(const l of visiveis){const base=fmComprasBase(o),card=el('<article class="fmc-lista"><div class="fmc-lista-cab"><div><h4></h4><p class="fmc-meta"></p></div><span class="fmc-status"></span></div><p class="fmc-lista-resumo"></p><div class="fmc-acoes"></div><details class="fmc-detalhes fmc-lista-detalhes"><summary>Itens e arquivos</summary><div class="fmc-detalhes-corpo"></div></details></article>');card.dataset.compraId=l.id;card.querySelector('h4').textContent=l.titulo;card.querySelector('.fmc-meta').textContent=[l.solicitante||'Sem solicitante',l.prazo?'Prazo '+fmtDataAno(l.prazo):'Sem prazo',l.prioridade==='alta'?'Alta prioridade':'',l.fornecedor].filter(Boolean).join(' · ');card.querySelector('.fmc-status').textContent=M.ROTULOS[l.situacao]+(M.atrasada(l,hoje())?' · Atrasada':'');
-      card.querySelector('.fmc-lista-resumo').textContent=l.itens.length+' item(ns) · Estimado: '+fmComprasTotalTexto(M.totalLista(l,'estimado'))+' · Cotado: '+fmComprasTotalTexto(M.totalLista(l,'cotado'))+' · Comprado: '+fmComprasTotalTexto(M.totalLista(l,'comprado'));
+      const resumo=card.querySelector('.fmc-lista-resumo');resumo.textContent=l.itens.length+' item(ns) · Solicitação: '+fmtDataAno(l.data);
+      const totais=el('<dl class="fmc-lista-totais"></dl>');for(const b of M.BASES){const grupo=el('<div><dt></dt><dd></dd></div>');grupo.querySelector('dt').textContent=b[0].toUpperCase()+b.slice(1);grupo.querySelector('dd').textContent=fmComprasTotalTexto(M.totalLista(l,b));totais.appendChild(grupo);}resumo.after(totais);
       const acoes=card.querySelector('.fmc-acoes'),edit=fmComprasBotao('Editar',()=>editar(l)),receber=fmComprasBotao('Conferir recebimento',()=>editar(l,true)),cancelar=fmComprasBotao(l.situacao==='cancelado'?'Reativar lista':'Cancelar lista',()=>{
         if(bloqueado())return;const situacao=l.situacao==='cancelado'?(l.itens.every(i=>i.recebido===i.quantidade)?'recebido':l.itens.some(i=>i.recebido>0)?'parcial':'solicitado'):'cancelado';try{fmComprasGravar(o,M.salvar(dados(),{...l,situacao},l.id,()=>uid()),base);pintar();notificarSalvo();}catch(e){erro(e.message);}
       }),imprimir=fmComprasBotao('PDF da lista',()=>exportar([l]));

@@ -31,6 +31,7 @@ function fmDocumentosPainel(o){
   const aviso=el('<p class="fmdoc-aviso" role="status" hidden></p>'),falha=el('<p class="fmdoc-erro" role="alert" hidden></p>');
   const filtros=el('<div class="fmdoc-filtros"></div>'),busca=el('<input type="search" aria-label="Buscar documentos" placeholder="Buscar nome, revisão ou descrição">');
   const chips=el('<div class="fmdoc-chips" role="group" aria-label="Categorias dos documentos"></div>'),situacoes=el('<div class="fmdoc-situacoes" role="group" aria-label="Estado dos documentos"></div>');
+  const categoriaMobile=el('<label class="fmdoc-campo fmdoc-categoria-mobile"><span>Categoria</span><select aria-label="Categoria dos documentos · celular"></select></label>'),seletorCategoria=categoriaMobile.querySelector('select');
   const corpo=el('<div class="fmdoc-lista" aria-live="polite"><p>Carregando…</p></div>'),edicao=el('<div class="fmdoc-edicao"></div>'),contador=el('<p class="fmdoc-contador" role="status"></p>');
   const upload=el('<div class="fmdoc-upload"><div class="fmdoc-upload-campos"></div><button type="button" class="btn ghost fmdoc-solta">Adicionar arquivos</button><input type="file" name="arquivos" multiple hidden><small>Até 25 MB por arquivo. PDF e imagens podem ser abertos; outros formatos ficam disponíveis para baixar.</small></div>');
   const categoriaUpload=fmDocumentosCampo('categoriaUpload','Categoria dos novos arquivos');categoriaUpload.querySelector('input').maxLength=80;
@@ -44,7 +45,8 @@ function fmDocumentosPainel(o){
   function origem(a){const sufixo=String(a.ref||'').slice(('obra:'+o.id).length);if(!sufixo)return 'Obra';if(sufixo.startsWith(':demanda:')){const id=sufixo.slice(9),d=(o.fmDemandas?.itens||[]).find(x=>x.id===id);return 'Demanda: '+(d?.titulo||id)}if(sufixo.startsWith(':compra:')){const id=sufixo.slice(8),c=(o.fmCompras?.listas||[]).find(x=>x.id===id);return 'Compra: '+(c?.titulo||id)}return 'Obra · vínculo anterior'}
   function mapa(){M.validar(o.fmArquivosMetadados);return o.fmArquivosMetadados}
   function atualizarChips(){
-    chips.replaceChildren();for(const categoria of ['',...M.categorias(mapa())]){const b=fmDocumentosBotao(categoria||'Todas',()=>{filtrosAtuais.categoria=categoria;pintar()},'');b.setAttribute('aria-pressed',String(categoria===filtrosAtuais.categoria));chips.appendChild(b)}
+    const categorias=M.categorias(mapa());if(filtrosAtuais.categoria&&!categorias.includes(filtrosAtuais.categoria))categorias.push(filtrosAtuais.categoria);
+    chips.replaceChildren();seletorCategoria.replaceChildren();for(const categoria of ['',...categorias]){const b=fmDocumentosBotao(categoria||'Todas',()=>{filtrosAtuais.categoria=categoria;pintar()},'');b.setAttribute('aria-pressed',String(categoria===filtrosAtuais.categoria));chips.appendChild(b);const opcao=el('<option></option>');opcao.value=categoria;opcao.textContent=categoria||'Todas as categorias';if(categoria===filtrosAtuais.categoria)opcao.setAttribute('selected','');seletorCategoria.appendChild(opcao)}
     situacoes.replaceChildren();for(const [valor,titulo] of [[false,'Em acompanhamento'],[true,'Arquivados']]){const b=fmDocumentosBotao(titulo,()=>{filtrosAtuais.arquivados=valor;pintar()},'');b.setAttribute('aria-pressed',String(valor===filtrosAtuais.arquivados));situacoes.appendChild(b)}
   }
   function conferirObra(){if(!E.obras.includes(o))throw Error('Esta obra foi atualizada. Reabra a ficha para continuar.')}
@@ -61,10 +63,10 @@ function fmDocumentosPainel(o){
     grade.appendChild(anterior);form.append(fmDocumentosCategoriaRapida(categoria),grade,fmDocumentosCampo('descricao','Descrição',meta.descricao,'textarea'));const notaVersoes=el('<p class="fmdoc-versao-nota">Cada versão mantém seu arquivo original. O vínculo organiza a sequência sem substituir conteúdo.</p>');form.appendChild(notaVersoes);const e=el('<p class="fmdoc-erro" role="alert" hidden></p>'),acoes=el('<div class="fmdoc-acoes"></div>');
     const submit=el('<button type="submit" class="btn">Salvar classificação</button>');
     const ler=()=>Object.fromEntries(['categoria','titulo','descricao','revisao','dataDocumento','versaoAnteriorId'].map(k=>[k,form.querySelector('[name='+k+']').value]));const inicial=JSON.stringify(ler());
-    const fechar=()=>{sec._fmDirty=false;editor=null;edicao.replaceChildren();pintar()};
+    const fechar=()=>{sec._fmDirty=false;editor=null;edicao.replaceChildren();pintar();const item=[...corpo.querySelectorAll('[data-arquivo-id]')].find(x=>x.dataset.arquivoId===a.id);item?.querySelector('.fmdoc-classificar')?.focus({preventScroll:true})};
     acoes.append(submit,fmDocumentosBotao('Cancelar',()=>{if(!sec._fmDirty||confirm('Descartar a classificação não salva?'))fechar()}));form.append(e,acoes);
     const marcou=()=>{sec._fmDirty=JSON.stringify(ler())!==inicial};form.addEventListener('input',marcou);form.addEventListener('change',marcou);
-    form.onsubmit=evento=>{evento.preventDefault();e.hidden=true;try{fmDocumentosGravar(o,a.id,ler(),base)}catch(ex){e.textContent=ex.message;e.hidden=false;sec._fmDirty=true;return}fechar();notificar(salvarMensagem)};
+    form.onsubmit=evento=>{evento.preventDefault();e.hidden=true;try{fmDocumentosGravar(o,a.id,ler(),base)}catch(ex){e.textContent=ex.message;e.hidden=false;e.tabIndex=-1;e.focus();sec._fmDirty=true;return}fechar();notificar(salvarMensagem)};
     editor=form;edicao.replaceChildren(form);form.querySelector('[name=categoria]').focus();pintar();
   }
   async function abrir(a,baixar){
@@ -80,13 +82,14 @@ function fmDocumentosPainel(o){
     for(const a of visiveis){
       const meta=a.meta,item=el('<article class="fmdoc-item"><div class="fmdoc-item-texto"><h4></h4><p class="fmdoc-item-nome"></p><p class="fmdoc-item-meta"></p><p class="fmdoc-item-descricao"></p></div><div class="fmdoc-item-acoes"></div></article>');item.dataset.arquivoId=a.id;
       item.querySelector('h4').textContent=meta.titulo||a.nome;const nome=item.querySelector('.fmdoc-item-nome');nome.textContent=meta.titulo?a.nome:'';nome.hidden=!meta.titulo;
-      item.querySelector('.fmdoc-item-meta').textContent=[meta.categoria||'Sem categoria',meta.revisao?'Revisão '+meta.revisao:'',meta.dataDocumento?'Documento de '+fmtDataAno(meta.dataDocumento):'',a.em?'Anexado em '+fmtDataAno(a.em):'',a.origem,tamanho(a.tam||0),a.tipo||'Tipo não informado',a.pendente?'Pendente · neste aparelho':'Na nuvem'].filter(Boolean).join(' · ');
+      const metaNo=item.querySelector('.fmdoc-item-meta');
+      for(const [classe,texto] of [['categoria',meta.categoria||'Sem categoria'],['revisao',meta.revisao?'Revisão '+meta.revisao:''],['data',meta.dataDocumento?'Documento de '+fmtDataAno(meta.dataDocumento):''],['data',a.em?'Anexado em '+fmtDataAno(a.em):''],['origem',a.origem],['formato',tamanho(a.tam||0)+' · '+(a.tipo||'Tipo não informado')],['envio',a.pendente?'Pendente · neste aparelho':'Na nuvem']]){if(!texto)continue;const parte=el('<span></span>');parte.className='fmdoc-meta-'+classe;parte.textContent=texto;metaNo.append(parte,document.createTextNode(' '))}
       const descricao=item.querySelector('.fmdoc-item-descricao');descricao.textContent=meta.descricao||'';descricao.hidden=!meta.descricao;
       const acoes=item.querySelector('.fmdoc-item-acoes');const podeAbrir=/^(application\/pdf|image\/(png|jpeg|webp|gif|bmp))$/i.test(a.tipo||'');
       if(podeAbrir){const b=fmDocumentosBotao('Abrir',()=>abrir(a,false));b.classList.add('fmdoc-abrir');b.setAttribute('aria-label','Abrir '+a.nome);acoes.appendChild(b)}
       else{const nota=el('<small class="fmdoc-formato"></small>');nota.textContent='Disponível para baixar';acoes.appendChild(nota)}
       const baixar=fmDocumentosBotao('Baixar',()=>abrir(a,true));baixar.classList.add('fmdoc-baixar');baixar.setAttribute('aria-label','Baixar '+a.nome);
-      const classificar=fmDocumentosBotao('Classificar',()=>editar(a));classificar.setAttribute('aria-label','Classificar '+a.nome);classificar.disabled=!!editor||enviando;
+      const classificar=fmDocumentosBotao('Classificar',()=>editar(a));classificar.classList.add('fmdoc-classificar');classificar.setAttribute('aria-label','Classificar '+a.nome);classificar.disabled=!!editor||enviando;
       const arquivar=fmDocumentosBotao(meta.arquivado?'Desarquivar':'Arquivar',()=>{try{conferirObra();fmDocumentosGravar(o,a.id,{arquivado:!meta.arquivado});notificar(salvarMensagem);pintar()}catch(e){erro(e.message)}});arquivar.setAttribute('aria-label',(meta.arquivado?'Desarquivar ':'Arquivar ')+a.nome);arquivar.disabled=!!editor||enviando;
       acoes.append(baixar,classificar,arquivar);
       if(meta.versaoAnteriorId){const anterior=arquivos.find(x=>x.id===meta.versaoAnteriorId),nota=el('<p class="fmdoc-versao-nota"></p>');nota.textContent=anterior?'Versão anterior: '+(M.metadados(m,anterior.id).titulo||anterior.nome):'Versão anterior indisponível nesta consulta';item.querySelector('.fmdoc-item-texto').appendChild(nota);if(anterior){const abre=/^(application\/pdf|image\/(png|jpeg|webp|gif|bmp))$/i.test(anterior.tipo||'');acoes.appendChild(fmDocumentosBotao(abre?'Abrir versão anterior':'Baixar versão anterior',()=>abrir(anterior,!abre)))}}
@@ -136,7 +139,7 @@ function fmDocumentosPainel(o){
     catch(e){falhaEnvio='Não foi possível concluir o envio dos arquivos pendentes desta obra.'}
     finally{enviando=false;sec._fmDirty=false;await atualizar();if(falhaEnvio)erro(falhaEnvio)}
   });pendentes.hidden=true;pendentes.title='Envia somente os anexos desta obra pendentes neste aparelho.';
-  cab.querySelector('.fmdoc-acoes').append(refresh,pendentes,pdf);filtros.append(busca,situacoes,chips);
+  cab.querySelector('.fmdoc-acoes').append(refresh,pendentes,pdf);filtros.append(busca,situacoes,categoriaMobile,chips);seletorCategoria.onchange=()=>{filtrosAtuais.categoria=seletorCategoria.value;pintar()};
   upload.querySelector('.fmdoc-upload-campos').append(categoriaUpload,fmDocumentosCategoriaRapida(categoriaUpload));try{fmDocumentosSugestoes(categoriaUpload,mapa())}catch(e){}
   const solta=upload.querySelector('.fmdoc-solta'),inp=upload.querySelector('[name=arquivos]');solta.onclick=()=>inp.click();inp.onchange=()=>{receber([...inp.files]);inp.value=''};
   solta.addEventListener('dragover',e=>{e.preventDefault();solta.classList.add('fmdoc-sobre')});solta.addEventListener('dragleave',()=>solta.classList.remove('fmdoc-sobre'));solta.addEventListener('drop',e=>{e.preventDefault();solta.classList.remove('fmdoc-sobre');if(!solta.disabled)receber([...e.dataTransfer.files])});

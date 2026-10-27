@@ -264,3 +264,11 @@
   .fortemais-fluida .fm-orcamento tr.fm-linha-custo { background:var(--bg); }
   .fortemais-fluida .fm-orcamento tr.fm-linha-lucro { background:var(--sucesso-cl); }
 }
+
+@media screen and (max-width:480px){
+ /* Cada campo financeiro mantém seu rótulo e seu valor completos. */
+ .fortemais-fluida .fm-previsao .fm-tabela:not(.fm-orcamento).tabela-adaptavel>tbody>tr{grid-template-columns:minmax(0,1fr);gap:6px}
+ .fortemais-fluida .fm-previsao .tabela-adaptavel>tbody>tr>td::before{font-size:12px;margin-bottom:3px}
+ .fortemais-fluida .fm-previsao .tabela-adaptavel>tbody>tr>td{font-size:14px}
+ .fortemais-fluida .fm-previsao .tabela-adaptavel .btn{min-height:44px;font-size:13px}
+}

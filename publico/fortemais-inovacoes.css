@@ -31,3 +31,13 @@
 .fmi-campo textarea{resize:vertical;min-height:85px}.fmi-form-grade{display:grid;grid-template-columns:1fr 1fr;gap:12px}.fmi-form-acoes{display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid var(--linha);padding-top:12px}.fmi-form-acoes .btn{min-height:42px}
 @media(max-width:700px){.fmi-cab{align-items:flex-start;flex-wrap:wrap}.fmi-cab .btn,.fm-visoes .btn,.fmi-situacoes .btn,.fmi-filtros .btn,.fmi-item-acoes .btn{min-height:44px}.fmi-editor{padding:14px}.fmi-campo input,.fmi-campo textarea,.fmi-campo select{font-size:16px}.fmi-form-grade{grid-template-columns:1fr}.fmi-filtros{display:grid;grid-template-columns:1fr}.fmi-item{display:block;padding:0 12px}.fmi-item-acoes{padding:0 0 12px}.fmi-item-titulo{font-size:14px}.fmi-vazio{padding:17px 14px}}
 @media print{.fm-visoes,.fmi-situacoes,.fmi-filtros,.fmi-cab>.btn,.fmi-item-acoes{display:none!important}.fmi-item{break-inside:avoid}}
+
+@media screen and (max-width:700px){
+ .fmi-filtros input,.fmi-filtros select{font-size:16px;min-height:44px;box-sizing:border-box}
+ .fmi-item-meta,.fmi-item-corpo dt,.fmi-expandir,.fmi-historico li>span{font-size:12px}
+ .fmi-item-meta>*{min-width:0;max-width:100%;overflow-wrap:anywhere}
+ .fmi-historico summary{min-height:44px;display:flex;align-items:center;gap:6px}
+ .fmi-historico summary::before{content:'▸'}.fmi-historico[open] summary::before{content:'▾'}
+ .fmi-form-acoes .btn{min-height:44px;flex:1;white-space:normal}
+ .fmi-cab h2,.fmi-cab p,.fmi-erro,.fmi-aviso{overflow-wrap:anywhere}
+}

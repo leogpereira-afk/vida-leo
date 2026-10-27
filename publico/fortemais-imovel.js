@@ -34,7 +34,7 @@ function fmImovelPainel(o){
   const upload=el('<div class="fmim-upload"><div class="fmim-grade"></div><div class="fmim-acoes"></div><input type="file" name="fotosUpload" accept="image/jpeg,image/png,image/webp,image/gif,image/bmp" multiple hidden><small class="fmim-nota">JPEG, PNG, WebP, GIF ou BMP. Até 25 MB por arquivo. Os originais são preservados.</small></div>');
   upload.querySelector('.fmim-grade').append(fmImovelCampo('tipoUpload','Tipo das novas imagens','','select',[['','Não informado'],...Object.entries(M.TIPOS)]),fmImovelCampo('usoUpload','Uso das novas imagens','','select',[['','Não informado'],...Object.entries(M.USOS)]));
   const contador=el('<p class="fmim-nota" role="status"></p>'),fotos=el('<div class="fmim-fotos" aria-live="polite"></div>');
-  let arquivos=[],carregando=true,enviando=false,editor=null,pendente=null,geracao=0,render=0,arquivados=false,nuvemDisponivel=false,localDisponivel=false;
+  let arquivos=[],carregando=true,enviando=false,editor=null,pendente=null,retornoEditor=null,geracao=0,render=0,arquivados=false,nuvemDisponivel=false,localDisponivel=false;
   const urls=new Set();
   const avisar=t=>{aviso.textContent=t;aviso.hidden=!t},erro=t=>{falha.textContent=t;falha.hidden=!t};
   const salvo='Salvo neste navegador. Acompanhe a sincronização no topo da Central.';
@@ -52,28 +52,29 @@ function fmImovelPainel(o){
     const textos=cadastro.querySelector('.fmim-textos dl');textos.replaceChildren();for(const [k,t] of Object.entries(rotulos))linha(k==='responsavel'||M.NUMEROS.includes(k)?dl:textos,t,d[k],!M.NUMEROS.includes(k));
     editarCadastro.disabled=ocupado();editarBase.disabled=ocupado();
   }
-  function fecharEditor(){editor=null;edicao.replaceChildren();marcar();ficha();pintar()}
+  function fecharEditor(){const retorno=retornoEditor;editor=null;retornoEditor=null;edicao.replaceChildren();marcar();ficha();pintar();retorno?.()?.focus({preventScroll:true})}
   function formulario(titulo,campos,ler,gravar){
     if(ocupado()){avisar('Salve ou cancele a edição em andamento.');return null}
     const f=el('<form class="fmim-editor"></form>'),h=el('<h4></h4>'),e=el('<p class="fmim-erro" role="alert" hidden></p>'),ac=el('<div class="fmim-acoes"></div>');h.textContent=titulo;f.append(h,campos,e,ac);
     const salvarBotao=el('<button type="submit" class="btn">Salvar alterações</button>');
     ac.append(salvarBotao,fmImovelBotao('Cancelar',()=>{if(!f._alterado||confirm('Descartar as alterações não salvas?'))fecharEditor()}));
     const inicial=JSON.stringify(ler(f));f._alterado=false;const mudou=()=>{f._alterado=JSON.stringify(ler(f))!==inicial;marcar()};f.addEventListener('input',mudou);f.addEventListener('change',mudou);
-    f.onsubmit=ev=>{ev.preventDefault();e.hidden=true;try{gravar(ler(f))}catch(ex){e.textContent=ex.message;e.hidden=false;f._alterado=true;marcar();return}fecharEditor();avisar(salvo)};
+    f.onsubmit=ev=>{ev.preventDefault();e.hidden=true;try{gravar(ler(f))}catch(ex){e.textContent=ex.message;e.hidden=false;e.tabIndex=-1;e.focus();f._alterado=true;marcar();return}fecharEditor();avisar(salvo)};
     editor=f;edicao.replaceChildren(f);f.querySelector('input,textarea,select')?.focus();ficha();pintar();return f;
   }
   function editarDados(){
     let d;try{d=conferir()}catch(e){erro(e.message);return}const base=fmImovelBase(o),campos=el('<div class="fmim-grade"></div>');
-    for(const [k,t] of Object.entries(rotulos)){const c=fmImovelCampo(k,t,d[k],M.NUMEROS.includes(k)?'number':k==='responsavel'?'text':'textarea');campos.appendChild(c)}
-    formulario('Editar características e descrição',campos,f=>Object.fromEntries(Object.keys(rotulos).map(k=>[k,f.querySelector('[name='+k+']').value])),v=>fmImovelGravar(o,M.cadastro(base.referencia,v),base));
+    const numeros=el('<fieldset class="fmim-numeros"><legend>Composição do imóvel</legend><div></div></fieldset>');
+    for(const [k,t] of Object.entries(rotulos)){const c=fmImovelCampo(k,t,d[k],M.NUMEROS.includes(k)?'number':k==='responsavel'?'text':'textarea');if(M.NUMEROS.includes(k))numeros.lastElementChild.appendChild(c);else{if(k==='responsavel')c.classList.add('fmim-largo');campos.appendChild(c);if(k==='responsavel')campos.appendChild(numeros)}}
+    if(formulario('Editar características e descrição',campos,f=>Object.fromEntries(Object.keys(rotulos).map(k=>[k,f.querySelector('[name='+k+']').value])),v=>fmImovelGravar(o,M.cadastro(base.referencia,v),base)))retornoEditor=()=>editarCadastro;
   }
   function editarFoto(a){
     let d;try{d=conferir()}catch(e){erro(e.message);return}const m=d.fotos?.[a.id]||{},base=fmImovelBase(o),campos=el('<div class="fmim-grade"></div>');
-    const nota=el('<p class="fmim-nota"></p>');nota.textContent=a.nome;campos.appendChild(nota);
+    const nota=el('<p class="fmim-nota fmim-largo"></p>');nota.textContent=a.nome;campos.appendChild(nota);
     for(const [k,t] of [['legenda','Legenda'],['data','Data da imagem'],['etapa','Etapa'],['ambiente','Ambiente']])campos.appendChild(fmImovelCampo(k,t,m[k],k==='data'?'date':k==='legenda'?'textarea':'text'));
     campos.append(fmImovelCampo('tipo','Tipo da imagem',m.tipo,'select',[['','Não informado'],...Object.entries(M.TIPOS)]),fmImovelCampo('uso','Uso da imagem',m.uso,'select',[['','Não informado'],...Object.entries(M.USOS)]));
     const ler=f=>Object.fromEntries(['legenda','data','etapa','ambiente','tipo','uso'].map(k=>[k,f.querySelector('[name='+k+']').value]));
-    formulario('Classificar imagem',campos,ler,v=>fmImovelGravar(o,M.foto(base.referencia,a.id,v),base));
+    if(formulario('Classificar imagem',campos,ler,v=>fmImovelGravar(o,M.foto(base.referencia,a.id,v),base)))retornoEditor=()=>[...fotos.querySelectorAll('[data-foto-id]')].find(x=>x.dataset.fotoId===a.id)?.querySelector('.fmim-classificar');
   }
   async function abrir(a,baixar){
     let janela;if(!baixar){janela=window.open('','_blank');if(!janela){erro('Permita a abertura de uma nova aba e tente novamente. Seu rascunho continua aqui.');return}janela.opener=null}
@@ -97,11 +98,11 @@ function fmImovelPainel(o){
       item.querySelector('.fmim-foto-contexto').textContent=[m.data?'Imagem de '+fmtDataAno(m.data):'',m.etapa?'Etapa: '+m.etapa:'',m.ambiente?'Ambiente: '+m.ambiente:''].filter(Boolean).join(' · ');
       item.querySelector('.fmim-foto-estado').textContent=[a.nome,a.em?'Anexada em '+fmtDataAno(a.em):'',a.envioAConferir?'Envio a conferir':a.pendente?'Pendente · neste aparelho':'Na nuvem'].filter(Boolean).join(' · ');
       if(a.id===d.capaId){const selo=el('<span class="fmim-selo">Capa da obra</span>');item.querySelector('.fmim-foto-corpo').prepend(selo)}
-      const ac=item.querySelector('.fmim-acoes');for(const [titulo,fn,mutacao] of [['Abrir',()=>abrir(a,false),false],['Baixar original',()=>abrir(a,true),false],['Classificar',()=>editarFoto(a),true],...(!m.arquivado?[[a.id===d.capaId?'Remover capa':'Usar como capa',()=>{try{conferir();fmImovelGravar(o,M.capa(o.fmImovel,a.id===d.capaId?null:a.id));avisar(salvo);pintar()}catch(e){erro(e.message)}},true]]:[]),[m.arquivado?'Desarquivar':'Arquivar',()=>{try{conferir();fmImovelGravar(o,M.foto(o.fmImovel,a.id,{arquivado:!m.arquivado}));avisar(salvo);pintar()}catch(e){erro(e.message)}},true]]){const b=fmImovelBotao(titulo,fn);b.disabled=mutacao&&ocupado();b.setAttribute('aria-label',titulo+' '+a.nome);ac.appendChild(b)}
+      const ac=item.querySelector('.fmim-acoes');for(const [titulo,fn,mutacao] of [['Abrir',()=>abrir(a,false),false],['Baixar original',()=>abrir(a,true),false],['Classificar',()=>editarFoto(a),true],...(!m.arquivado?[[a.id===d.capaId?'Remover capa':'Usar como capa',()=>{try{conferir();fmImovelGravar(o,M.capa(o.fmImovel,a.id===d.capaId?null:a.id));avisar(salvo);pintar()}catch(e){erro(e.message)}},true]]:[]),[m.arquivado?'Desarquivar':'Arquivar',()=>{try{conferir();fmImovelGravar(o,M.foto(o.fmImovel,a.id,{arquivado:!m.arquivado}));avisar(salvo);pintar()}catch(e){erro(e.message)}},true]]){const b=fmImovelBotao(titulo,fn);if(titulo==='Classificar')b.classList.add('fmim-classificar');b.disabled=mutacao&&ocupado();b.setAttribute('aria-label',titulo+' '+a.nome);ac.appendChild(b)}
       fotos.appendChild(item);miniatura(a,item.querySelector('.fmim-miniatura'),g);
     }
     contador.textContent=carregando?'Consultando arquivos…':visiveis.length+' imagem(ns) '+(arquivados?'arquivada(s)':'nesta visão')+(!nuvemDisponivel||!localDisponivel?' · consulta incompleta':'');
-    atualizarBotao.disabled=ocupado()||carregando;adicionar.disabled=ocupado()||carregando;inp.disabled=adicionar.disabled;for(const i of upload.querySelectorAll('select'))i.disabled=adicionar.disabled;
+    atualizarBotao.disabled=ocupado()||carregando;adicionar.disabled=ocupado()||carregando;adicionar.textContent=enviando?'Enviando imagens…':'Adicionar imagens';adicionar.setAttribute('aria-busy',String(enviando));inp.disabled=adicionar.disabled;for(const i of upload.querySelectorAll('select'))i.disabled=adicionar.disabled;
     enviarPendentes.hidden=!arquivos.some(a=>a.pendente);enviarPendentes.disabled=ocupado()||carregando;ficha();
   }
   async function atualizar(){
