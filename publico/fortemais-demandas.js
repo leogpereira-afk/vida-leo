@@ -35,6 +35,7 @@ function fmDemandasResumo(o) {
   return c;
 }
 function fmDemandasAtualizarResumo(o) {
+  if(typeof fmObrasAtualizarResumo==='function')fmObrasAtualizarResumo(o);
   document.querySelectorAll('[data-fmd-obra-summary]').forEach(no=>{if(no.dataset.fmdObraSummary===String(o.id))no.replaceWith(fmDemandasResumo(o));});
 }
 function fmDemandasBotao(texto,fn,estilo='ghost') {

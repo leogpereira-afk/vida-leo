@@ -674,7 +674,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-compacto.css?v=0a97e1fae61a">
 <link rel="stylesheet" href="./fortemais-inovacoes.css?v=be85f228f8ae">
 <link rel="stylesheet" href="./fortemais-ferramentas.css?v=b73b01e6fcca">
-<link rel="stylesheet" href="./fortemais-documentos.css?v=c4422b74e990">
+<link rel="stylesheet" href="./fortemais-documentos.css?v=60740c1c4686">
 <link rel="stylesheet" href="./fortemais-obras-moderno.css?v=2fbc3e7b4e73">
 <link rel="stylesheet" href="./donboy-painel.css?v=05a4255f7b34">
 <link rel="stylesheet" href="donboy-email.css?v=ed0e5b4334e2">
@@ -691,6 +691,9 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./central-mobile.css?v=48cfe554c15f">
 <link rel="stylesheet" href="./documentos-chips.css?v=5ed1e3ee6eeb">
 <link rel="stylesheet" href="./fortemais-calculos.css?v=905056bd8e68">
+<link rel="stylesheet" href="./fortemais-compras.css?v=32af1d2a7cb5">
+<link rel="stylesheet" href="./fortemais-imovel.css?v=f4ab4e4e6cce">
+<link rel="stylesheet" href="./fortemais-obras-dashboard.css?v=a33af7b48b2f">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -735,7 +738,7 @@ tr:hover .lixo{opacity:1}
 <script src="./organograma.js?v=3a5db1c22c87"></script>
 <script src="./fortemais-financeiro.js?v=48296dd2f793"></script>
 <script src="./fortemais-demandas-modelo.js?v=e2ba946c28ef"></script>
-<script src="./fortemais-demandas.js?v=be177dcfa8dd"></script>
+<script src="./fortemais-demandas.js?v=42cc60a6aad4"></script>
 <script src="./fortemais-inovacoes-modelo.js?v=365393461781"></script>
 <script src="./fortemais-inovacoes.js?v=c954cd746480"></script>
 <script src="./fortemais-ferramentas-modelo.js?v=72364381d62b"></script>
@@ -745,9 +748,14 @@ tr:hover .lixo{opacity:1}
 <script src="./fortemais-materiais.js?v=b15804e824ee"></script>
 <script src="./fortemais-ferramentas-conhecimento.js?v=76e2ad72f9ac"></script>
 <script src="./fortemais-ferramentas.js?v=abb591594c00"></script>
-<script src="./fortemais-documentos-modelo.js?v=e1839cfeccdb"></script>
-<script src="./fortemais-documentos.js?v=fc5f80ca53c6"></script>
+<script src="./fortemais-documentos-modelo.js?v=dc689335ec6a"></script>
+<script src="./fortemais-documentos.js?v=3dd31ba183be"></script>
 <script src="./fortemais-pdf.js?v=27455f7f3e11"></script>
+<script src="./fortemais-compras-modelo.js?v=2a003a8142ef"></script>
+<script src="./fortemais-compras.js?v=a981deb2a3d9"></script>
+<script src="./fortemais-imovel-modelo.js?v=744e87d6d831"></script>
+<script src="./fortemais-imovel.js?v=1b75b27bcbc7"></script>
+<script src="./fortemais-obras-dashboard.js?v=d8bd2eac5e6f"></script>
 <script src="openclaw-fila.js?v=066cb079a2b5"></script>
 <script src="./saude-comparacao.js?v=c7876474a532"></script>
 <script src="./leonardo-design.js?v=724c803cb14a"></script>
@@ -6294,9 +6302,11 @@ async function fmObraExcluir(o,concluir=()=>tela()){
   if(!E.obras.includes(o)){alert('Este projeto foi atualizado. Abra a lista novamente.');return}
   if(!confirm('Excluir o projeto “'+(o.nome||'Sem nome')+'”?\n\nSerão removidos o cadastro, as previsões, os sócios da previsão, os fluxos previstos, os custos, os aportes, as demandas, seu histórico e os anexos deste projeto. Esta ação não pode ser desfeita.'))return;
   fmExclusoes.add(o.id);const estado=E, demandasAntes=JSON.stringify(o.fmDemandas);
-  const demandasMudaram=()=>JSON.stringify(o.fmDemandas)!==demandasAntes;
+  const comprasAntes=JSON.stringify(o.fmCompras),imovelAntes=JSON.stringify(o.fmImovel);
+  const demandasMudaram=()=>JSON.stringify(o.fmDemandas)!==demandasAntes||JSON.stringify(o.fmCompras)!==comprasAntes||JSON.stringify(o.fmImovel)!==imovelAntes;
   try{
     if(!await apagarAnexosDe('obra:'+o.id))return;
+    for(const lista of o.fmCompras?.listas||[]){if(E!==estado||!E.obras.includes(o)||demandasMudaram())throw Error('os dados da obra mudaram durante a exclusão');if(!await apagarAnexosDe('obra:'+o.id+':compra:'+lista.id))return;}
     for(const demanda of FortemaisDemandasModelo.dados(o).itens){
       if(E!==estado||!E.obras.includes(o)||demandasMudaram())throw Error('os dados da obra mudaram durante a exclusão');
       if(!await apagarAnexosDe('obra:'+o.id+':demanda:'+demanda.id))return;
@@ -6523,14 +6533,28 @@ function fmObraToolbar(o,paginas,documentos,opcoes={}){
 }
 function fmPrevAbas(c,o,opcoes={}){
   const existente=el('<div class="fm-conteudo" data-fm-pagina="realizado"></div>');while(c.firstChild)existente.appendChild(c.firstChild);
-  const prev=fmPrevPainel(o),roi=fmRetornoPainel(o,'roi'),tir=fmRetornoPainel(o,'tir'),demandas=fmDemandasPainel(o),documentos=fmDocumentosPainel(o);
-  for(const [id,p] of [['previsao',prev],['roi',roi],['tir',tir],['demandas',demandas],['documentos',documentos]]){p.classList.add('fm-conteudo');p.dataset.fmPagina=id}
-  const nav=el('<nav class="fm-tabs" aria-label="Dados da obra"></nav>'),paginas=[prev,roi,tir,existente,demandas,documentos];
-  filtro.fmAbas=filtro.fmAbas||{};const ativar=id=>{const sujo=paginas.find(p=>!p.hidden&&p._fmDirty);if(sujo&&sujo.dataset.fmPagina!==id){alert('Salve ou cancele as alterações antes de trocar de aba.');return}filtro.fmAbas[o.id]=id;paginas.forEach(p=>p.hidden=p.dataset.fmPagina!==id);nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.pagina===id)))};
-  for(const [id,nome] of [['previsao','Previsão de lucro'],['roi','ROI'],['tir','TIR'],['demandas','Demandas e etapas'],['documentos','Projetos e documentos'],['realizado','Realizado e histórico']]){const b=acao(nome,()=>ativar(id),'ghost');b.dataset.pagina=id;nav.appendChild(b)}
-  c.append(fmObraToolbar(o,paginas,documentos,opcoes),fmObraResumo(o),nav,...paginas);const id=filtro.fmAbas[o.id];ativar(id==='retorno'?'roi':['previsao','roi','tir','realizado','demandas','documentos'].includes(id)?id:'previsao');
-  prepararTabelas(c);
-  return {paginas,realizado:existente,documentos};
+  const prev=fmPrevPainel(o),roi=fmRetornoPainel(o,'roi'),tir=fmRetornoPainel(o,'tir'),demandas=fmDemandasPainel(o),documentos=fmDocumentosPainel(o),compras=fmComprasPainel(o),imovel=fmImovelPainel(o);
+  const nav=el('<nav class="fm-tabs fmhub-tabs" aria-label="Áreas da obra"></nav>'),financeiro=el('<nav class="fm-tabs fm-financeiro-tabs" aria-label="Dados financeiros da obra"></nav>');
+  let dashboard;const paginas=[prev,roi,tir,existente,demandas,documentos,compras,imovel],financeiras=['previsao','roi','tir','realizado'];
+  filtro.fmAbas=filtro.fmAbas||{};filtro.fmFinanceiroAbas=filtro.fmFinanceiroAbas||{};
+  const ativar=destino=>{
+    const id=destino==='financeiro'?(filtro.fmFinanceiroAbas[o.id]||'previsao'):destino;
+    const sujo=paginas.find(p=>!p.hidden&&p._fmDirty);if(sujo&&sujo.dataset.fmPagina!==id){alert('Salve ou cancele as alterações antes de trocar de aba.');return}
+    filtro.fmAbas[o.id]=id;if(financeiras.includes(id))filtro.fmFinanceiroAbas[o.id]=id;
+    paginas.forEach(p=>p.hidden=p.dataset.fmPagina!==id);financeiro.hidden=!financeiras.includes(id);
+    nav.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.pagina===(financeiras.includes(id)?'financeiro':id))));
+    financeiro.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.pagina===id)));
+    if(id==='dashboard')dashboard.atualizar();
+    if(id==='documentos')documentos.atualizar();
+    if(id==='imovel')imovel.atualizar();
+  };
+  dashboard=fmObrasDashboard(o,ativar);paginas.unshift(dashboard);
+  for(const [id,p] of [['dashboard',dashboard],['previsao',prev],['roi',roi],['tir',tir],['demandas',demandas],['documentos',documentos],['compras',compras],['imovel',imovel]]){p.classList.add('fm-conteudo');p.dataset.fmPagina=id}
+  for(const [id,nome] of [['dashboard','Visão geral'],['financeiro','Financeiro'],['compras','Compras'],['documentos','Documentos'],['imovel','Fotos e descrição'],['demandas','Demandas e etapas']]){const b=acao(nome,()=>ativar(id),'ghost');b.dataset.pagina=id;nav.appendChild(b)}
+  for(const [id,nome] of [['previsao','Previsão de lucro'],['roi','ROI'],['tir','TIR'],['realizado','Realizado e histórico']]){const b=acao(nome,()=>ativar(id),'ghost');b.dataset.pagina=id;financeiro.appendChild(b)}
+  c.append(fmObraToolbar(o,paginas,documentos,opcoes),fmObraResumo(o),nav,financeiro,...paginas);
+  const id=filtro.fmAbas[o.id];ativar(id==='retorno'?'roi':['dashboard','previsao','roi','tir','realizado','demandas','documentos','compras','imovel'].includes(id)?id:'dashboard');
+  prepararTabelas(c);return {paginas,realizado:existente,documentos};
 }
 
 /* ---------------- a tela ---------------- */
@@ -6540,7 +6564,7 @@ function vMarketing(m){
 async function vFortemais(m){
   m.classList.add('fortemais-fluida');const r=rr('fortemais');
   const vista=Symbol('fortemais');m._fmVista=vista;
-  m.appendChild(el('<header class="fm-marca-topo"><div class="fm-marca-logo"><img src="fortemais-logo.png" width="220" height="49" alt="Fortemais Construtora"></div><div><h1>Obras e investimentos</h1><p>Planeje cada imóvel, seus custos e a participação dos sócios.</p></div></header>'));
+  m.appendChild(el('<header class="fm-marca-topo"><div class="fm-marca-logo"><img src="fortemais-logo.png" width="220" height="49" alt="Fortemais Construtora"></div><div><h1>Obras e investimentos</h1><p>Acompanhe cada obra, suas compras, documentos, fotos e resultados.</p></div></header>'));
   const visao=['inovacoes','ferramentas','dicas'].includes(filtro.fmVisao)?filtro.fmVisao:'obras';
   m.appendChild(fmInovacoesNavegacao(m,visao,r));
   if(visao==='inovacoes'){m.appendChild(fmInovacoesPainel());return}
@@ -6569,20 +6593,23 @@ async function vFortemais(m){
   m.appendChild(painel(busca,'Ano',
     seletor(filtro.fmAno,[['todas','Todas'],...(temAberta?[['aberto','Em aberto']]:[]),...anos.map(a2=>[a2,a2])],
       v=>{if(!fmPodeNavegar(m)){m.querySelector('select[aria-label="Ano das obras"]').value=filtro.fmAno;return}filtro.fmAno=v;r()},'Ano das obras'),
+    seletor(filtro.fmStatus||'todas',[['todas','Todos os status'],...[...new Set([...CFG('statusObra'),...E.obras.map(o=>o.status||'Em planejamento'),'Em planejamento','Em andamento','Vendida','Concluída'])].map(v=>[v,v])],v=>{if(!fmPodeNavegar(m)){m.querySelector('select[aria-label="Situação das obras"]').value=filtro.fmStatus||'todas';return}filtro.fmStatus=v;r()},'Situação das obras'),
     acao('+ Nova obra',novaObra),'|'));
 
   const visiveis=contas.filter(x=>{
+    if(filtro.fmStatus&&filtro.fmStatus!=='todas'&&(x.o.status||'Em planejamento')!==filtro.fmStatus)return false;
     const an=anoDe(x.o);if(filtro.fmBusca&&!normaliza([x.o.nome,x.o.endereco,x.o.empresa].join(' ')).includes(normaliza(filtro.fmBusca)))return false;
     if(filtro.fmAno==='todas')return true;
     if(filtro.fmAno==='aberto')return !an;
     return an===filtro.fmAno;
   });
 
+  m.appendChild(fmDashboardCarteira(visiveis.map(x=>x.o)));
   const oc=el('<div class="corpo" style="padding-top:2px"></div>');
   if(!E.obras.length){
-    oc.appendChild(el('<div class="vazio">Cadastre uma obra para montar a previsão de lucro e os retornos dos investidores.</div>'));
+    oc.appendChild(el('<div class="vazio">Cadastre uma obra para acompanhar compras, documentos, fotos e o financeiro.</div>'));
   } else if(!visiveis.length){
-    oc.appendChild(el('<div class="vazio">Nenhuma obra neste ano.</div>'));
+    oc.appendChild(el('<div class="vazio">Nenhuma obra corresponde aos filtros.</div>'));
   }
   visiveis.forEach(({o,c})=>{
     const aberta=filtro.fmAberta===o.id;
@@ -6598,7 +6625,7 @@ async function vFortemais(m){
     linha.setAttribute('role','button');linha.tabIndex=0;linha.setAttribute('aria-expanded',String(aberta));
     linha.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();linha.click()}};
     linha.setAttribute('aria-label',(aberta?'Recolher':'Abrir')+' obra '+(o.nome||'Sem nome'));
-    linha.onclick=()=>{if(!fmPodeNavegar(m))return;filtro.fmAberta=aberta?null:o.id;r();const nova=[...document.querySelectorAll('.fm-projeto')].find(x=>x.dataset.obraId===o.id)?.querySelector('.fm-projeto-abre');nova?.focus({preventScroll:true});nova?.scrollIntoView({block:'nearest'})};
+    linha.onclick=()=>{if(!fmPodeNavegar(m))return;filtro.fmAberta=aberta?null:o.id;if(!aberta){filtro.fmAbas=filtro.fmAbas||{};filtro.fmAbas[o.id]='dashboard'}r();const nova=[...document.querySelectorAll('.fm-projeto')].find(x=>x.dataset.obraId===o.id)?.querySelector('.fm-projeto-abre');nova?.focus({preventScroll:true});nova?.scrollIntoView({block:'nearest'})};
     cont.appendChild(linha);
     cont.appendChild(fmDemandasResumo(o));
     if(aberta){
@@ -6613,12 +6640,13 @@ async function vFortemais(m){
     const previstas=visiveis.map(x=>FortemaisFinance.previsao(fmPrevDados(x.o))).filter(x=>x.ok);
     oc.appendChild(el(`<p class="fm-nota">${visiveis.length} obra(s) · ${previstas.length} com previsão preenchida${previstas.length?' · lucro previsto somado: <b>'+brl(previstas.reduce((s,x)=>s+x.lucro,0))+'</b>':''}.</p>`));
   }
-  m.appendChild(bloco('fm-obras','🏗️ Obras','abra o projeto para planejar custos e retornos',oc));
+  m.appendChild(bloco('fm-obras','🏗️ Obras','abra uma obra para ver o dashboard e as áreas de acompanhamento',oc));
 
-  const comparativos=el('<div class="fm-comparativos"><p class="fm-nota" role="status">Consultando custos realizados…</p></div>');m.appendChild(comparativos);
+  const financeiroGeral=el('<details class="fm-apoio"><summary>Financeiro geral · comparativos e importação</summary></details>');m.appendChild(financeiroGeral);
+  const comparativos=el('<div class="fm-comparativos"><p class="fm-nota" role="status">Consultando custos realizados…</p></div>');financeiroGeral.appendChild(comparativos);
   const importar=bloco('fm-importar','📥 Importar custos do ERP','lançamentos realizados do sistema de obras',blocoImportarObra());
   if(E.colapso['fm-importar']==null){importar.classList.add('fechado');importar.querySelector('header').setAttribute('aria-expanded','false')}
-  m.appendChild(importar);
+  financeiroGeral.appendChild(importar);
 
   const resumo=await consultaResumo;
   if(m._fmVista!==vista||!m.querySelector('.fm-visoes'))return;
@@ -16899,6 +16927,8 @@ function validarBackup(j){
     if(j.aviao[k]!==undefined&&(!Array.isArray(j.aviao[k])||j.aviao[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))
       throw new Error('Lista inválida: aviao.'+k);
   for(const obra of j.obras||[]){
+    if(obra.fmCompras!==undefined)FortemaisComprasModelo.validar(obra.fmCompras);
+    if(obra.fmImovel!==undefined)FortemaisImovelModelo.validar(obra.fmImovel);
     if(obra.fmArquivosMetadados!==undefined){
       if(typeof FortemaisDocumentosModelo==='undefined')throw Error('Atualize a página para conferir a classificação dos documentos antes de restaurar.');
       FortemaisDocumentosModelo.validar(obra.fmArquivosMetadados);

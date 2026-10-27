@@ -1,7 +1,7 @@
 (function(root){
   'use strict';
-  const PADRAO=Object.freeze(['Arquitetônico','Estrutural','Instalações','Documentos','Imagens','Sem categoria']);
-  const LIMITES=Object.freeze({categoria:80,titulo:160,descricao:3000,revisao:80,dataDocumento:10});
+  const PADRAO=Object.freeze(['Arquitetônico','Estrutural','Instalações','Orçamentos','Contratos','Licenças','Memorial descritivo','Vistorias','Documentos','Imagens','Sem categoria']);
+  const LIMITES=Object.freeze({categoria:80,titulo:160,descricao:3000,revisao:80,dataDocumento:10,versaoAnteriorId:160});
   const especiais=new Set(['__proto__','prototype','constructor']);
   const tem=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
   const chave=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim();
@@ -14,6 +14,7 @@
       if(k==='arquivado'){if(typeof item[k]!=='boolean')throw Error('Estado de arquivamento inválido.');continue}
       if(!tem(LIMITES,k))throw Error('Campo de documento inválido: '+k+'.');
       if(typeof item[k]!=='string'||item[k].length>LIMITES[k]||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(item[k]))throw Error('Confira o campo '+k+' do documento.');
+      if(k==='versaoAnteriorId'&&item[k]&&!idValido(item[k]))throw Error('Identificador da versão anterior inválido.');
       if(k==='dataDocumento'&&item[k]&&!dataValida(item[k]))throw Error('Informe uma data válida para o documento.');
     }
   }
@@ -21,6 +22,7 @@
     if(mapa===undefined)return true;
     if(!objeto(mapa))throw Error('O mapa de documentos está inválido.');
     for(const id of Object.keys(mapa)){if(!idValido(id))throw Error('Identificador de documento inválido.');validarItem(mapa[id])}
+    const concluidos=new Set();for(const id of Object.keys(mapa)){const caminho=new Set();let atual=id;while(atual&&tem(mapa,atual)&&!concluidos.has(atual)){if(caminho.has(atual))throw Error('As versões de documentos não podem formar um ciclo.');caminho.add(atual);atual=mapa[atual].versaoAnteriorId}for(const x of caminho)concluidos.add(x)}
     return true;
   }
   function metadados(mapa,id){validar(mapa);return mapa&&tem(mapa,id)?{...mapa[id]}:{}}
@@ -28,7 +30,7 @@
     validar(mapa);if(!idValido(id))throw Error('Identificador de documento inválido.');validarItem(patch);
     const item={...metadados(mapa,id)};
     for(const [k,v] of Object.entries(patch)){if(typeof v==='string'){const texto=v.trim();if(texto)item[k]=texto;else delete item[k]}else item[k]=v}
-    validarItem(item);return Object.fromEntries([...Object.entries(mapa||{}).filter(([k])=>k!==id),[id,item]]);
+    validarItem(item);const novo=Object.fromEntries([...Object.entries(mapa||{}).filter(([k])=>k!==id),[id,item]]);validar(novo);return novo;
   }
   function categorias(mapa){validar(mapa);return [...new Set([...PADRAO,...Object.values(mapa||{}).map(x=>x.categoria).filter(Boolean)])]}
   function pertence(ref,obraId){const raiz='obra:'+obraId;return ref===raiz||String(ref||'').startsWith(raiz+':')}

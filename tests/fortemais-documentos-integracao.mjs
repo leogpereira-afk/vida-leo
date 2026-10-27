@@ -121,3 +121,14 @@ test('Documentos: link de download isola a nova aba quando o servidor não forç
   a.document.body.appendChild=node=>{if(node.tagName==='A')destino={target:node.getAttribute('target'),rel:node.getAttribute('rel'),nome:node.getAttribute('download')};return append(node)};
   await a.document.querySelector('.fmdoc-baixar').onclick();assert.equal(destino.target,'_blank');assert.match(destino.rel,/noopener/);assert.match(destino.rel,/noreferrer/);assert.equal(destino.nome,'Projeto a.pdf');
 });
+test('Documentos: versões apontam para arquivos da obra e preservam originais',async()=>{
+  const a=app({nuvem:[arquivo(),arquivo('b'),arquivo('fora','obra:outra')]});await tick();a.run('arqAdd=()=>{throw Error("não enviar")};arqDel=()=>{throw Error("não excluir")}');
+  const item=a.document.querySelector('[data-arquivo-id=b]');[...item.querySelectorAll('button')].find(b=>b.textContent==='Classificar').click();const seletor=a.document.querySelector('[name=versaoAnteriorId]');assert.equal([...seletor.options].some(o=>o.value==='fora'),false);for(const op of seletor.options)op.removeAttribute('selected');[...seletor.options].find(op=>op.value==='a').setAttribute('selected','');seletor.dispatchEvent(new a.document.defaultView.Event('change',{bubbles:true}));assert.equal(a.run('painel._fmDirty'),true);preencher(a,'revisao','R02');enviar(a);
+  assert.equal(a.run('obra.fmArquivosMetadados.b.versaoAnteriorId'),'a');assert.equal(a.run('mockNuvem.length'),3);assert.match(a.document.querySelector('[data-arquivo-id=b]').textContent,/Versão anterior: Projeto a.pdf/);assert.ok(botao(a,'Abrir versão anterior'));
+});
+test('Documentos: categorias rápidas preenchem classificação e marcam rascunho',async()=>{
+  const a=app({nuvem:[arquivo()]});await tick();botao(a,'Classificar').click();const rapido=[...a.document.querySelectorAll('.fmdoc-editor .fmdoc-categorias-rapidas button')].find(b=>b.textContent==='Licenças');rapido.click();assert.equal(a.document.querySelector('.fmdoc-editor [name=categoria]').value,'Licenças');assert.equal(a.run('painel._fmDirty'),true);enviar(a);assert.equal(a.run('obra.fmArquivosMetadados.a.categoria'),'Licenças');
+});
+test('Documentos: anexo da compra identifica a lista e mantém referência original',async()=>{
+  const a=app({nuvem:[arquivo('cotacao','obra:o:compra:lista')]});a.run("obra.fmCompras={versao:1,listas:[{id:'lista',titulo:'Lista sintética'}]}");await tick();assert.match(a.run('painel.textContent'),/Compra: Lista sintética/);assert.equal(a.run('mockNuvem[0].ref'),'obra:o:compra:lista');
+});

@@ -16,6 +16,7 @@ vm.runInContext(readFileSync(new URL('../../publico/fortemais-inovacoes.js',impo
 for(const file of ['fortemais-ferramentas-modelo.js','fortemais-apoio-modelo.js','fortemais-produtos-3d.js', 'fortemais-obra-3d.js','fortemais-materiais.js','fortemais-ferramentas.js'])vm.runInContext(readFileSync(new URL('../../publico/'+file,import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/fortemais-documentos.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/fortemais-pdf.js',import.meta.url),'utf8'),ctx);
+for(const file of ['fortemais-compras-modelo.js','fortemais-compras.js','fortemais-imovel-modelo.js','fortemais-imovel.js','fortemais-obras-dashboard.js'])vm.runInContext(readFileSync(new URL('../../publico/'+file,import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/donboy-email.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/openclaw-fila.js',import.meta.url),'utf8'),ctx);
 vm.runInContext(readFileSync(new URL('../../publico/marketing-fortemais.js',import.meta.url),'utf8'),ctx);

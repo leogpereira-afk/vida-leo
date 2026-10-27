@@ -40,3 +40,11 @@ test('Documentos: arquivar e desarquivar mantém identidade e conteúdo',()=>{
   const arquivado=M.salvar(m,'a',{arquivado:true}),ativo=M.salvar(arquivado,'a',{arquivado:false});
   assert.deepEqual(simples(ativo.a),{titulo:'Versão anterior',categoria:'Estrutural',arquivado:false});assert.equal(m.a.arquivado,undefined);
 });
+test('Documentos: versões vinculam IDs sem substituir conteúdo e rejeitam ciclos',()=>{
+  const M=modelo(),m={a:{titulo:'Primeira',revisao:'R01'}};
+  const nova=M.salvar(m,'b',{titulo:'Segunda',revisao:'R02',versaoAnteriorId:'a'});
+  assert.equal(nova.b.versaoAnteriorId,'a');assert.equal(nova.a.titulo,'Primeira');assert.equal(m.b,undefined);
+  assert.throws(()=>M.salvar(nova,'a',{versaoAnteriorId:'b'}),/ciclo/);assert.throws(()=>M.salvar(nova,'b',{versaoAnteriorId:'b'}),/ciclo/);
+  assert.equal(M.salvar(nova,'b',{versaoAnteriorId:''}).b.versaoAnteriorId,undefined);
+  assert.equal(M.validar({b:{versaoAnteriorId:'anterior-indisponivel'}}),true);
+});

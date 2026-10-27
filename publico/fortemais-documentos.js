@@ -20,6 +20,11 @@ function fmDocumentosSugestoes(campo,mapa){
   const lista=el('<datalist></datalist>');lista.id=uid();for(const categoria of FortemaisDocumentosModelo.categorias(mapa)){const opcao=el('<option></option>');opcao.value=categoria;lista.appendChild(opcao)}
   campo.querySelector('input').setAttribute('list',lista.id);campo.appendChild(lista);
 }
+function fmDocumentosCategoriaRapida(campo){
+  const grupo=el('<details class="fmdoc-categorias-rapidas"><summary>Categorias rápidas</summary><div></div></details>');
+  for(const categoria of FortemaisDocumentosModelo.PADRAO){const b=fmDocumentosBotao(categoria,()=>{const input=campo.querySelector('input');input.value=categoria;input.dispatchEvent(new document.defaultView.Event('input',{bubbles:true}));grupo.open=false});grupo.lastElementChild.appendChild(b)}
+  return grupo;
+}
 function fmDocumentosPainel(o){
   const M=FortemaisDocumentosModelo,sec=el('<section class="fmdoc-painel" aria-label="Projetos e documentos da obra"></section>');sec._fmDirty=false;
   const cab=el('<header class="fmdoc-cab"><div><h3>Projetos e documentos</h3><p>Arquivos da obra, classificados por área.</p></div><div class="fmdoc-acoes"></div></header>');
@@ -36,7 +41,7 @@ function fmDocumentosPainel(o){
   const notificar=texto=>{aviso.textContent=texto;aviso.hidden=!texto};
   const erro=texto=>{falha.textContent=texto;falha.hidden=!texto};
   const salvarMensagem='Classificação salva neste navegador. Acompanhe a sincronização no topo da Central.';
-  function origem(a){const sufixo=String(a.ref||'').slice(('obra:'+o.id).length);if(!sufixo)return 'Obra';if(sufixo.startsWith(':demanda:')){const id=sufixo.slice(9),d=(o.fmDemandas?.itens||[]).find(x=>x.id===id);return 'Demanda: '+(d?.titulo||id)}return 'Obra · vínculo anterior'}
+  function origem(a){const sufixo=String(a.ref||'').slice(('obra:'+o.id).length);if(!sufixo)return 'Obra';if(sufixo.startsWith(':demanda:')){const id=sufixo.slice(9),d=(o.fmDemandas?.itens||[]).find(x=>x.id===id);return 'Demanda: '+(d?.titulo||id)}if(sufixo.startsWith(':compra:')){const id=sufixo.slice(8),c=(o.fmCompras?.listas||[]).find(x=>x.id===id);return 'Compra: '+(c?.titulo||id)}return 'Obra · vínculo anterior'}
   function mapa(){M.validar(o.fmArquivosMetadados);return o.fmArquivosMetadados}
   function atualizarChips(){
     chips.replaceChildren();for(const categoria of ['',...M.categorias(mapa())]){const b=fmDocumentosBotao(categoria||'Todas',()=>{filtrosAtuais.categoria=categoria;pintar()},'');b.setAttribute('aria-pressed',String(categoria===filtrosAtuais.categoria));chips.appendChild(b)}
@@ -49,12 +54,16 @@ function fmDocumentosPainel(o){
     form.appendChild(el('<h4>Classificar arquivo</h4>'));const nome=el('<p class="fmdoc-editor-nome"></p>');nome.textContent=a.nome;form.appendChild(nome);
     const grade=el('<div class="fmdoc-editor-grade"></div>');const categoria=fmDocumentosCampo('categoria','Categoria',meta.categoria);fmDocumentosSugestoes(categoria,mapa());
     grade.append(categoria,fmDocumentosCampo('titulo','Título de exibição',meta.titulo),fmDocumentosCampo('revisao','Revisão',meta.revisao),fmDocumentosCampo('dataDocumento','Data do documento',meta.dataDocumento,'date'));
-    form.append(grade,fmDocumentosCampo('descricao','Descrição',meta.descricao,'textarea'));const e=el('<p class="fmdoc-erro" role="alert" hidden></p>'),acoes=el('<div class="fmdoc-acoes"></div>');
+    const anterior=el('<label class="fmdoc-campo"><span>Versão anterior deste documento</span><select name="versaoAnteriorId"></select></label>'),seletor=anterior.querySelector('select');
+    const opVazio=el('<option value="">Sem vínculo com versão anterior</option>');seletor.appendChild(opVazio);
+    const candidatos=arquivos.filter(x=>x.id!==a.id);for(const x of candidatos){const op=el('<option></option>');op.value=x.id;op.textContent=(M.metadados(mapa(),x.id).titulo||x.nome)+' · '+(M.metadados(mapa(),x.id).revisao||'Sem revisão');if(x.id===meta.versaoAnteriorId)op.setAttribute('selected','');seletor.appendChild(op)}
+    if(meta.versaoAnteriorId&&!candidatos.some(x=>x.id===meta.versaoAnteriorId)){const op=el('<option selected></option>');op.value=meta.versaoAnteriorId;op.textContent='Versão anterior indisponível nesta consulta';seletor.appendChild(op)}else if(!meta.versaoAnteriorId)opVazio.setAttribute('selected','');
+    grade.appendChild(anterior);form.append(fmDocumentosCategoriaRapida(categoria),grade,fmDocumentosCampo('descricao','Descrição',meta.descricao,'textarea'));const notaVersoes=el('<p class="fmdoc-versao-nota">Cada versão mantém seu arquivo original. O vínculo organiza a sequência sem substituir conteúdo.</p>');form.appendChild(notaVersoes);const e=el('<p class="fmdoc-erro" role="alert" hidden></p>'),acoes=el('<div class="fmdoc-acoes"></div>');
     const submit=el('<button type="submit" class="btn">Salvar classificação</button>');
-    const ler=()=>Object.fromEntries(['categoria','titulo','descricao','revisao','dataDocumento'].map(k=>[k,form.querySelector('[name='+k+']').value]));const inicial=JSON.stringify(ler());
+    const ler=()=>Object.fromEntries(['categoria','titulo','descricao','revisao','dataDocumento','versaoAnteriorId'].map(k=>[k,form.querySelector('[name='+k+']').value]));const inicial=JSON.stringify(ler());
     const fechar=()=>{sec._fmDirty=false;editor=null;edicao.replaceChildren();pintar()};
     acoes.append(submit,fmDocumentosBotao('Cancelar',()=>{if(!sec._fmDirty||confirm('Descartar a classificação não salva?'))fechar()}));form.append(e,acoes);
-    form.addEventListener('input',()=>{sec._fmDirty=JSON.stringify(ler())!==inicial});
+    const marcou=()=>{sec._fmDirty=JSON.stringify(ler())!==inicial};form.addEventListener('input',marcou);form.addEventListener('change',marcou);
     form.onsubmit=evento=>{evento.preventDefault();e.hidden=true;try{fmDocumentosGravar(o,a.id,ler(),base)}catch(ex){e.textContent=ex.message;e.hidden=false;sec._fmDirty=true;return}fechar();notificar(salvarMensagem)};
     editor=form;edicao.replaceChildren(form);form.querySelector('[name=categoria]').focus();pintar();
   }
@@ -79,7 +88,9 @@ function fmDocumentosPainel(o){
       const baixar=fmDocumentosBotao('Baixar',()=>abrir(a,true));baixar.classList.add('fmdoc-baixar');baixar.setAttribute('aria-label','Baixar '+a.nome);
       const classificar=fmDocumentosBotao('Classificar',()=>editar(a));classificar.setAttribute('aria-label','Classificar '+a.nome);classificar.disabled=!!editor||enviando;
       const arquivar=fmDocumentosBotao(meta.arquivado?'Desarquivar':'Arquivar',()=>{try{conferirObra();fmDocumentosGravar(o,a.id,{arquivado:!meta.arquivado});notificar(salvarMensagem);pintar()}catch(e){erro(e.message)}});arquivar.setAttribute('aria-label',(meta.arquivado?'Desarquivar ':'Arquivar ')+a.nome);arquivar.disabled=!!editor||enviando;
-      acoes.append(baixar,classificar,arquivar);corpo.appendChild(item);
+      acoes.append(baixar,classificar,arquivar);
+      if(meta.versaoAnteriorId){const anterior=arquivos.find(x=>x.id===meta.versaoAnteriorId),nota=el('<p class="fmdoc-versao-nota"></p>');nota.textContent=anterior?'Versão anterior: '+(M.metadados(m,anterior.id).titulo||anterior.nome):'Versão anterior indisponível nesta consulta';item.querySelector('.fmdoc-item-texto').appendChild(nota);if(anterior){const abre=/^(application\/pdf|image\/(png|jpeg|webp|gif|bmp))$/i.test(anterior.tipo||'');acoes.appendChild(fmDocumentosBotao(abre?'Abrir versão anterior':'Baixar versão anterior',()=>abrir(anterior,!abre)))}}
+      corpo.appendChild(item);
     }
     pdf.disabled=carregando||!!editor||enviando||!visiveis.length;refresh.disabled=enviando||!!editor;solta.disabled=enviando||!!editor;inp.disabled=solta.disabled;categoriaUpload.querySelector('input').disabled=solta.disabled;
     pendentes.hidden=!arquivos.some(a=>a.pendente);pendentes.disabled=enviando||!!editor||carregando;
@@ -126,7 +137,7 @@ function fmDocumentosPainel(o){
     finally{enviando=false;sec._fmDirty=false;await atualizar();if(falhaEnvio)erro(falhaEnvio)}
   });pendentes.hidden=true;pendentes.title='Envia somente os anexos desta obra pendentes neste aparelho.';
   cab.querySelector('.fmdoc-acoes').append(refresh,pendentes,pdf);filtros.append(busca,situacoes,chips);
-  upload.querySelector('.fmdoc-upload-campos').appendChild(categoriaUpload);try{fmDocumentosSugestoes(categoriaUpload,mapa())}catch(e){}
+  upload.querySelector('.fmdoc-upload-campos').append(categoriaUpload,fmDocumentosCategoriaRapida(categoriaUpload));try{fmDocumentosSugestoes(categoriaUpload,mapa())}catch(e){}
   const solta=upload.querySelector('.fmdoc-solta'),inp=upload.querySelector('[name=arquivos]');solta.onclick=()=>inp.click();inp.onchange=()=>{receber([...inp.files]);inp.value=''};
   solta.addEventListener('dragover',e=>{e.preventDefault();solta.classList.add('fmdoc-sobre')});solta.addEventListener('dragleave',()=>solta.classList.remove('fmdoc-sobre'));solta.addEventListener('drop',e=>{e.preventDefault();solta.classList.remove('fmdoc-sobre');if(!solta.disabled)receber([...e.dataTransfer.files])});
   busca.oninput=()=>{filtrosAtuais.busca=busca.value;pintar()};
