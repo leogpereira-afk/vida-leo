@@ -1,6 +1,7 @@
 import {marcaMarketing} from './marketing-marcas.mjs';
 import {descobrirAds,contaAds,coletarAds} from './marketing-direto-google-ads.mjs';
 import {FalhaDireta} from './marketing-direto.mjs';
+import {coletarContatosGA4} from './marketing-ga4-contatos.mjs';
 const GRAPH='https://graph.facebook.com/v26.0';
 const host=s=>{try{return new URL(s).hostname.replace(/^www\./,'').toLowerCase()}catch{return ''}};
 const falha=c=>{throw new FalhaDireta(c)};
@@ -49,6 +50,8 @@ export async function coletarFonte(f,a,api,agora,empresa='fortemais'){const marc
   const keys=Object.keys(GA),tot=await rel(keys);p.metricas=tot[0]||Object.fromEntries(keys.map(k=>[k,null]));
   for(const [t,d,ks]of [['paginas','pagePath',['visualizacoes','usuarios']],['canais','sessionDefaultChannelGroup',['sessoes','eventos_chave']],['cidades','city',['usuarios']],['dispositivos','deviceCategory',['usuarios']],['eventos','eventName',['eventos']]])await opcional(async()=>p.tabelas[t]=await rel(ks,d));
   await opcional(async()=>p.serie=(await rel(['usuarios','sessoes','visualizacoes'],'date')).map(r=>({dia:r.nome.replace(/^(\d{4})(\d{2})(\d{2})$/,'$1-$2-$3'),usuarios:r.usuarios,sessoes:r.sessoes,visualizacoes:r.visualizacoes})));
+  const contatos=await coletarContatosGA4(api,a,marca,j,agora,saida.qualidade);
+  if(contatos){saida.contatos=contatos.contatos;p.metricas.cliques_whatsapp=contatos.consolidado;if(contatos.contatos.estado==='erro')saida.qualidade.contatos_indisponiveis=true;}
  }else if(f==='search'){
   const q=async dims=>{const r=await api('https://www.googleapis.com/webmasters/v3/sites/'+encodeURIComponent(a.id)+'/searchAnalytics/query',{startDate:j.inicio,endDate:j.fim,type:'web',dataState:'final',...(dims?{dimensions:[dims]}:{}),rowLimit:100});if(r.rows?.length===100)saida.qualidade.limitado=true;return (r.rows||[]).map(x=>({nome:x.keys?.[0]||'',cliques:num(x.clicks),impressoes:num(x.impressions),ctr:num(x.ctr),posicao:num(x.position)}))};
   const total=await q();p.metricas=total[0]||{};delete p.metricas.nome;

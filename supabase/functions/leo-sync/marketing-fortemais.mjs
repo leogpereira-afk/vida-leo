@@ -52,6 +52,14 @@ export function projetarFonte(id,bruto,agora,marca){
  if(bruto.qualidade?.amostragem)f.avisos.push('Relatório com amostragem.');
  if(bruto.qualidade?.limiar_privacidade)f.avisos.push('O provedor aplicou limites de privacidade.');
  if(bruto.qualidade?.limitado)f.avisos.push('Listagem limitada; as linhas não representam necessariamente o total.');
+ if(id==='ga4'&&bruto.contatos){
+  const ct=bruto.contatos,periodo=intervalo(ct.periodo),inicioMedicao=dia(ct.inicioMedicao),coleta=instante(ct.coletadoEm);
+  if(periodo&&inicioMedicao&&periodo.inicio>=inicioMedicao&&coleta&&Date.parse(coleta)<=agora+300000&&['ok','aguardando_dados','aguardando_configuracao','erro'].includes(ct.estado)){
+   f.contatos={inicioMedicao,coletadoEm:coleta,estado:ct.estado,periodo:{...periodo,metricas:metricas(ct.periodo?.metricas,['whatsapp','telefone','email'])},ultimaLeituraConfirmada:ct.ultimaLeituraConfirmada===true};
+  }
+ }
+ if(bruto.qualidade?.contatos_indisponiveis)f.avisos.push('A consulta por canal falhou. Confira a data da última leitura confirmada.');
+ if(bruto.qualidade?.contatos_desatualizados)f.avisos.push('Valor anterior de WhatsApp preservado; a consulta por canal aguarda atualização.');
  return f;
 }
 const campos=['responsavel','conta','ativo','observacao'];

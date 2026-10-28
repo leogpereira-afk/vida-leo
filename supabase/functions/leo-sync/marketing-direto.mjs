@@ -1,6 +1,7 @@
 import {marcaMarketing} from './marketing-marcas.mjs';
 // Conexões isoladas por empresa. Nunca usa tokens pessoais ou da Impresilk.
 import {coletarFonte,descobrirAtivos,validarAtivo} from './marketing-direto-fontes.mjs';
+import {preservarHistoricoGA4} from './marketing-ga4-contatos.mjs';
 export const CALLBACK='https://heveemylixartyijxewh.supabase.co/functions/v1/leo-sync/googleCallback';
 const RETORNO='https://leogpereira-afk.github.io/vida-leo/';
 const TTL=600000;
@@ -28,7 +29,7 @@ export function bancoDireto(sb,empresa='fortemais'){const marca=marcaMarketing(e
  async ler(k){const {data,error}=await sb.from('leo_config').select('valor').eq('chave',PREFIX+k).maybeSingle();if(error)erro('banco');return data?.valor||null},
  async gravar(k,v){const {error}=await sb.from('leo_config').upsert({chave:PREFIX+k,valor:v,atualizado_em:new Date().toISOString()},{onConflict:'chave'});if(error)erro('banco')},
  async consumir(k,prova){let q=sb.from('leo_config').delete().eq('chave',PREFIX+k);if(prova)q=q.eq('valor->>prova',prova);const {data,error}=await q.select('valor').maybeSingle();if(error)erro('banco');return data?.valor||null},
- async salvarFonte(f,v){const {error}=await sb.from('painel_cache').upsert({chave:'leo_marketing_'+marca.id+'_direto_'+f,valor:v,atualizado_em:new Date().toISOString()},{onConflict:'chave'});if(error)erro('banco')}
+ async salvarFonte(f,v){const chave='leo_marketing_'+marca.id+'_direto_'+f;if(f==='ga4'&&v.contatos){const {data,error}=await sb.from('painel_cache').select('valor').eq('chave',chave).maybeSingle();if(error)erro('banco');v=preservarHistoricoGA4(v,data?.valor)}const {error}=await sb.from('painel_cache').upsert({chave,valor:v,atualizado_em:new Date().toISOString()},{onConflict:'chave'});if(error)erro('banco')}
 }}
 function cred(p,env){if(ehGoogle(p))return {id:env('GOOGLE_CLIENT_ID'),secret:env('GOOGLE_CLIENT_SECRET')};return {id:env('LEO_MKT_META_CLIENT_ID'),secret:env('LEO_MKT_META_CLIENT_SECRET')}}
 export function criarDireto({banco,env,fetcher=fetch,agora=()=>Date.now(),empresa='fortemais'}){
@@ -42,7 +43,7 @@ export function criarDireto({banco,env,fetcher=fetch,agora=()=>Date.now(),empres
  async function cliente(f){if(!FONTES.includes(f))erro('invalido');const t=await token(provedor(f));return (u,body)=>json(u,{headers:{Authorization:'Bearer '+t,...(body?{'Content-Type':'application/json'}:{})},...(body?{method:'POST',body:JSON.stringify(body)}:{})})}
  async function descoberta(f,api){const p=f==='instagram'?await banco.ler('pagina_instagram'):null;return descobrirAtivos(f,api,{paginaInstagram:p?.id,empresa})}
  async function listar(f){const api=await cliente(f);return {ok:true,...await descoberta(f,api)}}
- async function vincular(f,id){const api=await cliente(f);const {ativos}=await descoberta(f,api);const a=ativos.find(a=>a.id===id);if(!a)erro('vinculo');await validarAtivo(f,a,api,empresa);await banco.gravar('ativo_'+f,a);return {ok:true,ativo:{id:a.id,nome:a.nome}}}
+ async function vincular(f,id){const api=await cliente(f);const {ativos}=await descoberta(f,api);const a=ativos.find(a=>a.id===id);if(!a)erro('vinculo');await validarAtivo(f,a,api,empresa);if(f==='ga4'){const anterior=await banco.ler('ativo_'+f);if(anterior?.id===a.id&&anterior.medicaoContatos)a.medicaoContatos=anterior.medicaoContatos}await banco.gravar('ativo_'+f,a);return {ok:true,ativo:{id:a.id,nome:a.nome}}}
  async function coletar(f){const api=await cliente(f),a=await banco.ler('ativo_'+f);if(!a)erro('ativo');try{await validarAtivo(f,a,api,empresa);const v=await coletarFonte(f,a,api,agora(),empresa);await banco.salvarFonte(f,v);await banco.gravar('ultima_'+f,{codigo:v.estado,em:new Date(agora()).toISOString()});return {ok:true,estado:v.estado}}catch(e){const c=e instanceof FalhaDireta?e.codigo:'coleta';await banco.gravar('ultima_'+f,{codigo:c,em:new Date(agora()).toISOString()});throw new FalhaDireta(c)}}
  return {status,inicio,callback,confirmar,listar,vincular,coletar};
 }
