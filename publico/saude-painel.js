@@ -23,7 +23,7 @@ function saudeEstadoSync(texto){
   const t=String(texto||'').toLowerCase();
   if(t==='sincronizado')return{titulo:'Dados confirmados no servidor'+(_saudeConfirmadoEm?' às '+new Date(_saudeConfirmadoEm).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):''),tipo:'ok'};
   if(/enviando|baixando|conferindo/.test(t))return{titulo:'Sincronização em andamento',tipo:'neutro'};
-  if(/não enviado|sem conexão|recarregue/.test(t))return{titulo:'Dados locais; envio pendente',tipo:'atencao'};
+  if(/não enviado|sem conexão|recarregue|armazenamento cheio|precisa[m]? de conferência|sincronização não concluída|servidor indisponível/.test(t))return{titulo:'Dados locais; envio pendente',tipo:'atencao'};
   if(/outro acesso/.test(t))return{titulo:'Atualizado por outro acesso; confira textos preservados',tipo:'atencao'};
   return{titulo:DEV?'Prévia local; sem envio de dados':_saudeGravacao.estado||'Confira a sincronização',tipo:'neutro'};
 }

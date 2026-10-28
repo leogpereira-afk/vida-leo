@@ -769,7 +769,7 @@ tr:hover .lixo{opacity:1}
 <script src="./saude-modelo.js?v=f4466fcfb8e5"></script>
 <script src="./saude-documentos.js?v=0607d7cf9d4a"></script>
 <script src="./saude-evolucao.js?v=12f05d21e858"></script>
-<script src="./saude-painel.js?v=d0957a4cf2e9"></script>
+<script src="./saude-painel.js?v=9c95c48de591"></script>
 <script src="./saude-tratamentos.js?v=8b015d52bcfc"></script>
 <script src="donboy-email.js?v=6a1ba6d316f6"></script>
 <script src="./vendor/lz-string.min.js?v=95f4d1cbf099"></script>
@@ -1232,20 +1232,41 @@ const CFG=k=>(E.config&&E.config[k])||SEED.config[k];
 
 /* ---------------- estado ---------------- */
 const CHAVE='centralLeo.v1';
-function lerEstadoLocal(){
-  const texto=localStorage.getItem(CHAVE);if(!texto)return null;
+function lerJSONLocal(chave){
+  const texto=localStorage.getItem(chave);if(!texto)return null;
   if(texto.startsWith('lz16:')){
     if(typeof LZString==='undefined')throw Error('A compactação do cache não carregou. Recarregue a página.');
     const json=LZString.decompressFromUTF16(texto.slice(5));if(!json)throw Error('Cache inválido; consulte a nuvem.');return JSON.parse(json);
   }
   return JSON.parse(texto);
 }
+function lerEstadoLocal(){return lerJSONLocal(CHAVE)}
+function lerRecuperacaoLocal(){return lerJSONLocal('cl_descartado')}
+function erroQuotaLocal(e){return e?.name==='QuotaExceededError'||/quota/i.test(e?.message||'')}
+function compactarTextoLocal(texto){
+  if(typeof LZString==='undefined')throw Error('A compactação do cache não carregou. Recarregue a página.');
+  const compacto=LZString.compressToUTF16(texto);
+  if(LZString.decompressFromUTF16(compacto)!==texto)throw Error('Não foi possível conferir a cópia compactada.');
+  return 'lz16:'+compacto;
+}
+function compactarRecuperacaoLocal(){
+  const texto=localStorage.getItem('cl_descartado');
+  if(!texto||texto.startsWith('lz16:'))return false;
+  const compacto=compactarTextoLocal(texto);
+  if(compacto.length>=texto.length||localStorage.getItem('cl_descartado')!==texto)return false;
+  // Só altera a representação da nossa cópia, com conferência integral antes
+  // da gravação atômica. Nenhuma chave ou versão é removida para abrir espaço.
+  localStorage.setItem('cl_descartado',compacto);return true;
+}
 function guardarEstadoLocal(dados){
   const texto=JSON.stringify(dados);
   try{localStorage.setItem(CHAVE,texto)}catch(e){
-    if(typeof LZString==='undefined'||!(e.name==='QuotaExceededError'||/quota/i.test(e.message||'')))throw e;
-    // Sem excluir caches ou backups: compactação reversível só quando necessário.
-    localStorage.setItem(CHAVE,'lz16:'+LZString.compressToUTF16(texto));
+    if(typeof LZString==='undefined'||!erroQuotaLocal(e))throw e;
+    const compacto=compactarTextoLocal(texto);
+    try{localStorage.setItem(CHAVE,compacto)}catch(falha){
+      if(!erroQuotaLocal(falha)||!compactarRecuperacaoLocal())throw falha;
+      localStorage.setItem(CHAVE,compacto);
+    }
   }
 }
 let E=carregar();
@@ -1630,6 +1651,8 @@ function novoRegistroTabela(titulo,colunas,novo,base,render){
 /* ---------- modal ---------- */
 function atualizarCamadasModais(){
   const fundos=[...document.querySelectorAll('#modais .fundo')];
+  const recuperacao=document.querySelector('[data-abrir-rascunho-sync]');
+  if(recuperacao){recuperacao.hidden=fundos.length>0;recuperacao.style.display=fundos.length?'none':''}
   const app=document.querySelector('.app');
   app?.toggleAttribute('inert',fundos.length>0);
   if(fundos.length)app?.setAttribute('aria-hidden','true');else app?.removeAttribute('aria-hidden');
@@ -16753,9 +16776,13 @@ async function vConfig(m){
     'quem entra em cada sistema — criar, trocar senha, tirar',telaAcessos()));
 
   /* ---- versão descartada: o rastro do último conflito de sincronização ---- */
-  const desc=(()=>{try{return JSON.parse(localStorage.getItem('cl_descartado')||'null')}catch(_){return null}})();
+  let falhaRecuperacao=false;
+  const desc=(()=>{try{return lerRecuperacaoLocal()}catch(_){falhaRecuperacao=true;return null}})();
   const dx=el('<div class="corpo"></div>');
-  if(!desc||!desc.dados){
+  if(falhaRecuperacao){
+    dx.appendChild(el('<p role="alert">A cópia deste aparelho não pôde ser lida. Ela foi mantida intacta. Baixe o arquivo para conferência.</p>'));
+    dx.appendChild(acao('Baixar cópia preservada',()=>baixar(new Blob([localStorage.getItem('cl_descartado')||''],{type:'text/plain'}),'central-leo-recuperacao-original.txt')));
+  } else if(!desc||!desc.dados){
     dx.innerHTML='<div class="vazio">Nada descartado neste aparelho. Quando dois acessos gravam quase juntos, a versão que perde a corrida fica guardada aqui.</div>';
   } else {
     dx.appendChild(el(`<p style="font-size:13px">Guardada em <b>${new Date(desc.em).toLocaleString('pt-BR')}</b> —
@@ -16766,8 +16793,18 @@ async function vConfig(m){
     const b2=el('<button class="btn ghost" style="color:var(--vermelho)">Restaurar por cima</button>');
     b2.onclick=()=>restaurarBackup({text:async()=>JSON.stringify(desc.dados)});
     bb.appendChild(b1);bb.appendChild(b2);dx.appendChild(bb);
+    if(desc.anteriores?.length){
+      const historico=el('<details style="margin-top:12px"><summary></summary><div style="display:grid;gap:8px;margin-top:10px"></div></details>');
+      historico.querySelector('summary').textContent=desc.anteriores.length+' versão(ões) anterior(es) preservada(s)';
+      [...desc.anteriores].reverse().forEach((v,i)=>{
+        const linha=el('<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap"><span></span></div>');
+        linha.querySelector('span').textContent=new Date(v.em).toLocaleString('pt-BR');
+        linha.appendChild(acao('Baixar versão '+(desc.anteriores.length-i),()=>baixar(new Blob([JSON.stringify(v.dados,null,1)],{type:'application/json'}),'central-leo-recuperacao-'+(desc.anteriores.length-i)+'.json'),'ghost'));
+        historico.querySelector('div').appendChild(linha);
+      });dx.appendChild(historico);
+    }
   }
-  m.appendChild(bloco('cf-descartado','🗂 Versão descartada','o que saiu de cena no último conflito de sincronização',dx));
+  m.appendChild(bloco('cf-descartado','🗂 Versão descartada','cópias locais preservadas antes de substituir dados',dx));
 
   // histórico de rendimentos — editável
   const H=E.rendHist;
@@ -17012,7 +17049,19 @@ async function apiSync(metodo,corpo){
   return r.json();
 }
 let syncTimer=null;
-function pintaSync(t){const x=document.getElementById('stSync');if(x)x.textContent='☁ '+t;if(typeof saudeNotificarSync==='function')saudeNotificarSync(t)}
+function pintaSync(t){const x=document.getElementById('stSync');if(x){x.textContent='☁ '+t;x.removeAttribute('title')}if(typeof saudeNotificarSync==='function')saudeNotificarSync(t)}
+function falhaSync(e){
+  let texto='sincronização não concluída — tente novamente',detalhe='A sincronização não foi confirmada. Confira a versão local e as cópias preservadas antes de tentar novamente.';
+  if(erroQuotaLocal(e)){texto='armazenamento cheio — sincronização pendente';detalhe='Não houve espaço para guardar uma cópia segura. Seus dados locais e formulários foram mantidos. Baixe um backup em Ferramentas e backup antes de qualquer limpeza.'}
+  else if(e?.name==='SyncValidationError'){texto='dados precisam de conferência';detalhe='A resposta do servidor não passou na validação. A versão local foi mantida.'}
+  else if(e?.name==='SyncRecoveryError'){texto='cópia de recuperação precisa de conferência';detalhe='A cópia anterior foi mantida intacta. Confira Configurações → Versão descartada antes de substituir dados.'}
+  else if(e?.name==='TypeError'&&/fetch|network|load failed/i.test(e.message||'')){texto='sem conexão — tente sincronizar';detalhe='Não foi possível acessar o servidor. Confira a conexão e tente sincronizar novamente.'}
+  else if(/^HTTP 5\d\d$/.test(e?.message||'')){texto='servidor indisponível — tente novamente'}
+  pintaSync(texto);const x=document.getElementById('stSync');if(x)x.title=detalhe;
+}
+function validarDadosSync(dados){
+  try{return validarBackup(dados)}catch(causa){const e=Error('Os dados do servidor precisam de conferência.');e.name='SyncValidationError';e.cause=causa;throw e}
+}
 function agendaPush(){if(DEV||!pegaToken())return;pintaSync('alterações pendentes');clearTimeout(syncTimer);syncTimer=setTimeout(enviarNuvem,2500)}
 // ---- sincronização com gravação condicional (CAS) -------------------------
 // Cada ABA guarda, em memória, a versão do servidor que viu por último
@@ -17033,7 +17082,7 @@ function conteudoSync(dados){
 const marcaBase=(mt,conteudo=null)=>{if(mt){_tabBase=+mt;_tabConteudo=conteudo}};
 function atualizarMetadadosNuvem(r){
   if(!_tabConteudo||!r?.dados||!r.mt||conteudoSync(r.dados)!==_tabConteudo)return false;
-  validarBackup(r.dados);
+  validarDadosSync(r.dados);
   // Compare com a base confirmada, nunca com a edição local pendente. O cron
   // pode ter _mt maior que ela sem ter alterado nenhum cadastro.
   const atualizado={...E,agendaGoogleUltima:r.dados.agendaGoogleUltima};
@@ -17043,8 +17092,25 @@ function atualizarMetadadosNuvem(r){
   marcaBase(r.mt,_tabConteudo);atualizarStatusAgendaGoogle();
   return true;
 }
-function guardaDescartado(){
-  try{localStorage.setItem('cl_descartado',JSON.stringify({em:Date.now(),dados:lerEstadoLocal()}))}catch(_){}
+function guardaDescartado(dados=lerEstadoLocal()){
+  if(!dados)return;
+  let anterior;
+  try{
+    anterior=lerRecuperacaoLocal();
+    if(anterior&&(!Object.hasOwn(anterior,'dados')||anterior.anteriores!==undefined&&!Array.isArray(anterior.anteriores)))throw Error('Formato de recuperação desconhecido');
+  }catch(causa){const e=Error('A cópia anterior precisa de conferência.');e.name='SyncRecoveryError';e.cause=causa;throw e}
+  const anteriores=anterior?.anteriores||[],conteudo=conteudoSync(dados);
+  if(anterior&&[anterior,...anteriores].some(v=>conteudoSync(v.dados)===conteudo))return;
+  const registro={...anterior,em:Date.now(),dados};
+  if(anterior){const {anteriores:_,...ultima}=anterior;registro.anteriores=[...anteriores,ultima]}
+  const texto=JSON.stringify(registro);
+  // Cópias grandes já nascem compactadas para não ocupar o espaço do cache.
+  // Se mesmo assim não couber, interrompe a troca; nunca ignora a falha.
+  const preferido=texto.length>65536&&typeof LZString!=='undefined'?compactarTextoLocal(texto):texto;
+  try{localStorage.setItem('cl_descartado',preferido)}catch(e){
+    if(!erroQuotaLocal(e)||preferido!==texto||typeof LZString==='undefined')throw e;
+    localStorage.setItem('cl_descartado',compactarTextoLocal(texto));
+  }
 }
 /* Textos dos formulários ficam nesta aba quando outro acesso exige trocar a base. */
 const CHAVE_RASCUNHO_SYNC='cl_rascunho_sync_v1';
@@ -17115,18 +17181,20 @@ function mostrarRascunhoSync(){
   bt.dataset.abrirRascunhoSync='';bt.setAttribute('aria-label','Recuperar textos preservados antes da atualização');
   bt.style.cssText='position:fixed;right:18px;bottom:18px;max-width:calc(100vw - 36px);white-space:normal;z-index:90;box-shadow:0 4px 20px #0002';
   document.body.appendChild(bt);
+  atualizarCamadasModais();
 }
 function adotaNuvem(r,avisar,manterNovoGasto=false){
-  validarBackup(r.dados);
+  validarDadosSync(r.dados);
   // Receber uma mudança remota só é conflito quando há edição ou formulário
   // local a preservar. Uma aba limpa acompanha o servidor sem interromper.
   const edicaoLocal=_tabConteudo===null||conteudoSync(E)!==_tabConteudo;
   const novoGasto=manterNovoGasto?document.querySelector('[data-gasto-novo-sync]')?.closest('.fundo'):null;
+  if(edicaoLocal)guardaDescartado(E);
+  guardarEstadoLocal(r.dados);
   const preservou=guardarRascunhoSync(novoGasto);
-  guardaDescartado();
   // modal aberto sobre o estado antigo viraria órfão e comeria o que fosse digitado
   const mo=document.getElementById('modais');if(mo)for(const filho of [...mo.children])if(filho!==novoGasto)filho.remove();atualizarCamadasModais();
-  guardarEstadoLocal(r.dados);marcaBase(r.mt,conteudoSync(r.dados));E=carregar();tela({baseRemota:true});mostrarRascunhoSync();
+  marcaBase(r.mt,conteudoSync(r.dados));E=carregar();tela({baseRemota:true});mostrarRascunhoSync();
   pintaSync('atualizado de outro acesso');
   if((avisar&&edicaoLocal)||preservou)alert('Outro acesso atualizou os dados. Esta aba adotou a versão do servidor para preservar o que foi salvo lá.\n\n'+(preservou?'Os textos dos formulários foram preservados nesta aba. Use Recuperar textos preservados para conferir e copiar o que precisar.':'A versão local anterior ficou em Configurações → Versão descartada.'));
 }
@@ -17156,7 +17224,7 @@ function conferirBaseInicial(){
     pintaSync('conferindo…');
     const r=await apiSync('GET');
     if(!r?.dados||!r.mt)throw Error('Não foi possível confirmar a base do servidor.');
-    validarBackup(r.dados);
+    validarDadosSync(r.dados);
     const antes=estadoAntesPrimeiraLeitura,conteudoAntes=conteudoSync(antes);
     if(conteudoSync(r.dados)===conteudoAntes){
       marcaBase(r.mt,conteudoAntes);atualizarMetadadosNuvem(r);return true;
@@ -17166,7 +17234,7 @@ function conferirBaseInicial(){
       // Somente inclusões novas, sem edição/remoção de qualquer outro dado.
       // O restante vem integralmente da versão remota que autoriza este CAS.
       const unido={...r.dados,gastos:[...(r.dados.gastos||[]),...novos],_mt:Date.now()};
-      guardaDescartado(); // Mantém recuperável também o cache anterior à primeira leitura.
+      guardaDescartado(E); // Inclui os lançamentos feitos enquanto a primeira leitura chegava.
       guardarEstadoLocal(unido);marcaBase(r.mt,conteudoSync(r.dados));E=carregar();tela({baseRemota:true});return true;
     }
     const mudouDuranteLeitura=conteudoSync(E)!==conteudoAntes;
@@ -17205,7 +17273,7 @@ async function executarEnvio(){if(DEV&&!window.__testeSync)return true;
       if(p.status<200||p.status>=300)throw new Error('HTTP '+p.status);
       marcaBase(p.j&&p.j.mt,conteudoEnviado);pintaSync(E._mt===versaoEnviada?'sincronizado':'alterações pendentes');return true;
     }
-  }catch(e){pintaSync('não enviado — tente sincronizar');return false}}
+  }catch(e){falhaSync(e);return false}}
 async function puxarNuvem(){if(DEV&&!window.__testeSync){pintaSync('modo local');return}
   if(envioEmCurso)await envioEmCurso;
   try{
@@ -17222,7 +17290,7 @@ async function puxarNuvem(){if(DEV&&!window.__testeSync){pintaSync('modo local')
     if(envioEmCurso)await envioEmCurso;
     if(_tabBase!==baseDaLeitura)return; // Um envio ou outra leitura já avançou a versão.
     const remoto=r&&r.dados;
-    if(remoto)validarBackup(remoto);
+    if(remoto)validarDadosSync(remoto);
     // Uma leitura não pode autorizar a gravação de alterações feitas sobre outra base.
     if(remoto&&_tabBase&&+r.mt!==_tabBase){
       if(!atualizarMetadadosNuvem(r)){adotaNuvem(r,true);return}
@@ -17235,7 +17303,7 @@ async function puxarNuvem(){if(DEV&&!window.__testeSync){pintaSync('modo local')
     } else if((E._mt||0)>((remoto&&remoto._mt)||0)){await enviarNuvem();return}
     else pintaSync('sincronizado');
     mostrarRascunhoSync();
-  }catch(e){pintaSync('sem conexão')}}
+  }catch(e){falhaSync(e)}}
 async function sincronizarAgora(){await puxarNuvem()}
 function salvarPDF(){window.print()}
 function telaLogin(){
