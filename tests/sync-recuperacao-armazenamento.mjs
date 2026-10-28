@@ -74,7 +74,8 @@ test('Recuperação: quota no backup interrompe adoção de remoto sem perder ed
   await a.run('puxarNuvem()');
   assert.equal(a.run('E.agenda[0].obs'),estado.agenda[0].obs,'Uma edição sem cópia recuperável não pode sair de cena');
   assert.deepEqual(json(a,'E'),estado);
-  assert.equal(a.itens.get('centralLeo.v1'),cache,'O cache original continua íntegro');
+  assert.deepEqual(decodificar(a.itens.get('centralLeo.v1')),decodificar(cache),
+    'O conteúdo original continua íntegro, mesmo se a tentativa de recuperação compactou o cache');
   assert.equal(a.itens.get('cl_descartado'),backup,'A recuperação já existente também continua íntegra');
   assert.equal(a.run('_tabBase'),10,'Não autoriza PUT com a versão remota não adotada');
   conferirSomenteLeituras(a,1);

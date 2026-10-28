@@ -1249,26 +1249,42 @@ function compactarTextoLocal(texto){
   if(LZString.decompressFromUTF16(compacto)!==texto)throw Error('Não foi possível conferir a cópia compactada.');
   return 'lz16:'+compacto;
 }
-function compactarRecuperacaoLocal(){
-  const texto=localStorage.getItem('cl_descartado');
+function compactarChaveLocal(chave){
+  const texto=localStorage.getItem(chave);
   if(!texto||texto.startsWith('lz16:'))return false;
   const compacto=compactarTextoLocal(texto);
-  if(compacto.length>=texto.length||localStorage.getItem('cl_descartado')!==texto)return false;
+  if(compacto.length>=texto.length||localStorage.getItem(chave)!==texto)return false;
   // Só altera a representação da nossa cópia, com conferência integral antes
   // da gravação atômica. Nenhuma chave ou versão é removida para abrir espaço.
-  localStorage.setItem('cl_descartado',compacto);return true;
+  localStorage.setItem(chave,compacto);return true;
 }
-function guardarEstadoLocal(dados){
-  const texto=JSON.stringify(dados);
-  try{localStorage.setItem(CHAVE,texto)}catch(e){
-    if(typeof LZString==='undefined'||!erroQuotaLocal(e))throw e;
+function compactarRecuperacaoLocal(){return compactarChaveLocal('cl_descartado')}
+function compactarEstadoLocal(){return compactarChaveLocal(CHAVE)}
+function gravarTextoLocal(chave,texto,compactarOutra){
+  // Cache grande já nasce compacto. Uma gravação posterior não reexpande a
+  // cópia compactada nem ocupa novamente o espaço usado pela recuperação.
+  const jaCompactado=(localStorage.getItem(chave)||'').startsWith('lz16:');
+  if(jaCompactado&&typeof LZString==='undefined')throw Error('A compactação do cache não carregou. Recarregue a página.');
+  let representacao=texto;
+  if((texto.length>65536||jaCompactado)&&typeof LZString!=='undefined'){
     const compacto=compactarTextoLocal(texto);
-    try{localStorage.setItem(CHAVE,compacto)}catch(falha){
-      if(!erroQuotaLocal(falha)||!compactarRecuperacaoLocal())throw falha;
-      localStorage.setItem(CHAVE,compacto);
+    if(jaCompactado||compacto.length<texto.length)representacao=compacto;
+  }
+  try{localStorage.setItem(chave,representacao)}catch(e){
+    if(typeof LZString==='undefined'||!erroQuotaLocal(e))throw e;
+    if(representacao===texto){
+      representacao=compactarTextoLocal(texto);
+      try{localStorage.setItem(chave,representacao);return}catch(falha){
+        if(!erroQuotaLocal(falha))throw falha;e=falha;
+      }
     }
+    // A recuperação também pode precisar do espaço ocupado pelo cache JSON.
+    // Se ambas já estão compactas, a quota continua sendo uma falha real.
+    if(!compactarOutra())throw e;
+    localStorage.setItem(chave,representacao);
   }
 }
+function guardarEstadoLocal(dados){gravarTextoLocal(CHAVE,JSON.stringify(dados),compactarRecuperacaoLocal)}
 let E=carregar();
 function carregar(){
   let s=null; try{s=lerEstadoLocal()}catch(e){}
@@ -17104,13 +17120,9 @@ function guardaDescartado(dados=lerEstadoLocal()){
   const registro={...anterior,em:Date.now(),dados};
   if(anterior){const {anteriores:_,...ultima}=anterior;registro.anteriores=[...anteriores,ultima]}
   const texto=JSON.stringify(registro);
-  // Cópias grandes já nascem compactadas para não ocupar o espaço do cache.
-  // Se mesmo assim não couber, interrompe a troca; nunca ignora a falha.
-  const preferido=texto.length>65536&&typeof LZString!=='undefined'?compactarTextoLocal(texto):texto;
-  try{localStorage.setItem('cl_descartado',preferido)}catch(e){
-    if(!erroQuotaLocal(e)||preferido!==texto||typeof LZString==='undefined')throw e;
-    localStorage.setItem('cl_descartado',compactarTextoLocal(texto));
-  }
+  // Se nem compactar as duas cópias comportar o histórico completo, interrompe
+  // a troca. Nenhuma versão pode ser removida para liberar espaço.
+  gravarTextoLocal('cl_descartado',texto,compactarEstadoLocal);
 }
 /* Textos dos formulários ficam nesta aba quando outro acesso exige trocar a base. */
 const CHAVE_RASCUNHO_SYNC='cl_rascunho_sync_v1';
