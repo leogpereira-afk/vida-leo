@@ -149,3 +149,50 @@ for(const formato of ['JSON legado','compactado'])test('Recuperação: Configura
   assert.equal(a.itens.get('cl_descartado'),armazenamento);assert.deepEqual(json(a,'E'),estado);
   conferirSomenteLeituras(a,0);
 });
+
+test('Chrome com quota guarda a versão local e o histórico antes de receber a Holding sem duplicar cobranças',async()=>{
+  const a=await app(),anterior=backupAnterior(a),arquivo=new Map();
+  a.ctx.indexedDB={};
+  a.ctx.arquivo=arquivo;
+  a.run("arquivarTextoLocal=async(tipo,texto)=>arquivo.set(tipo+texto,texto)");
+  a.run("E.agenda[0].obs='Rascunho local integral';E._mt++;guardarEstadoLocal(E)");
+  const local=json(a,'E'),legado=a.itens.get('cl_descartado');
+  a.recusadas.add('cl_descartado');atualizarRemoto(a);
+  a.remoto.dados.holdingImoveis=[{id:'imovel-teste',nome:'Imóvel de teste',pagamentos:[],despesas:[{id:'condominio-teste',descricao:'Condomínio de teste',valorCentavos:1234,pagoEm:null}]}];
+  await a.run('puxarNuvem()');
+  assert.equal(a.run('_tabBase'),20);
+  assert.deepEqual(json(a,'E.holdingImoveis'),a.remoto.dados.holdingImoveis);
+  assert.deepEqual(JSON.parse(arquivo.get('estado'+JSON.stringify(local))),local);
+  assert.deepEqual(JSON.parse(arquivo.get('historico'+legado)),anterior);
+  assert.equal(a.itens.get('cl_descartado'),legado);
+  await a.run('puxarNuvem()');
+  assert.equal(a.run('E.holdingImoveis[0].despesas.length'),1);
+  conferirSomenteLeituras(a,2);
+});
+
+test('falha no arquivo alternativo conserva cache, histórico, edição e base',async()=>{
+  const a=await app();backupAnterior(a);a.ctx.indexedDB={};
+  a.run("arquivarTextoLocal=async()=>{throw Error('falha no disco')};E.agenda[0].obs='Não perder';guardarEstadoLocal(E)");
+  const cache=a.itens.get('centralLeo.v1'),legado=a.itens.get('cl_descartado');
+  a.recusadas.add('cl_descartado');atualizarRemoto(a);await a.run('puxarNuvem()');
+  assert.deepEqual(decodificar(a.itens.get('centralLeo.v1')),decodificar(cache));assert.equal(a.itens.get('cl_descartado'),legado);
+  assert.equal(a.run('_tabBase'),10);assert.equal(a.run('E.agenda[0].obs'),'Não perder');
+  conferirSomenteLeituras(a,1);
+});
+
+test('somente libera espaço do histórico depois de verificar a íntegra, mantendo o cache ativo',async()=>{
+  const a=await app(),historico=backupAnterior(a),legado=a.itens.get('cl_descartado'),arquivo=new Map();
+  const gravar=a.ctx.localStorage.setItem;
+  a.ctx.localStorage.setItem=(k,v)=>{
+    if(k==='centralLeo.v1'&&a.itens.has('cl_descartado'))throw Object.assign(Error('quota'),{name:'QuotaExceededError'});
+    gravar(k,v);
+  };
+  a.ctx.indexedDB={};a.ctx.arquivo=arquivo;
+  a.run("arquivarTextoLocal=async(tipo,texto)=>arquivo.set(tipo,texto)");
+  atualizarRemoto(a);await a.run('puxarNuvem()');
+  assert.equal(a.run('_tabBase'),20);assert.deepEqual(json(a,'E.agenda'),a.remoto.dados.agenda);
+  assert.deepEqual(decodificar(arquivo.get('historico')),historico);
+  assert.deepEqual(decodificar(legado),historico);
+  assert.equal(a.itens.has('cl_descartado'),false);
+  assert.deepEqual(decodificar(a.itens.get('centralLeo.v1')),a.remoto.dados);
+});

@@ -1243,8 +1243,9 @@ const CFG=k=>(E.config&&E.config[k])||SEED.config[k];
 
 /* ---------------- estado ---------------- */
 const CHAVE='centralLeo.v1';
-function lerJSONLocal(chave){
-  const texto=localStorage.getItem(chave);if(!texto)return null;
+function lerJSONLocal(chave){return decodificarJSONLocal(localStorage.getItem(chave))}
+function decodificarJSONLocal(texto){
+  if(!texto)return null;
   if(texto.startsWith('lz16:')){
     if(typeof LZString==='undefined')throw Error('A compactação do cache não carregou. Recarregue a página.');
     const json=LZString.decompressFromUTF16(texto.slice(5));if(!json)throw Error('Cache inválido; consulte a nuvem.');return JSON.parse(json);
@@ -16907,6 +16908,7 @@ async function vConfig(m){
       });dx.appendChild(historico);
     }
   }
+  await mostrarArquivoHistoricoLocal(dx);
   m.appendChild(bloco('cf-descartado','🗂 Versão descartada','cópias locais preservadas antes de substituir dados',dx));
 
   // histórico de rendimentos — editável
@@ -17219,6 +17221,72 @@ function guardaDescartado(dados=lerEstadoLocal()){
   // a troca. Nenhuma versão pode ser removida para liberar espaço.
   gravarTextoLocal('cl_descartado',texto,compactarEstadoLocal);
 }
+// Camada de recuperação independente da quota de localStorage e da fila de anexos.
+async function transacaoHistoricoLocal(modo,operacao){
+  const d=await new Promise((ok,erro)=>{
+    const r=indexedDB.open('centralLeoRecuperacao',1);
+    r.onupgradeneeded=()=>r.result.createObjectStore('versoes',{keyPath:'id'});
+    r.onsuccess=()=>ok(r.result);r.onerror=()=>erro(r.error);
+  });
+  try{
+    return await new Promise((ok,erro)=>{
+      const t=d.transaction('versoes',modo),r=operacao(t.objectStore('versoes'));
+      t.oncomplete=()=>ok(r.result);t.onabort=t.onerror=()=>erro(t.error||Error('Falha ao preservar a cópia local.'));
+    });
+  }finally{d.close()}
+}
+async function arquivarTextoLocal(tipo,texto){
+  const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(texto));
+  const id=tipo+'-'+Array.from(new Uint8Array(hash),n=>n.toString(16).padStart(2,'0')).join('');
+  const salvo=await transacaoHistoricoLocal('readonly',s=>s.get(id));
+  if(salvo){
+    if(salvo.texto!==texto)throw Error('A versão já arquivada difere da cópia atual.');
+    return;
+  }
+  await transacaoHistoricoLocal('readwrite',s=>s.put({id,tipo,texto,em:Date.now()}));
+  const copia=await transacaoHistoricoLocal('readonly',s=>s.get(id));
+  if(copia?.texto!==texto)throw Error('Não foi possível conferir a cópia local.');
+}
+// A tentativa normal é síncrona. Só passa ao IndexedDB quando a quota realmente falha.
+async function comReservaDeEspaco(gravar){
+  try{return gravar(false)}catch(e){
+    if(!erroQuotaLocal(e)||typeof indexedDB==='undefined')throw e;
+    const atual=JSON.stringify(E),base=_tabBase,cache=localStorage.getItem(CHAVE);
+    const legado=localStorage.getItem('cl_descartado');
+    try{
+      if(legado)await arquivarTextoLocal('historico',legado);
+      if(cache && JSON.stringify(decodificarJSONLocal(cache))!==atual)await arquivarTextoLocal('estado',cache);
+      await arquivarTextoLocal('estado',atual);
+    }catch(causa){e.cause=causa;throw e}
+    if(JSON.stringify(E)!==atual||base!==_tabBase||localStorage.getItem(CHAVE)!==cache||
+       localStorage.getItem('cl_descartado')!==legado){
+      throw Error('Outra gravação ocorreu durante a recuperação. Sincronize novamente.');
+    }
+    try{return gravar(true)}catch(falha){
+      if(!legado||!erroQuotaLocal(falha)||localStorage.getItem('cl_descartado')!==legado)throw falha;
+      // A cópia integral foi relida no IndexedDB. O cache ativo continua disponível.
+      localStorage.removeItem('cl_descartado');
+      return gravar(true);
+    }
+  }
+}
+async function mostrarArquivoHistoricoLocal(container){
+  if(typeof indexedDB==='undefined')return;
+  try{
+    const registros=await transacaoHistoricoLocal('readonly',s=>s.getAll());
+    if(!registros.length)return;
+    const detalhes=el('<details><summary>Cópias preservadas ao liberar espaço</summary></details>');
+    for(const r of registros.sort((a,b)=>b.em-a.em)){
+      const obj=decodificarJSONLocal(r.texto);
+      const versoes=r.tipo==='historico'?[obj,...(obj.anteriores||[])]:[{em:r.em,dados:obj}];
+      for(const [i,v] of versoes.entries()){
+        detalhes.appendChild(acao('Baixar versão de '+new Date(v.em||r.em).toLocaleString('pt-BR'),
+          ()=>baixar(new Blob([JSON.stringify(v.dados)],{type:'application/json'}),'central-leo-'+r.id+'-'+i+'.json'),'ghost'));
+      }
+    }
+    container.appendChild(detalhes);
+  }catch(_){container.appendChild(el('<p role="alert">Não foi possível ler o histórico arquivado deste navegador.</p>'))}
+}
 /* Textos dos formulários ficam nesta aba quando outro acesso exige trocar a base. */
 const CHAVE_RASCUNHO_SYNC='cl_rascunho_sync_v1';
 let rascunhoSyncMemoria=null;
@@ -17291,13 +17359,13 @@ function mostrarRascunhoSync(){
   document.body.appendChild(bt);
   atualizarCamadasModais();
 }
-function adotaNuvem(r,avisar,manterNovoGasto=false){
+function adotaNuvem(r,avisar,manterNovoGasto=false,estadoArquivado=false){
   validarDadosSync(r.dados);
   // Receber uma mudança remota só é conflito quando há edição ou formulário
   // local a preservar. Uma aba limpa acompanha o servidor sem interromper.
   const edicaoLocal=_tabConteudo===null||conteudoSync(E)!==_tabConteudo;
   const novoGasto=manterNovoGasto?document.querySelector('[data-gasto-novo-sync]')?.closest('.fundo'):null;
-  if(edicaoLocal)guardaDescartado(E);
+  if(edicaoLocal&&!estadoArquivado)guardaDescartado(E);
   guardarEstadoLocal(r.dados);
   const preservou=guardarRascunhoSync(novoGasto);
   // modal aberto sobre o estado antigo viraria órfão e comeria o que fosse digitado
@@ -17342,12 +17410,12 @@ function conferirBaseInicial(){
       // Somente inclusões novas, sem edição/remoção de qualquer outro dado.
       // O restante vem integralmente da versão remota que autoriza este CAS.
       const unido={...r.dados,gastos:[...(r.dados.gastos||[]),...novos],_mt:Date.now()};
-      guardaDescartado(E); // Inclui os lançamentos feitos enquanto a primeira leitura chegava.
-      guardarEstadoLocal(unido);marcaBase(r.mt,conteudoSync(r.dados));E=carregar();tela({baseRemota:true});return true;
+      await comReservaDeEspaco(arquivado=>{if(!arquivado)guardaDescartado(E);guardarEstadoLocal(unido)});
+      marcaBase(r.mt,conteudoSync(r.dados));E=carregar();tela({baseRemota:true});return true;
     }
     const mudouDuranteLeitura=conteudoSync(E)!==conteudoAntes;
     const cachePendente=(antes._mt||0)>(r.dados._mt||0);
-    adotaNuvem(r,mudouDuranteLeitura||cachePendente,!mudouDuranteLeitura&&!cachePendente);
+    await comReservaDeEspaco(arquivado=>adotaNuvem(r,mudouDuranteLeitura||cachePendente,!mudouDuranteLeitura&&!cachePendente,arquivado));
     return !mudouDuranteLeitura&&!cachePendente;
   })().finally(()=>{leituraInicialEmCurso=null;if(_tabBase)estadoAntesPrimeiraLeitura=null});
   return leituraInicialEmCurso;
@@ -17375,7 +17443,7 @@ async function executarEnvio(){if(DEV&&!window.__testeSync)return true;
           if(!tentativa)continue; // Uma repetição, ainda protegida pelo CAS.
           pintaSync('alterações pendentes — tente sincronizar');return false;
         }
-        adotaNuvem(r,true);return false;
+        await comReservaDeEspaco(arquivado=>adotaNuvem(r,true,false,arquivado));return false;
       }
       if(p.status===428){pintaSync('recarregue a página');return false}
       if(p.status<200||p.status>=300)throw new Error('HTTP '+p.status);
@@ -17401,13 +17469,13 @@ async function puxarNuvem(){if(DEV&&!window.__testeSync){pintaSync('modo local')
     if(remoto)validarDadosSync(remoto);
     // Uma leitura não pode autorizar a gravação de alterações feitas sobre outra base.
     if(remoto&&_tabBase&&+r.mt!==_tabBase){
-      if(!atualizarMetadadosNuvem(r)){adotaNuvem(r,true);return}
+      if(!atualizarMetadadosNuvem(r)){await comReservaDeEspaco(arquivado=>adotaNuvem(r,true,false,arquivado));return}
       if(conteudoSync(E)!==_tabConteudo){await enviarNuvem();return}
       pintaSync('sincronizado');return;
     }
     marcaBase(r&&r.mt,remoto?conteudoSync(remoto):null);
     if(remoto&&(remoto._mt||0)>(E._mt||0)){
-      adotaNuvem(r,!!document.querySelector('#modais .fundo'));
+      await comReservaDeEspaco(arquivado=>adotaNuvem(r,!!document.querySelector('#modais .fundo'),false,arquivado));
     } else if((E._mt||0)>((remoto&&remoto._mt)||0)){await enviarNuvem();return}
     else pintaSync('sincronizado');
     mostrarRascunhoSync();
