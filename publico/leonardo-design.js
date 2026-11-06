@@ -12,6 +12,8 @@ const LeonardoDesign = (() => {
     bancos: ['#476184','#a8c8ef','#2a3c55','bank'],
     patrimonio: ['#7f6b37','#dfc780','#4f462e','home'],
     caixavgv: ['#68732b','#c9d48a','#424929','chart'],
+    'universo-holding': ['#243450','#dfcd92','#15213b','building'],
+    'universo-imoveis': ['#4c4938','#dfcd92','#15213b','home'],
     aviao: ['#286e90','#87d1ef','#214858','plane'],
     viagens: ['#087c81','#7adce0','#194e51','globe'],
     demandas: ['#7051a1','#c7adf1','#423356','check'],
@@ -52,12 +54,13 @@ const LeonardoDesign = (() => {
   const descricoes = {
     inicio:'Seu dia em foco',donboy:'Assistentes e decisões',agenda:'Compromissos e prazos',planilhas:'Dados e consultas',
     rendimentos:'Entradas e resultados',gastos:'Despesas e recorrentes',empresas:'Negócios e planejamento',marketing:'Canais e resultados',
-    bancos:'Contas e organização',patrimonio:'Bens e investimentos',caixavgv:'Obras e recebimentos',aviao:'Voos e operação',
+    bancos:'Contas e organização',patrimonio:'Bens e investimentos',caixavgv:'Obras e recebimentos','universo-holding':'Imóveis, pagamentos e avião','universo-imoveis':'Carteira imobiliária',aviao:'Voos e operação',
     viagens:'Roteiros e reservas',demandas:'Próximos passos',saude:'Cuidados e acompanhamento',strava:'Atividades e evolução',
     estrategia:'Objetivos e iniciativas',fortemais:'Obras e ferramentas',oportunidades:'Ideias e possibilidades',
     'metodo-vof':'Visão, organização e foco',documentos:'Arquivos e vencimentos',drive:'Pastas e arquivos',guia:'Planos e referências',config:'Preferências e conexões'
   };
-  const imagens=Object.fromEntries(Object.keys(areas).map(id=>[id,id==='fortemais'?'./fortemais-3d/nav-obras.webp':'./central-3d/'+id+'.webp']));
+  const iconesArquitetura={fortemais:'./fortemais-3d/nav-obras.webp','universo-imoveis':'./fortemais-3d/nav-inovacoes.webp'};
+  const imagens=Object.fromEntries(Object.keys(areas).map(id=>[id,iconesArquitetura[id]||'./central-3d/'+id+'.webp']));
   function icone(id){
     if(!imagens[id])return '';
     return '<img class="leo-icone-3d" src="'+imagens[id]+'" width="64" height="64" alt="" aria-hidden="true" decoding="async">';

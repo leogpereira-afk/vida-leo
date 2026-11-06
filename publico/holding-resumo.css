@@ -1,0 +1,64 @@
+.holding-cab-navegacao{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center}
+.holding-cab-navegacao .holding-marca{display:grid;gap:4px}
+.holding-cab-navegacao .holding-destino{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;min-width:44px;background:#22314c;color:#fff;border:1px solid #778399;border-radius:10px;cursor:pointer;padding:6px 10px;font-size:.83rem;font-weight:650}
+.holding-cab-navegacao .holding-destino:first-child{border-color:#a48f58;color:#f1dea8}
+.holding-cab-navegacao .holding-destino[aria-current=page]{background:#3c3b34;border-color:#dfcd92}
+.holding-cab-navegacao .holding-destino:hover{background:#34435b}
+.holding-destino svg{width:23px;height:23px}
+.holding-cab-navegacao .holding-voltar-resumo{padding:0;justify-self:start;border:0;background:none;color:#e2d2a1;text-decoration:underline;text-underline-offset:3px;font-size:.8rem;cursor:pointer}
+.holding-titulo-resumo{display:flex;align-items:baseline;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;margin:21px 0 10px}
+.holding-titulo-resumo h2{font-size:1.19rem;line-height:1.25}
+.holding-titulo-resumo span,.holding-indicador small,.holding-identificacao{color:var(--holding-suave);font-size:.82rem}
+.holding-indicadores{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.holding-indicador,.holding-quadro{background:var(--holding-papel);border:1px solid var(--holding-linha);border-radius:11px;min-width:0}
+.holding-indicador{padding:12px 14px;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.holding-indicador:first-child{border-top:3px solid #aa925a;padding-top:10px}
+.holding-indicador dt,.holding-resumo-aeronave dt{color:var(--holding-suave);font-size:.85rem}
+.holding-indicador dd{font-weight:700;font-size:clamp(1.05rem,2vw,1.4rem);line-height:1.2;overflow-wrap:anywhere}
+.holding-quadros{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:9px;margin-top:9px}
+.holding-quadro{padding:14px}
+.holding-quadro h3{font-size:1rem;line-height:1.25;margin-bottom:6px}
+.holding-composicao{width:100%;border-collapse:collapse;font-size:.86rem;table-layout:auto}
+.holding-composicao :is(td,th){padding:7px 3px;text-align:right;border-bottom:1px solid var(--holding-linha);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.holding-composicao :is(td,th):first-child{text-align:left}
+.holding-composicao thead th{font-size:.76rem;color:var(--holding-suave);font-weight:600}
+.holding-composicao tbody th{font-weight:500}
+.holding-composicao td small{display:block;font-size:.75rem;color:var(--holding-suave)}
+.holding-composicao tbody tr:last-child :is(th,td){border-bottom:0}
+.holding-resumo-aeronave>div{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--holding-linha)}
+.holding-resumo-aeronave>div:last-child{border:0}
+.holding-resumo-aeronave dd{font-size:.93rem;font-weight:650;overflow-wrap:anywhere;text-align:right}
+@media(max-width:800px){.holding-quadros{grid-template-columns:1fr}}
+@media(max-width:620px){
+  .holding-cab-navegacao{gap:8px;padding:10px 12px}
+  .holding-cab-navegacao .holding-destino:first-child{flex-direction:column;gap:1px;line-height:1.1;padding:4px 6px}
+  .holding-cab-navegacao .holding-destino:first-child span{font-size:.68rem}
+  .holding-cab-navegacao .holding-voltar-resumo{min-height:28px}
+  .holding-indicadores{grid-template-columns:1fr}
+  .holding-indicador,.holding-indicador:first-child{padding:9px 11px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:3px 7px}
+  .holding-indicador small{grid-column:1/-1}
+  .holding-indicador dd{font-size:1.02rem}
+  .holding-quadro{padding:11px}
+  .holding-composicao{font-size:.8rem}
+  .holding-titulo-resumo{margin-top:14px}
+}
+.holding-kpis-dashboard{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.holding-mes-dashboard{display:flex;align-items:center;gap:8px;font-size:.84rem;color:var(--holding-suave)}
+.holding-mes-dashboard input{min-height:38px;max-width:100%;padding:5px 8px;border-radius:7px;border:1px solid var(--holding-linha);background:var(--holding-papel);color:var(--holding-ink);font:inherit}
+.holding-area .holding-kpi-dashboard{display:grid;align-content:start;gap:4px;text-align:left;border:1px solid var(--holding-linha);border-top:3px solid #a48d52;border-radius:11px;background:var(--holding-papel);color:var(--holding-ink);padding:11px 13px;min-width:0;overflow-wrap:anywhere}
+.holding-kpi-dashboard:nth-child(2){border-top-color:#496e61}.holding-kpi-dashboard:nth-child(3){border-top-color:#486584}
+.holding-kpi-dashboard:hover,.holding-faixa-patrimonio:hover,.holding-origem-renda:hover{border-color:#a49159}
+.holding-kpi-dashboard strong{font-size:clamp(1.14rem,1.9vw,1.55rem);line-height:1.25;font-variant-numeric:tabular-nums}
+.holding-kpi-rotulo{font-size:.88rem;font-weight:650}.holding-kpi-dashboard small,.holding-cobertura{color:var(--holding-suave);font-size:.77rem;line-height:1.35}
+.holding-cobertura{margin-top:3px}
+.holding-graficos{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.holding-area .holding-faixa-patrimonio{background:none;color:var(--holding-ink);border:0;border-bottom:1px solid var(--holding-linha);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 8px;align-items:center;width:100%;text-align:left;font-size:.85rem;min-height:42px;padding:6px 0}
+.holding-faixa-patrimonio:last-child{border-bottom:0}.holding-faixa-patrimonio strong,.holding-origem-renda strong{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.holding-faixa-patrimonio small{color:var(--holding-suave);font-size:.72rem}
+.holding-trilho{display:block;background:var(--holding-linha);height:5px;border-radius:3px;overflow:hidden}.holding-trilho i,.holding-area-coluna i{display:block;height:100%;background:#7e6d3d}.holding-faixa-patrimonio:nth-of-type(2) .holding-trilho i{background:#3e596e}.holding-faixa-patrimonio:nth-of-type(3) .holding-trilho i{background:#58796c}
+.holding-variaveis{display:inline-flex;align-items:center;gap:4px;margin:2px 0 8px}.holding-area .holding-variaveis button{border:1px solid var(--holding-linha);background:var(--holding-papel);color:var(--holding-ink);font-size:.78rem;border-radius:6px;padding:4px 8px}.holding-variaveis button[aria-pressed=true]{color:#fff;background:#213450}
+.holding-grafico-vazio{padding:12px 0;color:var(--holding-suave);font-size:.85rem}.holding-colunas-mensais{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px}
+.holding-area .holding-coluna{min-width:0;display:flex;flex-direction:column;align-items:stretch;text-align:center;background:transparent;color:var(--holding-suave);border:1px solid transparent;border-radius:6px;padding:2px 1px}.holding-coluna[aria-pressed=true]{border-color:#a28b51}.holding-coluna small{font-size:.7rem}
+.holding-area-coluna{height:60px;display:flex;align-items:flex-end;justify-content:center;border-bottom:1px solid var(--holding-linha)}.holding-area-coluna i{width:58%;min-height:2px;background:#45677c;border-radius:3px 3px 0 0}
+.holding-tabela-meses summary,.holding-origens-renda summary,.holding-contas summary{cursor:pointer;color:var(--holding-ink);font-size:.86rem;font-weight:650;padding:9px 0}.holding-origens-renda,.holding-contas{margin:8px 0}.holding-area .holding-origem-renda{display:flex;justify-content:space-between;gap:7px;max-width:420px;width:100%;background:var(--holding-papel);color:var(--holding-ink);border:1px solid var(--holding-linha);border-radius:7px;padding:8px 10px;margin:3px 0;font-size:.85rem}
+@media(max-width:780px){.holding-graficos{grid-template-columns:1fr}}
+@media(max-width:620px){.holding-kpis-dashboard{grid-template-columns:1fr}.holding-area .holding-kpi-dashboard{grid-template-columns:minmax(0,1fr) auto;align-items:baseline;padding:8px 11px}.holding-kpi-dashboard strong{font-size:1.18rem}.holding-kpi-dashboard small,.holding-cobertura{grid-column:1/-1}.holding-kpi-dashboard .holding-cobertura{margin:0}.holding-mes-dashboard input{min-height:44px;font-size:16px}.holding-faixa-patrimonio,.holding-area .holding-variaveis button{min-height:44px}}

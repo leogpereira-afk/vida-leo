@@ -1,0 +1,47 @@
+.hcar-painel { display:grid; gap:8px; min-width:0; }
+.hcar-grupo { min-width:0; border:1px solid var(--holding-linha,var(--linha)); border-radius:10px; background:var(--holding-papel,var(--card)); }
+.hcar-grupo>.hcar-sumario { cursor:pointer; padding:9px 12px; color:var(--holding-ink,var(--tinta)); font-size:.93rem; line-height:1.45; }
+.hcar-contagem { display:inline-block; min-width:1.6em; margin-left:7px; padding:0 5px; border-radius:5px; background:var(--bg); color:var(--holding-suave,var(--suave)); text-align:center; font-size:.76rem; font-variant-numeric:tabular-nums; }
+.hcar-conteudo { padding:0 12px 6px; }
+.hcar-conteudo>.hcar-acao { margin:4px 0 8px; }
+.hcar-linha { display:grid; grid-template-columns:minmax(110px,1.1fr) minmax(0,3fr) auto; align-items:center; gap:6px 12px; border-top:1px solid var(--holding-linha,var(--linha)); padding:9px 0; min-width:0; }
+.hcar-linha-titulo,.hcar-metrica { min-width:0; overflow-wrap:anywhere; }
+.hcar-linha-titulo h4,.hcar-editor h4 { margin:0; font-size:.9rem; line-height:1.35; }
+.hcar-metricas { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:8px; margin:0; }
+.hcar-metrica dt,.hcar-vazio,.hcar-historico { color:var(--holding-suave,var(--suave)); font-size:.76rem; line-height:1.35; }
+.hcar-metrica dd { margin:2px 0 0; font-size:.85rem; font-weight:650; font-variant-numeric:tabular-nums; }
+.hcar-acoes,.hcar-editor-acoes { display:flex; flex-wrap:wrap; gap:5px; align-items:center; }
+.hcar-acao,.hcar-salvar { border:1px solid var(--holding-linha,var(--linha)); background:var(--holding-papel,var(--card)); color:var(--holding-ink,var(--tinta)); border-radius:7px; padding:5px 8px; min-height:32px; font:inherit; font-size:.78rem; font-weight:600; cursor:pointer; }
+.hcar-salvar { background:#243450; color:#fff; border-color:#243450; }
+.hcar-acao:focus-visible,.hcar-salvar:focus-visible,.hcar-sumario:focus-visible,.hcar-historico summary:focus-visible { outline:3px solid #687db5; outline-offset:2px; }
+.hcar-painel button:disabled { cursor:wait; opacity:.65; }
+.hcar-historico,.hcar-local { grid-column:1/-1; }
+.hcar-historico { margin:0; }
+.hcar-historico summary { cursor:pointer; width:fit-content; }
+.hcar-historico ul { margin:4px 0 0; padding:0; list-style:none; }
+.hcar-historico li { display:flex; flex-wrap:wrap; gap:3px 9px; margin:4px 0; }
+.hcar-local:empty { display:none; }
+.hcar-editor { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr)); gap:8px 10px; padding:10px; border:1px solid var(--holding-linha,var(--linha)); border-left:3px solid #b09c62; background:var(--bg); border-radius:8px; }
+.hcar-editor h4,.hcar-editor-acoes,.hcar-erro { grid-column:1/-1; }
+.hcar-campo { display:grid; gap:4px; align-content:start; font-size:.81rem; min-width:0; }
+.hcar-campo input,.hcar-campo select { box-sizing:border-box; width:100%; min-width:0; border:1px solid var(--holding-linha,var(--linha)); border-radius:6px; background:var(--holding-papel,var(--card)); color:var(--holding-ink,var(--tinta)); padding:7px; font:inherit; }
+.hcar-campo :is(input,select):focus-visible { outline:2px solid #687db5; outline-offset:1px; }
+.hcar-erro,.hcar-retorno { margin:3px 0; font-size:.82rem; }
+.hcar-erro { color:var(--erro,#ac3540); }
+.hcar-erro[hidden],.hcar-retorno[hidden] { display:none; }
+@media(max-width:1100px) {
+  .hcar-linha { grid-template-columns:minmax(0,1fr) minmax(0,3fr); }
+  .hcar-acoes { grid-column:1/-1; }
+}
+@media(max-width:680px) {
+  .hcar-grupo>.hcar-sumario { min-height:44px; box-sizing:border-box; padding:11px 10px; }
+  .hcar-conteudo { padding-inline:10px; }
+  .hcar-linha { display:block; padding-block:10px; }
+  .hcar-metricas { grid-auto-flow:row; grid-template-columns:repeat(2,minmax(0,1fr)); margin:7px 0; }
+  .hcar-metrica dt,.hcar-vazio,.hcar-historico { font-size:.8rem; }
+  .hcar-metrica dd { font-size:.92rem; }
+  .hcar-editor { margin-top:7px; }
+  .hcar-painel :is(.hcar-acao,.hcar-salvar,input,select) { min-height:44px; }
+  .hcar-historico summary { line-height:44px; }
+  .hcar-campo :is(input,select) { font-size:16px; }
+}

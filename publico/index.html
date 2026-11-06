@@ -669,6 +669,9 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./saude-visual.css?v=81aa61302df9">
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
 <link rel="stylesheet" href="./aviao.css?v=44fae810ca9e">
+<link rel="stylesheet" href="./holding.css?v=30153156400c">
+<link rel="stylesheet" href="./holding-carteira.css?v=83713a7fb584">
+<link rel="stylesheet" href="./holding-resumo.css?v=4a0a3df0f52f">
 <link rel="stylesheet" href="./fortemais-previsao.css?v=cdb9222e7265">
 <link rel="stylesheet" href="./fortemais-demandas.css?v=a393c8abfff4">
 <link rel="stylesheet" href="./fortemais-compacto.css?v=0a97e1fae61a">
@@ -727,6 +730,14 @@ tr:hover .lixo{opacity:1}
 
 <script src="./vendor/ical-2.2.1.min.js"></script>
 <script src="./google-datas.js?v=85c5d36986f3"></script>
+<script src="./holding-modelo.js?v=89e0f33c58f7"></script>
+<script src="./holding-resumo.js?v=bb44bceb78fa"></script>
+<script src="./holding-carteira-modelo.js?v=e9a89da88050"></script>
+<script src="./holding-carteira-central.js?v=3ac72367d43d"></script>
+<script src="./holding-carteira-ui.js?v=a0459b885167"></script>
+<script src="./holding-dashboard.js?v=430e9c8c848f"></script>
+<script src="./holding-ui.js?v=57499078d034"></script>
+<script src="./holding-central.js?v=36fe678c48df"></script>
 <script src="./inicio-google.js?v=75bfe0d51b19"></script>
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
 <script src="./marketing-fortemais.js?v=cbf67399c021"></script>
@@ -758,7 +769,7 @@ tr:hover .lixo{opacity:1}
 <script src="./fortemais-obras-dashboard.js?v=d8bd2eac5e6f"></script>
 <script src="openclaw-fila.js?v=066cb079a2b5"></script>
 <script src="./saude-comparacao.js?v=c7876474a532"></script>
-<script src="./leonardo-design.js?v=724c803cb14a"></script>
+<script src="./leonardo-design.js?v=2bf285f8a71e"></script>
 <script src="./rendimentos-modelo.js?v=a2faa87ce0bd"></script>
 <script src="./rendimentos-dashboards-modelo.js?v=0987eb11dd63"></script>
 <script src="./financeiro-graficos.js?v=493dcd6ca9b6"></script>
@@ -2241,7 +2252,9 @@ const MODS=[
   {id:'bancos',ic:'🏦',nome:'Gestão',grupo:'',render:vBancos},
   {id:'patrimonio',ic:'🏠',nome:'Patrimônio',grupo:'',render:vPatrimonio},
   {id:'caixavgv',ic:'💰',nome:'Caixa e VGV',grupo:'',render:vCaixaVGV},
-  {id:'aviao',ic:'🛩️',nome:'Avião',grupo:'',render:vAviao},
+  {id:'universo-holding',ic:'🏙️',nome:'Universo Holding',grupo:'',render:m=>vUniversoHolding(m)},
+  {id:'universo-imoveis',ic:'🏠',nome:'Imóveis da holding',grupo:'',oculto:true,render:m=>vUniversoImoveis(m)},
+  {id:'aviao',ic:'🛩️',nome:'Avião',grupo:'',oculto:true,render:vAviao},
   {id:'viagens',ic:'✈️',nome:'Viagens',grupo:'Vida',render:vViagens},
   {id:'demandas',ic:'✅',nome:'Demandas',grupo:'',render:vDemandas},
   {id:'saude',ic:'🩺',nome:'Saúde',grupo:'',render:vSaude},
@@ -2266,7 +2279,7 @@ function menu(){
   // A lateral usa emojis; imagens 3D continuam nos cards e cabeçalhos das áreas.
   const emojis={donboy:'🤖',marketing:'📣','metodo-vof':'🎯',drive:'📁',strava:'🏃'};
   MODS.filter(m=>!m.oculto).forEach(m=>{
-    const selecionado=!m.url&&(m.id===atual||(atual==='estrategia'&&m.id==='empresas'));
+    const selecionado=!m.url&&(m.id===atual||(atual==='estrategia'&&m.id==='empresas')||(['aviao','universo-imoveis'].includes(atual)&&m.id==='universo-holding'));
     if(m.grupo)nav.appendChild(el(`<div class="sep">${m.grupo}</div>`));
     /* Entrada com `url` é ATALHO para outro sistema, não tela daqui: abre em
        outra aba, nunca fica marcada como ativa, e o ↗ avisa antes do clique.
@@ -2444,6 +2457,11 @@ function organizarPainelCompacto(pagina,secao){
 
 function tela(opcoes={}){
   if(atual==='fortemais'&&opcoes.baseRemota!==true&&!fmPodeNavegar())return false;
+  const edicaoHolding=(atual==='universo-imoveis'||atual==='universo-holding')&&document.querySelector('#main .holding-area .holding-dialog[open],#main .holding-area [data-holding-rascunho],#main .holding-area [aria-busy="true"],#main .holding-dialog[open]');
+  if(edicaoHolding){
+    edicaoHolding.dataset.holdingAtualizar='1';
+    return false;
+  }
   aplicarFonteInterface();
   const m=document.getElementById('main'),pagina=el('<div class="pagina"></div>');
   for(const p of m.querySelectorAll('[data-fm-pagina]'))p._fmDispose?.();
@@ -2460,8 +2478,77 @@ function tela(opcoes={}){
 }
 const rr=id=>()=>{if(atual===id||(id==='estrategia'&&atual==='empresas'&&filtro.empresaAba==='planejamento')||(id==='empresas'&&atual==='estrategia'))tela()};
 // trocar de tela: sobe ao topo, a não ser que alguém tenha pedido um bloco
-function irTela(id){if(atual==='fortemais'&&!fmPodeNavegar())return;if(id==='guia'&&_alvoBloco==='gu-bancos'){id='bancos';_alvoBloco=null}if(id==='guia'&&_alvoBloco==='gu-empresas'){id='empresas';_alvoBloco=null}if(!MODS.some(m=>m.id===id&&!m.url))return;atual=id;if(location.hash!=='#'+id)history.pushState(null,'','#'+id);alternarMenu(false);menu();if(!tela())window.scrollTo(0,0);document.getElementById('main').focus({preventScroll:true})}
-window.addEventListener('popstate',()=>{if(atual==='fortemais'&&!fmPodeNavegar()){history.pushState(null,'','#'+atual);return}const id=location.hash.slice(1)||'inicio';if(MODS.some(m=>m.id===id&&!m.url)){atual=id;menu();tela()}});
+function rotaDaHolding(id){return id==='universo-holding'||id==='universo-imoveis'}
+function impedimentoSaidaHolding(){
+  if(!rotaDaHolding(atual)||!temSessao())return '';
+  if(document.querySelector('#main :is(.holding-area,.holding-dialog) form[aria-busy="true"]'))return 'Aguarde o salvamento antes de sair da holding.';
+  if(document.querySelector('#main [data-holding-rascunho]'))return 'Salve ou cancele as alterações antes de sair da holding.';
+  return '';
+}
+function indiceHistoricoCentral(){
+  const indice=window.navigation?.currentEntry?.index ?? globalThis.history?.state?.centralPosicao;
+  return Number.isInteger(indice)&&indice>=0?indice:null;
+}
+let indiceTelaCentral=indiceHistoricoCentral();
+let vigiaSaidaHolding=false;
+function atualizarVigiaSaidaHolding(){
+  const ativo=rotaDaHolding(atual);
+  if(ativo===vigiaSaidaHolding)return;
+  if(ativo)window.addEventListener('beforeunload',avisarSaidaHolding);
+  else window.removeEventListener?.('beforeunload',avisarSaidaHolding);
+  vigiaSaidaHolding=ativo;
+}
+function abrirHashCentral(id){
+  if(location.hash==='#'+id)return;
+  // Nos navegadores sem Navigation API, identifica a posição das entradas
+  // vizinhas à holding para desfazer Voltar ou Avançar sem cortar a pilha.
+  const marcarPosicao=!window.navigation?.currentEntry&&(rotaDaHolding(atual)||rotaDaHolding(id))&&
+    typeof history.replaceState==='function'&&Number.isInteger(history.length)&&history.length>0;
+  history.pushState(null,'','#'+id);
+  if(marcarPosicao)history.replaceState({centralPosicao:history.length-1},'');
+}
+function manterEnderecoHolding(){
+  if(location.hash==='#'+atual)return;
+  const destino=indiceHistoricoCentral();
+  if(typeof history.go==='function'&&indiceTelaCentral!==null&&destino!==null&&indiceTelaCentral!==destino){
+    history.go(indiceTelaCentral-destino);
+  }else{
+    // Link antigo sem posição registrada. Restaura ao menos a rota visível.
+    abrirHashCentral(atual);
+    indiceTelaCentral=indiceHistoricoCentral();
+  }
+}
+function irTela(id){
+  if(atual==='fortemais'&&!fmPodeNavegar())return;
+  if(id==='guia'&&_alvoBloco==='gu-bancos'){id='bancos';_alvoBloco=null}
+  if(id==='guia'&&_alvoBloco==='gu-empresas'){id='empresas';_alvoBloco=null}
+  if(!MODS.some(m=>m.id===id&&!m.url))return;
+  const impedimento=impedimentoSaidaHolding();
+  if(impedimento){alert(impedimento);return}
+  abrirHashCentral(id);atual=id;indiceTelaCentral=indiceHistoricoCentral();atualizarVigiaSaidaHolding();
+  alternarMenu(false);menu();if(!tela())window.scrollTo(0,0);
+  document.getElementById('main').focus({preventScroll:true});
+}
+function navegarHistoricoCentral(){
+  if(atual==='fortemais'&&!fmPodeNavegar()){history.pushState(null,'','#'+atual);return}
+  const id=location.hash.slice(1)||'inicio';
+  const impedimento=impedimentoSaidaHolding();
+  if(impedimento){
+    if(id!==atual){manterEnderecoHolding();alert(impedimento)}
+    return;
+  }
+  if(MODS.some(m=>m.id===id&&!m.url)){atual=id;indiceTelaCentral=indiceHistoricoCentral();atualizarVigiaSaidaHolding();menu();tela()}
+}
+window.addEventListener('popstate',navegarHistoricoCentral);
+function avisarSaidaHolding(evento){
+  if(!impedimentoSaidaHolding())return;
+  evento.preventDefault();evento.returnValue='';
+}
+atualizarVigiaSaidaHolding();
+function preservarSaidaHolding(){
+  if(temSessao()&&rotaDaHolding(atual)&&document.querySelector('#main [data-holding-rascunho]'))guardarRascunhoSync();
+}
+window.addEventListener('pagehide',preservarSaidaHolding);
 const cab=(t,s)=>el(`<div class="topo"><div><h1>${t}</h1><p>${s||''}</p></div><span class="cresce"></span></div>`);
 const kpi=(rot,val,sub,cl,ir)=>`<div class="kpi ${cl||''}${ir?' clic':''}"${ir?` data-kpi="${ir}" role="button" tabindex="0" title="Abrir detalhes"`:''}><div class="rot">${rot}</div><div class="val">${val}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
 /* Cada card leva ao bloco que explica o número. Quase sempre é preciso
@@ -3283,7 +3370,7 @@ function vAviao(m){
   const topo=cab('Avião','Sua participação, manutenção, viagens e documentos em uma só visão.');
   const inp=el('<input type="file" accept=".xlsx,.json" hidden>');
   inp.onchange=()=>{const f=inp.files?.[0];if(f)importarAviao(f);inp.value=''};
-  topo.append(acao('Importar dados',()=>inp.click(),'ghost'),acao('Colar do Excel',colarPlanilhaAviao,'ghost'),acao('+ Viagem no avião',()=>novaViagemRotina(true)),inp);
+  topo.append(acao('← Universo Holding',()=>irTela('universo-holding'),'ghost'),acao('Importar dados',()=>inp.click(),'ghost'),acao('Colar do Excel',colarPlanilhaAviao,'ghost'),acao('+ Viagem no avião',()=>novaViagemRotina(true)),inp);
   m.appendChild(topo);
   const viagem=(E.viagens||[]).filter(v=>v.aviaoId==='principal');
   m.appendChild(el(`<div class="aviao-hero">
@@ -3604,7 +3691,7 @@ function modalViagem(v){
       {k:'transporte',t:'Transporte',tipo:'select',opcoes:['',...CFG('transportes')]},
       {k:'aviaoId',t:'Aeronave desta viagem',tipo:'select',opcoes:[{v:'',t:'Sem vínculo com o avião'},{v:'principal',t:'Meu avião'}],
         aoGravar:valor=>{if(!valor&&(E.aviao?.despesas||[]).some(d=>d.viagemId===v.id)){
-          alert('Esta viagem tem despesas do avião vinculadas. Desvincule-as na aba Avião antes de remover a aeronave.');return false}
+          alert('Esta viagem tem despesas do avião vinculadas. Abra Universo Holding → Avião para desvinculá-las antes de remover a aeronave.');return false}
           return true}},
       {k:'status',t:'Status',tipo:'select',opcoes:CFG('statusViagem')},
       {k:'gastos',t:'Orçamento estimado (R$)',tipo:'number'},
@@ -4030,7 +4117,7 @@ function modalViagem(v){
       } else rol.innerHTML='<div class="vazio">Sem custos lançados. Some alimentação, hotel, passagem…</div>';
       cc.appendChild(rol);
       const vinculadas=despesasDoAviaoNaViagem(v);
-      if(vinculadas.length)cc.appendChild(el(`<div class="aviao-vinculo">🛩️ Da aba Avião: ${vinculadas.map(d=>`${esc(d.categoria||'Despesa')} · ${brl(+d.minhaCota||0)}`).join(' · ')}. Edite essas despesas na aba Avião para não lançar duas vezes.</div>`));
+      if(vinculadas.length)cc.appendChild(el(`<div class="aviao-vinculo">🛩️ Despesas do avião: ${vinculadas.map(d=>`${esc(d.categoria||'Despesa')} · ${brl(+d.minhaCota||0)}`).join(' · ')}. Para editar, abra Universo Holding → Avião.</div>`));
       // orçado x realizado: enquanto não há custos, vale o orçamento estimado
       if(v.custos.length&&+v.gastos){
         const dif=total-(+v.gastos);
@@ -16979,6 +17066,14 @@ function validarBackup(j){
   if(j.aviao)for(const k of ['aportes','mensalidades','despesas'])
     if(j.aviao[k]!==undefined&&(!Array.isArray(j.aviao[k])||j.aviao[k].some(v=>!v||typeof v!=='object'||Array.isArray(v))))
       throw new Error('Lista inválida: aviao.'+k);
+  if(j.holdingImoveis!==undefined){
+    if(typeof HoldingModelo==='undefined')throw new Error('Atualize a página para conferir os imóveis da holding.');
+    HoldingModelo.validarCarteira(j.holdingImoveis);
+  }
+  if(j.holdingFinanceiro!==undefined){
+    if(typeof HoldingCarteiraModelo==='undefined')throw new Error('Atualize a página para conferir a carteira da holding.');
+    HoldingCarteiraModelo.validar(j.holdingFinanceiro,j.holdingImoveis ?? []);
+  }
   for(const obra of j.obras||[]){
     if(obra.fmCompras!==undefined)FortemaisComprasModelo.validar(obra.fmCompras);
     if(obra.fmImovel!==undefined)FortemaisImovelModelo.validar(obra.fmImovel);
@@ -17135,6 +17230,7 @@ function lerRascunhoSync(){
 function guardarRascunhoSync(ignorar=null){
   const formularios=[];
   const fontes=[...document.querySelectorAll('#modais .fundo'),...document.querySelectorAll('#main [data-uso-direto]'),
+    ...document.querySelectorAll('#main [data-holding-rascunho]'),
     ...[...document.querySelectorAll('#main [data-fm-pagina]')].filter(p=>p._fmDirty===true)].map(f=>({f,soAlterados:false}));
   const seletor='#main .ag-form,#main .editor-lista-mobile form,#main table input[data-i][data-k],#main table textarea[data-i][data-k],#main input.bNome';
   fontes.push(...[...document.querySelectorAll(seletor)].map(f=>({f,soAlterados:true})));
