@@ -16,6 +16,13 @@ function gastoReferenciaOrigem(g) {
 function pagamentoReferenciaCompartilhada(ref) {
   const gasto=ref.startsWith('gasto:') && (E.gastos||[]).find(g=>'gasto:'+g.id===ref);
   if (gastoVinculado(gasto)) return gastoReferenciaOrigem(gasto);
+  // Uma operação conciliada pode aparecer na aquisição e nas despesas.
+  // Os vínculos explícitos apontam para o mesmo gasto e o mesmo comprovante.
+  for(const g of E.gastos||[]) {
+    if(!g.holdingImovelId)continue;
+    const vinculos=[['parcela',g.holdingParcelaId],['despesa',g.holdingDespesaId],['pagamento',g.holdingPagamentoId]];
+    if(vinculos.some(([tipo,id])=>id && HoldingUI.refAnexos(g.holdingImovelId,tipo,id)===ref))return gastoReferenciaOrigem(g);
+  }
   for (const i of E.holdingImoveis||[]) {
     for (const [chave,tipo] of [['parcelas','parcela'],['pagamentos','pagamento'],['despesas','despesa']]) {
       if ((i[chave]||[]).some(p=>HoldingUI.refAnexos(i.id,tipo,p.id)===ref)) return ref;

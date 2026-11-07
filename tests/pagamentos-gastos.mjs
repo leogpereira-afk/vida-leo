@@ -93,3 +93,15 @@ test('Abrir imóveis e avião não importa pagamentos antigos em Gastos',()=>{
  const a=app();a.ctx.reg=registro('aportes');a.run(`E.aviao.aportes=[reg];E.holdingImoveis=[{id:'i',nome:'Imóvel',totalCentavos:10000,pagamentos:[{id:'p',data:'2026-01-01',valorCentavos:10000}]}];vAviao(document.getElementById('main'));vUniversoImoveis(document.getElementById('main'))`);
  assert.equal(a.estado().gastos.length,0);
 });
+
+test('Operação conciliada na aquisição e em despesas reutiliza um gasto e uma referência de comprovante',async()=>{
+ const a=app();
+ a.run(`E.holdingImoveis=[{id:'i',nome:'Imóvel de ensaio',totalCentavos:10000,parcelas:[{id:'p',descricao:'Permuta',valorCentavos:10000,vencimento:'2026-11-01'}],pagamentos:[{id:'pg',parcelaId:'p',descricao:'Permuta',data:'2026-11-01',valorCentavos:10000}],despesas:[{id:'d',tipo:'investimento',descricao:'Permuta',valorCentavos:10000,vencimento:'2026-11-01',pagoEm:'2026-11-01'}]}];E.gastos=[{id:'unico',holdingImovelId:'i',holdingParcelaId:'p',holdingDespesaId:'d',valor:100,pagoEm:'2026-11-01'}];`);
+ const canonical=a.run(`HoldingUI.refAnexos('i','parcela','p')`);
+ assert.equal(a.run(`holdingAnexosCompartilhados(HoldingUI.refAnexos('i','despesa','d'))`),canonical);
+ assert.equal(a.run(`holdingAnexosCompartilhados('gasto:unico')`),canonical);
+ await a.run(`holdingPagarDespesa('i','d',E.holdingImoveis[0].despesas[0],E.holdingImoveis[0])`);
+ await a.run(`holdingPagarParcela('i','p',E.holdingImoveis[0].parcelas[0],E.holdingImoveis[0])`);
+ assert.equal(a.estado().gastos.length,1);assert.equal(a.estado().gastos[0].id,'unico');
+ assert.equal(a.run(`holdingAnexosCompartilhados(HoldingUI.refAnexos('i','despesa','d'))`),canonical);
+});
