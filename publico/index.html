@@ -736,8 +736,8 @@ tr:hover .lixo{opacity:1}
 <script src="./holding-carteira-central.js?v=3ac72367d43d"></script>
 <script src="./holding-carteira-ui.js?v=83ca93590eb2"></script>
 <script src="./holding-dashboard.js?v=a20d1dee21de"></script>
-<script src="./holding-ui.js?v=7eac5a2d40fe"></script>
-<script src="./holding-central.js?v=3fe0ba286a3d"></script>
+<script src="./holding-ui.js?v=ce58eb4ff582"></script>
+<script src="./holding-central.js?v=f6227389d79a"></script>
 <script src="./inicio-google.js?v=75bfe0d51b19"></script>
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
 <script src="./marketing-fortemais.js?v=cbf67399c021"></script>
@@ -901,6 +901,7 @@ function arqIndice(){
 // O que existe para este registro: o que está no servidor mais o que ainda não
 // subiu daqui. Um id que exista dos dois lados conta UMA vez (o local é cópia).
 async function arqPor(ref){
+  ref=holdingAnexosCompartilhados(ref)||ref;
   const [locais,idx]=await Promise.all([arqLocaisPor(ref),arqIndice()]);
   const nuvem=(idx&&idx.get(ref))||[];
   const vistos=new Set(nuvem.map(x=>x.id));
@@ -913,6 +914,13 @@ async function arqPor(ref){
    índice um anexo que a tela mostra e que não abre — mentira visível é pior
    que byte órfão. Sem internet, fica na fila local e sobe depois. */
 async function arqSubir(reg,file){
+  const compartilhado=holdingAnexosCompartilhados(reg.ref);
+  if(compartilhado){
+    if(!await arqIndice())throw Error('Aguarde a conexão para conferir os comprovantes.');
+    const conferido=await holdingIdComprovante(compartilhado,file,true);
+    if(conferido.existente)return conferido.existente;
+    reg={...reg,ref:compartilhado,id:conferido.id};
+  }
   const s=await apiSync('POST',{acao:'arqSubirUrl',id:reg.id,ref:reg.ref});
   const r=await fetch(s.url,{method:'PUT',
     headers:{'content-type':file.type||'application/octet-stream'},body:file});
@@ -920,14 +928,23 @@ async function arqSubir(reg,file){
   await apiSync('POST',{acao:'arqIndexar',id:reg.id,ref:reg.ref,nome:reg.nome,
     tipo:reg.tipo,tam:reg.tam,em:reg.em,caminho:s.caminho});
   arqEsquecerIndice();
+  return reg;
 }
 const LIMITE_ARQ=25*1024*1024;
 async function arqAdd(ref,file){
   if(file.size>LIMITE_ARQ)
     throw new Error(file.name+' tem '+tamanho(file.size)+' — o limite é 25 MB por arquivo.');
-  const reg={id:uid(),ref,nome:file.name,tipo:file.type,tam:file.size,em:hoje()};
+  const compartilhado=holdingAnexosCompartilhados(ref);
+  let id;
+  if(compartilhado){
+    ref=compartilhado;
+    const conferido=await holdingIdComprovante(ref,file);
+    if(conferido.existente)return conferido.existente;
+    id=conferido.id;
+  }else id=uid();
+  const reg={id,ref,nome:file.name,tipo:file.type,tam:file.size,em:hoje()};
   if(naNuvem()){
-    try{ await arqSubir(reg,file); return reg }
+    try{ return await arqSubir(reg,file) }
     catch(e){
       // Recusa ENTENDIDA pelo servidor não vira fila: ficaria tentando para
       // sempre, calado. Só falha de rede é que espera a internet voltar.
@@ -1849,7 +1866,7 @@ function areaArquivos(ref,dica,somenteLeitura=false){
       };
       it.querySelector('.lixo').onclick=async()=>{
         if(somenteLeitura)return;
-        if(!confirm('Apagar o arquivo '+a.nome+'?'))return;
+        if(!confirm(holdingAnexosCompartilhados(ref)?'Apagar o comprovante '+a.nome+' do plano e de Gastos?':'Apagar o arquivo '+a.nome+'?'))return;
         try{ await arqDel(a.id);pintar() }
         catch(err){ alert('Não consegui apagar no servidor: '+(err.message||err)+'\nConfira a lista antes de tentar novamente.') }
       };
@@ -13087,6 +13104,11 @@ function modalLancamentoGasto(g,novo=false){
       {k:'natureza',t:'Natureza',opcoes:['Despesa pessoal','Estorno'],inicial:(+g.valor<0?'Estorno':'Despesa pessoal')},
       {k:'obs',t:'Observações',tipo:'textarea',full:true}],
       g,(v,patch)=>{financeiroValidarGasto(v);if(Object.hasOwn(patch,'empresaId')){if(v.empresaId==='__sem_empresa__')patch.empresaId=v.empresaId='';const empresa=(E.empresasPJ||[]).find(e=>String(e.id)===v.empresaId);if(v.empresaId&&!empresa)throw Error('A empresa não está mais no cadastro. Confira o vínculo.');if(g.empresa!==empresaAnterior||g.empresaNome!==empresaNomeAnterior)throw Error('O vínculo mudou em outra sessão. Reabra a ficha.');patch.empresa=v.empresa=empresa?.nome||'';if(g.empresaNome!==undefined)patch.empresaNome=v.empresaNome=empresa?.nome||'';}financeiroSalvarRegistro(E.gastos,g,v,patch)},fechar);
+    if(g.holdingImovelId && g.holdingParcelaId){
+      for(const nome of ['valor','mes','data','vencimento','situacao','pagoEm','empresaId','natureza'])camposGasto.controles[nome].disabled=true;
+      const origem=el('<p class="ff-note">Pagamento vinculado à parcela do imóvel. O comprovante é compartilhado com o plano.</p>');
+      origem.appendChild(acao('Abrir imóvel',()=>{fechar();irTela('universo-imoveis')},'ghost'));c.appendChild(origem);
+    }
     if(novo)camposGasto.form.dataset.gastoNovoSync='';
     for(const o of camposGasto.controles.empresaId.options)o.textContent=o.value==='__sem_empresa__'?'Despesa pessoal (remover vínculo)':o.value?(E.empresasPJ||[]).find(e=>String(e.id)===o.value)?.nome||'Vínculo a conferir: '+o.value:'Sem empresa / pessoal';
     c.appendChild(el('<p class="ff-note">Confira se este lançamento já existe. Os gráficos usam os lançamentos; recorrentes atuais são estimativas apresentadas separadamente. Evite duplicar a mesma despesa.</p>'));
@@ -13094,6 +13116,7 @@ function modalLancamentoGasto(g,novo=false){
   });
 }
 function financeiroRepetirGastos(itens,mes){
+  itens=itens.filter(g=>!g.holdingImovelId||!g.holdingParcelaId);
   abrirModal('Revisar gastos para '+mes.split('-').reverse().join('/'),'Selecione somente as despesas que quer repetir. Os originais e os comprovantes não mudam.',(c,fechar)=>{
     const escolhidos=new Set(),lista=el('<div class="ff-repeat-list"></div>'),status=el('<p class="ff-note" role="status" aria-live="polite"></p>'),btn=el('<button class="btn" type="button">Adicionar selecionados</button>');
     const atualizar=()=>{const vis=itens.filter(x=>escolhidos.has(x.id));status.textContent=vis.length+' selecionados · '+brl(vis.reduce((a,x)=>a+(+x.valor||0),0));btn.disabled=!vis.length};
@@ -13309,8 +13332,16 @@ function vGastosBase(m,opcoes={}){
     g=>modalLancamentoGasto(g)));
   const adicionarGasto=m.querySelector('[data-bid="gt-lista"] .mais');if(adicionarGasto)adicionarGasto.onclick=()=>modalLancamentoGasto({id:uid(),...novoLanc()},true);
 
-  const excluirGasto=async g=>{if(!confirm('Excluir este lançamento e seus comprovantes?'))return;if(!await apagarAnexosDe('gasto:'+g.id))return;E.gastos=E.gastos.filter(x=>x.id!==g.id);salvar();r()};
+  const excluirGasto=async g=>{if(g.holdingImovelId && g.holdingParcelaId){modalLancamentoGasto(g);return}if(!confirm('Excluir este lançamento e seus comprovantes?'))return;if(!await apagarAnexosDe('gasto:'+g.id))return;E.gastos=E.gastos.filter(x=>x.id!==g.id);salvar();r()};
   m.querySelectorAll('[data-bid="gt-lista"] [data-del]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();excluirGasto(doMes[+b.dataset.del])});
+  m.querySelectorAll('[data-bid="gt-lista"] [data-k]').forEach(campo=>{
+    const gasto=doMes[+campo.dataset.i];
+    if(gasto?.holdingImovelId && gasto.holdingParcelaId && ['valor','mes'].includes(campo.dataset.k))campo.disabled=true;
+  });
+  m.querySelectorAll('[data-bid="gt-lista"] [data-del]').forEach(btn=>{
+    const gasto=doMes[+btn.dataset.del];
+    if(gasto?.holdingImovelId && gasto.holdingParcelaId){btn.textContent='Ver';btn.title='Ver parcela vinculada';btn.setAttribute('aria-label',btn.title);}
+  });
   const cartoesLanc=el('<div class="gastos-categorias"></div>');
   const gruposLanc=new Map();
   classes.forEach(cl=>{
@@ -13326,7 +13357,9 @@ function vGastosBase(m,opcoes={}){
   doMes.slice().sort((a,b)=>(+b.valor||0)-(+a.valor||0)).forEach(g=>{
     const linha=el(`<div class="finance-expense-row" data-ff-gasto="${esc(g.id)}"><button class="finance-expense-open"><span>${esc(g.oque||'Sem descrição')}<small>${esc(g.classe||g.categoria||'Sem categoria')} · ${esc(g.mes||'Sem mês')} · ${esc(g.situacao||'Não informado')}${g.vencimento?' · vence '+esc(fmtDataAno(g.vencimento)):''}${g.parcela?' · parcela '+esc(g.parcela)+'/'+esc(g.parcelas||'?'):''}</small></span><b>${brl(+g.valor||0)} ›</b></button><button class="btn ghost mini" aria-label="${esc('Excluir '+(g.oque||'gasto'))}">Excluir</button></div>`);
     linha.querySelector('.finance-expense-open').onclick=()=>modalLancamentoGasto(g);
-    linha.querySelector('.btn').onclick=()=>excluirGasto(g);
+    const acaoGasto=linha.querySelector('.btn');
+    if(g.holdingImovelId && g.holdingParcelaId){acaoGasto.textContent='Ver parcela';acaoGasto.setAttribute('aria-label','Ver parcela de '+g.oque);}
+    acaoGasto.onclick=()=>excluirGasto(g);
     gruposLanc.get(g.classe||g.categoria||'Sem categoria')?.appendChild(linha);
   });
   const conteudoLanc=m.querySelector('[data-bid="gt-lista"] .conteudo');

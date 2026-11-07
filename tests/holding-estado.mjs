@@ -220,3 +220,96 @@ test('despesa avulsa quitada permanece no backup e mantém a aquisição e a aer
   assert.equal(app.run('HoldingModelo.resumoDespesas(E.holdingImoveis[0]).impostos.pago'),1300);
   assert.deepEqual(app.estado().aviao,app.aviaoAntes);
 });
+
+function planoIntegrado(app) {
+  iniciarPlano(app);
+  app.run('E.holdingImoveis[0].gastosEmpresaId="empresa-qa";E.empresasPJ=[{id:"empresa-qa",nome:"Empresa de ensaio"}];E.gastos=[]');
+}
+
+test('baixa integrada salva pagamento e gasto juntos, reutiliza vínculo e resiste à repetição e recarga', async()=>{
+  const app=novaCentral();planoIntegrado(app);
+  const pagar=()=>app.run('holdingPagarParcela("imovel-qa","serie-qa",baseParcelaQA,basePlanoQA)');
+  await Promise.all([pagar(),pagar()]);
+  const estado=app.estado(),g=estado.gastos[0],pg=estado.holdingImoveis[0].pagamentos[0];
+  assert.equal(estado.gastos.length,1);assert.equal(g.valor,pg.valorCentavos/100);
+  assert.equal(g.pagoEm,pg.data);assert.equal(g.mes,pg.data.slice(0,7));
+  assert.equal(g.empresaId,'empresa-qa');assert.equal(g.situacao,'Pago');
+  assert.equal(g.holdingImovelId,'imovel-qa');assert.equal(g.holdingParcelaId,'serie-qa');
+  app.run('E=carregar()');await pagar();assert.deepEqual(app.estado().gastos,estado.gastos);
+  app.run('E.gastos[0].id="legado";E.gastos[0].obs="Observação preservada";');
+  await pagar();assert.equal(app.estado().gastos.length,1);assert.equal(app.estado().gastos[0].id,'legado');assert.equal(app.estado().gastos[0].obs,'Observação preservada');
+});
+
+test('quota e empresa ausente impedem baixa parcial da parcela integrada', async()=>{
+  for (const modo of ['quota','empresa']) {
+    const app=novaCentral();planoIntegrado(app);
+    if(modo==='empresa')app.run('E.empresasPJ=[]');
+    const antes=app.estado();
+    if(modo==='quota')app.ctx.localStorage.setItem=()=>{throw Error('quota cheia')};
+    await assert.rejects(app.run('holdingPagarParcela("imovel-qa","serie-qa",baseParcelaQA,basePlanoQA)'),/salvar|empresa/);
+    assert.deepEqual(app.estado(),antes);
+  }
+});
+
+test('envio integrado inclui ambas as coleções em um PUT e conflito com outra aba mantém uma baixa e um gasto', async()=>{
+  const app=novaCentral({sincronizar:true});planoIntegrado(app);
+  app.run('marcaBase(100,conteudoSync(E))');
+  let remoto,puts=0;
+  app.ctx.fetch=async(_,op)=>{
+    if(op.method==='GET')return resposta({mt:200,dados:remoto});
+    puts++;const enviado=JSON.parse(op.body);
+    assert.equal(enviado.dados.gastos.length,1);
+    assert.equal(enviado.dados.holdingImoveis[0].pagamentos.length,1);
+    remoto=enviado.dados;remoto._mt=200;
+    return resposta({},409);
+  };
+  await assert.match(await app.run('holdingPagarParcela("imovel-qa","serie-qa",baseParcelaQA,basePlanoQA)'),/sincronizado/);
+  assert.equal(puts,1);assert.equal(app.estado().gastos.length,1);
+});
+
+test('releitura remota com baixa sem gasto não informa integração concluída', async()=>{
+  const app=novaCentral({sincronizar:true});planoIntegrado(app);
+  app.run('marcaBase(100,conteudoSync(E))');
+  let remoto;
+  app.ctx.fetch=async(_,op)=>{
+    if(op.method==='GET')return resposta({mt:200,dados:remoto});
+    remoto=JSON.parse(op.body).dados;remoto.gastos=[];remoto._mt=200;
+    return resposta({},409);
+  };
+  await assert.rejects(app.run('holdingPagarParcela("imovel-qa","serie-qa",baseParcelaQA,basePlanoQA)'),/mudou/);
+  assert.equal(app.estado().gastos.length,0);
+});
+
+test('o gasto vinculado resolve a mesma referência dos comprovantes da parcela', async()=>{
+  const app=novaCentral();planoIntegrado(app);
+  await app.run('holdingPagarParcela("imovel-qa","serie-qa",baseParcelaQA,basePlanoQA)');
+  const ref=app.run('HoldingUI.refAnexos("imovel-qa","parcela","serie-qa")');
+  assert.equal(app.run('holdingAnexosCompartilhados("gasto:"+E.gastos[0].id)'),ref);
+  assert.equal(app.run('holdingAnexosCompartilhados(HoldingUI.refAnexos("imovel-qa","parcela","serie-qa"))'),ref);
+  assert.equal(app.run('holdingAnexosCompartilhados("gasto:nao-vinculado")'),null);
+});
+
+test('upload compartilhado reusa comprovante histórico pelo conteúdo, mesmo com outro nome',async()=>{
+  const app=novaCentral();planoIntegrado(app);
+  app.ctx.crypto=(await import('node:crypto')).webcrypto;
+  const file=new Blob(['pdf de teste'],{type:'application/pdf'});file.name='outro nome.pdf';
+  app.ctx.fileQA=file;
+  app.ctx.historicoQA={id:'comprovante-antigo',tam:file.size,nome:'nome antigo.pdf',blob:file};
+  app.run('arqPor=async()=>[historicoQA]');
+  const r=await app.run('holdingIdComprovante("holding:imovel-qa:parcela:serie-qa",fileQA)');
+  assert.equal(r.id,'comprovante-antigo');assert.equal(r.existente.id,'comprovante-antigo');
+  app.run('arqPor=async()=>[]');
+  const [a,b]=await Promise.all([app.run('holdingIdComprovante("holding:imovel-qa:parcela:serie-qa",fileQA)'),app.run('holdingIdComprovante("holding:imovel-qa:parcela:serie-qa",fileQA)')]);
+  assert.equal(a.id,b.id);
+  const outro=await app.run('holdingIdComprovante("holding:imovel-qa:parcela:outra",fileQA)');
+  assert.notEqual(a.id,outro.id);
+});
+
+test('gasto vinculado protege valor e data na ficha e fica fora da repetição mensal',async()=>{
+  const app=novaCentral();planoIntegrado(app);
+  await app.run('holdingPagarParcela("imovel-qa","serie-qa",baseParcelaQA,basePlanoQA)');
+  app.run('modalLancamentoGasto(E.gastos[0])');
+  for(const name of ['valor','mes','data','situacao','pagoEm','empresaId'])assert.equal(app.document.querySelector('.ff-form [name="'+name+'"]').disabled,true);
+  app.run('document.querySelector(".fundo")?.remove();financeiroRepetirGastos(E.gastos,"2027-01")');
+  assert.equal(app.document.querySelectorAll('.ff-repeat-row').length,0);
+});
