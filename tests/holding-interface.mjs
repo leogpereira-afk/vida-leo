@@ -291,7 +291,7 @@ function arquivoDoTeste(a,banco) {
   `);
 }
 function botaoAnexo(a,descricao) {
-  return [...a.document.querySelectorAll('.holding-anexos-abrir')].find(b=>b.getAttribute('aria-label').startsWith(`Boleto e comprovantes: ${descricao},`));
+  return [...a.document.querySelectorAll('.holding-anexos-abrir')].find(b=>b.getAttribute('aria-label').includes(`: ${descricao},`));
 }
 
 test('Boleto fica vinculado à mesma despesa depois de editar, baixar e recarregar; o download conserva os bytes',async()=>{
@@ -355,9 +355,9 @@ test('Histórico mostra o mesmo boleto da parcela quitada e separa o comprovante
   await confirmarPago(a,ficha().querySelector('.holding-baixa'));
   const historico=ficha().querySelector('.holding-historico');historico.open=true;
   const itemHist=descricao=>[...historico.querySelectorAll('li')].find(li=>li.querySelector('.holding-parcela-ref')?.textContent.includes(descricao));
-  const vinculado=itemHist('Mensal do ensaio');button(vinculado,'Boleto e comprovantes').click();await tick();
+  const vinculado=itemHist('Mensal do ensaio');vinculado.querySelector('.holding-anexos-abrir').click();await tick();
   assert.equal(a.ctx.consultasAnexoTeste.at(-1),refParcela);assert.match(vinculado.querySelector('.holding-anexos').textContent,/parcela-teste.pdf/);
-  const manual=itemHist('Entrada de teste');button(manual,'Boleto e comprovantes').click();await tick();
+  const manual=itemHist('Entrada de teste');manual.querySelector('.holding-anexos-abrir').click();await tick();
   const refManual=a.run("HoldingUI.refAnexos('imovel-anexos','pagamento','linha')");
   assert.equal(a.ctx.consultasAnexoTeste.at(-1),refManual);assert.notEqual(refManual,refParcela);
   assert.match(manual.querySelector('.holding-anexos').textContent,/Nenhum arquivo/);

@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {setup} from './helpers/dom.mjs';
 const json=x=>JSON.parse(JSON.stringify(x));
-function app(){
- const a=setup(),s=new Map();a.ctx.localStorage={getItem:k=>s.get(k)||null,setItem:(k,v)=>s.set(k,v),removeItem:k=>s.delete(k)};
+function app(opcoes){
+ const a=setup(opcoes),s=new Map();a.ctx.localStorage={getItem:k=>s.get(k)||null,setItem:(k,v)=>s.set(k,v),removeItem:k=>s.delete(k)};
  a.run('E=carregar();E.gastos=[];E.empresasPJ=[];E._mt=100');
  a.estado=()=>json(a.run('E'));return a;
 }
@@ -104,4 +104,42 @@ test('Operação conciliada na aquisição e em despesas reutiliza um gasto e um
  await a.run(`holdingPagarParcela('i','p',E.holdingImoveis[0].parcelas[0],E.holdingImoveis[0])`);
  assert.equal(a.estado().gastos.length,1);assert.equal(a.estado().gastos[0].id,'unico');
  assert.equal(a.run(`holdingAnexosCompartilhados(HoldingUI.refAnexos('i','despesa','d'))`),canonical);
+});
+
+
+test('Indicador distingue ausência, anexo local, sincronização e consulta remota indisponível',async()=>{
+ const a=app({hostname:'central.test'});a.run(`localStorage.setItem('cl_token','teste');globalThis.arquivosTeste=[];arqPor=async()=>arquivosTeste;arqIndice=async()=>new Map();globalThis.indicador=pagamentoComprovante('gasto:teste','Descrição <img src=x>');document.getElementById('main').append(indicador)`);
+ const atualizar=()=>a.run('indicador.atualizarComprovante()');await atualizar();
+ const indicador=a.document.querySelector('.pagamento-comprovante');
+ assert.equal(indicador.dataset.estadoComprovante,'ausente');assert.match(indicador.textContent,/Sem comprovante/);
+ assert.equal(indicador.querySelector('button').textContent,'Anexar comprovante');
+ indicador.querySelector('button').click();assert.equal(a.document.querySelector('.fundo img'),null);
+ assert.match(a.document.querySelector('.fundo').textContent,/Descrição <img src=x>/);
+ a.run(`arquivosTeste=[{id:'a',pendente:true}];window.__testeSync=true`);await atualizar();
+ assert.equal(indicador.dataset.estadoComprovante,'anexado');assert.match(indicador.textContent,/1 arquivo anexado · sincronização pendente/);
+ a.run(`arqIndice=async()=>null;arquivosTeste=[]`);await atualizar();
+ assert.equal(indicador.dataset.estadoComprovante,'indisponivel');assert.doesNotMatch(indicador.textContent,/Sem comprovante/);
+ a.run(`arqPor=async()=>{throw Error('offline')}`);await atualizar();assert.equal(indicador.dataset.estadoComprovante,'indisponivel');
+});
+
+test('Atualização de comprovante alcança origem e Gastos sem modificar os lançamentos',async()=>{
+ const a=app();await gravar(a,'aportes',registro('aportes'));const antes=a.estado();
+ a.run(`globalThis.arquivosTeste=[];arqPor=async()=>arquivosTeste;globalThis.fonte=pagamentoComprovante(aviaoRefPagamento('aportes','r'),'Avião');globalThis.destino=pagamentoComprovante('gasto:'+E.gastos[0].id,'Gastos');document.getElementById('main').append(fonte,destino)`);
+ await a.run('pagamentoAtualizarComprovantes()');
+ assert.equal(a.document.querySelectorAll('[data-estado-comprovante=ausente]').length,2);
+ a.run(`arquivosTeste=[{id:'mesmo'}]`);await a.run(`pagamentoAtualizarComprovantes('gasto:'+E.gastos[0].id)`);
+ assert.equal(a.document.querySelectorAll('[data-estado-comprovante=anexado]').length,2);
+ a.run(`arquivosTeste=[]`);await a.run(`pagamentoAtualizarComprovantes(aviaoRefPagamento('aportes','r'))`);
+ assert.equal(a.document.querySelectorAll('[data-estado-comprovante=ausente]').length,2);assert.deepEqual(a.estado(),antes);
+});
+
+test('Todos os pagamentos do avião recebem ação para anexar; pendentes não são marcados como pagos sem comprovante',async()=>{
+ const a=app();
+ for(const tipo of ['aportes','mensalidades','despesas'])await gravar(a,tipo,registro(tipo));
+ await gravar(a,'despesas',{...registro('despesas','avulso'),natureza:'avulso'});
+ a.run(`E.aviao.mensalidades.push({...E.aviao.mensalidades[0],id:'pendente',status:'A Vencer',pagoEm:''})`);
+ for(const [view,expected] of [["vParticipacaoAviao(main)",1],["filtro.aviaoPlanilha='mensais';vPlanilhaAviao(main)",1],["filtro.aviaoPlanilha='viagens';vPlanilhaAviao(main)",1],["filtro.aviaoPlanilha='avulsos';vPlanilhaAviao(main)",1]]){
+  a.run(`globalThis.main=document.getElementById('main');main.innerHTML='';${view}`);await a.run('pagamentoAtualizarComprovantes()');
+  assert.equal(a.document.querySelectorAll('[data-estado-comprovante=ausente]').length,expected);
+ }
 });

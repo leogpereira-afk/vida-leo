@@ -669,7 +669,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./saude-visual.css?v=81aa61302df9">
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
 <link rel="stylesheet" href="./aviao.css?v=44fae810ca9e">
-<link rel="stylesheet" href="./holding.css?v=c22eebabfaf9">
+<link rel="stylesheet" href="./holding.css?v=30b9ea6e9c03">
 <link rel="stylesheet" href="./holding-carteira.css?v=83713a7fb584">
 <link rel="stylesheet" href="./holding-resumo.css?v=42f98a13cd9a">
 <link rel="stylesheet" href="./fortemais-previsao.css?v=cdb9222e7265">
@@ -736,8 +736,8 @@ tr:hover .lixo{opacity:1}
 <script src="./holding-carteira-central.js?v=3ac72367d43d"></script>
 <script src="./holding-carteira-ui.js?v=83ca93590eb2"></script>
 <script src="./holding-dashboard.js?v=a20d1dee21de"></script>
-<script src="./holding-ui.js?v=7a732698cc62"></script>
-<script src="./pagamentos-gastos.js?v=c799cc689da2"></script>
+<script src="./holding-ui.js?v=fa0255849bb6"></script>
+<script src="./pagamentos-gastos.js?v=0aa0ab2c3f67"></script>
 <script src="./holding-central.js?v=8489b6e8482c"></script>
 <script src="./inicio-google.js?v=75bfe0d51b19"></script>
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
@@ -1026,6 +1026,7 @@ async function arqSubirPendentes(avisar,refEscopo=null){
       catch(e){ falhou++ }
     }
     arqEsquecerIndice();
+    await pagamentoAtualizarComprovantes();
     if(avisar)alert(subiu+' anexo(s) enviados ao servidor.'+(falhou?'\n⚠️ '+falhou+' não foram — tente de novo.':''));
     return{subiu,falhou};
   } finally { _subindo=false }
@@ -1868,7 +1869,7 @@ function areaArquivos(ref,dica,somenteLeitura=false){
       it.querySelector('.lixo').onclick=async()=>{
         if(somenteLeitura)return;
         if(!confirm(holdingAnexosCompartilhados(ref)?'Apagar o comprovante '+a.nome+' do cadastro de origem e de Gastos?':'Apagar o arquivo '+a.nome+'?'))return;
-        try{ await arqDel(a.id);pintar() }
+        try{ await arqDel(a.id);await pagamentoAtualizarComprovantes(ref) }
         catch(err){ alert('Não consegui apagar no servidor: '+(err.message||err)+'\nConfira a lista antes de tentar novamente.') }
       };
       lista.appendChild(it);
@@ -1881,7 +1882,7 @@ function areaArquivos(ref,dica,somenteLeitura=false){
     const ruins=[];
     for(const f of fs){ try{ await arqAdd(ref,f) }catch(e){ ruins.push(e.message||String(e)) } }
     solta.disabled=false;solta.removeAttribute('aria-busy');
-    solta.classList.remove('ocupado');solta.textContent=antes;pintar();
+    solta.classList.remove('ocupado');solta.textContent=antes;await pagamentoAtualizarComprovantes(ref);
     if(ruins.length)alert('Não subiu:\n\n· '+ruins.join('\n· '));
   };
   solta.onclick=()=>inp.click();
@@ -1889,6 +1890,7 @@ function areaArquivos(ref,dica,somenteLeitura=false){
   solta.addEventListener('dragover',e=>{e.preventDefault();solta.classList.add('sobre')});
   solta.addEventListener('dragleave',()=>solta.classList.remove('sobre'));
   solta.addEventListener('drop',e=>{e.preventDefault();solta.classList.remove('sobre');receber([...e.dataTransfer.files])});
+  c.dataset.comprovanteRef=ref;c.atualizarArquivos=pintar;
   pintar();
   return c;
 }
@@ -3180,7 +3182,7 @@ function modalRegistroAviao(tipo,item,natureza='viagem'){
       c.append(sec,acoes);
     },null,{antesFechar:()=>!salvando});
 }
-function tabelaAviao(titulos,registros,linha,editar,{nome='',rodape=[],numericas=[]}={}){
+function tabelaAviao(titulos,registros,linha,editar,{nome='',rodape=[],numericas=[],tipo=''}={}){
   const rol=el('<div class="rolagem"></div>');
   if(!registros.length){rol.appendChild(el('<div class="vazio">Nenhum registro ainda.</div>'));return rol}
   rol.tabIndex=0;rol.setAttribute('role','region');rol.setAttribute('aria-label',nome||'Planilha do avião');
@@ -3193,6 +3195,8 @@ function tabelaAviao(titulos,registros,linha,editar,{nome='',rodape=[],numericas
     const b=acao('Editar',()=>editar(x),'ghost');
     b.setAttribute('aria-label','Editar '+nome.toLowerCase()+' · '+(x.descricao||x.competencia||x.data||''));
     tr.lastElementChild.appendChild(b);
+    const colecao=tipo||x.colecao;
+    if(colecao&&typeof x.id==='string'&&x.id.trim()&&(colecao==='aportes'||x.status==='Pago'))tr.lastElementChild.appendChild(pagamentoComprovante(aviaoRefPagamento(colecao,x.id),x.descricao||x.competencia||x.data||nome));
     const primeira=tr.firstElementChild;if(primeira&&!primeira.querySelector('button,a,input')){const atalho=acao('',()=>editar(x),'central-registro-abrir');atalho.setAttribute('aria-label','Abrir registro de '+(nome||'avião')+' · '+(x.descricao||x.competencia||x.data||''));while(primeira.firstChild)atalho.append(primeira.firstChild);primeira.append(atalho)}
     tb.appendChild(tr);
   });
@@ -3237,7 +3241,7 @@ function vParticipacaoAviao(m){
     const superior=el('<div class="aviao-sheet-top"></div>');
     superior.appendChild(secaoPlanilhaAviao('av-aportes','Aquisição da minha cota','Pagamentos que compõem o valor investido.',
       tabelaAviao(['Data','Forma de pagamento','Valor pago'],a.aportes,x=>[esc(fmtDataAno(x.data)),esc(x.forma||'—'),brl(x.valor)],x=>modalRegistroAviao('aportes',x),
-        {nome:'Pagamento da aquisição',numericas:[2],rodape:['Total pago na cota','',brl(r.aporte)]}),'+ Pagamento',()=>modalRegistroAviao('aportes',null)));
+        {tipo:'aportes',nome:'Pagamento da aquisição',numericas:[2],rodape:['Total pago na cota','',brl(r.aporte)]}),'+ Pagamento',()=>modalRegistroAviao('aportes',null)));
     const indicadores=el('<dl class="aviao-sheet-indicadores"></dl>');
     for(const [t,v] of [
       ['Participação societária',percentual(a.participacao)],['Valor de referência',dinheiro(a.valorReferencia)],
@@ -3270,7 +3274,7 @@ function vPlanilhaAviao(m){
     sheet.appendChild(secaoPlanilhaAviao('av-avulsos','🧾 Custos avulsos','Despesas independentes de viagens e mensalidades. Os valores representam sua parte.',
       tabelaAviao(['Data','Categoria','Descrição','Fornecedor','Total da aeronave','Minha parte','Status','Pagamento','Observações'],linhas,
         x=>[esc(fmtDataAno(x.data)),esc(x.categoria||'—'),esc(x.descricao||'—'),esc(x.fornecedor||'—'),dinheiro(x.valorTotal),brl(x.minhaCota),status(x),esc(x.pagoEm?fmtDataAno(x.pagoEm):'—'),esc(x.obs||'—')],
-        x=>modalRegistroAviao('despesas',x,'avulso'),{nome:'Custo avulso',numericas:[4,5]}),'+ Custo avulso',()=>modalRegistroAviao('despesas',null,'avulso')));
+        x=>modalRegistroAviao('despesas',x,'avulso'),{tipo:'despesas',nome:'Custo avulso',numericas:[4,5]}),'+ Custo avulso',()=>modalRegistroAviao('despesas',null,'avulso')));
   }else if(mensais){
     sheet.appendChild(resumo([['Total pago',brl(r.pago),'Mensalidades pagas'],['Total pendente',brl(r.pendente),'Mensalidades em aberto'],
       ['Próximo vencimento',r.proxima?fmtDataAno(r.proxima):'—','Primeira parcela em aberto'],['Custo mensal',dinheiro(a.manutencaoMinha),'Minha cota'] ]));
@@ -3280,7 +3284,7 @@ function vPlanilhaAviao(m){
     sheet.appendChild(secaoPlanilhaAviao('av-mensal','Custos mensais','Suas mensalidades. Edite a linha para registrar o pagamento.',
       tabelaAviao(['Competência','Vencimento','Minha cota','Status','Data pagamento','Observações'],linhas,
         x=>[esc(x.competencia?.slice(0,7).split('-').reverse().join('/')||'—'),esc(fmtDataAno(x.vencimento)),brl(x.minhaCota),status(x),x.pagoEm?esc(fmtDataAno(x.pagoEm)):'—',esc(x.obs||'—')],
-        x=>modalRegistroAviao('mensalidades',x),{nome:'Mensalidade',numericas:[2],rodape:['Total · sem cancelados','',brl(r.totalCotas),'','','']}),
+        x=>modalRegistroAviao('mensalidades',x),{tipo:'mensalidades',nome:'Mensalidade',numericas:[2],rodape:['Total · sem cancelados','',brl(r.totalCotas),'','','']}),
       '+ Mensalidade',()=>modalRegistroAviao('mensalidades',null)));
   }else{
     sheet.appendChild(resumo([['Total de despesas',brl(r.despesas),'Valor total da aeronave'],['Combustível',brl(r.combustivel),'Valor total'],
@@ -3289,7 +3293,7 @@ function vPlanilhaAviao(m){
     sheet.appendChild(secaoPlanilhaAviao('av-extras','Custos de viagens','As despesas são vinculadas às mesmas viagens da Central.',
       tabelaAviao(['Data','Categoria','Descrição / rota','Valor total','Minha cota','Status','Observações','Viagem vinculada'],linhas,
         x=>[esc(fmtDataAno(x.data)),esc(x.categoria||'—'),esc(x.descricao||'—'),brl(x.valorTotal),brl(x.minhaCota),status(x),esc(x.obs||'—'),esc(E.viagens.find(v=>v.id===x.viagemId)?.evento||'Sem vínculo')],
-        x=>modalRegistroAviao('despesas',x),{nome:'Despesa de viagem',numericas:[3,4],rodape:['Total · sem cancelados','','',brl(r.despesas),brl(r.minhaParte),'','','']}),
+        x=>modalRegistroAviao('despesas',x),{tipo:'despesas',nome:'Despesa de viagem',numericas:[3,4],rodape:['Total · sem cancelados','','',brl(r.despesas),brl(r.minhaParte),'','','']}),
       '+ Despesa',()=>modalRegistroAviao('despesas',null)));
     sheet.appendChild(el('<p class="aviao-sheet-nota">A coluna “Minha cota” mantém o valor informado no arquivo ou no cadastro. Para relacionar um custo a uma viagem, clique em “Editar” e escolha a viagem correspondente.</p>'));
   }
@@ -13352,6 +13356,7 @@ function vGastosBase(m,opcoes={}){
   m.querySelectorAll('[data-bid="gt-lista"] [data-del]').forEach(btn=>{
     const gasto=doMes[+btn.dataset.del];
     if(gastoVinculado(gasto)){btn.textContent='Ver';btn.title='Ver pagamento vinculado';btn.setAttribute('aria-label',btn.title);}
+    if(gasto.situacao==='Pago')btn.parentElement.appendChild(pagamentoComprovante('gasto:'+gasto.id,gasto.oque||'Pagamento'));
   });
   const cartoesLanc=el('<div class="gastos-categorias"></div>');
   const gruposLanc=new Map();
@@ -13371,6 +13376,7 @@ function vGastosBase(m,opcoes={}){
     const acaoGasto=linha.querySelector('.btn');
     if(gastoVinculado(g)){acaoGasto.textContent='Ver origem';acaoGasto.setAttribute('aria-label','Ver origem de '+g.oque);}
     acaoGasto.onclick=()=>excluirGasto(g);
+    if(g.situacao==='Pago')linha.appendChild(pagamentoComprovante('gasto:'+g.id,g.oque||'Pagamento'));
     gruposLanc.get(g.classe||g.categoria||'Sem categoria')?.appendChild(linha);
   });
   const conteudoLanc=m.querySelector('[data-bid="gt-lista"] .conteudo');

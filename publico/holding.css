@@ -193,3 +193,13 @@
 
 .holding-saldo-sem-plano{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:10px 0;padding:12px;border:1px solid var(--holding-dourado);border-radius:8px;background:var(--holding-papel);color:var(--holding-ink)}
 .holding-saldo-sem-plano strong{flex:1 1 100%}.holding-saldo-sem-plano p{flex:1 1 260px;font-size:.85rem;color:var(--holding-suave)}
+
+/* Comprovantes compartilhados em imóveis, avião e Gastos. */
+.pagamento-comprovante{display:flex;flex-direction:column;align-items:flex-start;gap:5px;margin:6px 0;max-width:100%;white-space:normal}
+.pagamento-comprovante-status{font-size:12px;line-height:1.4;color:var(--suave);overflow-wrap:anywhere}
+.pagamento-comprovante[data-estado-comprovante="ausente"] .pagamento-comprovante-status{color:#765111;background:#fff4d9;border-radius:6px;padding:3px 7px;font-weight:600}
+.pagamento-comprovante[data-estado-comprovante="anexado"] .pagamento-comprovante-status{color:#285a43}
+.pagamento-comprovante button{min-height:40px;white-space:normal;text-align:left}
+.gasto-categoria .finance-expense-row{flex-wrap:wrap}
+.finance-expense-row>.pagamento-comprovante{flex-basis:100%;flex-direction:row;align-items:center;justify-content:space-between;gap:10px;margin:0 0 8px}
+@media(max-width:600px){.pagamento-comprovante button{min-height:44px}.finance-expense-row>.pagamento-comprovante{flex-wrap:wrap}}

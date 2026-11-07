@@ -256,7 +256,7 @@
       }
       const referencia=pg.parcelaId ? refAnexos(imovel.id,'parcela',pg.parcelaId) : refAnexos(imovel.id,'pagamento',pg.id);
       const rotulo=[pg.descricao || 'Pagamento',dataBR(pg.data),dinheiro(pg.valorCentavos),imovel.nome].join(', ');
-      acoes.append(botaoAnexos(linha,referencia,rotulo));linha.append(acoes);
+      acoes.append(pagamentoComprovante(referencia,rotulo,botaoAnexos(linha,referencia,rotulo)));linha.append(acoes);
       lista.append(linha);
     }
     detalhes.append(lista);
@@ -483,7 +483,7 @@
         const editar=botao('Editar','holding-link',ev=>formulario(contexto,imovel,item,despesa?'despesa':'parcela',ev.currentTarget));
         editar.setAttribute('aria-label',`Editar: ${rotulo}`);celulas[7].append(editar);
       }
-      celulas[7].append(anexos);
+      celulas[7].append(pagoEm?pagamentoComprovante(referencia,rotulo,anexos):anexos);
       body.append(tr);
     }
     return tabela;

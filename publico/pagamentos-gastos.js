@@ -107,3 +107,44 @@ function aviaoHistoricoRegistros() {
   }
   return area;
 }
+
+/* O indicador é derivado dos arquivos: anexar não altera nem cria pagamentos. */
+function pagamentoComprovante(ref,rotulo,botaoExistente=null) {
+  const area=el('<div class="pagamento-comprovante"><span class="pagamento-comprovante-status" role="status">Conferindo anexos…</span></div>');
+  area.dataset.comprovanteRef=ref;
+  const status=area.firstElementChild;
+  const botao=botaoExistente||acao('Anexar comprovante',()=>{
+    let arquivos;
+    abrirModal('Comprovante do pagamento',esc(rotulo),corpo=>{
+      corpo.appendChild(el('<p class="ff-note">O mesmo arquivo fica disponível no pagamento e em Gastos quando vinculados. Anexar aqui não cria outro lançamento.</p>'));
+      arquivos=areaArquivos(ref,'Anexar comprovante');corpo.appendChild(arquivos);
+    },null,{recarregar:false,antesFechar:()=>!arquivos?.querySelector('.solta[aria-busy="true"]')});
+  },'ghost');
+  area.appendChild(botao);
+  let geracao=0;
+  area.atualizarComprovante=async()=>{
+    const versao=++geracao;
+    try {
+      const [arquivos,indice]=await Promise.all([arqPor(ref),arqIndice()]);
+      if(versao!==geracao)return;
+      const indisponivel=naNuvem()&&!indice;
+      const pendente=naNuvem()&&arquivos.some(a=>a.pendente);
+      area.dataset.estadoComprovante=indisponivel?'indisponivel':arquivos.length?'anexado':'ausente';
+      status.textContent=indisponivel?'Não foi possível conferir os anexos':arquivos.length?`${arquivos.length} ${arquivos.length===1?'arquivo anexado':'arquivos anexados'}${pendente?' · sincronização pendente':''}`:'Sem comprovante';
+      botao.textContent=arquivos.length?'Ver / anexar comprovante':'Anexar comprovante';
+      botao.setAttribute('aria-label',botao.textContent+': '+rotulo);
+    } catch(erro) {
+      if(versao!==geracao)return;
+      area.dataset.estadoComprovante='indisponivel';status.textContent='Não foi possível conferir os anexos';
+      botao.textContent='Ver / anexar comprovante';botao.setAttribute('aria-label',botao.textContent+': '+rotulo);
+    }
+  };
+  area.atualizarComprovante();return area;
+}
+function pagamentoAtualizarComprovantes(ref) {
+  const canonico=r=>pagamentoReferenciaCompartilhada(r)||r;
+  const origem=ref&&canonico(ref);
+  return Promise.all([...document.querySelectorAll('[data-comprovante-ref]')]
+    .filter(n=>!origem||canonico(n.dataset.comprovanteRef)===origem)
+    .map(n=>n.atualizarComprovante?.()||n.atualizarArquivos?.()));
+}
