@@ -12,7 +12,7 @@ export function setup({hostname='localhost'}={}){const {document,HTMLElement}=pa
 const storage={getItem:()=>null,setItem(){},removeItem(){}};
 const ctx=vm.createContext({LeoGoogleDatas:globalThis.LeoGoogleDatas,FortemaisFinance:globalThis.FortemaisFinance,FortemaisDemandasModelo:globalThis.FortemaisDemandasModelo,FortemaisInovacoesModelo:globalThis.FortemaisInovacoesModelo,FortemaisDocumentosModelo:globalThis.FortemaisDocumentosModelo,ICAL,atob,btoa,document,window:{addEventListener(){},scrollTo(){},matchMedia:()=>({matches:false})},location:{hostname,hash:''},history:{pushState(){}},localStorage:storage,sessionStorage:storage,console,structuredClone,Date,URL,URLSearchParams,Blob,TextEncoder,TextDecoder,setTimeout:()=>0,clearTimeout(){},alert(){},confirm:()=>false});
 vm.runInContext(readFileSync(new URL('../../publico/fortemais-demandas.js',import.meta.url),'utf8'),ctx);
-for(const file of ['holding-modelo.js','holding-resumo.js','holding-carteira-modelo.js','holding-carteira-central.js','holding-carteira-ui.js','holding-dashboard.js','holding-ui.js','holding-central.js']) {
+for(const file of ['holding-modelo.js','holding-resumo.js','holding-carteira-modelo.js','holding-carteira-central.js','holding-carteira-ui.js','holding-dashboard.js','holding-ui.js','holding-central.js','pagamentos-gastos.js']) {
   vm.runInContext(readFileSync(new URL('../../publico/'+file,import.meta.url),'utf8'),ctx);
 }
 vm.runInContext(readFileSync(new URL('../../publico/fortemais-inovacoes.js',import.meta.url),'utf8'),ctx);

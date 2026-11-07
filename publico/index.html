@@ -736,8 +736,9 @@ tr:hover .lixo{opacity:1}
 <script src="./holding-carteira-central.js?v=3ac72367d43d"></script>
 <script src="./holding-carteira-ui.js?v=83ca93590eb2"></script>
 <script src="./holding-dashboard.js?v=a20d1dee21de"></script>
-<script src="./holding-ui.js?v=588c4f2296e5"></script>
-<script src="./holding-central.js?v=361ab60d20a9"></script>
+<script src="./holding-ui.js?v=7a732698cc62"></script>
+<script src="./pagamentos-gastos.js?v=f3fe6c1554dc"></script>
+<script src="./holding-central.js?v=8489b6e8482c"></script>
 <script src="./inicio-google.js?v=75bfe0d51b19"></script>
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
 <script src="./marketing-fortemais.js?v=cbf67399c021"></script>
@@ -1866,7 +1867,7 @@ function areaArquivos(ref,dica,somenteLeitura=false){
       };
       it.querySelector('.lixo').onclick=async()=>{
         if(somenteLeitura)return;
-        if(!confirm(holdingAnexosCompartilhados(ref)?'Apagar o comprovante '+a.nome+' do plano e de Gastos?':'Apagar o arquivo '+a.nome+'?'))return;
+        if(!confirm(holdingAnexosCompartilhados(ref)?'Apagar o comprovante '+a.nome+' do cadastro de origem e de Gastos?':'Apagar o arquivo '+a.nome+'?'))return;
         try{ await arqDel(a.id);pintar() }
         catch(err){ alert('Não consegui apagar no servidor: '+(err.message||err)+'\nConfira a lista antes de tentar novamente.') }
       };
@@ -3106,7 +3107,8 @@ function modalValoresAviao(){
 }
 function modalRegistroAviao(tipo,item,natureza='viagem'){
   const avulso=tipo==='despesas'&&(item?.natureza||natureza)==='avulso';
-  const estadoLido=E;
+  const estadoLido=E,baseItem=item?structuredClone(item):null;
+  let salvando=false;
   const mensal=tipo==='mensalidades',aporte=tipo==='aportes',novo=!item;
   const d=item?structuredClone(item):aporte?{id:uid(),data:hoje(),forma:'',valor:0,chave:''}:
     mensal?{id:uid(),competencia:hoje().slice(0,7)+'-01',vencimento:hoje(),valorTotal:E.aviao.manutencaoTotalAtual??null,minhaCota:+E.aviao.manutencaoMinha||0,status:'A Vencer',pagoEm:'',obs:'',chave:''}:
@@ -3139,9 +3141,16 @@ function modalRegistroAviao(tipo,item,natureza='viagem'){
       const erro=el('<p class="form-erro" role="alert"></p>');sec.append(fs,erro);
       const acoes=el('<div class="secao modal-acoes"></div>');
       acoes.appendChild(acao('Cancelar',fechar,'ghost'));
+      async function persistir(excluir=false) {
+        if(salvando)return;salvando=true;
+        const controles=[...c.querySelectorAll('input,select,textarea,button')].filter(x=>!x.disabled);
+        controles.forEach(x=>x.disabled=true);erro.textContent='Salvando…';
+        try {await aviaoGravarRegistro(tipo,excluir?baseItem:d,baseItem,{excluir});salvando=false;fechar();}
+        catch(e){erro.textContent=e.message||'Não foi possível salvar.';controles.forEach(x=>x.disabled=false);salvando=false;}
+      }
       if(item)acoes.appendChild(acao('Apagar registro',()=>{
-        if(!confirm('Apagar este registro do avião?'))return;
-        E.aviao[tipo]=E.aviao[tipo].filter(x=>x.id!==item.id);salvar();fechar();
+        if(!confirm('Apagar este registro e retirar seu lançamento vinculado de Gastos? Os dados e comprovantes ficam preservados no histórico.'))return;
+        persistir(true);
       },'ghost'));
       acoes.appendChild(acao('Salvar registro',()=>{
         if(E!==estadoLido){erro.textContent='Os dados foram atualizados. Feche e abra este cadastro novamente.';return}
@@ -3158,17 +3167,18 @@ function modalRegistroAviao(tipo,item,natureza='viagem'){
           const total=fs.querySelector('[data-k=valorTotal]');if(total&&!total.value.trim())d.valorTotal=null;
           if(d.status==='Pago'&&!dataISOValida(d.pagoEm)){erro.textContent='Informe a data do pagamento.';return}
         }
-        if(!aporte&&!mensal&&d.viagemId){
-          const v=E.viagens.find(x=>x.id===d.viagemId);
-          if(!v){erro.textContent='A viagem vinculada não existe mais.';return}
-          v.aviaoId='principal';if(!v.transporte)v.transporte='Avião próprio';
-        }
-        d.editadoManual=true;
-        if(item)Object.assign(item,d);else E.aviao[tipo].push(d);
-        salvar();fechar();
+        if(!aporte&&d.status==='Pago'&&!dataISOValida(d.pagoEm)){erro.textContent='Informe a data do pagamento.';return}
+        persistir();
       }));
+      sec.appendChild(el('<p class="aviao-muted">Ao salvar como pago, sua parte entra uma única vez em Gastos. Os comprovantes são compartilhados.</p>'));
+      if(item){
+        const anexos=el('<details class="ff-attachments"><summary>Boleto e comprovantes</summary></details>');
+        anexos.appendChild(areaArquivos(aviaoRefPagamento(tipo,item.id),'Adicionar boleto ou comprovante'));sec.appendChild(anexos);
+      }else sec.appendChild(el('<p class="aviao-muted">Salve o registro para anexar o boleto ou comprovante.</p>'));
+      const situacao=fs.querySelector('[data-k=status]'),dataPg=fs.querySelector('[data-k=pagoEm]');
+      situacao?.addEventListener('change',()=>{if(situacao.value==='Pago'&&!dataPg.value){dataPg.value=hoje();d.pagoEm=dataPg.value;}});
       c.append(sec,acoes);
-    });
+    },null,{antesFechar:()=>!salvando});
 }
 function tabelaAviao(titulos,registros,linha,editar,{nome='',rodape=[],numericas=[]}={}){
   const rol=el('<div class="rolagem"></div>');
@@ -3407,6 +3417,7 @@ function vAviao(m){
   const nav=el('<nav class="aviao-abas" aria-label="Seções do avião"></nav>');
   abas.forEach(([id,rot])=>{const b=el(`<button type="button" ${id===atualAba?'class="on" aria-current="page"':''}>${rot}</button>`);b.onclick=()=>{filtro.aviaoAba=id;tela()};nav.appendChild(b)});
   m.appendChild(nav);
+  const historicoRemovidos=aviaoHistoricoRegistros();if(historicoRemovidos)m.appendChild(historicoRemovidos);
   if(atualAba==='sobre'){
     vParticipacaoAviao(m);
     const intro=el('<div class="aviao-sobre"><div class="aviao-sobre-texto"><h2>A história do avião</h2><p>Registre o que esta aeronave representa, onde fica e como você a utiliza. As fotos que você enviar ficam junto desta ficha.</p></div><div class="aviao-sobre-emblema" aria-hidden="true">🛩️</div></div>');
@@ -13104,10 +13115,10 @@ function modalLancamentoGasto(g,novo=false){
       {k:'natureza',t:'Natureza',opcoes:['Despesa pessoal','Estorno'],inicial:(+g.valor<0?'Estorno':'Despesa pessoal')},
       {k:'obs',t:'Observações',tipo:'textarea',full:true}],
       g,(v,patch)=>{financeiroValidarGasto(v);if(Object.hasOwn(patch,'empresaId')){if(v.empresaId==='__sem_empresa__')patch.empresaId=v.empresaId='';const empresa=(E.empresasPJ||[]).find(e=>String(e.id)===v.empresaId);if(v.empresaId&&!empresa)throw Error('A empresa não está mais no cadastro. Confira o vínculo.');if(g.empresa!==empresaAnterior||g.empresaNome!==empresaNomeAnterior)throw Error('O vínculo mudou em outra sessão. Reabra a ficha.');patch.empresa=v.empresa=empresa?.nome||'';if(g.empresaNome!==undefined)patch.empresaNome=v.empresaNome=empresa?.nome||'';}financeiroSalvarRegistro(E.gastos,g,v,patch)},fechar);
-    if(g.holdingImovelId && g.holdingParcelaId){
+    if(gastoVinculado(g)){
       for(const nome of ['valor','mes','data','vencimento','situacao','pagoEm','empresaId','natureza'])camposGasto.controles[nome].disabled=true;
-      const origem=el('<p class="ff-note">Pagamento vinculado à parcela do imóvel. O comprovante é compartilhado com o plano.</p>');
-      origem.appendChild(acao('Abrir imóvel',()=>{fechar();irTela('universo-imoveis')},'ghost'));c.appendChild(origem);
+      const origem=el('<p class="ff-note">Pagamento vinculado ao cadastro de origem. O comprovante é o mesmo nos dois lugares.</p>');
+      origem.appendChild(acao(g.aviaoTipo?'Abrir registro do avião':'Abrir imóvel',()=>{fechar();if(g.aviaoTipo){irTela('aviao');const item=E.aviao[g.aviaoTipo]?.find(x=>x.id===g.aviaoRegistroId);if(item)modalRegistroAviao(g.aviaoTipo,item);}else irTela('universo-imoveis')},'ghost'));c.appendChild(origem);
     }
     if(novo)camposGasto.form.dataset.gastoNovoSync='';
     for(const o of camposGasto.controles.empresaId.options)o.textContent=o.value==='__sem_empresa__'?'Despesa pessoal (remover vínculo)':o.value?(E.empresasPJ||[]).find(e=>String(e.id)===o.value)?.nome||'Vínculo a conferir: '+o.value:'Sem empresa / pessoal';
@@ -13116,7 +13127,7 @@ function modalLancamentoGasto(g,novo=false){
   });
 }
 function financeiroRepetirGastos(itens,mes){
-  itens=itens.filter(g=>!g.holdingImovelId||!g.holdingParcelaId);
+  itens=itens.filter(g=>!gastoVinculado(g));
   abrirModal('Revisar gastos para '+mes.split('-').reverse().join('/'),'Selecione somente as despesas que quer repetir. Os originais e os comprovantes não mudam.',(c,fechar)=>{
     const escolhidos=new Set(),lista=el('<div class="ff-repeat-list"></div>'),status=el('<p class="ff-note" role="status" aria-live="polite"></p>'),btn=el('<button class="btn" type="button">Adicionar selecionados</button>');
     const atualizar=()=>{const vis=itens.filter(x=>escolhidos.has(x.id));status.textContent=vis.length+' selecionados · '+brl(vis.reduce((a,x)=>a+(+x.valor||0),0));btn.disabled=!vis.length};
@@ -13168,7 +13179,7 @@ function vGastosBase(m,opcoes={}){
     const valorParc=parcelas.reduce((s,x)=>s+(+x.minhaCota||0),0);
     const valorExtra=extras.reduce((s,x)=>s+(+x.minhaCota||0),0);
     const av=el(`<div class="aviao-vinculo" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
-      <span style="flex:1">🛩️ <b>${esc(a.nome||a.matricula)}</b> · ${parcelas.length} parcela(s) programada(s), ${brl(valorParc)} · ${extras.length} despesa(s) extra(s), ${brl(valorExtra)} ${todos?'no histórico':'neste mês'}. O livro do avião é ligado a Viagens e Agenda; estes valores ficam fora do total de Gastos desta página para evitar dupla contagem com seus lançamentos pessoais.</span></div>`);
+      <span style="flex:1">🛩️ <b>${esc(a.nome||a.matricula)}</b> · ${parcelas.length} parcela(s) programada(s), ${brl(valorParc)} · ${extras.length} despesa(s) extra(s), ${brl(valorExtra)} ${todos?'no histórico':'neste mês'}. Pagamentos registrados no avião geram um lançamento vinculado em Gastos. O resumo acima não é somado novamente; registros históricos sem vínculo continuam no livro do avião.</span></div>`);
     av.appendChild(acao('Abrir custos do avião',()=>{filtro.aviaoAba='custos';irTela('aviao')},'ghost'));
     m.appendChild(av);
   }
@@ -13332,15 +13343,15 @@ function vGastosBase(m,opcoes={}){
     g=>modalLancamentoGasto(g)));
   const adicionarGasto=m.querySelector('[data-bid="gt-lista"] .mais');if(adicionarGasto)adicionarGasto.onclick=()=>modalLancamentoGasto({id:uid(),...novoLanc()},true);
 
-  const excluirGasto=async g=>{if(g.holdingImovelId && g.holdingParcelaId){modalLancamentoGasto(g);return}if(!confirm('Excluir este lançamento e seus comprovantes?'))return;if(!await apagarAnexosDe('gasto:'+g.id))return;E.gastos=E.gastos.filter(x=>x.id!==g.id);salvar();r()};
+  const excluirGasto=async g=>{if(gastoVinculado(g)){modalLancamentoGasto(g);return}if(!confirm('Excluir este lançamento e seus comprovantes?'))return;if(!await apagarAnexosDe('gasto:'+g.id))return;E.gastos=E.gastos.filter(x=>x.id!==g.id);salvar();r()};
   m.querySelectorAll('[data-bid="gt-lista"] [data-del]').forEach(b=>b.onclick=ev=>{ev.stopPropagation();excluirGasto(doMes[+b.dataset.del])});
   m.querySelectorAll('[data-bid="gt-lista"] [data-k]').forEach(campo=>{
     const gasto=doMes[+campo.dataset.i];
-    if(gasto?.holdingImovelId && gasto.holdingParcelaId && ['valor','mes'].includes(campo.dataset.k))campo.disabled=true;
+    if(gastoVinculado(gasto) && ['valor','mes'].includes(campo.dataset.k))campo.disabled=true;
   });
   m.querySelectorAll('[data-bid="gt-lista"] [data-del]').forEach(btn=>{
     const gasto=doMes[+btn.dataset.del];
-    if(gasto?.holdingImovelId && gasto.holdingParcelaId){btn.textContent='Ver';btn.title='Ver parcela vinculada';btn.setAttribute('aria-label',btn.title);}
+    if(gastoVinculado(gasto)){btn.textContent='Ver';btn.title='Ver pagamento vinculado';btn.setAttribute('aria-label',btn.title);}
   });
   const cartoesLanc=el('<div class="gastos-categorias"></div>');
   const gruposLanc=new Map();
@@ -13358,7 +13369,7 @@ function vGastosBase(m,opcoes={}){
     const linha=el(`<div class="finance-expense-row" data-ff-gasto="${esc(g.id)}"><button class="finance-expense-open"><span>${esc(g.oque||'Sem descrição')}<small>${esc(g.classe||g.categoria||'Sem categoria')} · ${esc(g.mes||'Sem mês')} · ${esc(g.situacao||'Não informado')}${g.vencimento?' · vence '+esc(fmtDataAno(g.vencimento)):''}${g.parcela?' · parcela '+esc(g.parcela)+'/'+esc(g.parcelas||'?'):''}</small></span><b>${brl(+g.valor||0)} ›</b></button><button class="btn ghost mini" aria-label="${esc('Excluir '+(g.oque||'gasto'))}">Excluir</button></div>`);
     linha.querySelector('.finance-expense-open').onclick=()=>modalLancamentoGasto(g);
     const acaoGasto=linha.querySelector('.btn');
-    if(g.holdingImovelId && g.holdingParcelaId){acaoGasto.textContent='Ver parcela';acaoGasto.setAttribute('aria-label','Ver parcela de '+g.oque);}
+    if(gastoVinculado(g)){acaoGasto.textContent='Ver origem';acaoGasto.setAttribute('aria-label','Ver origem de '+g.oque);}
     acaoGasto.onclick=()=>excluirGasto(g);
     gruposLanc.get(g.classe||g.categoria||'Sem categoria')?.appendChild(linha);
   });

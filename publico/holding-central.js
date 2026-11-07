@@ -68,49 +68,25 @@ async function holdingConfirmarGravacao(aindaPresente, gastoPresente = () => tru
 // Um identificador estável liga o gasto ao pagamento, inclusive após recarga
 // ou repetição em outra aba. A configuração pertence ao cadastro privado.
 function holdingIntegrarParcela(carteira, imovelId, parcelaId) {
-  const gastos = E.gastos || [];
-  const imovel = carteira.find(i => i.id === imovelId);
-  if (!imovel?.gastosEmpresaId || !parcelaId) return { gastos, conferir: () => true };
-  const empresa = (E.empresasPJ || []).find(e => e.id === imovel.gastosEmpresaId);
-  if (!empresa) throw Error('Confira a empresa vinculada ao imóvel antes de registrar o pagamento.');
-  const parcela = imovel.parcelas?.find(p => p.id === parcelaId);
-  const pagamento = HoldingModelo.pagamentoDaParcela(imovel, parcelaId);
-  if (!parcela || !pagamento) throw Error('A parcela e o pagamento precisam estar registrados juntos.');
-  const vinculados = gastos.filter(g => g.holdingImovelId === imovelId && g.holdingParcelaId === parcelaId);
-  if (vinculados.length > 1) throw Error('Há mais de um gasto vinculado a esta parcela. Confira os lançamentos.');
-  const anterior = vinculados[0];
-  const id = anterior?.id || 'gasto:' + HoldingUI.refAnexos(imovelId, 'parcela', parcelaId);
-  if (!anterior && gastos.some(g => g.id === id)) throw Error('O identificador do gasto já está em uso.');
-  const esperado = {
-    ...anterior, id,
-    oque: anterior?.oque || imovel.nome + ' · ' + parcela.descricao,
-    valor: pagamento.valorCentavos / 100, mes: pagamento.data.slice(0,7),
-    data: pagamento.data, pagoEm: pagamento.data, vencimento: parcela.vencimento || '',
-    situacao: 'Pago', classe: anterior?.classe || 'Outros',
-    empresaId: empresa.id, empresa: empresa.nome,
-    holdingImovelId: imovelId, holdingParcelaId: parcelaId
-  };
-  const conferir = lista => {
-    const registros = lista.filter(g => g.holdingImovelId === imovelId && g.holdingParcelaId === parcelaId);
-    return registros.length === 1 && holdingMesmosDados(registros[0], esperado);
-  };
-  if (holdingMesmosDados(anterior, esperado)) return { gastos, conferir };
-  return { gastos: anterior ? gastos.map(g => g.id === id ? esperado : g) : [...gastos, esperado], conferir };
+  return holdingIntegrarPagamento(carteira,imovelId,'parcela',parcelaId);
 }
-
+function holdingIntegrarPagamento(carteira,imovelId,tipo,id) {
+  if(!id) return {gastos:E.gastos||[],conferir:()=>true};
+  const imovel=carteira.find(i=>i.id===imovelId);
+  if(!imovel) throw Error('Imóvel não encontrado.');
+  const item=(imovel[tipo==='parcela'?'parcelas':tipo==='despesa'?'despesas':'pagamentos']||[]).find(p=>p.id===id);
+  const pagamento=tipo==='parcela'?HoldingModelo.pagamentoDaParcela(imovel,id):item;
+  if(!item || !pagamento) throw Error('O registro e o pagamento precisam estar registrados juntos.');
+  if(tipo==='despesa'&&!item.pagoEm) return {gastos:E.gastos||[],conferir:()=>true};
+  const campo=tipo==='parcela'?'holdingParcelaId':tipo==='despesa'?'holdingDespesaId':'holdingPagamentoId';
+  return prepararGastoAutomatico({holdingImovelId:imovelId,[campo]:id},HoldingUI.refAnexos(imovelId,tipo,id),{
+    oque:imovel.nome+' · '+(item.descricao||'Pagamento'),valor:pagamento.valorCentavos/100,
+    pagoEm:tipo==='despesa'?item.pagoEm:pagamento.data,vencimento:item.vencimento||'',
+    ...pagamentoEmpresa(imovel.gastosEmpresaId)
+  });
+}
 function holdingAnexosCompartilhados(ref) {
-  const gasto = ref.startsWith('gasto:') && (E.gastos || []).find(g => 'gasto:' + g.id === ref);
-  const imoveis = E.holdingImoveis || [];
-  if (gasto?.holdingImovelId && gasto.holdingParcelaId) {
-    const imovel = imoveis.find(i => i.id === gasto.holdingImovelId);
-    const parcela = imovel?.parcelas?.find(p => p.id === gasto.holdingParcelaId);
-    if (parcela) return HoldingUI.refAnexos(imovel.id, 'parcela', parcela.id);
-  }
-  for (const imovel of imoveis) {
-    if (!imovel.gastosEmpresaId) continue;
-    if ((imovel.parcelas || []).some(p => HoldingUI.refAnexos(imovel.id,'parcela',p.id) === ref)) return ref;
-  }
-  return null;
+  return pagamentoReferenciaCompartilhada(ref);
 }
 
 async function holdingIdComprovante(ref, file, somenteNuvem = false) {
@@ -165,7 +141,7 @@ async function holdingGravarPagamento(imovelId, dados, basePagamento = null, bas
       !holdingMesmosDados(holdingMetadadosImovel(imovel), holdingMetadadosImovel(baseImovel)))) holdingConflito();
   const localizar = lista => lista.find(item => item.id === imovelId)?.pagamentos?.find(item => item.id === dados.id);
   const esperado = localizar(proxima);
-  const integrado = holdingIntegrarParcela(proxima, imovelId, esperado.parcelaId);
+  const integrado = holdingIntegrarPagamento(proxima, imovelId, esperado.parcelaId?'parcela':'pagamento', esperado.parcelaId||esperado.id);
   holdingPersistir(carteira, proxima, integrado.gastos);
   return holdingConfirmarGravacao(lista => holdingMesmosDados(esperado, localizar(lista)), integrado.conferir);
 }
@@ -183,7 +159,7 @@ async function holdingMovimentar(imovelId, baseImovel, operacao) {
     if (operacao.lerBase && !holdingMesmosDados(operacao.lerBase(imovel), operacao.base)) holdingConflito();
   }
   const esperado = operacao.lerResultado(proxima.find(i => i.id === imovelId));
-  const integrado = holdingIntegrarParcela(proxima, imovelId, operacao.gastoParcelaId);
+  const integrado = holdingIntegrarPagamento(proxima, imovelId, operacao.gastoDespesaId?'despesa':'parcela', operacao.gastoDespesaId||operacao.gastoParcelaId);
   holdingPersistir(carteira, proxima, integrado.gastos);
   return holdingConfirmarGravacao(lista => {
     const salvo = lista.find(i => i.id === imovelId);
@@ -231,6 +207,7 @@ function holdingPagarParcela(imovelId, parcelaId, baseParcela, baseImovel) {
 
 function holdingGravarDespesa(imovelId, dados, baseDespesa, baseImovel) {
   return holdingMovimentar(imovelId, baseImovel, {
+    gastoDespesaId: dados.id,
     base: baseDespesa,
     lerBase: item => item.despesas?.find(d => d.id === dados.id),
     aplicar: carteira => HoldingModelo.gravarDespesa(carteira, imovelId, dados),
@@ -241,6 +218,7 @@ function holdingGravarDespesa(imovelId, dados, baseDespesa, baseImovel) {
 function holdingPagarDespesa(imovelId, despesaId, baseDespesa, baseImovel) {
   const ler = item => item.despesas?.find(d => d.id === despesaId);
   return holdingMovimentar(imovelId, baseImovel, {
+    gastoDespesaId: despesaId,
     base: baseDespesa, lerBase: ler, lerResultado: ler,
     aplicar: carteira => HoldingModelo.pagarDespesa(carteira, imovelId, despesaId, hoje())
   });

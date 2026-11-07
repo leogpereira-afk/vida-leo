@@ -11,7 +11,7 @@ test('dashboard reconcilia centavos, separa aquisição, cancelados e datas de p
  assert.equal(run("gastosDashboardAviao(E.aviao).total"),190.30);
  assert.equal(run("resumoPlanilhaAviao(E.aviao).minhaParte"),30);
 });
-test('avulsos têm cadastro próprio, não entram na tabela de viagens e exigem data quando pagos',()=>{
+test('avulsos têm cadastro próprio, não entram na tabela de viagens e exigem data quando pagos',async()=>{
  const {run,document}=setup();run("modalRegistroAviao('despesas',null,'avulso')");
  assert.ok(document.querySelector('input[data-k=fornecedor]'));
  assert.equal(document.querySelector('[data-k=viagemId]'),null);
@@ -19,7 +19,7 @@ test('avulsos têm cadastro próprio, não entram na tabela de viagens e exigem 
  preencher('descricao','Equipamento de exemplo');preencher('minhaCota','25,50');preencher('status','Pago');
  const salvar=()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Salvar registro').click();salvar();
  assert.equal(run('E.aviao.despesas.length'),0);
- preencher('pagoEm','2026-01-08');salvar();
+ preencher('pagoEm','2026-01-08');salvar();await new Promise(resolve=>setImmediate(resolve));
  assert.equal(run('E.aviao.despesas[0].natureza'),'avulso');
  assert.equal(run('E.aviao.despesas[0].valorTotal'),null);
  assert.equal(run('E.aviao.despesas[0].minhaCota'),25.50);

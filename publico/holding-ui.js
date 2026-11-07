@@ -500,7 +500,7 @@
       if (!disponivel(contexto)) return;
       contexto.painelAberto={id:imovel.id,aba:''};contexto.desenhar('',imovel.id);
     }));topo.append(acoes);sec.append(topo);
-    if (!despesa && imovel.gastosEmpresaId) sec.append(elemento('p','holding-painel-nota','Ao marcar uma parcela como paga, o lançamento entra em Gastos e compartilha os comprovantes.'));
+    sec.append(elemento('p','holding-painel-nota','Todo pagamento entra automaticamente em Gastos e compartilha os mesmos comprovantes.'));
     if (!despesa && imovel.origemPlano) sec.append(elemento('p','holding-painel-nota',imovel.origemPlano));
     if (despesa) sec.append(elemento('p','holding-painel-nota','Despesas separadas do valor de aquisição.'));
     const chave=`${imovel.id}:${aba}`;

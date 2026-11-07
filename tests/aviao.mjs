@@ -195,7 +195,7 @@ test('visão e Gastos: diferença da parcela é visível sem somar o avião duas
   const ponte=document.querySelector('#main .aviao-vinculo');
   assert.match(ponte.textContent,/900,00/);
   assert.match(ponte.textContent,/140,00/);
-  assert.match(ponte.textContent,/fora do total de Gastos/);
+  assert.match(ponte.textContent,/resumo acima não é somado novamente/);
 });
 
 test('Patrimônio: mostra a participação com acesso ao painel sem duplicar a carteira',()=>{

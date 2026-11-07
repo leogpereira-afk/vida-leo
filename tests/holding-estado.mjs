@@ -182,6 +182,8 @@ test('409 com a mesma parcela já quitada em outra aba reconhece o pagamento do 
   app.run('marcaBase(100,conteudoSync(E))');
   const remoto = app.estado();
   remoto.holdingImoveis = json(app.run('HoldingModelo.pagarParcela(E.holdingImoveis,"imovel-qa","serie-qa",hoje())'));
+  app.ctx.carteiraRemota=remoto.holdingImoveis;
+  remoto.gastos=json(app.run('holdingIntegrarParcela(carteiraRemota,"imovel-qa","serie-qa").gastos'));
   remoto.demandas = [{ id:'demanda-outra-aba', titulo:'Outro acesso' }]; remoto._mt = 200;
   let puts = 0;
   app.ctx.fetch = async (_, op) => { if (op.method === 'GET') return resposta({mt:200,dados:remoto}); puts++; return resposta({},409); };
