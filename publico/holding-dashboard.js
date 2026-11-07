@@ -107,13 +107,13 @@ function holdingGraficoMeses(serie, mesAtual, selecionarMes) {
 function vUniversoHolding(m) {
   const raiz = holdingElemento('section','holding-area holding-inicio');
   const abrirAviao = () => irTela('aviao');
-  raiz.append(holdingCabecalho({abrirImoveis:()=>irTela('universo-imoveis'),abrirAviao,abrirResumo:()=>irTela('universo-holding')},'resumo'));
+  raiz.append(holdingCabecalho('resumo'));
   const titulo=holdingElemento('div','holding-titulo-resumo');
   const rotulo=holdingElemento('label','holding-mes-dashboard');
   const mes=holdingElemento('input');mes.type='month';
   mes.value=filtro.holdingCompetencia || hoje().slice(0,7);
   rotulo.append(holdingElemento('span','','Mês de referência'),mes);
-  titulo.append(holdingElemento('h2','','Resumo do patrimônio'),rotulo);
+  titulo.append(holdingElemento('h1','','Resumo do patrimônio'),rotulo);
   const paineis=holdingElemento('div','holding-dados-dashboard');
   const cadastros=holdingElemento('section','holding-cadastros-dashboard');
   const contas=holdingElemento('div');
@@ -174,4 +174,15 @@ function vUniversoHolding(m) {
   }
   mes.addEventListener('change',()=>trocarMes(mes.value));
   atualizarResumo();preencherCadastros();
+}
+
+function vUniversoEmpresas(m) {
+  const raiz = holdingElemento('section','holding-area');
+  raiz.append(holdingCabecalho('universo-empresas'));
+  const competencia = filtro.holdingCompetencia || hoje().slice(0,7);
+  const topo = holdingElemento('div','holding-titulo-resumo');
+  topo.append(holdingElemento('h1','','Empresas'),holdingElemento('span','',holdingNomeMes(competencia)));
+  raiz.append(topo);
+  m.append(raiz);
+  holdingRenderCarteira(raiz,{mes:competencia, somenteEmpresas:true});
 }

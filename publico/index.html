@@ -669,9 +669,9 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./saude-visual.css?v=81aa61302df9">
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
 <link rel="stylesheet" href="./aviao.css?v=44fae810ca9e">
-<link rel="stylesheet" href="./holding.css?v=30153156400c">
+<link rel="stylesheet" href="./holding.css?v=eaf3d0724c02">
 <link rel="stylesheet" href="./holding-carteira.css?v=83713a7fb584">
-<link rel="stylesheet" href="./holding-resumo.css?v=4a0a3df0f52f">
+<link rel="stylesheet" href="./holding-resumo.css?v=42f98a13cd9a">
 <link rel="stylesheet" href="./fortemais-previsao.css?v=cdb9222e7265">
 <link rel="stylesheet" href="./fortemais-demandas.css?v=a393c8abfff4">
 <link rel="stylesheet" href="./fortemais-compacto.css?v=0a97e1fae61a">
@@ -730,14 +730,14 @@ tr:hover .lixo{opacity:1}
 
 <script src="./vendor/ical-2.2.1.min.js"></script>
 <script src="./google-datas.js?v=85c5d36986f3"></script>
-<script src="./holding-modelo.js?v=89e0f33c58f7"></script>
-<script src="./holding-resumo.js?v=bb44bceb78fa"></script>
+<script src="./holding-modelo.js?v=ca650bf40991"></script>
+<script src="./holding-resumo.js?v=394edf124179"></script>
 <script src="./holding-carteira-modelo.js?v=e9a89da88050"></script>
 <script src="./holding-carteira-central.js?v=3ac72367d43d"></script>
-<script src="./holding-carteira-ui.js?v=a0459b885167"></script>
-<script src="./holding-dashboard.js?v=430e9c8c848f"></script>
-<script src="./holding-ui.js?v=57499078d034"></script>
-<script src="./holding-central.js?v=36fe678c48df"></script>
+<script src="./holding-carteira-ui.js?v=83ca93590eb2"></script>
+<script src="./holding-dashboard.js?v=a20d1dee21de"></script>
+<script src="./holding-ui.js?v=3da699ed02c0"></script>
+<script src="./holding-central.js?v=3fe0ba286a3d"></script>
 <script src="./inicio-google.js?v=75bfe0d51b19"></script>
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
 <script src="./marketing-fortemais.js?v=cbf67399c021"></script>
@@ -769,7 +769,7 @@ tr:hover .lixo{opacity:1}
 <script src="./fortemais-obras-dashboard.js?v=d8bd2eac5e6f"></script>
 <script src="openclaw-fila.js?v=066cb079a2b5"></script>
 <script src="./saude-comparacao.js?v=c7876474a532"></script>
-<script src="./leonardo-design.js?v=2bf285f8a71e"></script>
+<script src="./leonardo-design.js?v=dfde73f13a29"></script>
 <script src="./rendimentos-modelo.js?v=a2faa87ce0bd"></script>
 <script src="./rendimentos-dashboards-modelo.js?v=0987eb11dd63"></script>
 <script src="./financeiro-graficos.js?v=493dcd6ca9b6"></script>
@@ -2254,6 +2254,7 @@ const MODS=[
   {id:'patrimonio',ic:'🏠',nome:'Patrimônio',grupo:'',render:vPatrimonio},
   {id:'caixavgv',ic:'💰',nome:'Caixa e VGV',grupo:'',render:vCaixaVGV},
   {id:'universo-holding',ic:'🏙️',nome:'Universo Holding',grupo:'',render:m=>vUniversoHolding(m)},
+  {id:'universo-empresas',ic:'🏢',nome:'Empresas da holding',grupo:'',oculto:true,render:m=>vUniversoEmpresas(m)},
   {id:'universo-imoveis',ic:'🏠',nome:'Imóveis da holding',grupo:'',oculto:true,render:m=>vUniversoImoveis(m)},
   {id:'aviao',ic:'🛩️',nome:'Avião',grupo:'',oculto:true,render:vAviao},
   {id:'viagens',ic:'✈️',nome:'Viagens',grupo:'Vida',render:vViagens},
@@ -2280,7 +2281,7 @@ function menu(){
   // A lateral usa emojis; imagens 3D continuam nos cards e cabeçalhos das áreas.
   const emojis={donboy:'🤖',marketing:'📣','metodo-vof':'🎯',drive:'📁',strava:'🏃'};
   MODS.filter(m=>!m.oculto).forEach(m=>{
-    const selecionado=!m.url&&(m.id===atual||(atual==='estrategia'&&m.id==='empresas')||(['aviao','universo-imoveis'].includes(atual)&&m.id==='universo-holding'));
+    const selecionado=!m.url&&(m.id===atual||(atual==='estrategia'&&m.id==='empresas')||(['aviao','universo-imoveis','universo-empresas'].includes(atual)&&m.id==='universo-holding'));
     if(m.grupo)nav.appendChild(el(`<div class="sep">${m.grupo}</div>`));
     /* Entrada com `url` é ATALHO para outro sistema, não tela daqui: abre em
        outra aba, nunca fica marcada como ativa, e o ↗ avisa antes do clique.
@@ -2458,7 +2459,7 @@ function organizarPainelCompacto(pagina,secao){
 
 function tela(opcoes={}){
   if(atual==='fortemais'&&opcoes.baseRemota!==true&&!fmPodeNavegar())return false;
-  const edicaoHolding=(atual==='universo-imoveis'||atual==='universo-holding')&&document.querySelector('#main .holding-area .holding-dialog[open],#main .holding-area [data-holding-rascunho],#main .holding-area [aria-busy="true"],#main .holding-dialog[open]');
+  const edicaoHolding=rotaDaHolding(atual)&&document.querySelector('#main .holding-area .holding-dialog[open],#main .holding-area [data-holding-rascunho],#main .holding-area [aria-busy="true"],#main .holding-dialog[open]');
   if(edicaoHolding){
     edicaoHolding.dataset.holdingAtualizar='1';
     return false;
@@ -2479,7 +2480,7 @@ function tela(opcoes={}){
 }
 const rr=id=>()=>{if(atual===id||(id==='estrategia'&&atual==='empresas'&&filtro.empresaAba==='planejamento')||(id==='empresas'&&atual==='estrategia'))tela()};
 // trocar de tela: sobe ao topo, a não ser que alguém tenha pedido um bloco
-function rotaDaHolding(id){return id==='universo-holding'||id==='universo-imoveis'}
+function rotaDaHolding(id){return ['universo-holding','universo-imoveis','universo-empresas'].includes(id)}
 function impedimentoSaidaHolding(){
   if(!rotaDaHolding(atual)||!temSessao())return '';
   if(document.querySelector('#main :is(.holding-area,.holding-dialog) form[aria-busy="true"]'))return 'Aguarde o salvamento antes de sair da holding.';
@@ -3371,7 +3372,10 @@ function vAviao(m){
   const topo=cab('Avião','Sua participação, manutenção, viagens e documentos em uma só visão.');
   const inp=el('<input type="file" accept=".xlsx,.json" hidden>');
   inp.onchange=()=>{const f=inp.files?.[0];if(f)importarAviao(f);inp.value=''};
-  topo.append(acao('← Universo Holding',()=>irTela('universo-holding'),'ghost'),acao('Importar dados',()=>inp.click(),'ghost'),acao('Colar do Excel',colarPlanilhaAviao,'ghost'),acao('+ Viagem no avião',()=>novaViagemRotina(true)),inp);
+  const marcaHolding=el('<div class="holding-area"></div>');
+  marcaHolding.append(holdingCabecalho('aviao'));
+  m.append(marcaHolding);
+  topo.append(acao('Importar dados',()=>inp.click(),'ghost'),acao('Colar do Excel',colarPlanilhaAviao,'ghost'),acao('+ Viagem no avião',()=>novaViagemRotina(true)),inp);
   m.appendChild(topo);
   const viagem=(E.viagens||[]).filter(v=>v.aviaoId==='principal');
   m.appendChild(el(`<div class="aviao-hero">

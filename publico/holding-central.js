@@ -170,9 +170,6 @@ function vUniversoImoveis(m) {
     editarParcela: holdingEditarParcela,
     pagarParcela: holdingPagarParcela,
     gravarDespesa: holdingGravarDespesa,
-    pagarDespesa: holdingPagarDespesa,
-    abrirResumo: () => irTela('universo-holding'),
-    abrirImoveis: () => irTela('universo-imoveis'),
-    abrirAviao: () => irTela('aviao')
+    pagarDespesa: holdingPagarDespesa
   });
 }

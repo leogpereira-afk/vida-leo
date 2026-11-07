@@ -7,36 +7,30 @@ function holdingElemento(tag, classe, texto) {
   return elemento;
 }
 
-function holdingAtalho(texto, desenho, destino, ativo = false) {
-  const botao = holdingElemento('button', 'holding-destino');
-  botao.type = 'button';
-  botao.setAttribute('aria-label', texto === 'Imóveis' ? 'Abrir imóveis' : 'Abrir avião');
-  botao.title = texto;
-  if (ativo) botao.setAttribute('aria-current', 'page');
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('aria-hidden', 'true');
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  path.setAttribute('d', desenho);
-  svg.append(path);
-  botao.append(svg);
-  if (texto === 'Imóveis') botao.append(holdingElemento('span', '', texto));
-  botao.addEventListener('click', destino);
-  return botao;
-}
-
-function holdingCabecalho(acoes, secao) {
+function holdingCabecalho(secao) {
   const cab = holdingElemento('header', 'holding-cabecalho holding-cab-navegacao');
-  cab.append(holdingAtalho('Imóveis','M2.5 10.5 12 3l9.5 7.5M5 9v12h14V9M9.5 21v-7h5v7', acoes.abrirImoveis, secao === 'imoveis'));
-  const marca = holdingElemento('div', 'holding-titulo holding-marca');
-  marca.append(holdingElemento('h1', '', 'Universo Holding'));
-  if (secao !== 'resumo') {
-    const retorno = holdingElemento('button', 'holding-voltar-resumo', '← Resumo do patrimônio');
-    retorno.type = 'button';
-    retorno.addEventListener('click', acoes.abrirResumo);
-    marca.append(retorno);
+  const marca = holdingElemento('button', 'holding-marca');
+  marca.type = 'button';
+  marca.setAttribute('aria-label', 'Universo Holding · Resumo do patrimônio');
+  const logo = holdingElemento('img');
+  logo.src = './universo-holding.webp';
+  logo.alt = 'Universo Holding';
+  logo.width = 260;
+  logo.height = 78;
+  marca.append(logo);
+  if (secao !== 'resumo') marca.append(holdingElemento('span', 'holding-voltar-resumo', '← Resumo do patrimônio'));
+  marca.addEventListener('click', () => irTela('universo-holding'));
+  const nav = holdingElemento('nav', 'holding-destinos');
+  nav.setAttribute('aria-label', 'Áreas da Universo Holding');
+  for (const [nome, rota] of [['Imóveis','universo-imoveis'],['Avião','aviao'],['Empresas','universo-empresas']]) {
+    const destino = holdingElemento('button', 'holding-destino', nome);
+    destino.type = 'button';
+    destino.setAttribute('aria-label', 'Abrir ' + nome.toLocaleLowerCase('pt-BR'));
+    if (rota === secao) destino.setAttribute('aria-current', 'page');
+    destino.addEventListener('click', () => irTela(rota));
+    nav.append(destino);
   }
-  cab.append(marca, holdingAtalho('Avião','M21 3c1 1-1 4-3 6l-2 2 2 8-2 2-4-7-4 3v3l-1 1-2-4-3-2 1-1h3l3-4-7-4 2-2 8 2 2-2c2-2 5-4 6-3Z', acoes.abrirAviao));
+  cab.append(marca, nav);
   return cab;
 }
 

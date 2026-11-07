@@ -26,7 +26,13 @@ test('o menu abre o resumo; imóveis e avião têm atalhos separados e mantêm a
   assert.equal(run('atual'),'aviao');
   assert.equal(document.querySelector('#nav [aria-current="page"] .tx').textContent,'Universo Holding');
   assert.equal(document.querySelector('#main h1').textContent,'Avião');
-  const voltar=[...document.querySelectorAll('#main button')].find(b=>b.textContent.includes('Universo Holding'));
+  const empresas=document.querySelector('#main button[aria-label="Abrir empresas"]');
+  empresas.click();
+  assert.equal(run('atual'),'universo-empresas');
+  assert.equal(document.querySelector('#nav [aria-current="page"] .tx').textContent,'Universo Holding');
+  assert.ok(document.querySelector('[data-carteira-grupo="empresas"]').open);
+  assert.equal(document.querySelector('[data-carteira-grupo="imoveis"]'),null);
+  const voltar=document.querySelector('#main .holding-marca');
   assert.ok(voltar);
   voltar.click();
   assert.equal(run('atual'),'universo-holding');

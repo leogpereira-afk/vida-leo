@@ -1,13 +1,13 @@
-.holding-cab-navegacao{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center}
-.holding-cab-navegacao .holding-marca{display:grid;gap:4px}
-.holding-cab-navegacao .holding-destino{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:44px;min-width:44px;background:#22314c;color:#fff;border:1px solid #778399;border-radius:10px;cursor:pointer;padding:6px 10px;font-size:.83rem;font-weight:650}
-.holding-cab-navegacao .holding-destino:first-child{border-color:#a48f58;color:#f1dea8}
-.holding-cab-navegacao .holding-destino[aria-current=page]{background:#3c3b34;border-color:#dfcd92}
-.holding-cab-navegacao .holding-destino:hover{background:#34435b}
-.holding-destino svg{width:23px;height:23px}
-.holding-cab-navegacao .holding-voltar-resumo{padding:0;justify-self:start;border:0;background:none;color:#e2d2a1;text-decoration:underline;text-underline-offset:3px;font-size:.8rem;cursor:pointer}
+.holding-cab-navegacao{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#141816;border:1px solid #61543a;padding:10px 16px}
+.holding-cab-navegacao .holding-marca{display:grid;gap:2px;justify-items:start;background:none;border:0;padding:0;color:#f1dea8}
+.holding-marca img{display:block;width:200px;max-width:100%;height:auto;border-radius:5px}
+.holding-voltar-resumo{font-size:.78rem}
+.holding-destinos{display:flex;gap:5px;max-width:100%}
+.holding-cab-navegacao .holding-destino{min-height:44px;padding:6px 13px;border:1px solid #726c5b;border-radius:8px;background:transparent;color:#f9f6eb;font-size:.88rem;font-weight:600}
+.holding-cab-navegacao .holding-destino:hover{background:#35352e}
+.holding-cab-navegacao .holding-destino[aria-current=page]{background:#dfcf9e;color:#22251d;border-color:#dfcf9e}
 .holding-titulo-resumo{display:flex;align-items:baseline;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;margin:21px 0 10px}
-.holding-titulo-resumo h2{font-size:1.19rem;line-height:1.25}
+.holding-titulo-resumo h1{font-size:1.19rem;line-height:1.25}
 .holding-titulo-resumo span,.holding-indicador small,.holding-identificacao{color:var(--holding-suave);font-size:.82rem}
 .holding-indicadores{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
 .holding-indicador,.holding-quadro{background:var(--holding-papel);border:1px solid var(--holding-linha);border-radius:11px;min-width:0}
@@ -31,9 +31,9 @@
 @media(max-width:800px){.holding-quadros{grid-template-columns:1fr}}
 @media(max-width:620px){
   .holding-cab-navegacao{gap:8px;padding:10px 12px}
-  .holding-cab-navegacao .holding-destino:first-child{flex-direction:column;gap:1px;line-height:1.1;padding:4px 6px}
-  .holding-cab-navegacao .holding-destino:first-child span{font-size:.68rem}
-  .holding-cab-navegacao .holding-voltar-resumo{min-height:28px}
+  .holding-marca img{width:166px}
+  .holding-destinos{width:100%}
+  .holding-destinos button{flex:1}
   .holding-indicadores{grid-template-columns:1fr}
   .holding-indicador,.holding-indicador:first-child{padding:9px 11px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:3px 7px}
   .holding-indicador small{grid-column:1/-1}

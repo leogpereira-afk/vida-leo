@@ -29,7 +29,7 @@ test('o resumo soma somente aquisições no indicador de aquisição e separa de
   assert.equal(resumo.despesas.impostos.pago,1900);
   assert.match(document.querySelector('.holding-composicao').textContent,/Impostos/);
   assert.match(document.querySelector('.holding-indicadores').textContent,/Valor informado em 1 de 2/);
-  assert.equal(document.querySelectorAll('#main .holding-destino').length,2);
+  assert.equal(document.querySelectorAll('#main .holding-destino').length,3);
   assert.equal(run('JSON.stringify(E)===anterior'),true);
 });
 

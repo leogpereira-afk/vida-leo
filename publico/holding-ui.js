@@ -93,9 +93,10 @@
       quantidade.min='1'; quantidade.max='360'; quantidade.step='1';
     }
     function atualizarTipo() {
-      const aquisicao=natureza.value==='aquisicao';valor.required=aquisicao;vencimento.required=aquisicao;
+      const aquisicao=natureza.value==='aquisicao';valor.required=aquisicao;vencimento.required=aquisicao && !edicao && Number(quantidade?.value)>1;
       valor.placeholder=aquisicao?'0,00':'A informar';
     }
+    quantidade?.addEventListener('input',atualizarTipo);
     natureza.addEventListener('change',atualizarTipo);atualizarTipo();
     return () => {
       const aquisicao=natureza.value==='aquisicao';
@@ -405,6 +406,7 @@
       celulas[1].append(elemento('strong','',item.descricao));
       const categoria=item.descricao.trim().toLocaleLowerCase('pt-BR')===NATUREZAS[tipo].toLocaleLowerCase('pt-BR')?'':NATUREZAS[tipo];
       const ref=[categoria,item.quantidade>1?`${item.numero} de ${item.quantidade}`:''].filter(Boolean).join(' · ');
+      if (item.observacao) celulas[1].append(elemento('small','',item.observacao));
       if (ref) celulas[1].append(elemento('small','',ref));
       celulas[2].append(elemento('span','',item.vencimento?dataBR(item.vencimento):'A informar'));
       celulas[3].append(elemento('strong','',item.valorCentavos==null?'Valor a informar':dinheiro(item.valorCentavos)));
@@ -430,6 +432,7 @@
     const acoes=elemento('div','holding-painel-acoes');
     const incluir=botao(despesa?'+ Despesa avulsa':'+ Lançamento','holding-secundario',ev=>formulario(contexto,imovel,null,despesa?'despesa':'serie',ev.currentTarget));
     acoes.append(incluir);topo.append(acoes);sec.append(topo);
+    if (!despesa && imovel.origemPlano) sec.append(elemento('p','holding-painel-nota',imovel.origemPlano));
     if (despesa) sec.append(elemento('p','holding-painel-nota','Despesas separadas do valor de aquisição.'));
     const chave=`${imovel.id}:${aba}`;
     if(!contexto.recortes.has(chave)) contexto.recortes.set(chave,{mes:'todos',tipo:'todos'});
@@ -485,9 +488,9 @@
     function desenhar(mensagem,imovelFoco,abrirHistorico=false) {
       const carteira=api.listar();
       const raiz=elemento('section','holding-area');
-      raiz.append(holdingCabecalho(api,'imoveis'));
+      raiz.append(holdingCabecalho('universo-imoveis'));
       const lista=elemento('section','holding-lista'), topo=elemento('div','holding-lista-cab');
-      topo.append(elemento('h2','','Imóveis'),botao('+ Cadastrar imóvel','holding-primario',ev=>formulario(contexto,null,null,'imovel',ev.currentTarget)));lista.append(topo);
+      topo.append(elemento('h1','','Imóveis'),botao('+ Cadastrar imóvel','holding-primario',ev=>formulario(contexto,null,null,'imovel',ev.currentTarget)));lista.append(topo);
       if (carteira.length) {
         const resumos=carteira.map(i=>globalThis.HoldingModelo.resumo(i));
         const quitados=resumos.filter(r=>r.status==='Quitado').length,andamento=resumos.filter(r=>r.status==='Em pagamento').length;

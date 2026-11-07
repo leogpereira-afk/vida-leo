@@ -78,7 +78,7 @@
     else if (item.tipo !== undefined && item.tipo !== 'aquisicao') throw Error('A parcela do plano deve ser de aquisição.');
     if (typeof item.descricao !== 'string' || !item.descricao.trim()) throw Error('Informe a descrição.');
     if (!despesa || item.valorCentavos != null) inteiroPositivo(item.valorCentavos, 'O valor');
-    if (!despesa || item.vencimento != null) dataValida(item.vencimento, 'data de vencimento');
+    if (item.vencimento != null) dataValida(item.vencimento, 'data de vencimento');
     if (item.agendadoPara != null) {
       if (!despesa) throw Error('Informe a data agendada na despesa individual.');
       dataValida(item.agendadoPara, 'data agendada');

@@ -229,7 +229,7 @@ const holdingRenderCarteira = (() => {
     return detalhes;
   }
 
-  return function holdingRenderCarteira(container,{mes,aoAtualizar}={}) {
+  return function holdingRenderCarteira(container,{mes,aoAtualizar,somenteEmpresas=false}={}) {
     if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(mes))throw Error('Informe uma competência válida.');
     const secao=elemento('section','hcar-painel');secao.setAttribute('aria-label','Empresas e renda dos imóveis');
     const status=elemento('p','hcar-retorno');status.hidden=true;status.setAttribute('role','status');
@@ -243,10 +243,10 @@ const holdingRenderCarteira = (() => {
         if(!origem.has(reg.origemId))origem.set(reg.origemId,[]);
         origem.get(reg.origemId).push(reg);
       }
-      const imobiliario=grupo(ctx,'imoveis','Patrimônio e aluguel dos imóveis',ctx.api.listarImoveis(),dados);
       const empresas=grupo(ctx,'empresas','Participações em empresas',ctx.api.listarEmpresas(),dados);
-      for(const d of [imobiliario,empresas])d.open=abertos.has(d.dataset.carteiraGrupo);
-      secao.replaceChildren(status,imobiliario,empresas);
+      const grupos=somenteEmpresas ? [empresas] : [grupo(ctx,'imoveis','Patrimônio e aluguel dos imóveis',ctx.api.listarImoveis(),dados),empresas];
+      for(const d of grupos)d.open=somenteEmpresas || abertos.has(d.dataset.carteiraGrupo);
+      secao.replaceChildren(status,...grupos);
     }
     desenhar();container.append(secao);return secao;
   };
