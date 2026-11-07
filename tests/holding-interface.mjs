@@ -178,8 +178,9 @@ test('O plano organiza parcelas mensais e a baixa de uma linha atualiza o percen
   assert.equal(a.ctx.imoveisTeste[0].pagamentos.length,1);assert.match(ficha().querySelector('.holding-linha').textContent,/30%/);
   assert.equal(linhas()[0].querySelector('.holding-mensal-c5').textContent,'06/11/2026');
   assert.equal(linhas()[0].querySelector('.holding-mensal-status').textContent,'Pago');
-  assert.equal(linhas()[0].querySelector('.holding-pago').checked,true);
-  assert.equal(linhas()[0].querySelector('.holding-pago').disabled,true);
+  linhas()[0].querySelector('.holding-ver-pago').click();
+  assert.match(ficha().querySelector('.holding-dados-baixa').textContent,/06\/11\/2026/);
+  assert.equal(a.ctx.imoveisTeste[0].pagamentos.length,1);
   assert.equal(button(ficha().querySelector('.holding-historico'),'Corrigir'),undefined);
   button(linhas()[1],'Editar').click();alterar(a,'valor','40,00');await salvar(a);
   assert.match(linhas()[1].textContent,/40,00/);assert.match(ficha().querySelector('.holding-linha').textContent,/30%/);
@@ -218,7 +219,7 @@ function filtrar(a,ficha,nome,valor) {
   select.dispatchEvent(new a.document.defaultView.Event('change',{bubbles:true}));
 }
 function totaisResumo(ficha) {
-  return Object.fromEntries([...ficha.querySelectorAll('.holding-controle-total > div')].map(g=>[g.querySelector('dt').textContent,g.querySelector('dd').textContent.replace(/\s/g,' ')]));
+  return Object.fromEntries([...ficha.querySelectorAll('.holding-controle-total > button')].map(g=>[g.querySelector('small').textContent,g.querySelector('strong').textContent.replace(/\s/g,' ')]));
 }
 
 test('Filtros de mês e natureza recalculam valores e status das linhas, mantendo datas reais e valores a informar',async()=>{

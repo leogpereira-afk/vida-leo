@@ -162,3 +162,26 @@
 .holding-historico-acoes{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:3px}.holding-parcelas li>.holding-anexos{grid-column:1/-1;border-radius:6px;padding:8px;background:var(--holding-papel);border:1px solid var(--holding-linha)}
 @container(max-width:520px){.holding-parcelas li .holding-historico-acoes{grid-column:1/-1;justify-content:flex-start}}
 .holding-agendado{display:block;margin-top:3px;color:var(--holding-suave);font-size:.73rem}
+
+/* Filtros e atalhos da carteira */
+.holding-resumo{gap:6px}
+.holding-area .holding-filtro-imoveis,.holding-area .holding-indicador-filtro,.holding-area button.holding-metrica{
+  min-height:44px;border:1px solid var(--holding-linha);border-radius:8px;background:var(--holding-papel);color:var(--holding-ink);cursor:pointer
+}
+.holding-area .holding-filtro-imoveis{padding:5px 11px;font-size:.83rem}
+.holding-area .holding-filtro-imoveis[aria-pressed=true]{background:var(--holding-marinho);color:white;border-color:var(--holding-marinho)}
+.holding-area .holding-metrica,.holding-area .holding-indicador-filtro{display:grid;align-content:center;gap:3px;min-width:0;text-align:left;position:relative;padding:6px 16px 6px 8px;font-variant-numeric:tabular-nums}
+.holding-area button.holding-metrica::after,.holding-indicador-filtro::after{content:'›';position:absolute;right:5px;top:50%;transform:translateY(-50%);color:var(--holding-suave)}
+.holding-area .holding-metrica strong,.holding-area .holding-indicador-filtro strong{font-size:.9rem;line-height:1.25;overflow-wrap:anywhere}
+.holding-metrica .holding-barra{max-width:100%;width:75px;height:4px;margin:0}
+.holding-area .holding-controle-total{padding:0;gap:5px;background:transparent;overflow:visible}
+.holding-indicador-filtro small{color:var(--holding-suave);font-size:.76rem}
+.holding-area .holding-indicador-filtro[aria-pressed=true]{border-color:#9e874d;box-shadow:inset 0 -3px #9e874d}
+.holding-area button.holding-metrica:hover,.holding-indicador-filtro:hover,.holding-filtro-imoveis:hover{border-color:#9e874d}
+.holding-area .holding-ver-pago{display:inline-grid;place-items:center;min-height:40px;min-width:30px;border-radius:7px;background:#e1efe7;color:#245635;border:1px solid #8fae9a;cursor:pointer;font-weight:700}
+.holding-area .holding-anexos-abrir{border:1px solid var(--holding-linha);border-radius:6px;background:var(--holding-papel);padding:4px 6px;color:var(--holding-ink)}
+.holding-dados-baixa{font-weight:600}
+@container(max-width:790px){.holding-area .holding-ver-pago{min-width:44px;min-height:44px}}
+
+.holding-area button.holding-status,.holding-area button.holding-mensal-status{border:1px solid currentColor;cursor:pointer}
+.holding-area button.holding-status:hover,.holding-area button.holding-mensal-status:hover{text-decoration:underline;text-underline-offset:2px}

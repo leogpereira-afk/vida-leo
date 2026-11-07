@@ -296,7 +296,7 @@
         rotulo: rotuloCompromisso(imovel, item, despesa), situacao: situacaoMensal(item.vencimento, pagoEm, hoje) };
     }).sort((a,b) => (a.item.vencimento || '9999-99').localeCompare(b.item.vencimento || '9999-99'));
   }
-  function resumoControle(linhas) {
+  function resumoControle(linhas, exibicao, selecionar) {
     let pago = 0, pendente = 0, semValor = 0;
     for (const { item, pagoEm } of linhas) {
       if (item.valorCentavos == null) semValor++;
@@ -308,14 +308,20 @@
     const pendentesConhecidos = linhas.some(l => !l.pagoEm && l.item.valorCentavos != null);
     const texto = (soma, conhecidos) => semValor ? [conhecidos ? dinheiro(soma) : '', `${semValor} a informar`].filter(Boolean).join(' + ') : dinheiro(soma);
     const percentual = !semValor && previsto > 0 ? (pago / previsto) * 100 : null;
-    const dl = elemento('dl','holding-controle-total');
-    for (const [rotulo, valor] of [
-      ['Total previsto', texto(previsto, valoresConhecidos)], ['Total pago', dinheiro(pago)],
-      ['Total pendente', texto(pendente, pendentesConhecidos)], ['% quitado', percentagem(percentual, pago === previsto)]
+    const grupo = elemento('div','holding-controle-total');
+    grupo.setAttribute('role','group'); grupo.setAttribute('aria-label','Filtrar lançamentos pelos totais');
+    for (const [id,rotulo,valor,acao] of [
+      ['todos','Total previsto',texto(previsto,valoresConhecidos),'Mostrar todos os lançamentos'],
+      ['pagos','Total pago',dinheiro(pago),'Mostrar lançamentos pagos'],
+      ['pendentes','Total pendente',texto(pendente,pendentesConhecidos),'Mostrar lançamentos pendentes'],
+      ['percentual','% quitado',percentagem(percentual,pago===previsto),'Ver composição da quitação']
     ]) {
-      const grupo = elemento('div'); grupo.append(elemento('dt','',rotulo),elemento('dd','',valor)); dl.append(grupo);
+      const btn=botao('','holding-indicador-filtro',()=>selecionar(id));
+      btn.append(elemento('small','',rotulo),elemento('strong','',valor));
+      btn.title=acao;btn.dataset.exibicao=id;
+      btn.setAttribute('aria-pressed',String(exibicao===id));grupo.append(btn);
     }
-    return dl;
+    return grupo;
   }
   function totaisDeDespesas(imovel, linhas) {
     const dl=elemento('dl','holding-tipostotal');
@@ -376,6 +382,7 @@
       const painel=elemento('section','holding-anexos');painel.id=`anexos-${numeroColunas?'controle':'historico'}-${referencia}`;
       painel.setAttribute('aria-label',`Boleto e comprovantes de ${rotulo}`);
       painel.append(elemento('strong','','Boleto e comprovantes'));
+      if (origem.dataset.baixa) painel.append(elemento('p','holding-dados-baixa',origem.dataset.baixa));
       painel.append(elemento('p','holding-anexos-modo',naNuvem()?'Arquivos marcados como “neste aparelho” aguardam sincronização.':'Anexos desta prévia são salvos neste navegador.'));
       painel.append(areaArquivos(referencia,'Adicionar boleto ou comprovante'));
       if (numeroColunas) {
@@ -399,6 +406,7 @@
     for(const l of linhas) {
       const {item,pagoEm,tipo,situacao,rotulo}=l;
       const tr=elemento('tr','holding-compromisso');tr.dataset.situacao=situacao;
+      if (pagoEm) tr.dataset.baixa=item.descricao+' · '+dinheiro(item.valorCentavos)+' pagos em '+dataBR(pagoEm);
       const celulas=colunas.map((nome,i)=>{
         const c=elemento('td',`holding-mensal-c${i}`);c.dataset.campo=nome;tr.append(c);return c;
       });
@@ -410,16 +418,27 @@
       if (ref) celulas[1].append(elemento('small','',ref));
       celulas[2].append(elemento('span','',item.vencimento?dataBR(item.vencimento):'A informar'));
       celulas[3].append(elemento('strong','',item.valorCentavos==null?'Valor a informar':dinheiro(item.valorCentavos)));
-      celulas[4].append(controleBaixa(contexto,imovel,l));
+      const referencia=refAnexos(imovel.id,despesa?'despesa':'parcela',item.id);
+      const anexos=botaoAnexos(tr,referencia,rotulo,colunas.length);
+      if (pagoEm) {
+        const ver=botao('✓','holding-ver-pago',()=>anexos.click());
+        ver.title='Ver pagamento e comprovantes';
+        ver.setAttribute('aria-label','Ver pagamento e comprovantes: '+rotulo);
+        celulas[4].append(ver);
+      } else celulas[4].append(controleBaixa(contexto,imovel,l));
       celulas[5].append(elemento('span','',pagoEm?dataBR(pagoEm):'—'));
-      const status=elemento('span','holding-mensal-status',situacao);celulas[6].append(status);
+      const status=botao(situacao,'holding-mensal-status',ev=>{
+        if (pagoEm) anexos.click();
+        else formulario(contexto,imovel,item,despesa?'despesa':'parcela',ev.currentTarget);
+      });
+      status.title=pagoEm?'Ver pagamento e comprovantes':'Editar lançamento';
+      celulas[6].append(status);
       if (despesa && !pagoEm && item.agendadoPara) celulas[6].append(elemento('small','holding-agendado',`Agendado para ${dataBR(item.agendadoPara)}`));
       if (!pagoEm) {
         const editar=botao('Editar','holding-link',ev=>formulario(contexto,imovel,item,despesa?'despesa':'parcela',ev.currentTarget));
         editar.setAttribute('aria-label',`Editar: ${rotulo}`);celulas[7].append(editar);
       }
-      const referencia=refAnexos(imovel.id,despesa?'despesa':'parcela',item.id);
-      celulas[7].append(botaoAnexos(tr,referencia,rotulo,colunas.length));
+      celulas[7].append(anexos);
       body.append(tr);
     }
     return tabela;
@@ -440,17 +459,31 @@
     const linhas=linhasDoControle(imovel,despesa,contexto.api.hoje());
     sec.append(controlesRecorte(contexto,imovel,despesa,linhas,recorte));
     const filtradas=linhas.filter(l=>(recorte.tipo==='todos'||l.tipo===recorte.tipo)&&(recorte.mes==='todos'||(l.mes||'sem')===recorte.mes));
-    sec.append(resumoControle(filtradas));
+    const exibicao=recorte.exibicao || 'todos';
+    function selecionar(id) {
+      if (!disponivel(contexto)) return;
+      recorte.exibicao=id;
+      contexto.desenhar('',imovel.id);
+      contexto.container.querySelector('.holding-controle-total [aria-pressed="true"]')?.focus({preventScroll:true});
+    }
+    sec.append(resumoControle(filtradas,exibicao,selecionar));
+    const visiveis=filtradas.filter(l=>exibicao==='pagos' ? l.pagoEm : exibicao==='pendentes' ? !l.pagoEm : true);
+    if (exibicao==='percentual') {
+      const pagas=filtradas.filter(l=>l.pagoEm).length;
+      sec.append(elemento('p','holding-painel-nota',pagas+' de '+filtradas.length+' lançamentos pagos. O percentual considera os valores do período.'));
+    }
     if (despesa && filtradas.length) sec.append(totaisDeDespesas(imovel,filtradas));
     sec.append(elemento('div','holding-editor-local'));
-    if (filtradas.length) sec.append(tabelaMensal(contexto,imovel,filtradas,despesa));
+    if (visiveis.length) sec.append(tabelaMensal(contexto,imovel,visiveis,despesa));
+    else if (filtradas.length) sec.append(elemento('p','holding-vazio',exibicao==='pendentes'?'Nenhum lançamento pendente neste período.':'Nenhum lançamento pago neste período.'));
     else sec.append(elemento('p','holding-vazio',linhas.length?'Nenhum lançamento neste recorte.':despesa?'Nenhuma despesa lançada.':'Nenhuma parcela cadastrada.'));
     if (!despesa) sec.append(historico(contexto,imovel,abrirHistorico));
     return sec;
   }
-  function coluna(rotulo,valor) {
-    const cell=elemento('div','holding-coluna');
-    cell.append(elemento('small','holding-rotulo',rotulo),elemento('strong','',valor)); return cell;
+  function coluna(rotulo,valor,dica,acao) {
+    const cell=botao('','holding-metrica',acao);
+    cell.title=dica;
+    cell.append(elemento('small','holding-rotulo',rotulo),elemento('strong','',valor));return cell;
   }
   function cartao(contexto,imovel,abrirHistorico) {
     const resumo=globalThis.HoldingModelo.resumo(imovel), quitado=resumo.status==='Quitado';
@@ -459,14 +492,30 @@
     const titulo=elemento('h3');
     const editar=botao(imovel.nome,'holding-nome',ev=>formulario(contexto,imovel,null,'imovel',ev.currentTarget));
     editar.title='Editar imóvel'; titulo.append(editar);
-    const status=elemento('span','holding-status',resumo.status);
+    const status=botao(resumo.status,'holding-status',ev=>{
+      if (resumo.percentual==null) formulario(contexto,imovel,null,'imovel',ev.currentTarget);
+      else abrirPlano(quitado?'pagos':'pendentes',quitado);
+    });
+    status.title=resumo.percentual==null?'Completar dados do imóvel':quitado?'Ver histórico de pagamentos':'Ver parcelas pendentes';
     status.dataset.tipo=quitado?'quitado':resumo.percentual==null?'incompleto':'andamento';
     const identidade=elemento('div','holding-identidade'); identidade.append(titulo,status); row.append(identidade);
     const faltaTotal=imovel.totalCentavos==null;
-    const aquisicao=coluna('Aquisição',faltaTotal ? '—' : dinheiro(imovel.totalCentavos));
-    if (faltaTotal) aquisicao.lastChild.replaceWith(botao('Informar valor','holding-link',ev=>formulario(contexto,imovel,null,'imovel',ev.currentTarget)));
-    row.append(aquisicao,coluna('Pago',dinheiro(resumo.pago)),coluna('Saldo',resumo.saldo==null?'—':dinheiro(resumo.saldo)));
-    const pct=coluna('% pago',resumo.percentual==null?'—':percentagem(resumo.percentual,quitado));
+    function abrirPlano(exibicao,historico=false) {
+      if (!disponivel(contexto)) return;
+      contexto.painelAberto={id:imovel.id,aba:'plano'};
+      contexto.recortes.set(imovel.id+':plano',{mes:'todos',tipo:'todos',exibicao});
+      contexto.desenhar('',imovel.id,historico);
+      const destino=contexto.container.querySelector(historico?'.holding-historico summary':'.holding-controle-total [aria-pressed="true"]');
+      destino?.focus();
+    }
+    let aquisicao;
+    if (faltaTotal) {
+      aquisicao=elemento('div','holding-metrica');
+      aquisicao.append(elemento('small','holding-rotulo','Aquisição'),botao('Informar valor','holding-link',ev=>formulario(contexto,imovel,null,'imovel',ev.currentTarget)));
+    } else aquisicao=coluna('Aquisição',dinheiro(imovel.totalCentavos),'Abrir plano completo',()=>abrirPlano('todos'));
+    row.append(aquisicao,coluna('Pago',dinheiro(resumo.pago),'Abrir histórico de pagamentos',()=>abrirPlano('pagos',true)),
+      coluna('Saldo',resumo.saldo==null?'—':dinheiro(resumo.saldo),'Ver parcelas pendentes',()=>abrirPlano('pendentes')));
+    const pct=coluna('% pago',resumo.percentual==null?'—':percentagem(resumo.percentual,quitado),'Ver pagamentos da aquisição',()=>abrirPlano('todos',true));
     if (resumo.percentual!=null) {
       const barra=elemento('progress','holding-barra');barra.max=100;barra.value=resumo.percentual;barra.setAttribute('aria-label',`${percentagem(resumo.percentual,quitado)} pago`);pct.append(barra);
     }
@@ -491,22 +540,37 @@
       raiz.append(holdingCabecalho('universo-imoveis'));
       const lista=elemento('section','holding-lista'), topo=elemento('div','holding-lista-cab');
       topo.append(elemento('h1','','Imóveis'),botao('+ Cadastrar imóvel','holding-primario',ev=>formulario(contexto,null,null,'imovel',ev.currentTarget)));lista.append(topo);
+      const alvo=imovelFoco && carteira.find(i=>i.id===imovelFoco);
+      if (mensagem && alvo && contexto.filtro!==globalThis.HoldingModelo.resumo(alvo).status) contexto.filtro='todos';
       if (carteira.length) {
         const resumos=carteira.map(i=>globalThis.HoldingModelo.resumo(i));
         const quitados=resumos.filter(r=>r.status==='Quitado').length,andamento=resumos.filter(r=>r.status==='Em pagamento').length;
-        const info=[`${carteira.length} ${carteira.length===1?'imóvel':'imóveis'}`,`${andamento} em pagamento`,`${quitados} ${quitados===1?'quitado':'quitados'}`];
-        const pendentes=carteira.length-andamento-quitados;if (pendentes) info.push(`${pendentes} com valor a informar`);
-        const resumo=elemento('div','holding-resumo');info.forEach(t=>resumo.append(elemento('span','',t)));lista.append(resumo);
+        const filtros=[['todos',carteira.length+' '+(carteira.length===1?'imóvel':'imóveis')],['Em pagamento',andamento+' em pagamento'],['Quitado',quitados+' '+(quitados===1?'quitado':'quitados')]];
+        const pendentes=carteira.length-andamento-quitados;
+        if (pendentes || contexto.filtro==='A informar') filtros.push(['A informar',pendentes+' com valor a informar']);
+        const resumo=elemento('div','holding-resumo');
+        resumo.setAttribute('role','group');resumo.setAttribute('aria-label','Filtrar imóveis por situação');
+        for (const [situacao,rotulo] of filtros) {
+          const btn=botao(rotulo,'holding-filtro-imoveis',()=>{
+            if (!disponivel(contexto)) return;
+            contexto.filtro=situacao;desenhar();
+            container.querySelector('.holding-resumo [aria-pressed="true"]')?.focus({preventScroll:true});
+          });
+          btn.setAttribute('aria-pressed',String(situacao===contexto.filtro));resumo.append(btn);
+        }
+        lista.append(resumo);
       }
       if (mensagem) { const status=elemento('p','holding-feedback',mensagem);status.setAttribute('role','status');lista.append(status); }
       if (!carteira.length) lista.append(elemento('p','holding-lista-vazia','Cadastre o primeiro imóvel para acompanhar sua aquisição e seus pagamentos.'));
       let foco;
-      for(const imovel of carteira) {
+      const visiveis=carteira.filter(i=>contexto.filtro==='todos'||globalThis.HoldingModelo.resumo(i).status===contexto.filtro);
+      if (carteira.length && !visiveis.length) lista.append(elemento('p','holding-vazio','Nenhum imóvel nesta situação.'));
+      for(const imovel of visiveis) {
         const {card,titulo}=cartao(contexto,imovel,imovelFoco===imovel.id && abrirHistorico);lista.append(card);if(imovel.id===imovelFoco)foco=titulo;
       }
       raiz.append(lista);container.replaceChildren(raiz);if (foco && container.isConnected) foco.focus({preventScroll:true});
     }
-    const contexto={container,api,desenhar,recortes:new Map(),painelAberto:{id:null,aba:''}};
+    const contexto={container,api,desenhar,filtro:'todos',recortes:new Map(),painelAberto:{id:null,aba:''}};
     desenhar();
   }
   globalThis.HoldingUI=Object.freeze({render,refAnexos});
