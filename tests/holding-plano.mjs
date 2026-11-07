@@ -136,3 +136,34 @@ test('restauração rejeita referências ausentes, duplicidade ou divergência n
     assert.throws(()=>M.validarCarteira(alterado),/vínculo/);
   }
 });
+
+test('Reparcelamento distribui centavos, preserva baixas e arquiva o cronograma anterior',()=>{
+  let c=M.gravarSerie(novo(20001),'unidade',{...serie,quantidade:2,valorCentavos:5000});
+  c=M.pagarParcela(c,'unidade','serie','2024-01-31');
+  const antes=structuredClone(c), dados={id:'ajuste',quantidade:3,intervaloMeses:6,primeiroVencimento:'2026-12-31'};
+  const previa=M.simularParcelamento(c[0],dados);
+  assert.deepEqual(previa.parcelas.map(p=>p.valorCentavos),[5001,5000,5000]);
+  assert.equal(previa.ultimoVencimento,'2027-12-31');
+  const novoPlano=M.reparcelar(c,'unidade',dados);
+  assert.deepEqual(c,antes);
+  assert.deepEqual(novoPlano[0].pagamentos,c[0].pagamentos);
+  assert.deepEqual(novoPlano[0].parcelas[0],c[0].parcelas[0]);
+  assert.deepEqual(novoPlano[0].reparcelamentos[0].parcelasAnteriores,[c[0].parcelas[1]]);
+  assert.equal(M.resumo(novoPlano[0]).saldo,15001);
+  assert.equal(M.reparcelar(novoPlano,'unidade',dados),novoPlano);
+  assert.throws(()=>M.reparcelar(novoPlano,'unidade',{...dados,quantidade:4}),/identificador/);
+  assert.equal(M.prazoPlano(novoPlano[0]).completo,true);
+  assert.equal(M.prazoPlano(c[0]).completo,false);
+});
+
+test('Parcelamento valida entradas e vencimentos sem inventar quitação de plano incompleto',()=>{
+  const i=novo(10001)[0],dados={id:'ajuste',quantidade:3,intervaloMeses:1,primeiroVencimento:'2027-01-31'};
+  assert.deepEqual(M.simularParcelamento(i,dados).parcelas.map(p=>p.vencimento),['2027-01-31','2027-02-28','2027-03-31']);
+  for (const extra of [{quantidade:0},{quantidade:361},{quantidade:1.5},{intervaloMeses:0},{intervaloMeses:5},{primeiroVencimento:'2027-02-30'}]) assert.throws(()=>M.simularParcelamento(i,{...dados,...extra}));
+  assert.throws(()=>M.simularParcelamento({...i,totalCentavos:null},dados),/aquisição/);
+  assert.throws(()=>M.simularParcelamento(novo(2)[0],dados),/centavo/);
+  const quitado=M.salvarPagamento([i],i.id,{id:'pago',data:'2026-11-01',valorCentavos:10001});
+  assert.throws(()=>M.reparcelar(quitado,i.id,dados),/quitado/);
+  assert.equal(M.prazoPlano(quitado[0]).quitadoEm,'2026-11-01');
+  assert.equal(M.prazoPlano(i).completo,false);
+});

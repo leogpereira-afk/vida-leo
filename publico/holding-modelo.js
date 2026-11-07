@@ -311,6 +311,53 @@
     return adicionarSerie(carteira, imovel, 'parcelas', dados, dados.primeiroVencimento);
   }
 
+  function prazoPlano(imovel) {
+    const r = resumo(imovel);
+    const pendentes = listaDo(imovel,'parcelas').filter(p => !pagamentoDaParcela(imovel,p.id));
+    const datas = pendentes.map(p => p.vencimento).filter(Boolean).sort();
+    const previsto = pendentes.reduce((s,p) => s+p.valorCentavos,0);
+    return { quantidade:pendentes.length, ultimoVencimento:datas.at(-1) || null,
+      completo:r.saldo != null && previsto===r.saldo && datas.length===pendentes.length,
+      quitadoEm:r.saldo===0 ? pagamentosDo(imovel).map(p=>p.data).sort().at(-1) : null };
+  }
+
+  function simularParcelamento(imovel,dados) {
+    const saldo = resumo(imovel).saldo;
+    if (saldo == null) throw Error('Informe o valor de aquisição para distribuir o saldo.');
+    if (saldo === 0) throw Error('Este imóvel já está quitado.');
+    idValido(dados.id);
+    const n = quantidadeSerie(dados.quantidade);
+    const intervalo = dados.intervaloMeses;
+    if (![1,2,3,6,12].includes(intervalo)) throw Error('Escolha o intervalo entre as parcelas.');
+    dataValida(dados.primeiroVencimento,'data do primeiro vencimento');
+    if (saldo < n) throw Error('Cada parcela precisa ter pelo menos um centavo.');
+    const valor = Math.floor(saldo/n), resto = saldo % n;
+    const parcelas = Array.from({length:n},(_,indice)=>({
+      id:idDaSerie(dados.id,indice),grupoId:dados.id,numero:indice+1,quantidade:n,
+      descricao:`Parcela ${indice+1} de ${n}`,valorCentavos:valor+(indice<resto?1:0),
+      vencimento:vencimentoDoMes(dados.primeiroVencimento,indice*intervalo)
+    }));
+    return {saldoCentavos:saldo,parcelas,ultimoVencimento:parcelas.at(-1).vencimento};
+  }
+
+  function reparcelar(carteira,imovelId,dados) {
+    const imovel = imovelNaCarteira(carteira,imovelId);
+    const anteriores = imovel.reparcelamentos || [];
+    const existente = anteriores.find(p=>p.id===dados.id);
+    if (existente) {
+      if (existente.quantidade===dados.quantidade && existente.intervaloMeses===dados.intervaloMeses && existente.primeiroVencimento===dados.primeiroVencimento) return carteira;
+      throw Error('Já existe um ajuste com este identificador.');
+    }
+    const previa = simularParcelamento(imovel,dados);
+    const usados = new Set([...listaDo(imovel,'parcelas'),...anteriores.flatMap(p=>p.parcelasAnteriores)].map(p=>p.id));
+    if (previa.parcelas.some(p=>usados.has(p.id))) throw Error('O identificador de uma parcela já está em uso.');
+    const pagas = listaDo(imovel,'parcelas').filter(p=>pagamentoDaParcela(imovel,p.id));
+    const registro = {id:dados.id,quantidade:dados.quantidade,intervaloMeses:dados.intervaloMeses,
+      primeiroVencimento:dados.primeiroVencimento,saldoCentavos:previa.saldoCentavos,criadoEm:new Date().toISOString(),
+      parcelasAnteriores:listaDo(imovel,'parcelas').filter(p=>!pagamentoDaParcela(imovel,p.id))};
+    return substituir(carteira,{...imovel,parcelas:[...pagas,...previa.parcelas],reparcelamentos:[...anteriores,registro]});
+  }
+
   function editarPrevisao(carteira, imovel, chave, anterior, dados) {
     const campos = camposPrevistos(dados, anterior, chave === 'despesas');
     if (mesmaPrevisao(anterior, campos)) return carteira;
@@ -385,6 +432,6 @@
 
   globalThis.HoldingModelo = Object.freeze({
     centavos, resumo, validarCarteira, salvarImovel, salvarPagamento,
-    gravarSerie, editarParcela, pagarParcela, gravarDespesa, pagarDespesa, pagamentoDaParcela, idDaSerie, tipoDespesa, TIPOS_DESPESA, resumoDespesas
+    gravarSerie, simularParcelamento, reparcelar, prazoPlano, vencimentoDoMes, editarParcela, pagarParcela, gravarDespesa, pagarDespesa, pagamentoDaParcela, idDaSerie, tipoDespesa, TIPOS_DESPESA, resumoDespesas
   });
 })();

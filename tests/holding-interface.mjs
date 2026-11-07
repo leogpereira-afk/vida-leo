@@ -18,6 +18,7 @@ function app(imoveis) {
       abrirAviao: () => irTela('aviao'),
       abrirImoveis: () => irTela('universo-imoveis'),
       abrirResumo: () => irTela('universo-holding'),
+      reparcelar: async (id,dados) => { imoveisTeste = HoldingModelo.reparcelar(imoveisTeste,id,dados); },
       gravarSerie: async (id,dados) => { imoveisTeste = HoldingModelo.gravarSerie(imoveisTeste,id,dados); },
       editarParcela: async (id,dados) => { imoveisTeste = HoldingModelo.editarParcela(imoveisTeste,id,dados); },
       pagarParcela: async (id,parcelaId) => { imoveisTeste = HoldingModelo.pagarParcela(imoveisTeste,id,parcelaId,'2026-11-06'); },
@@ -32,7 +33,8 @@ function app(imoveis) {
 }
 function alterar(a,campo,valor) {
   const input = a.document.querySelector(`.holding-form [name="${campo}"]`);
-  input.value = valor;
+  if(input.tagName==='SELECT') [...input.options].find(opt=>opt.value===valor).selected=true;
+  else input.value = valor;
   input.dispatchEvent(new a.document.defaultView.Event('input',{bubbles:true}));
 }
 async function salvar(a) {
@@ -382,4 +384,46 @@ test('Agendamento em despesa em aberto é independente do vencimento, da baixa e
   assert.equal(a.ctx.imoveisTeste[0].despesas[0].pagoEm,null);assert.equal(totaisResumo(ficha())['Total pendente'],'R$ 10,00');
   await confirmarPago(a,linha.querySelector('.holding-baixa'));linha=ficha().querySelector('.holding-compromisso');
   assert.equal(linha.dataset.situacao,'Pago');assert.doesNotMatch(linha.textContent,/Agendado para/);assert.equal(linha.querySelector('.holding-mensal-c5').textContent,'06/11/2026');
+});
+
+test('Indicadores do card alternam abrir e recolher; Recolher preserva o rascunho',()=>{
+  const a=app([imovel('sala','Sala',10000)]), ficha=()=>card(a,'Sala');
+  for(const indice of [0,1,2,3]) {
+    ficha().querySelectorAll('button.holding-metrica')[indice].click();
+    assert.ok(ficha().querySelector('.holding-painel'));
+    ficha().querySelectorAll('button.holding-metrica')[indice].click();
+    assert.equal(Boolean(ficha().querySelector('.holding-painel')),false);
+  }
+  button(ficha(),'Plano').click();button(ficha(),'Recolher').click();
+  assert.equal(Boolean(ficha().querySelector('.holding-painel')),false);
+  button(ficha(),'Despesas').click();button(ficha(),'Recolher').click();
+  assert.equal(Boolean(ficha().querySelector('.holding-painel')),false);
+  button(ficha(),'Plano').click();button(ficha(),'+ Lançamento').click();
+  alterar(a,'descricao','Rascunho preservado');button(ficha(),'Recolher').click();
+  assert.equal(ficha().querySelector('[name=descricao]').value,'Rascunho preservado');
+  assert.match(ficha().querySelector('.holding-erro').textContent,/Salve ou cancele/);
+});
+
+
+test('Ajustar parcelamento simula data final, cancela sem alterações e aplica somente ao salvar',async()=>{
+  const propriedade=imovel('sala','Sala',100001);
+  propriedade.parcelas=[{id:'antiga',descricao:'Parcela antiga',valorCentavos:50000,vencimento:'2026-12-10'}];
+  const a=app([propriedade]), ficha=()=>card(a,'Sala');
+  assert.match(ficha().querySelector('.holding-prazo').textContent,/Plano parcial/);
+  const antes=JSON.stringify(a.ctx.imoveisTeste);
+  button(ficha(),'Plano').click();button(ficha(),'Ajustar parcelamento').click();
+  alterar(a,'quantidade','24');alterar(a,'primeiroVencimento','2026-12-31');
+  assert.match(a.document.querySelector('.holding-previa-parcelamento').textContent,/novembro de 2028/);
+  assert.equal(JSON.stringify(a.ctx.imoveisTeste),antes);
+  button(a.document.querySelector('.holding-form'),'Cancelar').click();
+  assert.equal(JSON.stringify(a.ctx.imoveisTeste),antes);
+  button(ficha(),'Ajustar parcelamento').click();
+  alterar(a,'quantidade','3');alterar(a,'primeiroVencimento','2026-12-31');alterar(a,'intervaloMeses','6');
+  assert.match(a.document.querySelector('.holding-previa-parcelamento').textContent,/dezembro de 2027/);
+  await salvar(a);
+  assert.equal(a.ctx.imoveisTeste[0].parcelas.length,3);
+  assert.equal(a.ctx.imoveisTeste[0].parcelas.reduce((s,p)=>s+p.valorCentavos,0),100001);
+  assert.match(ficha().querySelector('.holding-prazo').textContent,/Término: dezembro de 2027/);
+  assert.match(ficha().querySelector('.holding-planos-anteriores').textContent,/Parcela antiga/);
+  assert.equal(ficha().querySelectorAll('.holding-compromisso').length,3);
 });

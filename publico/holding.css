@@ -185,3 +185,8 @@
 
 .holding-area button.holding-status,.holding-area button.holding-mensal-status{border:1px solid currentColor;cursor:pointer}
 .holding-area button.holding-status:hover,.holding-area button.holding-mensal-status:hover{text-decoration:underline;text-underline-offset:2px}
+
+.holding-prazo{display:block;margin-top:5px;font-size:.76rem;line-height:1.35;color:var(--holding-suave);overflow-wrap:anywhere}
+.holding-previa-parcelamento{grid-column:1/-1;display:grid;gap:7px;padding:12px;border:1px solid var(--holding-linha);border-radius:8px;background:var(--holding-papel);color:var(--holding-ink)}
+.holding-previa-parcelamento>strong{font-size:1.05rem}.holding-previa-parcelamento ol{max-height:200px;overflow:auto;padding-left:26px;font-variant-numeric:tabular-nums}
+.holding-planos-anteriores summary{cursor:pointer;min-height:32px}.holding-planos-anteriores .holding-historico>details{margin-top:8px}

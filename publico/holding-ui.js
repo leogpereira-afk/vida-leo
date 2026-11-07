@@ -11,6 +11,7 @@
     if (!quitado && valor >= 99.995) return '>99,99%';
     return proporcao.format(valor) + '%';
   };
+  const mesAno = iso => new Intl.DateTimeFormat('pt-BR',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(iso+'T12:00:00Z'));
   const dataBR = iso => iso ? iso.split('-').reverse().join('/') : 'Data a informar';
 
   function elemento(tag, classe, texto) {
@@ -70,6 +71,38 @@
       const total = campo(form,'Valor de aquisição (R$)','total',dinheiroCampo(imovel?.totalCentavos),{decimal:true,placeholder:'A informar'});
       return () => api.gravarImovel({id,nome:nome.value.trim(),totalCentavos:valorCampo(total,true)},baseImovel);
     }
+    if (tipo === 'parcelamento') {
+      const modelo=globalThis.HoldingModelo, prazo=modelo.prazoPlano(imovel);
+      const inicio=(imovel.parcelas || []).filter(p=>!modelo.pagamentoDaParcela(imovel,p.id) && p.vencimento>=api.hoje()).map(p=>p.vencimento).sort()[0] || api.hoje();
+      form.append(elemento('p','holding-form-imovel',imovel.nome));
+      form.append(elemento('p','holding-painel-nota',`Distribui todo o saldo de ${dinheiro(modelo.resumo(imovel).saldo)} e substitui as ${prazo.quantidade} parcelas ainda não pagas, inclusive reforços e semestrais. Pagamentos, Gastos e comprovantes já registrados são preservados. O plano anterior fica no histórico.`));
+      const quantidade=campo(form,'Quantidade de parcelas restantes','quantidade',prazo.quantidade || 12,{tipo:'number',requerido:true});
+      quantidade.min='1';quantidade.max='360';quantidade.step='1';
+      const vencimento=campo(form,'Primeiro vencimento','primeiroVencimento',inicio,{tipo:'date',requerido:true});
+      const label=elemento('label','holding-campo');label.append(elemento('span','','Intervalo entre parcelas'));
+      const intervalo=elemento('select');intervalo.name='intervaloMeses';
+      for (const [n,texto] of [[1,'Mensal'],[2,'Bimestral'],[3,'Trimestral'],[6,'Semestral'],[12,'Anual']]) {
+        const opt=elemento('option','',texto);opt.value=String(n);opt.selected=n===1;intervalo.append(opt);
+      }
+      label.append(intervalo);form.append(label);
+      const previa=elemento('div','holding-previa-parcelamento');previa.setAttribute('role','status');previa.setAttribute('aria-live','polite');form.append(previa);
+      const dados=()=>({id,quantidade:quantidadeCampo(quantidade),primeiroVencimento:vencimento.value,intervaloMeses:Number(intervalo.value)});
+      function atualizar() {
+        previa.replaceChildren();
+        try {
+          const plano=modelo.simularParcelamento(imovel,dados());
+          const valores=[...new Set(plano.parcelas.map(p=>p.valorCentavos))];
+          previa.append(elemento('strong','',`Término previsto: ${mesAno(plano.ultimoVencimento)}`),
+            elemento('span','',`${plano.parcelas.length} parcelas de ${valores.map(dinheiro).join(' ou ')} · última em ${dataBR(plano.ultimoVencimento)}`));
+          const detalhes=elemento('details');detalhes.append(elemento('summary','','Conferir vencimentos'));
+          const lista=elemento('ol');for(const p of plano.parcelas) lista.append(elemento('li','',`${dataBR(p.vencimento)} · ${dinheiro(p.valorCentavos)}`));
+          detalhes.append(lista);previa.append(detalhes);
+        } catch(erro) { previa.append(elemento('span','',erro.message)); }
+      }
+      for(const input of [quantidade,vencimento,intervalo]) { input.addEventListener('input',atualizar);input.addEventListener('change',atualizar); }
+      atualizar();
+      return ()=>{form.dataset.destino='plano';return api.reparcelar(imovel.id,dados(),baseImovel);};
+    }
     if (tipo === 'pagamento') {
       const data = campo(form,'Data do pagamento','data',item?.data || api.hoje(),{tipo:'date',requerido:true});
       const valor = campo(form,'Valor pago (R$)','valor',dinheiroCampo(item?.valorCentavos),{decimal:true,requerido:true,placeholder:'0,00'});
@@ -95,6 +128,11 @@
     function atualizarTipo() {
       const aquisicao=natureza.value==='aquisicao';valor.required=aquisicao;vencimento.required=aquisicao && !edicao && Number(quantidade?.value)>1;
       valor.placeholder=aquisicao?'0,00':'A informar';
+    }
+    if (quantidade) {
+      const prazo=elemento('p','holding-painel-nota');prazo.setAttribute('role','status');form.append(prazo);
+      const atualizarPrazo=()=>{try { prazo.textContent=vencimento.value ? `Última parcela: ${dataBR(globalThis.HoldingModelo.vencimentoDoMes(vencimento.value,quantidadeCampo(quantidade)-1))}` : 'Informe o primeiro vencimento para ver a data final.'; } catch(erro) {prazo.textContent=erro.message;} };
+      quantidade.addEventListener('input',atualizarPrazo);vencimento.addEventListener('input',atualizarPrazo);atualizarPrazo();
     }
     quantidade?.addEventListener('input',atualizarTipo);
     natureza.addEventListener('change',atualizarTipo);atualizarTipo();
@@ -123,8 +161,8 @@
     const {container,api,desenhar} = contexto;
     container.querySelector('.holding-inline')?.remove();
     if (container.querySelector('.holding-dialog')) return;
-    const modal = tipo === 'imovel' || tipo === 'pagamento';
-    const titulos = {imovel:imovel ? 'Editar imóvel' : 'Cadastrar imóvel',pagamento:item ? 'Corrigir pagamento' : 'Lançar pagamento',serie:'Novo lançamento',parcela:'Editar parcela',despesa:item ? 'Editar despesa' : 'Novo lançamento'};
+    const modal = tipo === 'imovel' || tipo === 'pagamento' || tipo === 'parcelamento';
+    const titulos = {parcelamento:'Ajustar parcelamento',imovel:imovel ? 'Editar imóvel' : 'Cadastrar imóvel',pagamento:item ? 'Corrigir pagamento' : 'Lançar pagamento',serie:'Novo lançamento',parcela:'Editar parcela',despesa:item ? 'Editar despesa' : 'Novo lançamento'};
     const titulo = titulos[tipo];
     const id = (tipo === 'imovel' ? imovel?.id : item?.id) || api.novoId();
     const editor = elemento(modal ? 'dialog' : 'section',modal ? 'holding-dialog' : 'holding-inline');
@@ -152,7 +190,7 @@
     const erro = elemento('p','holding-erro');
     erro.setAttribute('role','alert'); erro.hidden = true;
     const acoes = elemento('div','holding-form-acoes');
-    const salvar = elemento('button','holding-primario',{imovel:'Salvar imóvel',pagamento:'Salvar pagamento',serie:'Salvar lançamento',parcela:'Salvar parcela',despesa:item?'Salvar despesa':'Salvar lançamento'}[tipo]);
+    const salvar = elemento('button','holding-primario',{parcelamento:'Aplicar parcelamento',imovel:'Salvar imóvel',pagamento:'Salvar pagamento',serie:'Salvar lançamento',parcela:'Salvar parcela',despesa:item?'Salvar despesa':'Salvar lançamento'}[tipo]);
     salvar.type='submit';
     acoes.append(botao('Cancelar','holding-secundario',fechar),salvar);
     form.append(erro,acoes);
@@ -450,7 +488,11 @@
     topo.append(elemento('h4','',despesa?'Despesas do imóvel':'Plano de pagamento'));
     const acoes=elemento('div','holding-painel-acoes');
     const incluir=botao(despesa?'+ Despesa avulsa':'+ Lançamento','holding-secundario',ev=>formulario(contexto,imovel,null,despesa?'despesa':'serie',ev.currentTarget));
-    acoes.append(incluir);topo.append(acoes);sec.append(topo);
+    if (!despesa && globalThis.HoldingModelo.resumo(imovel).saldo>0) acoes.append(botao('Ajustar parcelamento','holding-secundario',ev=>formulario(contexto,imovel,null,'parcelamento',ev.currentTarget)));
+    acoes.append(incluir,botao('Recolher','holding-secundario',()=>{
+      if (!disponivel(contexto)) return;
+      contexto.painelAberto={id:imovel.id,aba:''};contexto.desenhar('',imovel.id);
+    }));topo.append(acoes);sec.append(topo);
     if (!despesa && imovel.gastosEmpresaId) sec.append(elemento('p','holding-painel-nota','Ao marcar uma parcela como paga, o lançamento entra em Gastos e compartilha os comprovantes.'));
     if (!despesa && imovel.origemPlano) sec.append(elemento('p','holding-painel-nota',imovel.origemPlano));
     if (despesa) sec.append(elemento('p','holding-painel-nota','Despesas separadas do valor de aquisição.'));
@@ -478,8 +520,23 @@
     if (visiveis.length) sec.append(tabelaMensal(contexto,imovel,visiveis,despesa));
     else if (filtradas.length) sec.append(elemento('p','holding-vazio',exibicao==='pendentes'?'Nenhum lançamento pendente neste período.':'Nenhum lançamento pago neste período.'));
     else sec.append(elemento('p','holding-vazio',linhas.length?'Nenhum lançamento neste recorte.':despesa?'Nenhuma despesa lançada.':'Nenhuma parcela cadastrada.'));
-    if (!despesa) sec.append(historico(contexto,imovel,abrirHistorico));
+    if (!despesa) {sec.append(historico(contexto,imovel,abrirHistorico));sec.append(historicoPlanos(imovel));}
     return sec;
+  }
+  function historicoPlanos(imovel) {
+    const area=elemento('div','holding-planos-anteriores');
+    if (!imovel.reparcelamentos?.length) return area;
+    const detalhes=elemento('details','holding-historico');detalhes.append(elemento('summary','',`Planos anteriores (${imovel.reparcelamentos.length})`));
+    detalhes.append(elemento('p','holding-painel-nota','Cronogramas substituídos, fora do saldo e das próximas cobranças.'));
+    for(const revisao of [...imovel.reparcelamentos].reverse()) {
+      const grupo=elemento('details');grupo.append(elemento('summary','',`Substituído em ${dataBR(revisao.criadoEm.slice(0,10))} · ${revisao.parcelasAnteriores.length} parcelas`));
+      const lista=elemento('ul','holding-parcelas');
+      for(const p of revisao.parcelasAnteriores) {
+        const li=elemento('li');li.append(elemento('span','',`${p.descricao} · ${dataBR(p.vencimento)}`),elemento('strong','',dinheiro(p.valorCentavos)),botaoAnexos(li,refAnexos(imovel.id,'parcela',p.id),`${p.descricao}, plano anterior, ${imovel.nome}`));lista.append(li);
+      }
+      grupo.append(lista);detalhes.append(grupo);
+    }
+    area.append(detalhes);return area;
   }
   function coluna(rotulo,valor,dica,acao) {
     const cell=botao('','holding-metrica',acao);
@@ -499,11 +556,18 @@
     });
     status.title=resumo.percentual==null?'Completar dados do imóvel':quitado?'Ver histórico de pagamentos':'Ver parcelas pendentes';
     status.dataset.tipo=quitado?'quitado':resumo.percentual==null?'incompleto':'andamento';
-    const identidade=elemento('div','holding-identidade'); identidade.append(titulo,status); row.append(identidade);
+    const identidade=elemento('div','holding-identidade'); identidade.append(titulo,status);
+    const prazo=globalThis.HoldingModelo.prazoPlano(imovel);
+    const textoPrazo=prazo.quitadoEm ? `Quitado em ${mesAno(prazo.quitadoEm)}` : prazo.completo && prazo.ultimoVencimento ? `Término: ${mesAno(prazo.ultimoVencimento)} · ${prazo.quantidade} restantes` : prazo.ultimoVencimento ? `Plano parcial até ${mesAno(prazo.ultimoVencimento)} · ${prazo.quantidade} restantes` : 'Término a definir';
+    identidade.append(elemento('small','holding-prazo',textoPrazo));row.append(identidade);
     const faltaTotal=imovel.totalCentavos==null;
     function abrirPlano(exibicao,historico=false) {
       if (!disponivel(contexto)) return;
-      contexto.painelAberto={id:imovel.id,aba:'plano'};
+      const origem=exibicao+':'+historico;
+      if (contexto.painelAberto.id===imovel.id && contexto.painelAberto.aba==='plano' && contexto.painelAberto.origem===origem) {
+        contexto.painelAberto={id:imovel.id,aba:''};contexto.desenhar('',imovel.id);return;
+      }
+      contexto.painelAberto={id:imovel.id,aba:'plano',origem};
       contexto.recortes.set(imovel.id+':plano',{mes:'todos',tipo:'todos',exibicao});
       contexto.desenhar('',imovel.id,historico);
       const destino=contexto.container.querySelector(historico?'.holding-historico summary':'.holding-controle-total [aria-pressed="true"]');

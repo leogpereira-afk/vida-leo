@@ -203,6 +203,14 @@ function holdingGravarSerie(imovelId, dados, baseImovel) {
   });
 }
 
+function holdingReparcelar(imovelId,dados,baseImovel) {
+  const ler = item => ({parcelas:item.parcelas || [],pagamentos:item.pagamentos || [],reparcelamentos:item.reparcelamentos || []});
+  return holdingMovimentar(imovelId,baseImovel,{
+    base:ler(baseImovel),lerBase:ler,lerResultado:ler,
+    aplicar:carteira=>HoldingModelo.reparcelar(carteira,imovelId,dados)
+  });
+}
+
 function holdingEditarParcela(imovelId, dados, baseParcela, baseImovel) {
   const ler = item => item.parcelas?.find(p => p.id === dados.id);
   return holdingMovimentar(imovelId, baseImovel, {
@@ -246,6 +254,7 @@ function vUniversoImoveis(m) {
     gravarImovel: holdingGravarImovel,
     gravarPagamento: holdingGravarPagamento,
     gravarSerie: holdingGravarSerie,
+    reparcelar: holdingReparcelar,
     editarParcela: holdingEditarParcela,
     pagarParcela: holdingPagarParcela,
     gravarDespesa: holdingGravarDespesa,

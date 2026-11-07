@@ -313,3 +313,26 @@ test('gasto vinculado protege valor e data na ficha e fica fora da repetição m
   app.run('document.querySelector(".fundo")?.remove();financeiroRepetirGastos(E.gastos,"2027-01")');
   assert.equal(app.document.querySelectorAll('.ff-repeat-row').length,0);
 });
+
+test('Ajustar plano preserva gasto e pagamento já baixado, persiste e rejeita edição concorrente',async()=>{
+  const app=novaCentral();
+  app.run(`E.empresasPJ=[{id:'empresa',nome:'Empresa sintética'}];E.holdingImoveis[0].gastosEmpresaId='empresa';
+    E.holdingImoveis=HoldingModelo.gravarSerie(E.holdingImoveis,'imovel-qa',{id:'prev',descricao:'Parcela',quantidade:2,valorCentavos:5000,primeiroVencimento:'2026-11-30'});`);
+  await app.run(`holdingPagarParcela('imovel-qa','prev',E.holdingImoveis[0].parcelas[0],E.holdingImoveis[0])`);
+  const antes=app.estado();
+  app.run(`globalThis.baseAjuste=structuredClone(E.holdingImoveis[0]);globalThis.ajusteQA={id:'ajuste',quantidade:3,primeiroVencimento:'2026-12-31',intervaloMeses:1}`);
+  await app.run(`holdingReparcelar('imovel-qa',ajusteQA,baseAjuste)`);
+  assert.deepEqual(app.estado().gastos,antes.gastos);
+  assert.deepEqual(app.estado().holdingImoveis[0].pagamentos,antes.holdingImoveis[0].pagamentos);
+  await app.run(`holdingReparcelar('imovel-qa',ajusteQA,baseAjuste)`);
+  assert.equal(app.estado().holdingImoveis[0].reparcelamentos.length,1);
+  app.run('E=carregar();validarBackup(E)');
+  assert.equal(app.estado().holdingImoveis[0].parcelas.length,4);
+  const antesConflito=app.estado();
+  await assert.rejects(app.run(`holdingReparcelar('imovel-qa',{...ajusteQA,id:'outra'},baseAjuste)`),/mudou/);
+  assert.deepEqual(app.estado(),antesConflito);
+  app.run('globalThis.baseAjuste=structuredClone(E.holdingImoveis[0])');
+  app.ctx.localStorage.setItem=()=>{throw Error('QuotaExceededError')};
+  await assert.rejects(app.run(`holdingReparcelar('imovel-qa',{...ajusteQA,id:'quota'},baseAjuste)`),/Não foi possível salvar/);
+  assert.deepEqual(app.estado(),antesConflito);
+});
