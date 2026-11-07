@@ -76,7 +76,7 @@
       const inicio=(imovel.parcelas || []).filter(p=>!modelo.pagamentoDaParcela(imovel,p.id) && p.vencimento>=api.hoje()).map(p=>p.vencimento).sort()[0] || api.hoje();
       form.append(elemento('p','holding-form-imovel',imovel.nome));
       form.append(elemento('p','holding-painel-nota',`Distribui todo o saldo de ${dinheiro(modelo.resumo(imovel).saldo)} e substitui as ${prazo.quantidade} parcelas ainda não pagas, inclusive reforços e semestrais. Pagamentos, Gastos e comprovantes já registrados são preservados. O plano anterior fica no histórico.`));
-      const quantidade=campo(form,'Quantidade de parcelas restantes','quantidade',prazo.quantidade || 12,{tipo:'number',requerido:true});
+      const quantidade=campo(form,'Quantidade de parcelas restantes','quantidade',prazo.completo ? prazo.quantidade : '',{tipo:'number',requerido:true});
       quantidade.min='1';quantidade.max='360';quantidade.step='1';
       const vencimento=campo(form,'Primeiro vencimento','primeiroVencimento',inicio,{tipo:'date',requerido:true});
       const label=elemento('label','holding-campo');label.append(elemento('span','','Intervalo entre parcelas'));
@@ -334,7 +334,7 @@
         rotulo: rotuloCompromisso(imovel, item, despesa), situacao: situacaoMensal(item.vencimento, pagoEm, hoje) };
     }).sort((a,b) => (a.item.vencimento || '9999-99').localeCompare(b.item.vencimento || '9999-99'));
   }
-  function resumoControle(linhas, exibicao, selecionar) {
+  function resumoControle(linhas, exibicao, selecionar, imovel = null) {
     let pago = 0, pendente = 0, semValor = 0;
     for (const { item, pagoEm } of linhas) {
       if (item.valorCentavos == null) semValor++;
@@ -348,12 +348,19 @@
     const percentual = !semValor && previsto > 0 ? (pago / previsto) * 100 : null;
     const grupo = elemento('div','holding-controle-total');
     grupo.setAttribute('role','group'); grupo.setAttribute('aria-label','Filtrar lançamentos pelos totais');
-    for (const [id,rotulo,valor,acao] of [
+    const aquisicao=imovel && globalThis.HoldingModelo.resumo(imovel);
+    const indicadores=aquisicao ? [
+      ['todos','Valor de aquisição',imovel.totalCentavos==null?'A informar':dinheiro(imovel.totalCentavos),'Mostrar todas as parcelas'],
+      ['pagos','Total pago',dinheiro(aquisicao.pago),'Mostrar parcelas pagas'],
+      ['pendentes','Dívida restante',aquisicao.saldo==null?'A informar':dinheiro(aquisicao.saldo),'Mostrar parcelas pendentes'],
+      ['percentual','% quitado',percentagem(aquisicao.percentual,aquisicao.saldo===0),'Ver composição da aquisição']
+    ] : [
       ['todos','Total previsto',texto(previsto,valoresConhecidos),'Mostrar todos os lançamentos'],
       ['pagos','Total pago',dinheiro(pago),'Mostrar lançamentos pagos'],
       ['pendentes','Total pendente',texto(pendente,pendentesConhecidos),'Mostrar lançamentos pendentes'],
       ['percentual','% quitado',percentagem(percentual,pago===previsto),'Ver composição da quitação']
-    ]) {
+    ];
+    for (const [id,rotulo,valor,acao] of indicadores) {
       const btn=botao('','holding-indicador-filtro',()=>selecionar(id));
       btn.append(elemento('small','',rotulo),elemento('strong','',valor));
       btn.title=acao;btn.dataset.exibicao=id;
@@ -509,16 +516,29 @@
       contexto.desenhar('',imovel.id);
       contexto.container.querySelector('.holding-controle-total [aria-pressed="true"]')?.focus({preventScroll:true});
     }
-    sec.append(resumoControle(filtradas,exibicao,selecionar));
+    sec.append(resumoControle(filtradas,exibicao,selecionar,despesa?null:imovel));
+    const aquisicao=despesa?null:globalThis.HoldingModelo.resumo(imovel);
+    if (!despesa) {
+      sec.append(elemento('p','holding-painel-nota','Os totais consideram toda a aquisição, incluindo pagamentos manuais. O mês filtra apenas a lista de parcelas.'));
+      const previsto=linhas.filter(l=>!l.pagoEm).reduce((s,l)=>s+l.item.valorCentavos,0);
+      const semPlano=aquisicao.saldo==null?null:aquisicao.saldo-previsto;
+      if (semPlano>0) {
+        const aviso=elemento('div','holding-saldo-sem-plano');
+        aviso.append(elemento('strong','',`${dinheiro(semPlano)} da dívida ainda sem parcelas definidas`),
+          elemento('p','','Informe quantas parcelas faltam para distribuir o saldo restante e ver quando termina de pagar.'),
+          botao('Informar parcelas restantes','holding-primario',ev=>formulario(contexto,imovel,null,'parcelamento',ev.currentTarget)));
+        sec.append(aviso);
+      }
+    }
     const visiveis=filtradas.filter(l=>exibicao==='pagos' ? l.pagoEm : exibicao==='pendentes' ? !l.pagoEm : true);
     if (exibicao==='percentual') {
       const pagas=filtradas.filter(l=>l.pagoEm).length;
-      sec.append(elemento('p','holding-painel-nota',pagas+' de '+filtradas.length+' lançamentos pagos. O percentual considera os valores do período.'));
+      sec.append(elemento('p','holding-painel-nota',despesa ? pagas+' de '+filtradas.length+' lançamentos pagos. O percentual considera os valores do período.' : 'O percentual compara todos os pagamentos com o valor total de aquisição do imóvel.'));
     }
     if (despesa && filtradas.length) sec.append(totaisDeDespesas(imovel,filtradas));
     sec.append(elemento('div','holding-editor-local'));
     if (visiveis.length) sec.append(tabelaMensal(contexto,imovel,visiveis,despesa));
-    else if (filtradas.length) sec.append(elemento('p','holding-vazio',exibicao==='pendentes'?'Nenhum lançamento pendente neste período.':'Nenhum lançamento pago neste período.'));
+    else if (filtradas.length) sec.append(elemento('p','holding-vazio',exibicao==='pendentes' ? aquisicao?.saldo>0 ? 'Nenhuma parcela pendente cadastrada neste recorte. A dívida restante está no resumo acima.' : 'Nenhum lançamento pendente neste período.' : 'Nenhum lançamento pago neste período.'));
     else sec.append(elemento('p','holding-vazio',linhas.length?'Nenhum lançamento neste recorte.':despesa?'Nenhuma despesa lançada.':'Nenhuma parcela cadastrada.'));
     if (!despesa) {sec.append(historico(contexto,imovel,abrirHistorico));sec.append(historicoPlanos(imovel));}
     return sec;

@@ -190,3 +190,6 @@
 .holding-previa-parcelamento{grid-column:1/-1;display:grid;gap:7px;padding:12px;border:1px solid var(--holding-linha);border-radius:8px;background:var(--holding-papel);color:var(--holding-ink)}
 .holding-previa-parcelamento>strong{font-size:1.05rem}.holding-previa-parcelamento ol{max-height:200px;overflow:auto;padding-left:26px;font-variant-numeric:tabular-nums}
 .holding-planos-anteriores summary{cursor:pointer;min-height:32px}.holding-planos-anteriores .holding-historico>details{margin-top:8px}
+
+.holding-saldo-sem-plano{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:10px 0;padding:12px;border:1px solid var(--holding-dourado);border-radius:8px;background:var(--holding-papel);color:var(--holding-ink)}
+.holding-saldo-sem-plano strong{flex:1 1 100%}.holding-saldo-sem-plano p{flex:1 1 260px;font-size:.85rem;color:var(--holding-suave)}

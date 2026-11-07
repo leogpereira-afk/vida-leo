@@ -254,13 +254,13 @@ test('Filtros de mês e natureza recalculam valores e status das linhas, mantend
   assert.equal(linhas().length,0);assert.equal(totaisResumo(ficha())['% quitado'],'A informar');
 });
 
-test('Controle mensal do plano soma só parcelas vinculadas e deixa os pagamentos manuais no histórico da aquisição',()=>{
+test('Resumo do plano inclui pagamentos manuais e saldo não distribuído, mantendo a lista das parcelas',()=>{
   const propriedade=imovel('sala','Sala',100000);
   propriedade.parcelas=[{id:'prev1',descricao:'Parcela identificada',valorCentavos:40000,vencimento:'2026-10-31'}];
   propriedade.pagamentos=[{id:'manual',descricao:'Entrada independente',valorCentavos:20000,data:'2026-10-02'},
     {id:'confirmado',parcelaId:'prev1',descricao:'Parcela identificada',valorCentavos:40000,data:'2026-10-29'}];
   const a=app([propriedade]),ficha=card(a,'Sala');button(ficha,'Plano').click();
-  assert.deepEqual(totaisResumo(card(a,'Sala')),{'Total previsto':'R$ 400,00','Total pago':'R$ 400,00','Total pendente':'R$ 0,00','% quitado':'100%'});
+  assert.deepEqual(totaisResumo(card(a,'Sala')),{'Valor de aquisição':'R$ 1.000,00','Total pago':'R$ 600,00','Dívida restante':'R$ 400,00','% quitado':'60%'});
   assert.equal(card(a,'Sala').querySelectorAll('.holding-compromisso').length,1);
   assert.match(card(a,'Sala').querySelector('.holding-historico').textContent,/Entrada independente/);
 });
@@ -273,7 +273,7 @@ test('Falha na baixa desmarca a caixa e preserva o pendente; mudar o recorte nã
   const form=ficha().querySelector('.holding-baixa');await confirmarPago(a,form);
   assert.match(form.querySelector('[role="alert"]').textContent,/conflitante/);
   assert.equal(form.querySelector('input').checked,false);assert.equal(form.querySelector('input').disabled,false);
-  assert.equal(totaisResumo(ficha())['Total pendente'],'R$ 100,00');
+  assert.equal(totaisResumo(ficha())['Dívida restante'],'R$ 500,00');
   button(ficha(),'+ Lançamento').click();alterar(a,'descricao','Manter meu rascunho');
   filtrar(a,ficha(),'mes','2026-01');
   assert.equal(ficha().querySelector('[name="holding-mes"]').value,'todos');
@@ -426,4 +426,25 @@ test('Ajustar parcelamento simula data final, cancela sem alterações e aplica 
   assert.match(ficha().querySelector('.holding-prazo').textContent,/Término: dezembro de 2027/);
   assert.match(ficha().querySelector('.holding-planos-anteriores').textContent,/Parcela antiga/);
   assert.equal(ficha().querySelectorAll('.holding-compromisso').length,3);
+});
+
+test('Plano com somente parcelas pagas mostra dívida real e permite informar parcelas restantes',async()=>{
+  const propriedade=imovel('sala','Sala',30000000);
+  propriedade.parcelas=[{id:'paga',descricao:'Entrada de ensaio',valorCentavos:22500000,vencimento:'2026-10-01'}];
+  propriedade.pagamentos=[{id:'baixa',parcelaId:'paga',descricao:'Entrada de ensaio',valorCentavos:22500000,data:'2026-10-01'}];
+  const a=app([propriedade]),ficha=()=>card(a,'Sala');
+  button(ficha(),'Plano').click();
+  const esperado={'Valor de aquisição':'R$ 300.000,00','Total pago':'R$ 225.000,00','Dívida restante':'R$ 75.000,00','% quitado':'75%'};
+  assert.deepEqual(totaisResumo(ficha()),esperado);
+  filtrar(a,ficha(),'mes','2026-10');assert.deepEqual(totaisResumo(ficha()),esperado);
+  ficha().querySelector('[data-exibicao=pendentes]').click();
+  assert.doesNotMatch(ficha().textContent,/Nenhum lançamento pendente/);
+  assert.match(ficha().querySelector('.holding-saldo-sem-plano').textContent,/75.000,00/);
+  button(ficha(),'Informar parcelas restantes').click();
+  assert.equal(a.document.querySelector('[name=quantidade]').value,'');
+  alterar(a,'quantidade','15');alterar(a,'primeiroVencimento','2026-12-10');await salvar(a);
+  assert.deepEqual(totaisResumo(ficha()),esperado);
+  assert.equal(a.ctx.imoveisTeste[0].parcelas.length,16);
+  assert.equal(Boolean(ficha().querySelector('.holding-saldo-sem-plano')),false);
+  assert.match(ficha().querySelector('.holding-prazo').textContent,/fevereiro de 2028/);
 });
