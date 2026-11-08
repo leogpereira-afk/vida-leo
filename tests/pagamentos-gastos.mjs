@@ -138,7 +138,7 @@ test('Todos os pagamentos do avião recebem ação para anexar; pendentes não s
  for(const tipo of ['aportes','mensalidades','despesas'])await gravar(a,tipo,registro(tipo));
  await gravar(a,'despesas',{...registro('despesas','avulso'),natureza:'avulso'});
  a.run(`E.aviao.mensalidades.push({...E.aviao.mensalidades[0],id:'pendente',status:'A Vencer',pagoEm:''})`);
- for(const [view,expected] of [["vParticipacaoAviao(main)",1],["filtro.aviaoPlanilha='mensais';vPlanilhaAviao(main)",1],["filtro.aviaoPlanilha='viagens';vPlanilhaAviao(main)",1],["filtro.aviaoPlanilha='avulsos';vPlanilhaAviao(main)",1]]){
+ for(const [view,expected] of [["vParticipacaoAviao(main)",1],["filtro.aviaoCustosMes='';vPlanilhaAviao(main)",3]]){
   a.run(`globalThis.main=document.getElementById('main');main.innerHTML='';${view}`);await a.run('pagamentoAtualizarComprovantes()');
   assert.equal(a.document.querySelectorAll('[data-estado-comprovante=ausente]').length,expected);
  }

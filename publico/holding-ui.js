@@ -54,7 +54,7 @@
     if (!Number.isInteger(qtd) || qtd < 1 || qtd > 360) throw Error('Informe uma quantidade entre 1 e 360.');
     return qtd;
   }
-  const NATUREZAS = {aquisicao:'Parcela de aquisição',investimento:'Investimento no imóvel',condominio:'Condomínio',impostos:'Impostos',avulsa:'Despesa avulsa'};
+  const NATUREZAS = {aquisicao:'Parcela de aquisição',investimento:'Investimento no imóvel',condominio:'Condomínio',impostos:'Impostos',iptu:'IPTU',reforma:'Reforma',manutencao:'Manutenção',seguro:'Seguro',agua:'Água',energia:'Energia',internet:'Internet',outros:'Outros',avulsa:'Despesa avulsa'};
   function campoNatureza(form,valor,opcoes) {
     const label=elemento('label','holding-campo');label.append(elemento('span','','Tipo de lançamento'));
     const select=elemento('select');select.name='tipo';
@@ -112,8 +112,8 @@
     const edicao = Boolean(item);
     const editarParcela = tipo === 'parcela';
     const tipoAnterior = item && !editarParcela ? globalThis.HoldingModelo.tipoDespesa(item) : null;
-    const tipos = edicao ? (editarParcela ? ['aquisicao'] : ['investimento','condominio','impostos',...(tipoAnterior==='avulsa'?['avulsa']:[])]) : ['aquisicao','investimento','condominio','impostos'];
-    const inicial = tipoAnterior || (tipo==='despesa'?'investimento':'aquisicao');
+    const tipos = edicao ? (editarParcela ? ['aquisicao'] : [...HoldingModelo.TIPOS_DESPESA,...(tipoAnterior==='avulsa'?['avulsa']:[])]) : tipo==='despesa' ? [...HoldingModelo.TIPOS_DESPESA] : ['aquisicao',...HoldingModelo.TIPOS_DESPESA];
+    const inicial = tipoAnterior || (tipo==='despesa'?'condominio':'aquisicao');
     const natureza=campoNatureza(form,inicial,tipos);
     if (editarParcela) natureza.disabled=true;
     const descricao=campo(form,'Descrição','descricao',item?.descricao,{requerido:true,maxLength:500,placeholder:'Ex.: entrada ou condomínio'});
@@ -358,7 +358,7 @@
       ['todos','Total previsto',texto(previsto,valoresConhecidos),'Mostrar todos os lançamentos'],
       ['pagos','Total pago',dinheiro(pago),'Mostrar lançamentos pagos'],
       ['pendentes','Total pendente',texto(pendente,pendentesConhecidos),'Mostrar lançamentos pendentes'],
-      ['percentual','% quitado',percentagem(percentual,pago===previsto),'Ver composição da quitação']
+      ['percentual','% das despesas pagas',percentagem(percentual,pago===previsto),'Ver composição da quitação']
     ];
     for (const [id,rotulo,valor,acao] of indicadores) {
       const btn=botao('','holding-indicador-filtro',()=>selecionar(id));
@@ -371,7 +371,7 @@
   function totaisDeDespesas(imovel, linhas) {
     const dl=elemento('dl','holding-tipostotal');
     const porTipo=globalThis.HoldingModelo.resumoDespesas({...imovel, despesas:linhas.map(l => l.item)});
-    for(const id of ['investimento','condominio','impostos','avulsa']) {
+    for(const id of [...HoldingModelo.TIPOS_DESPESA,'avulsa']) {
       const item=porTipo[id]; if(!item.quantidade) continue;
       const texto=[item.pago ? dinheiro(item.pago)+' pago' : '',item.aberto ? dinheiro(item.aberto)+' em aberto' : '',item.aInformar ? `${item.aInformar} a informar` : ''].filter(Boolean).join(' · ');
       const grupo=elemento('div'); grupo.append(elemento('dt','',NATUREZAS[id]),elemento('dd','',texto));dl.append(grupo);
@@ -398,7 +398,7 @@
     if (!periodo.some(([valor])=>valor===recorte.mes)) recorte.mes='todos';
     filtros.append(seletorRecorte('holding-mes','Mês do vencimento',periodo,recorte.mes,v=>{recorte.mes=v;},contexto,imovel));
     if (despesa) {
-      const tipos=['investimento','condominio','impostos'];
+      const tipos=[...HoldingModelo.TIPOS_DESPESA];
       if(linhas.some(l=>l.tipo==='avulsa')) tipos.push('avulsa');
       const opcoes=[['todos','Todas as despesas'],...tipos.map(t=>[t,NATUREZAS[t]])];
       if (!opcoes.some(([valor])=>valor===recorte.tipo)) recorte.tipo='todos';
@@ -494,7 +494,7 @@
     const topo=elemento('div','holding-painel-cab');
     topo.append(elemento('h4','',despesa?'Despesas do imóvel':'Plano de pagamento'));
     const acoes=elemento('div','holding-painel-acoes');
-    const incluir=botao(despesa?'+ Despesa avulsa':'+ Lançamento','holding-secundario',ev=>formulario(contexto,imovel,null,despesa?'despesa':'serie',ev.currentTarget));
+    const incluir=botao(despesa?'+ Despesa':'+ Lançamento','holding-secundario',ev=>formulario(contexto,imovel,null,despesa?'despesa':'serie',ev.currentTarget));
     if (!despesa && globalThis.HoldingModelo.resumo(imovel).saldo>0) acoes.append(botao('Ajustar parcelamento','holding-secundario',ev=>formulario(contexto,imovel,null,'parcelamento',ev.currentTarget)));
     acoes.append(incluir,botao('Recolher','holding-secundario',()=>{
       if (!disponivel(contexto)) return;
@@ -502,11 +502,22 @@
     }));topo.append(acoes);sec.append(topo);
     sec.append(elemento('p','holding-painel-nota','Todo pagamento entra automaticamente em Gastos e compartilha os mesmos comprovantes.'));
     if (!despesa && imovel.origemPlano) sec.append(elemento('p','holding-painel-nota',imovel.origemPlano));
-    if (despesa) sec.append(elemento('p','holding-painel-nota','Despesas separadas do valor de aquisição.'));
+    if (despesa) {
+      sec.append(elemento('p','holding-painel-nota','Condomínio, IPTU, reforma e demais despesas não alteram a quitação da aquisição.'));
+      const atalhos=elemento('div','holding-painel-acoes');
+      for (const categoria of ['condominio','iptu','reforma','manutencao']) atalhos.append(botao('+ '+NATUREZAS[categoria],'holding-secundario',ev=>{
+        if(!disponivel(contexto))return;
+        formulario(contexto,imovel,null,'despesa',ev.currentTarget);
+        const form=contexto.container.querySelector('.holding-form');
+        if(form){const select=form.querySelector('[name=tipo]');for(const option of select.options)option.selected=false;[...select.options].find(option=>option.value===categoria).selected=true;select.dispatchEvent(new select.ownerDocument.defaultView.Event('change'));form.querySelector('[name=descricao]').value=NATUREZAS[categoria];}
+      }));
+      sec.append(atalhos);
+    }
     const chave=`${imovel.id}:${aba}`;
     if(!contexto.recortes.has(chave)) contexto.recortes.set(chave,{mes:'todos',tipo:'todos'});
     const recorte=contexto.recortes.get(chave);
-    const linhas=linhasDoControle(imovel,despesa,contexto.api.hoje());
+    const operacionais=HoldingModelo.despesasOperacionais(imovel,contexto.api.gastos?.() || []);
+    const linhas=linhasDoControle(despesa ? {...imovel,despesas:operacionais} : imovel,despesa,contexto.api.hoje());
     sec.append(controlesRecorte(contexto,imovel,despesa,linhas,recorte));
     const filtradas=linhas.filter(l=>(recorte.tipo==='todos'||l.tipo===recorte.tipo)&&(recorte.mes==='todos'||(l.mes||'sem')===recorte.mes));
     const exibicao=recorte.exibicao || 'todos';
@@ -568,8 +579,8 @@
     const card=elemento('article','holding-cartao');
     const row=elemento('div','holding-linha');
     const titulo=elemento('h3');
-    const editar=botao(imovel.nome,'holding-nome',ev=>formulario(contexto,imovel,null,'imovel',ev.currentTarget));
-    editar.title='Editar imóvel'; titulo.append(editar);
+    const editar=botao(imovel.nome,'holding-nome',()=>{if(!disponivel(contexto))return;contexto.selecionado=imovel.id;contexto.painelAberto={id:imovel.id,aba:'plano'};contexto.desenhar('',imovel.id);});
+    editar.title='Abrir imóvel'; titulo.append(editar);
     const status=botao(resumo.status,'holding-status',ev=>{
       if (resumo.percentual==null) formulario(contexto,imovel,null,'imovel',ev.currentTarget);
       else abrirPlano(quitado?'pagos':'pendentes',quitado);
@@ -583,6 +594,7 @@
     const faltaTotal=imovel.totalCentavos==null;
     function abrirPlano(exibicao,historico=false) {
       if (!disponivel(contexto)) return;
+      contexto.selecionado=imovel.id;
       const origem=exibicao+':'+historico;
       if (contexto.painelAberto.id===imovel.id && contexto.painelAberto.aba==='plano' && contexto.painelAberto.origem===origem) {
         contexto.painelAberto={id:imovel.id,aba:''};contexto.desenhar('',imovel.id);return;
@@ -610,7 +622,7 @@
     for(const [id,rotulo] of [['plano','Plano'],['despesas','Despesas']]) {
       const btn=botao(rotulo,'holding-secundario',()=>{
         if (!disponivel(contexto)) return;
-        contexto.painelAberto={id:imovel.id,aba:aberta===id?'':id}; contexto.desenhar('',imovel.id);
+        contexto.selecionado=imovel.id;contexto.painelAberto={id:imovel.id,aba:aberta===id?'':id}; contexto.desenhar('',imovel.id);
       });
       btn.setAttribute('aria-expanded',String(aberta===id));acoes.append(btn);
     }
@@ -624,10 +636,14 @@
       const raiz=elemento('section','holding-area');
       raiz.append(holdingCabecalho('universo-imoveis'));
       const lista=elemento('section','holding-lista'), topo=elemento('div','holding-lista-cab');
-      topo.append(elemento('h1','','Imóveis'),botao('+ Cadastrar imóvel','holding-primario',ev=>formulario(contexto,null,null,'imovel',ev.currentTarget)));lista.append(topo);
+      const selecionado=carteira.find(i=>i.id===contexto.selecionado);
+      if(selecionado) {
+        topo.append(botao('← Todos os imóveis','holding-secundario',()=>{if(!disponivel(contexto))return;contexto.selecionado=null;contexto.painelAberto={id:null,aba:''};desenhar();}),elemento('h1','',selecionado.nome),botao('Editar imóvel','holding-secundario',ev=>formulario(contexto,selecionado,null,'imovel',ev.currentTarget)));
+      } else topo.append(elemento('h1','','Imóveis'),botao('+ Cadastrar imóvel','holding-primario',ev=>formulario(contexto,null,null,'imovel',ev.currentTarget)));
+      lista.append(topo);
       const alvo=imovelFoco && carteira.find(i=>i.id===imovelFoco);
       if (mensagem && alvo && contexto.filtro!==globalThis.HoldingModelo.resumo(alvo).status) contexto.filtro='todos';
-      if (carteira.length) {
+      if (carteira.length && !selecionado) {
         const resumos=carteira.map(i=>globalThis.HoldingModelo.resumo(i));
         const quitados=resumos.filter(r=>r.status==='Quitado').length,andamento=resumos.filter(r=>r.status==='Em pagamento').length;
         const filtros=[['todos',carteira.length+' '+(carteira.length===1?'imóvel':'imóveis')],['Em pagamento',andamento+' em pagamento'],['Quitado',quitados+' '+(quitados===1?'quitado':'quitados')]];
@@ -648,14 +664,14 @@
       if (mensagem) { const status=elemento('p','holding-feedback',mensagem);status.setAttribute('role','status');lista.append(status); }
       if (!carteira.length) lista.append(elemento('p','holding-lista-vazia','Cadastre o primeiro imóvel para acompanhar sua aquisição e seus pagamentos.'));
       let foco;
-      const visiveis=carteira.filter(i=>contexto.filtro==='todos'||globalThis.HoldingModelo.resumo(i).status===contexto.filtro);
+      const visiveis=selecionado?[selecionado]:carteira.filter(i=>contexto.filtro==='todos'||globalThis.HoldingModelo.resumo(i).status===contexto.filtro);
       if (carteira.length && !visiveis.length) lista.append(elemento('p','holding-vazio','Nenhum imóvel nesta situação.'));
       for(const imovel of visiveis) {
         const {card,titulo}=cartao(contexto,imovel,imovelFoco===imovel.id && abrirHistorico);lista.append(card);if(imovel.id===imovelFoco)foco=titulo;
       }
       raiz.append(lista);container.replaceChildren(raiz);if (foco && container.isConnected) foco.focus({preventScroll:true});
     }
-    const contexto={container,api,desenhar,filtro:'todos',recortes:new Map(),painelAberto:{id:null,aba:''}};
+    const contexto={container,api,desenhar,selecionado:api.imovelInicial || null,filtro:'todos',recortes:new Map(),painelAberto:{id:api.imovelInicial||null,aba:api.imovelInicial?'plano':''}};
     desenhar();
   }
   globalThis.HoldingUI=Object.freeze({render,refAnexos});

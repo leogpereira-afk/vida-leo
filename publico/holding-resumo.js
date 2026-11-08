@@ -34,8 +34,8 @@ function holdingCabecalho(secao) {
   return cab;
 }
 
-function holdingConsolidar(carteira, aviao) {
-  const tipos = ['investimento', 'condominio', 'impostos', 'avulsa'];
+function holdingConsolidar(carteira, aviao, gastos = []) {
+  const tipos = [...HoldingModelo.TIPOS_DESPESA, 'avulsa'];
   const despesas = Object.fromEntries(tipos.map(tipo => [tipo, { pago: 0, aberto: 0, semValor: 0, registros: 0 }]));
   const imoveis = { quantidade: carteira.length, comValor: 0, quitados: 0, saldo: 0, pago: 0 };
   for (const imovel of carteira) {
@@ -46,7 +46,7 @@ function holdingConsolidar(carteira, aviao) {
       imoveis.comValor++;
     }
     if (resumo.status === 'Quitado') imoveis.quitados++;
-    const porTipo = HoldingModelo.resumoDespesas(imovel);
+    const porTipo = HoldingModelo.resumoDespesas({...imovel,despesas:HoldingModelo.despesasOperacionais(imovel,gastos)});
     for (const tipo of tipos) {
       const grupo = despesas[tipo];
       grupo.registros += porTipo[tipo].quantidade;
@@ -72,7 +72,7 @@ function holdingIndicador(rotulo, valor, nota) {
 function holdingQuadroImoveis({imoveis, despesas}) {
   const sec = holdingElemento('section', 'holding-quadro');
   sec.append(holdingElemento('h3', '', 'Imóveis'));
-  const categorias = [['Investimento no imóvel','investimento'],['Condomínio','condominio'],['Impostos','impostos']];
+  const categorias = [['Investimento no imóvel','investimento'],['Condomínio','condominio'],['Impostos','impostos'],['IPTU','iptu'],['Reforma','reforma'],['Manutenção','manutencao'],['Seguro','seguro'],['Água','agua'],['Energia','energia'],['Internet','internet'],['Outros','outros']];
   if (despesas.avulsa.registros) categorias.push(['Outras despesas','avulsa']);
   const tabela = holdingElemento('table', 'holding-composicao');
   tabela.setAttribute('aria-label', 'Composição dos valores dos imóveis');

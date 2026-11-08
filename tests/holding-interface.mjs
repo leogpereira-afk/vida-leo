@@ -132,6 +132,7 @@ test('Edição usa a base da abertura, recuperar dados atuais ao cancelar não a
   };
   a.run('apiHoldingTeste.gravarImovel = gravarEmConflito');
   button(card(a,'Sala anterior'),'Sala anterior').click();
+  button(a.document,'Editar imóvel').click();
   alterar(a,'nome','Minha alteração');
   a.ctx.imoveisTeste[0].nome = 'Nome visto no servidor';
   a.document.querySelector('dialog').dataset.holdingAtualizar = '1';
@@ -160,7 +161,7 @@ test('O plano organiza parcelas mensais e a baixa de uma linha atualiza o percen
   button(card(a,'Sala'),'Plano').click();
   button(card(a,'Sala'),'+ Lançamento').click();
   const opcoes=[...a.document.querySelectorAll('.holding-form select option')].map(opt=>opt.textContent);
-  assert.deepEqual(opcoes,['Parcela de aquisição','Investimento no imóvel','Condomínio','Impostos']);
+  assert.deepEqual(opcoes,['Parcela de aquisição','Investimento no imóvel','Condomínio','Impostos','IPTU','Reforma','Manutenção','Seguro','Água','Energia','Internet','Outros']);
   alterar(a,'descricao','Prestação');alterar(a,'valor','30,00');alterar(a,'vencimento','2026-01-31');alterar(a,'quantidade','2');
   await salvar(a);
   const ficha=()=>card(a,'Sala');
@@ -190,7 +191,7 @@ test('O plano organiza parcelas mensais e a baixa de uma linha atualiza o percen
 
 test('Condomínio incompleto permite cadastrar sem data, completar o valor e baixar como despesa fora da aquisição',async()=>{
   const a=app([imovel('sala','Sala',90000)]), ficha=()=>card(a,'Sala');
-  button(ficha(),'Despesas').click();button(ficha(),'+ Despesa avulsa').click();
+  button(ficha(),'Despesas').click();button(ficha(),'+ Despesa').click();
   selecionarTipo(a,'condominio');alterar(a,'descricao','Condomínio de teste');
   await salvar(a);
   let item=ficha().querySelector('.holding-compromisso');
@@ -238,20 +239,20 @@ test('Filtros de mês e natureza recalculam valores e status das linhas, mantend
   const linhas=()=>[...ficha().querySelectorAll('.holding-compromisso')];
   assert.deepEqual(new Set(linhas().map(l=>l.dataset.situacao)),new Set(['Em atraso','Vence hoje','Pago','A vencer','Vencimento a informar']));
   assert.match(totaisResumo(ficha())['Total previsto'],/600,00.*1 a informar/);
-  assert.equal(totaisResumo(ficha())['% quitado'],'A informar');
+  assert.equal(totaisResumo(ficha())['% das despesas pagas'],'A informar');
   assert.equal(linhas().find(l=>l.dataset.situacao==='Pago').querySelector('.holding-mensal-c5').textContent,'02/11/2026');
   filtrar(a,ficha(),'tipo','condominio');filtrar(a,ficha(),'mes','2026-11');
   assert.equal(linhas().length,3);
-  assert.deepEqual(totaisResumo(ficha()),{'Total previsto':'R$ 100,00','Total pago':'R$ 20,00','Total pendente':'R$ 80,00','% quitado':'20%'});
+  assert.deepEqual(totaisResumo(ficha()),{'Total previsto':'R$ 100,00','Total pago':'R$ 20,00','Total pendente':'R$ 80,00','% das despesas pagas':'20%'});
   const venceHoje=linhas().find(l=>l.dataset.situacao==='Vence hoje');
   await confirmarPago(a,venceHoje.querySelector('form'));
-  assert.deepEqual(totaisResumo(ficha()),{'Total previsto':'R$ 100,00','Total pago':'R$ 40,00','Total pendente':'R$ 60,00','% quitado':'40%'});
+  assert.deepEqual(totaisResumo(ficha()),{'Total previsto':'R$ 100,00','Total pago':'R$ 40,00','Total pendente':'R$ 60,00','% das despesas pagas':'40%'});
   assert.equal(ficha().querySelector('[name="holding-tipo"]').value,'condominio');
   filtrar(a,ficha(),'tipo','investimento');filtrar(a,ficha(),'mes','sem');
-  assert.equal(linhas().length,1);assert.equal(totaisResumo(ficha())['% quitado'],'A informar');
+  assert.equal(linhas().length,1);assert.equal(totaisResumo(ficha())['% das despesas pagas'],'A informar');
   assert.equal(linhas()[0].querySelector('.holding-pago').disabled,true);
   filtrar(a,ficha(),'tipo','impostos');
-  assert.equal(linhas().length,0);assert.equal(totaisResumo(ficha())['% quitado'],'A informar');
+  assert.equal(linhas().length,0);assert.equal(totaisResumo(ficha())['% das despesas pagas'],'A informar');
 });
 
 test('Resumo do plano inclui pagamentos manuais e saldo não distribuído, mantendo a lista das parcelas',()=>{
@@ -376,7 +377,7 @@ test('Agendamento em despesa em aberto é independente do vencimento, da baixa e
   const propriedade=imovel('imovel-agenda','Sala com agendamento',50000);
   propriedade.despesas=[{id:'conta',descricao:'Despesa do ensaio',tipo:'condominio',valorCentavos:1000,vencimento:'2026-11-15',pagoEm:null}];
   const a=app([propriedade]), ficha=()=>card(a,propriedade.nome);button(ficha(),'Despesas').click();
-  button(ficha(),'+ Despesa avulsa').click();assert.equal(a.document.querySelector('[name=agendadoPara]'),null);button(a.document.querySelector('.holding-form'),'Cancelar').click();
+  button(ficha(),'+ Despesa').click();assert.equal(a.document.querySelector('[name=agendadoPara]'),null);button(a.document.querySelector('.holding-form'),'Cancelar').click();
   button(ficha().querySelector('.holding-compromisso'),'Editar').click();alterar(a,'agendadoPara','2026-11-05');await salvar(a);
   let linha=ficha().querySelector('.holding-compromisso');assert.equal(linha.dataset.situacao,'A vencer');
   assert.equal(linha.querySelector('.holding-pago').checked,false);assert.match(linha.textContent,/Agendado para 05\/11\/2026/);

@@ -153,7 +153,7 @@ function vUniversoHolding(m) {
     graficos.append(composicao,holdingGraficoMeses(financeiro.serie,competencia(),trocarMes));
     paineis.replaceChildren(linha,graficos,renda);
     const aberto=Boolean(contas.querySelector('details')?.open);
-    const detalhes=holdingContasAquisicao(holdingConsolidar(carteira,E.aviao));detalhes.open=aberto;
+    const detalhes=holdingContasAquisicao(holdingConsolidar(carteira,E.aviao,E.gastos));detalhes.open=aberto;
     contas.replaceChildren(detalhes);
   }
   function preencherCadastros() {

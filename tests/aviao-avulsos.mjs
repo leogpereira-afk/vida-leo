@@ -11,7 +11,7 @@ test('dashboard reconcilia centavos, separa aquisição, cancelados e datas de p
  assert.equal(run("gastosDashboardAviao(E.aviao).total"),190.30);
  assert.equal(run("resumoPlanilhaAviao(E.aviao).minhaParte"),30);
 });
-test('avulsos têm cadastro próprio, não entram na tabela de viagens e exigem data quando pagos',async()=>{
+test('custos têm cadastro e aparecem na lista unificada, com data obrigatória quando pagos',async()=>{
  const {run,document}=setup();run("modalRegistroAviao('despesas',null,'avulso')");
  assert.ok(document.querySelector('input[data-k=fornecedor]'));
  assert.equal(document.querySelector('[data-k=viagemId]'),null);
@@ -23,15 +23,15 @@ test('avulsos têm cadastro próprio, não entram na tabela de viagens e exigem 
  assert.equal(run('E.aviao.despesas[0].natureza'),'avulso');
  assert.equal(run('E.aviao.despesas[0].valorTotal'),null);
  assert.equal(run('E.aviao.despesas[0].minhaCota'),25.50);
- run("filtro.aviaoPlanilha='viagens';vPlanilhaAviao(document.getElementById('main'))");
- assert.doesNotMatch(document.getElementById('main').textContent,/Equipamento de exemplo/);
+ run("filtro.aviaoCustosMes='';vPlanilhaAviao(document.getElementById('main'))");
+ assert.match(document.getElementById('main').textContent,/Equipamento de exemplo/);
  run("document.getElementById('main').replaceChildren();filtro.aviaoPlanilha='avulsos';vPlanilhaAviao(document.getElementById('main'))");
  assert.match(document.getElementById('main').textContent,/Equipamento de exemplo/);
 });
 test('dashboard vazio renderiza, preserva os dados e permite abrir um lançamento',()=>{
  const {run,document}=setup();run("vDashboardAviao(document.getElementById('main'))");assert.match(document.getElementById('main').textContent,/Nenhum pagamento/);
  run("E.aviao.despesas=[{id:'t',natureza:'avulso',data:'2026-01-01',pagoEm:'2026-01-02',descricao:'Exemplo',minhaCota:10,status:'Pago'}];document.getElementById('main').replaceChildren();vDashboardAviao(document.getElementById('main'))");
- document.querySelector('table button').click();assert.match(document.querySelector('[role=dialog]').textContent,/Editar custo avulso/);
+ document.querySelector('table button').click();assert.match(document.querySelector('[role=dialog]').textContent,/Editar custo da aeronave/);
  assert.equal(run('E.aviao.despesas.length'),1);
 });
 

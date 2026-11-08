@@ -104,9 +104,9 @@ test('painel: seções de visão, custos, viagens e fotos são acessíveis',()=>
   run("document.getElementById('main').replaceChildren();filtro.aviaoAba='sobre';vAviao(document.getElementById('main'))");
   assert.match(document.getElementById('main').textContent,/A história do avião/);
   assert.match(document.getElementById('main').textContent,/Adicionar fotos e documentos/);
-  run("document.getElementById('main').replaceChildren();filtro.aviaoAba='custos';vAviao(document.getElementById('main'))");
-  assert.match(document.getElementById('main').textContent,/Custos mensais/);
-  assert.match(document.getElementById('main').textContent,/Custos de viagens/);
+  run("document.getElementById('main').replaceChildren();filtro.aviaoAba='custos';filtro.aviaoCustosMes='';vAviao(document.getElementById('main'))");
+  assert.match(document.getElementById('main').textContent,/Custos da aeronave/);
+  assert.match(document.getElementById('main').textContent,/custos avulsos e de viagens/);
   run("document.getElementById('main').replaceChildren();filtro.aviaoAba='viagens';vAviao(document.getElementById('main'))");
   assert.match(document.getElementById('main').textContent,/Nova viagem no avião/);
 });
@@ -114,19 +114,19 @@ test('painel: seções de visão, custos, viagens e fotos são acessíveis',()=>
 test('custos: linhas importadas aparecem no livro do avião com edição',()=>{
   const {run,ctx,document}=setup(),x=planilha();
   ctx.m=x.mensal;ctx.d=x.viagem;
-  run("E.aviao=mesclarAviaoImportado(E.aviao,validarPacoteAviao({...aviaoDaPlanilha(m,d),manutencaoTotalAtual:5000}));filtro.aviaoAba='custos';vAviao(document.getElementById('main'))");
+  run("E.aviao=mesclarAviaoImportado(E.aviao,validarPacoteAviao({...aviaoDaPlanilha(m,d),manutencaoTotalAtual:5000}));filtro.aviaoAba='custos';filtro.aviaoCustosMes='';vAviao(document.getElementById('main'))");
   assert.equal(document.querySelectorAll('[data-bid="av-aportes"]').length,0);
   assert.equal(document.querySelectorAll('[data-bid="av-valores"]').length,0);
-  assert.equal(document.querySelectorAll('[data-bid="av-mensal"] tbody tr').length,2);
-  const mensal=document.querySelector('[data-bid="av-mensal"]');
-  for(const coluna of ['Competência','Vencimento','Minha cota','Status','Data pagamento','Observações'])
+  assert.equal(document.querySelectorAll('[data-bid="av-custos"] tbody tr').length,3);
+  const mensal=document.querySelector('[data-bid="av-custos"]');
+  for(const coluna of ['Categoria','Vencimento','Minha parte','Situação','Pagamento'])
     assert.ok([...mensal.querySelectorAll('th')].some(th=>th.textContent===coluna),coluna);
   assert.match(mensal.textContent,/Pagamento conferido/);
-  assert.match(document.getElementById('main').textContent,/5\.000,00/);
+  assert.equal(run('E.aviao.manutencaoTotalAtual'),5000);
   run("document.getElementById('main').replaceChildren();filtro.aviaoPlanilha='viagens';vAviao(document.getElementById('main'))");
-  assert.equal(document.querySelectorAll('[data-bid="av-extras"] tbody tr').length,1);
-  assert.equal(document.querySelectorAll('[data-bid="av-extras"] tbody td:last-child button').length,1);
-  assert.equal(document.querySelectorAll('[data-bid="av-extras"] tbody td:first-child .central-registro-abrir').length,1);
+  assert.equal(document.querySelectorAll('[data-bid="av-custos"] tbody tr').length,3);
+  assert.ok(document.querySelectorAll('[data-bid="av-custos"] tbody td:last-child button').length>=3);
+  assert.equal(document.querySelectorAll('[data-bid="av-custos"] tbody td:first-child .central-registro-abrir').length,3);
 });
 
 test('resumo da planilha reconcilia aquisição, referência, mensalidades e despesas sem cancelados',()=>{
@@ -154,13 +154,13 @@ test('reimportação acrescenta a coluna de total em cadastros antigos e preserv
 
 test('mensalidades exibem só minha cota e preservam observações e dados importados',()=>{
   const {run,ctx,document}=setup(),x=planilha();ctx.m=x.mensal;ctx.d=x.viagem;
-  run("E.aviao=mesclarAviaoImportado(E.aviao,{...aviaoDaPlanilha(m,d),manutencaoTotalAtual:5000});E.aviao.mensalidades[0].obs='<img src=x onerror=alert(1)>';filtro.aviaoAba='custos';vAviao(document.getElementById('main'))");
-  const mensal=document.querySelector('[data-bid="av-mensal"]');
+  run("E.aviao=mesclarAviaoImportado(E.aviao,{...aviaoDaPlanilha(m,d),manutencaoTotalAtual:5000});E.aviao.mensalidades[0].obs='<img src=x onerror=alert(1)>';filtro.aviaoAba='custos';filtro.aviaoCustosMes='';vAviao(document.getElementById('main'))");
+  const mensal=document.querySelector('[data-bid="av-custos"]');
   assert.equal(mensal.querySelectorAll('img').length,0);assert.match(mensal.textContent,/<img/);
   assert.doesNotMatch(mensal.textContent,/Valor total|3\.000,00|6\.000,00/);
   assert.equal(run('E.aviao.mensalidades[0].valorTotal'),3000);
-  assert.match(document.querySelector('.aviao-sheet-nota').textContent,/5\.000,00/);
-  assert.match(mensal.querySelector('tfoot').textContent,/1\.800,00/);
+  assert.match(document.querySelector('.aviao-sheet-nota').textContent,/Aquisição da cota separada/);
+  assert.equal(run('resumoPlanilhaAviao(E.aviao).totalCotas'),1800);
   mensal.querySelector('tbody button').click();
   assert.doesNotMatch(document.querySelector('[role=dialog]').textContent,/Valor total da mensalidade/);
 });
@@ -223,7 +223,7 @@ test('Sobre o avião recebe aquisição e valores, com edição preservada',()=>
   assert.ok(document.querySelector('[data-bid="av-valores"]'));
   assert.ok(document.querySelector('[data-bid="av-administracao"] input[type=tel]'));
   assert.ok(document.querySelector('[data-bid="av-administracao"] input[type=email]'));
-  assert.equal(document.querySelectorAll('[data-bid="av-mensal"]').length,0);
+  assert.equal(document.querySelectorAll('[data-bid="av-custos"]').length,0);
   document.querySelector('[data-bid="av-aportes"] tbody button').click();
   assert.match(document.querySelector('[role=dialog]').textContent,/Editar aporte/);
 });

@@ -148,3 +148,55 @@ function pagamentoAtualizarComprovantes(ref) {
     .filter(n=>!origem||canonico(n.dataset.comprovanteRef)===origem)
     .map(n=>n.atualizarComprovante?.()||n.atualizarArquivos?.()));
 }
+
+function aviaoCategoriasCustos() {
+  return ['Mensalidade','Internet / Comunicação','Manutenção Extra','Taxas / Hangaragem','Combustível','Seguro','Licenças / Documentação','Equipamentos','Outro'];
+}
+function aviaoLinhasCustos(a) {
+  return [...(a.mensalidades||[]).map(x=>({...x,colecao:'mensalidades',categoria:x.categoria||'Mensalidade',descricao:x.descricao||'Mensalidade da aeronave',dataVencimento:x.vencimento})),
+    ...(a.despesas||[]).map(x=>({...x,colecao:'despesas',categoria:x.categoria||'Outro',dataVencimento:x.vencimento||x.data}))];
+}
+function aviaoResumoCustos(a,mes='',categoria='') {
+  const linhas=aviaoLinhasCustos(a).filter(x=>(!categoria||x.categoria===categoria)&&(!mes||(x.status==='Pago'?x.pagoEm:x.dataVencimento)?.startsWith(mes)));
+  const ativos=linhas.filter(x=>x.status!=='Cancelado');
+  const soma=xs=>xs.reduce((s,x)=>s+Math.round((+x.minhaCota||0)*100),0)/100;
+  const categorias=[...new Set([...aviaoCategoriasCustos(),...aviaoLinhasCustos(a).map(x=>x.categoria)])];
+  return {linhas,pago:soma(ativos.filter(x=>x.status==='Pago')),aberto:soma(ativos.filter(x=>x.status!=='Pago')),
+    categorias:categorias.filter(c=>!categoria||c===categoria).map(nome=>({nome,pago:soma(ativos.filter(x=>x.categoria===nome&&x.status==='Pago')),aberto:soma(ativos.filter(x=>x.categoria===nome&&x.status!=='Pago'))}))};
+}
+function aviaoCriarSerieCustos(tipo,dados,quantidade,intervalo=1) {
+  if(!['despesas','mensalidades'].includes(tipo))throw Error('Escolha um custo da aeronave.');
+  aviaoRefPagamento(tipo,dados.id);
+  if(!Number.isInteger(quantidade)||quantidade<1||quantidade>360||![1,2,3,6,12].includes(intervalo))throw Error('Informe de 1 a 360 lançamentos e uma frequência válida.');
+  if(dados.status==='Pago'||dados.status==='Cancelado')throw Error('Crie a recorrência em aberto e registre cada pagamento separadamente.');
+  if(!Number.isFinite(dados.minhaCota)||dados.minhaCota<=0||!Number.isSafeInteger(Math.round(dados.minhaCota*100)))throw Error('Informe o valor da sua parte.');
+  if(tipo==='despesas'&&!dados.descricao?.trim())throw Error('Informe a descrição.');
+  const inicio=tipo==='mensalidades'?dados.vencimento:dados.data;
+  if(!dataISOValida(inicio))throw Error('Informe o primeiro vencimento.');
+  return Array.from({length:quantidade},(_,i)=>{
+    const data=HoldingModelo.vencimentoDoMes(inicio,i*intervalo);
+    return {...dados,id:dados.id+':recorrencia:'+i,grupoId:dados.id,numero:i+1,quantidade,intervaloMeses:intervalo,
+      ...(tipo==='mensalidades'?{vencimento:data,competencia:data.slice(0,7)+'-01'}:{data}),
+      minhaCota:Math.round(dados.minhaCota*100)/100,pagoEm:'',status:tipo==='mensalidades'?'A Vencer':'Pendente',editadoManual:true};
+  });
+}
+async function aviaoGravarSerieCustos(tipo,dados,quantidade,intervalo=1) {
+  const novos=aviaoCriarSerieCustos(tipo,dados,quantidade,intervalo);
+  await holdingConferirBase();
+  const a=E.aviao,lista=a[tipo]||[];
+  const ids=new Set(novos.map(x=>x.id));
+  if(lista.some(x=>ids.has(x.id))) {
+    if(novos.every(x=>lista.filter(y=>y.id===x.id).length===1&&holdingMesmosDados(lista.find(y=>y.id===x.id),x)))return 'Recorrência já cadastrada.';
+    throw Error('Esta recorrência já existe ou foi alterada. Confira os lançamentos.');
+  }
+  if(dados.viagemId)throw Error('Cadastre custos de viagem individualmente.');
+  const antes={aviao:a,mt:E._mt};
+  E.aviao={...a,[tipo]:[...lista,...novos]};
+  try{salvar();}catch(erro){E.aviao=antes.aviao;E._mt=antes.mt;falhaSync(erro);throw Error('Não foi possível salvar a recorrência neste dispositivo.');}
+  if(holdingLocal())return 'Recorrência salva neste dispositivo de prévia.';
+  const confirmado=await enviarNuvem();
+  const presente=estado=>novos.every(x=>holdingMesmosDados(estado.aviao?.[tipo]?.find(y=>y.id===x.id),x));
+  if(!presente(E))holdingConflito();
+  const remoto=!confirmado&&_tabConteudo?JSON.parse(_tabConteudo):null;
+  return confirmado||(remoto&&presente(remoto))?'Salvo e sincronizado.':'Salvo neste dispositivo. Sincronização pendente.';
+}

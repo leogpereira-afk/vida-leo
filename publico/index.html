@@ -668,7 +668,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./saude-painel.css?v=1449c43115ae">
 <link rel="stylesheet" href="./saude-visual.css?v=81aa61302df9">
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
-<link rel="stylesheet" href="./aviao.css?v=44fae810ca9e">
+<link rel="stylesheet" href="./aviao.css?v=9aec95913935">
 <link rel="stylesheet" href="./holding.css?v=30b9ea6e9c03">
 <link rel="stylesheet" href="./holding-carteira.css?v=83713a7fb584">
 <link rel="stylesheet" href="./holding-resumo.css?v=42f98a13cd9a">
@@ -730,15 +730,15 @@ tr:hover .lixo{opacity:1}
 
 <script src="./vendor/ical-2.2.1.min.js"></script>
 <script src="./google-datas.js?v=85c5d36986f3"></script>
-<script src="./holding-modelo.js?v=03357c2c6ae5"></script>
-<script src="./holding-resumo.js?v=394edf124179"></script>
+<script src="./holding-modelo.js?v=bac1b837dd41"></script>
+<script src="./holding-resumo.js?v=d2854ddb3598"></script>
 <script src="./holding-carteira-modelo.js?v=e9a89da88050"></script>
 <script src="./holding-carteira-central.js?v=3ac72367d43d"></script>
 <script src="./holding-carteira-ui.js?v=83ca93590eb2"></script>
-<script src="./holding-dashboard.js?v=a20d1dee21de"></script>
-<script src="./holding-ui.js?v=fa0255849bb6"></script>
-<script src="./pagamentos-gastos.js?v=0aa0ab2c3f67"></script>
-<script src="./holding-central.js?v=8489b6e8482c"></script>
+<script src="./holding-dashboard.js?v=2f9ca019d684"></script>
+<script src="./holding-ui.js?v=c560fcbb14b3"></script>
+<script src="./pagamentos-gastos.js?v=734045c6f628"></script>
+<script src="./holding-central.js?v=9a7b4aad269e"></script>
 <script src="./inicio-google.js?v=75bfe0d51b19"></script>
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
 <script src="./marketing-fortemais.js?v=cbf67399c021"></script>
@@ -3124,8 +3124,8 @@ function modalRegistroAviao(tipo,item,natureza='viagem'){
       {k:'status',t:'Situação',tipo:'select',opcoes:['A Vencer','Pago','Cancelado']},
       {k:'pagoEm',t:'Data do pagamento',tipo:'date'},
       {k:'obs',t:'Observações',tipo:'textarea',full:true}]:[
-      {k:'data',t:'Data',tipo:'date'},
-      {k:'categoria',t:'Categoria',tipo:'select',opcoes:avulso?['Licenças / Documentação','Internet / Comunicação','Equipamentos','Manutenção Extra','Outro']:['Combustível','Taxas / Hangaragem','Manutenção Extra','Outro']},
+      {k:'data',t:'Vencimento',tipo:'date'},
+      {k:'categoria',t:'Categoria',tipo:'select',opcoes:[...new Set([...aviaoCategoriasCustos(),...(d.categoria?[d.categoria]:[])])]},
       {k:'descricao',t:avulso?'Descrição':'Descrição / rota',full:true},
       ...(avulso?[{k:'fornecedor',t:'Fornecedor / favorecido'}]:[]),
       {k:'valorTotal',t:avulso?'Custo total da aeronave (opcional)':'Custo total',tipo:avulso?'text':'moeda'},
@@ -3135,19 +3135,26 @@ function modalRegistroAviao(tipo,item,natureza='viagem'){
       ...(!avulso?[{k:'viagemId',t:'Vincular a uma viagem',tipo:'select',opcoes:[{v:'',t:'Sem viagem vinculada'},...E.viagens.filter(v=>v.status!=='Cancelado').map(v=>({v:v.id,t:(v.evento||v.cidade||'Viagem')+' · '+(v.ida||'sem data')}))]}]:[]),
       {k:'obs',t:'Observações',tipo:'textarea',full:true},
     ];
-  abrirModal((novo?'Adicionar ':'Editar ')+(aporte?'aporte':mensal?'mensalidade':avulso?'custo avulso':'despesa do avião'),
+  abrirModal((novo?'Adicionar ':'Editar ')+(aporte?'aporte':mensal?'mensalidade':avulso?'custo da aeronave':'despesa do avião'),
     avulso?'Informe sua parte. O custo total é opcional e não é calculado pela participação.':'Os valores vinculados aparecem em Viagens sem criar outro lançamento.',(c,fechar)=>{
       const sec=el('<div class="secao"></div>'),fs=campos(d,defs.map(x=>({...x,rascunho:true})));
       fs.querySelectorAll('input,select,textarea').forEach((inp,i)=>inp.dataset.k=defs[i].k);
       if(avulso){const total=fs.querySelector('[data-k=valorTotal]');total.inputMode='decimal';total.value=d.valorTotal==null?'':brl2(d.valorTotal);total.gravarEntrada=()=>{try{d.valorTotal=total.value.trim()?financeiroNumero(total.value):null;erroCampoEntrada(total,'');return true}catch(e){return erroCampoEntrada(total,e.message)}}}
       const erro=el('<p class="form-erro" role="alert"></p>');sec.append(fs,erro);
+      let quantidade,intervalo;
+      if(novo&&!aporte&&(mensal||avulso)){
+        const recorrencia=el('<div class="aviao-recorrencia"><label>Quantidade de lançamentos<input aria-label="Quantidade de lançamentos" type="number" min="1" max="360" step="1" value="1"></label><label>Repetir a cada<select aria-label="Frequência"><option value="1">Mês</option><option value="2">2 meses</option><option value="3">3 meses</option><option value="6">6 meses</option><option value="12">Ano</option></select></label><p role="status"></p></div>');
+        quantidade=recorrencia.querySelector('input');intervalo=recorrencia.querySelector('select');
+        const atualizar=()=>{try{const inicio=fs.querySelector('[data-k='+(mensal?'vencimento':'data')+']').value,n=Number(quantidade.value);if(!Number.isInteger(n)||n<1||n>360)throw Error('Informe de 1 a 360 lançamentos.');recorrencia.querySelector('p').textContent=n===1?'Lançamento único.':n+' cobranças · último vencimento em '+fmtDataAno(HoldingModelo.vencimentoDoMes(inicio,(n-1)*Number(intervalo.value)))+'. Cada cobrança será criada em aberto.';}catch(e){recorrencia.querySelector('p').textContent=e.message;}};
+        recorrencia.addEventListener('input',atualizar);recorrencia.addEventListener('change',atualizar);fs.addEventListener('input',atualizar);sec.append(recorrencia);atualizar();
+      }
       const acoes=el('<div class="secao modal-acoes"></div>');
       acoes.appendChild(acao('Cancelar',fechar,'ghost'));
       async function persistir(excluir=false) {
         if(salvando)return;salvando=true;
         const controles=[...c.querySelectorAll('input,select,textarea,button')].filter(x=>!x.disabled);
         controles.forEach(x=>x.disabled=true);erro.textContent='Salvando…';
-        try {await aviaoGravarRegistro(tipo,excluir?baseItem:d,baseItem,{excluir});salvando=false;fechar();}
+        try {if(quantidade&&Number(quantidade.value)>1)await aviaoGravarSerieCustos(tipo,d,Number(quantidade.value),Number(intervalo.value));else await aviaoGravarRegistro(tipo,excluir?baseItem:d,baseItem,{excluir});salvando=false;fechar();}
         catch(e){erro.textContent=e.message||'Não foi possível salvar.';controles.forEach(x=>x.disabled=false);salvando=false;}
       }
       if(item)acoes.appendChild(acao('Apagar registro',()=>{
@@ -3157,6 +3164,7 @@ function modalRegistroAviao(tipo,item,natureza='viagem'){
       acoes.appendChild(acao('Salvar registro',()=>{
         if(E!==estadoLido){erro.textContent='Os dados foram atualizados. Feche e abra este cadastro novamente.';return}
         for(const inp of fs.querySelectorAll('input,select,textarea'))if(inp.gravarEntrada?.()===false)return;
+        if(quantidade&&(!Number.isInteger(Number(quantidade.value))||Number(quantidade.value)<1||Number(quantidade.value)>360)){erro.textContent='Informe de 1 a 360 lançamentos.';return}
         const datas=aporte?['data']:mensal?['competencia','vencimento']:['data'];
         if(datas.some(k=>!dataISOValida(d[k]))){erro.textContent='Confira as datas.';return}
         if(!aporte&&d.pagoEm&&!dataISOValida(d.pagoEm)){erro.textContent='Confira a data do pagamento.';return}
@@ -3254,50 +3262,32 @@ function vParticipacaoAviao(m){
     superior.appendChild(secaoPlanilhaAviao('av-valores','Participação e valores','Estimativas patrimoniais; ganhos ainda não realizados.',indicadores,'Ajustar valores',modalValoresAviao));
     const sheet=el('<div class="aviao-planilha"></div>');sheet.appendChild(superior);m.appendChild(sheet);
 }
+function aviaoPainelMensalCustos(m){
+  const mes=filtro.aviaoCustosMes===undefined?hoje().slice(0,7):filtro.aviaoCustosMes,categoria=filtro.aviaoCustoCategoria||'';
+  const r=aviaoResumoCustos(E.aviao,mes,categoria);
+  const filtros=el('<div class="aviao-custos-filtros"><label>Mês de referência<input type="month" aria-label="Mês dos custos"></label><label>Categoria<select aria-label="Categoria dos custos"><option value="">Todas as categorias</option></select></label></div>');
+  const input=filtros.querySelector('input');input.value=mes;input.onchange=()=>{filtro.aviaoCustosMes=input.value;tela()};
+  filtros.appendChild(acao('Todo o histórico',()=>{filtro.aviaoCustosMes='';tela()},'ghost'));
+  const select=filtros.querySelector('select');
+  for(const nome of [...new Set([...aviaoCategoriasCustos(),...aviaoLinhasCustos(E.aviao).map(x=>x.categoria)])]){const o=document.createElement('option');o.value=nome;o.textContent=nome;o.selected=nome===categoria;select.append(o)}
+  select.onchange=()=>{filtro.aviaoCustoCategoria=select.value;tela()};m.append(filtros);
+  m.append(el('<div class="aviao-sheet-resumo aviao-custos-resumo"><div><small>Pago '+(mes?'no mês':'no histórico')+'</small><strong>'+brl(r.pago)+'</strong><span>Minha parte · data do pagamento</span></div><div><small>Em aberto '+(mes?'no mês':'no histórico')+'</small><strong>'+brl(r.aberto)+'</strong><span>Minha parte · vencimentos</span></div></div>'));
+  const categorias=el('<div class="aviao-categorias" aria-label="Custo pago por categoria"></div>');
+  for(const x of r.categorias.filter(x=>x.pago||x.aberto||categoria===x.nome)){const btn=acao('',()=>{filtro.aviaoCustoCategoria=categoria===x.nome?'':x.nome;tela()},'ghost');btn.setAttribute('aria-pressed',String(categoria===x.nome));btn.innerHTML='<span>'+esc(x.nome)+'</span><strong>'+brl(x.pago)+' pago</strong><small>'+brl(x.aberto)+' em aberto</small>';categorias.append(btn)}
+  if(!categorias.children.length)categorias.append(el('<p class="aviao-muted">Nenhum custo ativo neste período.</p>'));
+  m.append(categorias,el('<p class="aviao-sheet-nota">Aquisição da cota separada. Pagos pela data de pagamento; em aberto pelo vencimento. Valores da minha parte.</p>'));
+  return r;
+}
 function vPlanilhaAviao(m){
-  const a=E.aviao,r=resumoPlanilhaAviao(a),aba=['mensais','viagens','avulsos'].includes(filtro.aviaoPlanilha)?filtro.aviaoPlanilha:'mensais',mensais=aba==='mensais';
-  const dinheiro=v=>v==null?'—':brl(v);
-  const status=x=>'<span class="av-status '+(x.status==='Pago'?'av-pago':x.status==='Cancelado'?'av-cancelado':'av-pendente')+'">'+esc(x.status||'Pendente')+'</span>';
-  const sheet=el('<div class="aviao-planilha"></div>');
-  const nav=el('<nav class="aviao-sheet-tabs" aria-label="Abas da planilha"></nav>');
-  for(const [id,rotulo] of [['mensais','Custos mensais'],['viagens','Custos de viagens'],['avulsos','🧾 Custos avulsos']]){
-    const ativo=aba===id;
-    const b=el('<button type="button"'+(ativo?' class="on" aria-current="page"':'')+'>'+rotulo+'</button>');
-    b.onclick=()=>{filtro.aviaoPlanilha=id;tela()};nav.appendChild(b);
-  }
-  sheet.appendChild(nav);
-  const resumo=(itens)=>el('<div class="aviao-sheet-resumo">'+itens.map(([t,v,d])=>'<div><small>'+esc(t)+'</small><strong>'+v+'</strong><span>'+esc(d||'')+'</span></div>').join('')+'</div>');
-  if(aba==='avulsos'){
-    const linhas=(a.despesas||[]).filter(x=>x.natureza==='avulso').slice().sort((x,y)=>y.data.localeCompare(x.data));
-    const ativos=linhas.filter(x=>x.status!=='Cancelado'),soma=lista=>lista.reduce((s,x)=>s+Math.round((+x.minhaCota||0)*100),0)/100;
-    sheet.appendChild(resumo([['Pago',brl(soma(ativos.filter(x=>x.status==='Pago'))),'Minha parte paga'],['Em aberto',brl(soma(ativos.filter(x=>x.status!=='Pago'))),'Minha parte pendente'],['Total lançado',brl(soma(ativos)),'Sem cancelados'],['Lançamentos',String(ativos.length),'Custos avulsos']]));
-    sheet.appendChild(secaoPlanilhaAviao('av-avulsos','🧾 Custos avulsos','Despesas independentes de viagens e mensalidades. Os valores representam sua parte.',
-      tabelaAviao(['Data','Categoria','Descrição','Fornecedor','Total da aeronave','Minha parte','Status','Pagamento','Observações'],linhas,
-        x=>[esc(fmtDataAno(x.data)),esc(x.categoria||'—'),esc(x.descricao||'—'),esc(x.fornecedor||'—'),dinheiro(x.valorTotal),brl(x.minhaCota),status(x),esc(x.pagoEm?fmtDataAno(x.pagoEm):'—'),esc(x.obs||'—')],
-        x=>modalRegistroAviao('despesas',x,'avulso'),{tipo:'despesas',nome:'Custo avulso',numericas:[4,5]}),'+ Custo avulso',()=>modalRegistroAviao('despesas',null,'avulso')));
-  }else if(mensais){
-    sheet.appendChild(resumo([['Total pago',brl(r.pago),'Mensalidades pagas'],['Total pendente',brl(r.pendente),'Mensalidades em aberto'],
-      ['Próximo vencimento',r.proxima?fmtDataAno(r.proxima):'—','Primeira parcela em aberto'],['Custo mensal',dinheiro(a.manutencaoMinha),'Minha cota'] ]));
-    if(a.manutencaoTotalAtual!=null)
-      sheet.appendChild(el('<p class="aviao-sheet-nota">Custo mensal atual da aeronave: <b>'+brl(a.manutencaoTotalAtual)+'</b>. Minha cota: <b>'+dinheiro(a.manutencaoMinha)+'</b>.</p>'));
-    const linhas=[...a.mensalidades].sort((x,y)=>x.competencia.localeCompare(y.competencia));
-    sheet.appendChild(secaoPlanilhaAviao('av-mensal','Custos mensais','Suas mensalidades. Edite a linha para registrar o pagamento.',
-      tabelaAviao(['Competência','Vencimento','Minha cota','Status','Data pagamento','Observações'],linhas,
-        x=>[esc(x.competencia?.slice(0,7).split('-').reverse().join('/')||'—'),esc(fmtDataAno(x.vencimento)),brl(x.minhaCota),status(x),x.pagoEm?esc(fmtDataAno(x.pagoEm)):'—',esc(x.obs||'—')],
-        x=>modalRegistroAviao('mensalidades',x),{tipo:'mensalidades',nome:'Mensalidade',numericas:[2],rodape:['Total · sem cancelados','',brl(r.totalCotas),'','','']}),
-      '+ Mensalidade',()=>modalRegistroAviao('mensalidades',null)));
-  }else{
-    sheet.appendChild(resumo([['Total de despesas',brl(r.despesas),'Valor total da aeronave'],['Combustível',brl(r.combustivel),'Valor total'],
-      ['Manutenção extra',brl(r.manutencaoExtra),'Valor total'],['Minha cota total',brl(r.minhaParte),'Minha parte nas despesas']]));
-    const linhas=a.despesas.filter(x=>x.natureza!=='avulso').sort((x,y)=>x.data.localeCompare(y.data));
-    sheet.appendChild(secaoPlanilhaAviao('av-extras','Custos de viagens','As despesas são vinculadas às mesmas viagens da Central.',
-      tabelaAviao(['Data','Categoria','Descrição / rota','Valor total','Minha cota','Status','Observações','Viagem vinculada'],linhas,
-        x=>[esc(fmtDataAno(x.data)),esc(x.categoria||'—'),esc(x.descricao||'—'),brl(x.valorTotal),brl(x.minhaCota),status(x),esc(x.obs||'—'),esc(E.viagens.find(v=>v.id===x.viagemId)?.evento||'Sem vínculo')],
-        x=>modalRegistroAviao('despesas',x),{tipo:'despesas',nome:'Despesa de viagem',numericas:[3,4],rodape:['Total · sem cancelados','','',brl(r.despesas),brl(r.minhaParte),'','','']}),
-      '+ Despesa',()=>modalRegistroAviao('despesas',null)));
-    sheet.appendChild(el('<p class="aviao-sheet-nota">A coluna “Minha cota” mantém o valor informado no arquivo ou no cadastro. Para relacionar um custo a uma viagem, clique em “Editar” e escolha a viagem correspondente.</p>'));
-  }
-  m.appendChild(sheet);
+  const sheet=el('<div class="aviao-planilha aviao-custos-unificados"></div>');
+  const r=aviaoPainelMensalCustos(sheet);
+  const linhas=r.linhas.slice().sort((a,b)=>(a.dataVencimento||'').localeCompare(b.dataVencimento||''));
+  const tabela=tabelaAviao(['Vencimento','Categoria','Descrição','Minha parte','Situação','Pagamento'],linhas,
+    x=>[esc(fmtDataAno(x.dataVencimento)),esc(x.categoria),esc(x.descricao)+(x.obs?'<small class="aviao-recorrente">'+esc(x.obs)+'</small>':'')+(x.quantidade?'<small class="aviao-recorrente">Recorrente · '+x.numero+'/'+x.quantidade+'</small>':x.colecao==='mensalidades'?'<small class="aviao-recorrente">Mensal</small>':''),brl(x.minhaCota),'<span class="av-status '+(x.status==='Pago'?'av-pago':x.status==='Cancelado'?'av-cancelado':'av-pendente')+'">'+esc(x.status||'Pendente')+'</span>',esc(x.pagoEm?fmtDataAno(x.pagoEm):'—')],
+    x=>modalRegistroAviao(x.colecao,E.aviao[x.colecao].find(y=>y.id===x.id)),{nome:'Custo da aeronave',numericas:[3]});
+  for(const row of tabela.querySelectorAll('tbody tr'))[...row.children].forEach((cell,i)=>cell.dataset.label=['Vencimento','Categoria','Descrição','Minha parte','Situação','Pagamento','Ações'][i]);
+  sheet.append(secaoPlanilhaAviao('av-custos','Custos da aeronave','Mensalidades, custos avulsos e de viagens em uma única lista. Edite a linha para registrar o pagamento.',tabela,'+ Custo / recorrência',()=>modalRegistroAviao('despesas',null,'avulso')));
+  m.append(sheet);
 }
 // Todos os indicadores usam centavos e somente a parte do proprietário.
 function gastosDashboardAviao(a,ano=''){
@@ -3326,11 +3316,13 @@ function quadroDesembolsadoAviao(a,mostrarDiferenca=false){
 function vDashboardAviao(m){
   const ano=filtro.aviaoGastosAno||'',r=gastosDashboardAviao(E.aviao,ano);
   const painel=el('<div class="aviao-planilha aviao-dashboard"></div>');
+  painel.append(el('<h2>Custos por categoria</h2>'));aviaoPainelMensalCustos(painel);
+  painel.append(el('<h3>Histórico anual</h3>'));
   const ferramentas=el('<div class="aviao-dashboard-filtros"><label>Período <select aria-label="Ano dos gastos"><option value="">Todo o histórico</option></select></label></div>');
   const select=ferramentas.querySelector('select');
   for(const a of [...new Set([...r.anos,...(ano?[ano]:[])])]){const o=document.createElement('option');o.value=a;o.textContent=a;o.selected=a===ano;select.appendChild(o)}
   select.onchange=()=>{filtro.aviaoGastosAno=select.value;tela()};
-  ferramentas.appendChild(acao('+ Custo avulso',()=>modalRegistroAviao('despesas',null,'avulso'),'ghost'));painel.appendChild(ferramentas);
+  ferramentas.appendChild(acao('+ Custo / recorrência',()=>modalRegistroAviao('despesas',null,'avulso'),'ghost'));painel.appendChild(ferramentas);
   painel.appendChild(el('<div class="aviao-sheet-resumo">'+[['Total pago',brl(r.pago),'Pagamentos registrados'],['Em aberto',brl(r.aberto),'Vencimentos / datas do período'],['Total lançado',brl(r.total),'Pago + em aberto'],['Registros',String(r.registros.length),'Sem cancelados']].map(([t,v,d])=>'<div><small>'+esc(t)+'</small><strong>'+v+'</strong><span>'+esc(d)+'</span></div>').join('')+'</div>'));
   painel.appendChild(el('<p class="aviao-sheet-nota">Valores da minha parte. Pagos pela data do pagamento; abertos pelo vencimento ou data do lançamento. Aquisição da cota não entra nos gastos. Histórico lançado não comprova fechamento mensal.</p>'));
   if(r.semData)painel.appendChild(el('<p class="aviao-sheet-nota">'+r.semData+' pagamento(s) sem data: incluídos somente no total do histórico e na composição, fora da evolução mensal. Edite o registro para informar a data.</p>'));
@@ -3416,7 +3408,7 @@ function vAviao(m){
       <p>${esc(a.matricula||'Cadastre a aeronave para começar')}${a.titularidade?' · '+esc(a.titularidade):''}</p>
     </div><span class="cresce"></span><div class="aviao-participacao">${a.participacao!=null?(a.participacao*100).toLocaleString('pt-BR')+'%':'—'}<small>participação na aeronave</small></div>
   </div>`));
-  const abas=[['visao','Visão geral'],['sobre','Sobre o avião'],['gastos','📊 Gastos'],['custos','Planilha de custos'],['viagens','Viagens']];
+  const abas=[['visao','Visão geral'],['sobre','Sobre o avião'],['gastos','📊 Gastos'],['custos','Custos da aeronave'],['viagens','Viagens']];
   const atualAba=abas.some(([id])=>id===filtro.aviaoAba)?filtro.aviaoAba:'visao';
   const nav=el('<nav class="aviao-abas" aria-label="Seções do avião"></nav>');
   abas.forEach(([id,rot])=>{const b=el(`<button type="button" ${id===atualAba?'class="on" aria-current="page"':''}>${rot}</button>`);b.onclick=()=>{filtro.aviaoAba=id;tela()};nav.appendChild(b)});
@@ -13122,7 +13114,7 @@ function modalLancamentoGasto(g,novo=false){
     if(gastoVinculado(g)){
       for(const nome of ['valor','mes','data','vencimento','situacao','pagoEm','empresaId','natureza'])camposGasto.controles[nome].disabled=true;
       const origem=el('<p class="ff-note">Pagamento vinculado ao cadastro de origem. O comprovante é o mesmo nos dois lugares.</p>');
-      origem.appendChild(acao(g.aviaoTipo?'Abrir registro do avião':'Abrir imóvel',()=>{fechar();if(g.aviaoTipo){irTela('aviao');const item=E.aviao[g.aviaoTipo]?.find(x=>x.id===g.aviaoRegistroId);if(item)modalRegistroAviao(g.aviaoTipo,item);}else irTela('universo-imoveis')},'ghost'));c.appendChild(origem);
+      origem.appendChild(acao(g.aviaoTipo?'Abrir registro do avião':'Abrir imóvel',()=>{fechar();if(g.aviaoTipo){irTela('aviao');const item=E.aviao[g.aviaoTipo]?.find(x=>x.id===g.aviaoRegistroId);if(item)modalRegistroAviao(g.aviaoTipo,item);}else {filtro.holdingImovelId=g.holdingImovelId;irTela('universo-imoveis')}},'ghost'));c.appendChild(origem);
     }
     if(novo)camposGasto.form.dataset.gastoNovoSync='';
     for(const o of camposGasto.controles.empresaId.options)o.textContent=o.value==='__sem_empresa__'?'Despesa pessoal (remover vínculo)':o.value?(E.empresasPJ||[]).find(e=>String(e.id)===o.value)?.nome||'Vínculo a conferir: '+o.value:'Sem empresa / pessoal';

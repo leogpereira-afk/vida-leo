@@ -111,3 +111,34 @@
   .aviao-sobre-emblema{display:none}
   .aviao-viagem{flex-wrap:wrap}
 }
+
+/* Custos unificados: indicadores compactos e a mesma origem de cada pagamento. */
+.aviao-custos-filtros,.aviao-recorrencia{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:16px 0}
+.aviao-custos-filtros label,.aviao-recorrencia label{display:grid;gap:5px;font-size:12px}
+.aviao-custos-filtros input,.aviao-custos-filtros select,.aviao-recorrencia input,.aviao-recorrencia select{min-height:40px;padding:8px;border:1px solid var(--linha);border-radius:8px;background:var(--papel);color:var(--tinta)}
+.aviao-recorrencia p{flex-basis:100%;font-size:12px;margin:0}
+.aviao-categorias{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:8px;margin:12px 0}
+.aviao-categorias .btn{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;white-space:normal;padding:12px}
+.aviao-categorias .btn[aria-pressed=true]{border-color:var(--av-azul);background:var(--av-azul-cl)}
+.aviao-categorias small{font-weight:400}
+.aviao-recorrente{display:block;font-size:11px;color:var(--suave)}
+.aviao-custos-unificados .aviao-tabela{min-width:820px}
+.aviao-custos-unificados .aviao-tabela td:last-child{min-width:175px}
+.aviao-custos-unificados .pagamento-comprovante{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.aviao-custos-unificados .pagamento-comprovante-status{font-size:11px}
+@media(max-width:600px){.aviao-custos-filtros{align-items:stretch}.aviao-custos-filtros label{flex:1 1 140px}.aviao-custos-filtros input,.aviao-custos-filtros select,.aviao-categorias .btn,.aviao-custos-unificados .btn{min-height:44px}}
+.aviao-sheet-resumo.aviao-custos-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}
+.aviao-custos-unificados .pagamento-comprovante{flex-direction:row;margin:4px 0}
+.aviao-custos-unificados .aviao-tabela td:last-child{width:205px;text-align:left}
+@media(max-width:600px){
+ .aviao-custos-unificados .aviao-tabela{min-width:0;width:100%;display:block}
+ .aviao-custos-unificados .aviao-tabela thead{display:none}
+ .aviao-custos-unificados .aviao-tabela tbody{display:block}
+ .aviao-custos-unificados .aviao-tabela tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding:10px;border-bottom:1px solid var(--linha);gap:8px}
+ .aviao-custos-unificados .aviao-tabela td{display:block;padding:0;border:0;text-align:left;min-width:0;overflow-wrap:anywhere}
+ .aviao-custos-unificados .aviao-tabela td::before{content:attr(data-label);display:block;color:var(--suave);font-size:11px;margin-bottom:3px}
+ .aviao-custos-unificados .aviao-tabela td:nth-child(3){grid-column:1/-1;grid-row:1;font-weight:600}
+ .aviao-custos-unificados .aviao-tabela td:last-child{grid-column:1/-1;width:auto;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+ .aviao-custos-unificados .aviao-tabela td:last-child::before{display:none}
+ .aviao-custos-unificados .pagamento-comprovante{flex:1;justify-content:space-between}
+}

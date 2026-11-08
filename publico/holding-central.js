@@ -227,6 +227,8 @@ function holdingPagarDespesa(imovelId, despesaId, baseDespesa, baseImovel) {
 function vUniversoImoveis(m) {
   HoldingUI.render(m, {
     listar: holdingCarteira,
+    gastos: () => E.gastos || [],
+    imovelInicial: filtro.holdingImovelId,
     novoId: uid,
     hoje,
     gravarImovel: holdingGravarImovel,
@@ -238,4 +240,5 @@ function vUniversoImoveis(m) {
     gravarDespesa: holdingGravarDespesa,
     pagarDespesa: holdingPagarDespesa
   });
+  delete filtro.holdingImovelId;
 }

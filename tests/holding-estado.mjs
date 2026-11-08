@@ -102,6 +102,7 @@ test('rascunho fica visível após adoção remota e uma correção obsoleta nã
   const app = novaCentral({ sincronizar: true });
   app.run('tela(); marcaBase(100,conteudoSync(E))');
   app.document.querySelector('.holding-cartao button').click();
+  [...app.document.querySelectorAll('button')].find(b=>b.textContent==='Editar imóvel').click();
   const nome = app.document.querySelector('.holding-dialog input[name="nome"]');
   assert.ok(nome);
   nome.value = 'Nome digitado'; nome.dispatchEvent(new app.document.defaultView.Event('input', { bubbles: true }));

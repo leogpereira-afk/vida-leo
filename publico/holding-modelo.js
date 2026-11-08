@@ -65,7 +65,7 @@
     return imovel[chave];
   }
 
-  const TIPOS_DESPESA = Object.freeze(['investimento', 'condominio', 'impostos']);
+  const TIPOS_DESPESA = Object.freeze(['investimento','condominio','impostos','iptu','reforma','manutencao','seguro','agua','energia','internet','outros']);
 
   function tipoDespesa(despesa) {
     if (despesa.tipo == null || despesa.tipo === 'avulsa') return 'avulsa';
@@ -259,7 +259,7 @@
     if (despesa) {
       const tipo = dados.tipo === undefined ? anterior?.tipo : dados.tipo;
       if (!TIPOS_DESPESA.includes(tipo) && !(anterior && tipoDespesa(anterior) === 'avulsa' && (tipo == null || tipo === 'avulsa'))) {
-        throw Error('Escolha investimento, condomínio ou impostos.');
+        throw Error('Escolha uma categoria de despesa.');
       }
       if (tipo != null) item.tipo = tipo;
       const agendado = dados.agendadoPara === undefined ? anterior?.agendadoPara : dados.agendadoPara;
@@ -412,6 +412,14 @@
     return substituir(carteira, { ...imovel, despesas: despesas.map(x => x.id === despesaId ? paga : x) });
   }
 
+  // Só exclui a operação conciliada explicitamente com a aquisição. Não infere por valor/nome.
+  function despesasOperacionais(imovel, gastos = []) {
+    const duplicadas = new Set(gastos.filter(g => g.holdingImovelId === imovel.id && g.holdingDespesaId &&
+      ((g.holdingParcelaId && (imovel.pagamentos || []).some(p => p.parcelaId === g.holdingParcelaId && (!p.tipo || p.tipo === 'aquisicao'))) ||
+       (g.holdingPagamentoId && (imovel.pagamentos || []).some(p => p.id === g.holdingPagamentoId && (!p.tipo || p.tipo === 'aquisicao')))))
+      .map(g => g.holdingDespesaId));
+    return (imovel.despesas || []).filter(d => !duplicadas.has(d.id));
+  }
   function resumoDespesas(imovel) {
     const novo = () => ({ pago: 0, aberto: 0, aInformar: 0, quantidade: 0 });
     const resultado = Object.fromEntries([...TIPOS_DESPESA, 'avulsa', 'total'].map(tipo => [tipo, novo()]));
@@ -432,6 +440,6 @@
 
   globalThis.HoldingModelo = Object.freeze({
     centavos, resumo, validarCarteira, salvarImovel, salvarPagamento,
-    gravarSerie, simularParcelamento, reparcelar, prazoPlano, vencimentoDoMes, editarParcela, pagarParcela, gravarDespesa, pagarDespesa, pagamentoDaParcela, idDaSerie, tipoDespesa, TIPOS_DESPESA, resumoDespesas
+    gravarSerie, simularParcelamento, reparcelar, prazoPlano, vencimentoDoMes, editarParcela, pagarParcela, gravarDespesa, pagarDespesa, pagamentoDaParcela, idDaSerie, tipoDespesa, TIPOS_DESPESA, resumoDespesas, despesasOperacionais
   });
 })();
