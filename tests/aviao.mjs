@@ -106,7 +106,7 @@ test('painel: seções de visão, custos, viagens e fotos são acessíveis',()=>
   assert.match(document.getElementById('main').textContent,/Adicionar fotos e documentos/);
   run("document.getElementById('main').replaceChildren();filtro.aviaoAba='custos';filtro.aviaoCustosMes='';vAviao(document.getElementById('main'))");
   assert.match(document.getElementById('main').textContent,/Custos da aeronave/);
-  assert.match(document.getElementById('main').textContent,/custos avulsos e de viagens/);
+  assert.match(document.getElementById('main').textContent,/Pagamento rápido/);
   run("document.getElementById('main').replaceChildren();filtro.aviaoAba='viagens';vAviao(document.getElementById('main'))");
   assert.match(document.getElementById('main').textContent,/Nova viagem no avião/);
 });

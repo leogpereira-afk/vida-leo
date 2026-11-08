@@ -52,9 +52,16 @@ function prepararGastoAutomatico(vinculo,ref,campos) {
   const conferir=lista=>{const itens=lista.filter(mesmo);return itens.length===1&&holdingMesmosDados(itens[0],esperado);};
   return {gastos:holdingMesmosDados(anterior,esperado)?gastos:anterior?gastos.map(g=>g===anterior?esperado:g):[...gastos,esperado],anterior,conferir};
 }
-async function aviaoGravarRegistro(tipo,dados,baseItem=null,{excluir=false}={}) {
+async function aviaoMarcarPago(tipo,baseItem,data=hoje()) {
+  if(!['mensalidades','despesas'].includes(tipo)||!baseItem?.id)throw Error('Escolha uma conta da aeronave.');
+  if(baseItem.status==='Cancelado')throw Error('Este lançamento está cancelado.');
+  if(baseItem.status==='Pago')throw Error('Este lançamento já está pago.');
+  return aviaoGravarRegistro(tipo,{...baseItem,status:'Pago',pagoEm:data},baseItem);
+}
+async function aviaoGravarRegistro(tipo,dados,baseItem=null,{excluir=false,viagemObrigatoria=false}={}) {
   aviaoRefPagamento(tipo,dados.id);
   await holdingConferirBase();
+  if(viagemObrigatoria && !(E.viagens||[]).some(v=>v.id===dados.viagemId&&v.aviaoId==='principal'&&v.status!=='Cancelado'))throw Error('A viagem mudou ou não está mais disponível neste avião. Confira a viagem antes de salvar.');
   const a=E.aviao,lista=a[tipo]||[],atual=lista.find(x=>x.id===dados.id);
   if (lista.filter(x=>x.id===dados.id).length>1) throw Error('Identificador repetido no avião.');
   if (baseItem && (!atual || baseItem.id!==dados.id)) holdingConflito();
@@ -161,7 +168,7 @@ function aviaoResumoCustos(a,mes='',categoria='') {
   const ativos=linhas.filter(x=>x.status!=='Cancelado');
   const soma=xs=>xs.reduce((s,x)=>s+Math.round((+x.minhaCota||0)*100),0)/100;
   const categorias=[...new Set([...aviaoCategoriasCustos(),...aviaoLinhasCustos(a).map(x=>x.categoria)])];
-  return {linhas,pago:soma(ativos.filter(x=>x.status==='Pago')),aberto:soma(ativos.filter(x=>x.status!=='Pago')),
+  return {linhas,total:soma(ativos),pago:soma(ativos.filter(x=>x.status==='Pago')),aberto:soma(ativos.filter(x=>x.status!=='Pago')),
     categorias:categorias.filter(c=>!categoria||c===categoria).map(nome=>({nome,pago:soma(ativos.filter(x=>x.categoria===nome&&x.status==='Pago')),aberto:soma(ativos.filter(x=>x.categoria===nome&&x.status!=='Pago'))}))};
 }
 function aviaoCriarSerieCustos(tipo,dados,quantidade,intervalo=1) {

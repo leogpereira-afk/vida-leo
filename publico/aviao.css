@@ -127,7 +127,7 @@
 .aviao-custos-unificados .pagamento-comprovante{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
 .aviao-custos-unificados .pagamento-comprovante-status{font-size:11px}
 @media(max-width:600px){.aviao-custos-filtros{align-items:stretch}.aviao-custos-filtros label{flex:1 1 140px}.aviao-custos-filtros input,.aviao-custos-filtros select,.aviao-categorias .btn,.aviao-custos-unificados .btn{min-height:44px}}
-.aviao-sheet-resumo.aviao-custos-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}
+.aviao-sheet-resumo.aviao-custos-resumo{grid-template-columns:repeat(3,minmax(0,1fr))}
 .aviao-custos-unificados .pagamento-comprovante{flex-direction:row;margin:4px 0}
 .aviao-custos-unificados .aviao-tabela td:last-child{width:205px;text-align:left}
 @media(max-width:600px){
@@ -142,3 +142,11 @@
  .aviao-custos-unificados .aviao-tabela td:last-child::before{display:none}
  .aviao-custos-unificados .pagamento-comprovante{flex:1;justify-content:space-between}
 }
+
+.aviao-viagem>.aviao-viagem-acoes{flex:0 0 auto;display:flex;gap:8px;flex-wrap:wrap}
+.aviao-baixa-status{display:block;white-space:normal;max-width:260px}
+.aviao-baixa-status:empty{display:none}
+.aviao-baixa-status[role=alert]{color:var(--vermelho)}
+.aviao-baixa-feedback{padding:12px;border:1px solid var(--linha);border-radius:10px;color:var(--verde);background:var(--papel)}
+.aviao-custos-filtros .btn[aria-pressed=true]{background:var(--av-azul-cl);border-color:var(--av-azul);color:var(--tinta)}
+@media(max-width:600px){.aviao-sheet-resumo.aviao-custos-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}.aviao-custos-resumo>div:last-child{grid-column:1/-1}.aviao-viagem-acoes .btn{min-height:44px}.aviao-viagem>.aviao-viagem-acoes{width:100%}}
