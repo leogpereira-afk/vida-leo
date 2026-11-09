@@ -668,7 +668,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./saude-painel.css?v=1449c43115ae">
 <link rel="stylesheet" href="./saude-visual.css?v=81aa61302df9">
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
-<link rel="stylesheet" href="./aviao.css?v=62aca3038a08">
+<link rel="stylesheet" href="./aviao.css?v=fdfe84271e73">
 <link rel="stylesheet" href="./holding.css?v=30b9ea6e9c03">
 <link rel="stylesheet" href="./holding-carteira.css?v=83713a7fb584">
 <link rel="stylesheet" href="./holding-resumo.css?v=42f98a13cd9a">
@@ -737,7 +737,7 @@ tr:hover .lixo{opacity:1}
 <script src="./holding-carteira-ui.js?v=83ca93590eb2"></script>
 <script src="./holding-dashboard.js?v=2f9ca019d684"></script>
 <script src="./holding-ui.js?v=c560fcbb14b3"></script>
-<script src="./pagamentos-gastos.js?v=28c476d12764"></script>
+<script src="./pagamentos-gastos.js?v=364abfa19917"></script>
 <script src="./holding-central.js?v=9a7b4aad269e"></script>
 <script src="./inicio-google.js?v=75bfe0d51b19"></script>
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
@@ -3107,7 +3107,7 @@ function modalValoresAviao(){
     c.append(sec,acoes);
   });
 }
-function modalRegistroAviao(tipo,item,natureza='viagem'){
+function modalRegistroAviao(tipo,item,natureza='viagem',aoFechar=null){
   const avulso=tipo==='despesas'&&(item?.natureza||natureza)==='avulso';
   const estadoLido=E,baseItem=item?structuredClone(item):null;
   let salvando=false;
@@ -3189,9 +3189,9 @@ function modalRegistroAviao(tipo,item,natureza='viagem'){
       const situacao=fs.querySelector('[data-k=status]'),dataPg=fs.querySelector('[data-k=pagoEm]');
       situacao?.addEventListener('change',()=>{if(situacao.value==='Pago'&&!dataPg.value){dataPg.value=hoje();d.pagoEm=dataPg.value;}});
       c.append(sec,acoes);
-    },null,{antesFechar:()=>!salvando});
+    },aoFechar,{antesFechar:()=>!salvando});
 }
-function modalGastoViagemAviao(viagem){
+function modalGastoViagemAviao(viagem,aoFechar=null){
   const viagemId=viagem.id,estadoLido=E;
   const d={id:uid(),natureza:'viagem',viagemId,descricao:'',minhaCota:0,valorTotal:null,data:hoje(),categoria:'Outro',status:'Pago',pagoEm:'',obs:''};
   let salvando=false;
@@ -3216,6 +3216,75 @@ function modalGastoViagemAviao(viagem){
       try{await aviaoGravarRegistro('despesas',d,null,{viagemObrigatoria:true});salvando=false;fechar();}
       catch(e){erro.textContent=e.message||'Não foi possível salvar o gasto.';salvando=false;controles.forEach(x=>x.disabled=false);}
     }));c.append(sec,acoes);
+  },aoFechar,{antesFechar:()=>!salvando});
+}
+function modalEditarCustoViagem(viagem,item=null,aoFechar=null){
+  const viagemId=viagem.id,base=item?structuredClone(item):null;
+  const d=item?structuredClone(item):{id:uid(),descricao:'',categoria:'Outros',valor:0,data:hoje(),situacao:'Pago',pagoEm:hoje(),pago:''};
+  if(!d.id){alert('Este gasto está sem identificador. Confira o cadastro antes de editar.');return;}
+  let salvando=false;
+  abrirModal(item?'Editar gasto da viagem':'Adicionar gasto à viagem',esc(viagem.evento||viagem.cidade||'Viagem'),(c,fechar)=>{
+    const defs=[{k:'descricao',t:'Descrição',full:true},{k:'categoria',t:'Categoria',tipo:'select',opcoes:[...new Set([...CFG('catCusto'),d.categoria].filter(Boolean))]},
+      {k:'valor',t:'Valor (R$)',tipo:'moeda'},{k:'data',t:'Data da despesa (opcional)',tipo:'date'},
+      {k:'situacao',t:'Pagamento',tipo:'select',opcoes:['Não informado','Pendente','Pago']},{k:'pagoEm',t:'Data do pagamento',tipo:'date'},
+      {k:'pago',t:'Forma de pagamento',tipo:'select',opcoes:[...new Set(['',...CFG('formasPagto'),d.pago].filter(x=>x!=null))]}];
+    const sec=el('<div class="secao"></div>'),fs=campos(d,defs.map(x=>({...x,rascunho:true}))),erro=el('<p class="form-erro" role="alert"></p>');
+    fs.querySelectorAll('input,select').forEach((x,i)=>x.dataset.k=defs[i].k);
+    sec.append(fs,erro,el('<p class="ff-note">Ao salvar como pago, o valor entra uma única vez em Gastos. Os comprovantes são os mesmos nos dois lugares.</p>'));
+    const acoes=el('<div class="secao modal-acoes"></div>');acoes.append(acao('Cancelar',fechar,'ghost'),acao('Salvar gasto',async()=>{
+      if(salvando)return;
+      for(const x of fs.querySelectorAll('input,select'))if(x.gravarEntrada?.()===false)return;
+      if(d.situacao!=='Pago')d.pagoEm='';
+      salvando=true;const controles=[...c.querySelectorAll('input,select,button')].filter(x=>!x.disabled);controles.forEach(x=>x.disabled=true);erro.textContent='Salvando…';
+      try{await viagemGravarCusto(viagemId,d,base);salvando=false;fechar();}
+      catch(e){erro.textContent=e.message||'Não foi possível salvar.';salvando=false;controles.forEach(x=>x.disabled=false);}
+    }));c.append(sec,acoes);
+  },aoFechar,{antesFechar:()=>!salvando});
+}
+function modalGastosViagem(viagem){
+  const viagemId=viagem.id;let salvando=false;
+  abrirModal('Gastos detalhados da viagem',esc(viagem.evento||viagem.cidade||'Viagem'),(c,fechar)=>{
+    const corpo=el('<div class="viagem-gastos-detalhes"></div>');c.append(corpo);
+    function desenhar(){
+      corpo.replaceChildren();const v=E.viagens.find(x=>x.id===viagemId);
+      if(!v){corpo.append(el('<p>A viagem não está mais disponível.</p>'));return;}
+      const linhas=viagemLinhasGastos(v),soma=xs=>xs.reduce((s,x)=>s+Math.round(x.valor*100),0)/100;
+      corpo.append(el('<div class="viagem-gastos-totais"><div><small>Total lançado</small><strong>'+brl(soma(linhas))+'</strong></div><div><small>Pago</small><strong>'+brl(soma(linhas.filter(x=>x.situacao==='Pago')))+'</strong></div><div><small>Em aberto</small><strong>'+brl(soma(linhas.filter(x=>x.situacao==='Pendente')))+'</strong></div></div>'));
+      if(linhas.some(x=>x.situacao==='Não informado'))corpo.append(el('<p class="ff-note">Há despesas sem confirmação de pagamento. Complete a situação e a data em Editar para incluí-las corretamente em Gastos.</p>'));
+      if(!linhas.length)corpo.append(el('<p class="vazio">Nenhuma despesa lançada.'+(+v.gastos?' O valor de '+brl(v.gastos)+' é apenas o orçamento estimado.':'')+'</p>'));
+      for(const linha of linhas){
+        const row=el('<article class="viagem-gasto-item"><div><h4>'+esc(linha.descricao)+'</h4><p>'+esc(linha.categoria)+' · '+esc(linha.origem==='aviao'?'Aeronave':'Viagem')+'</p><p>'+esc(linha.data?fmtDataAno(linha.data):'Data a informar')+' · '+esc(linha.situacao)+'</p></div><strong>'+brl(linha.valor)+'</strong></article>');
+        const acoes=el('<div class="viagem-gasto-acoes"></div>');
+        if(linha.ref){
+          const base=structuredClone(linha.item);
+          acoes.append(pagamentoComprovante(linha.ref,linha.descricao),acao('Editar',()=>{
+            if(salvando)return;
+            if(linha.origem==='aviao')modalRegistroAviao('despesas',base,'viagem',desenhar);else modalEditarCustoViagem(v,base,desenhar);
+          },'ghost'));
+          const aviso=el('<small class="form-erro" role="alert"></small>');
+          acoes.append(acao('Apagar despesa',async()=>{
+            if(salvando||!confirm('Apagar “'+linha.descricao+'” e retirar seu lançamento vinculado de Gastos? Os dados e comprovantes ficam preservados no histórico de removidos.'))return;
+            salvando=true;const controles=[...corpo.querySelectorAll('button')].filter(x=>!x.disabled);controles.forEach(x=>x.disabled=true);aviso.textContent='Apagando…';
+            try{
+              if(linha.origem==='aviao')await aviaoGravarRegistro('despesas',base,base,{excluir:true});else await viagemGravarCusto(viagemId,base,base,{excluir:true});
+              desenhar();
+            }catch(e){aviso.textContent=e.message||'Não foi possível apagar.';}
+            finally{salvando=false;controles.forEach(x=>x.disabled=false);}
+          },'ghost'),aviso);
+        }else acoes.append(el('<span>Identificador do gasto a conferir.</span>'));
+        row.append(acoes);corpo.append(row);
+      }
+      const removidos=[...(v.custosExcluidos||[]).map(h=>({...h,ref:viagemRefCusto(v.id,h.registro.id)})),...(E.aviao.registrosExcluidos||[]).filter(h=>h.tipo==='despesas'&&h.registro.viagemId===v.id).map(h=>({...h,ref:aviaoRefPagamento('despesas',h.registro.id)}))];
+      if(removidos.length){
+        const historico=el('<details class="viagem-gastos-removidos"><summary>Despesas removidas ('+removidos.length+')</summary></details>');
+        for(const h of removidos){const detalhe=el('<details><summary>'+esc(h.registro.descricao||h.registro.categoria||'Despesa')+' · '+brl(h.registro.valor??h.registro.minhaCota)+' · removida em '+fmtDataAno(h.em.slice(0,10))+'</summary></details>');detalhe.append(areaArquivos(h.ref,'Comprovantes preservados',true));historico.append(detalhe);}
+        corpo.append(historico);
+      }
+      const rodape=el('<div class="secao modal-acoes"></div>');
+      if(v.status!=='Cancelado')rodape.append(acao('+ Gasto',()=>{if(salvando)return;if(v.aviaoId==='principal')modalGastoViagemAviao(v,desenhar);else modalEditarCustoViagem(v,null,desenhar);}));
+      rodape.append(acao('Fechar',fechar,'ghost'));corpo.append(rodape);
+    }
+    desenhar();
   },null,{antesFechar:()=>!salvando});
 }
 function tabelaAviao(titulos,registros,linha,editar,{nome='',rodape=[],numericas=[],tipo='',pagamentoRapido=false}={}){
@@ -3531,7 +3600,8 @@ function vAviao(m){
   trips.appendChild(el('<p class="aviao-muted">Estas são as próprias viagens da aba Viagens. Despesas extras vinculadas entram na soma da viagem; mensalidades ficam separadas.</p>'));
   if(!viagem.length)trips.appendChild(el('<div class="vazio">Nenhuma viagem vinculada. Use “Vincular viagem existente” para escolher uma viagem já cadastrada, ou crie uma nova.</div>'));
   else viagem.slice().sort((x,y)=>(x.ida||'').localeCompare(y.ida||'')).forEach(v=>{
-    const li=el(`<div class="aviao-viagem"><div><b>${esc(v.evento||v.cidade||'Viagem')}</b><small>${esc(fmtDataAno(v.ida))} · ${esc(v.cidade||'Destino não informado')} · ${esc(v.status||'')}</small></div><strong>${brl(custoViagem(v))}</strong></div>`);
+    const li=el(`<div class="aviao-viagem"><div><b>${esc(v.evento||v.cidade||'Viagem')}</b><small>${esc(fmtDataAno(v.ida))} · ${esc(v.cidade||'Destino não informado')} · ${esc(v.status||'')}</small></div><button type="button" class="viagem-valor-detalhar" aria-label="${esc('Ver gastos de '+(v.evento||v.cidade||'Viagem'))}">${brl(custoViagem(v))} ›</button></div>`);
+    li.querySelector('.viagem-valor-detalhar').onclick=()=>modalGastosViagem(v);
     const acoes=el('<div class="aviao-viagem-acoes"></div>');
     if(v.status!=='Cancelado'){
       const adicionar=acao('+ Gasto',()=>modalGastoViagemAviao(v));adicionar.setAttribute('aria-label','Adicionar gasto · '+(v.evento||v.cidade||'Viagem'));acoes.append(adicionar);
@@ -3614,12 +3684,13 @@ function vViagens(m) {
       <td style="padding:9px 10px;color:${temHotelViagem(v) ? 'inherit' : 'var(--areia)'}">${esc(v.hotel || (v.hoteis||[]).map(h=>h.nome).filter(Boolean).join(', ') || '—')}</td>
       <td style="padding:9px 10px">${esc(v.transporte || '—')}</td>
       <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums">${diasEntre(v.ida, v.volta) || '—'}</td>
-      <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${custo ? brl(custo) : '—'}</td>
+      <td style="padding:9px 10px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600"><button type="button" class="viagem-valor-detalhar" aria-label="${esc('Ver gastos de '+(v.evento||v.cidade||'Viagem'))}">${custo ? brl(custo) : '—'} ›</button></td>
       <td style="padding:9px 10px;font-size:12px">${v.status === 'Cancelado' ? '<span style="color:var(--suave)">cancelada</span>'
         : !falta.length ? '<span class="chip" style="background:var(--verde-cl);color:var(--verde)">pronta</span>'
         : falta.map(x=>'<span class="chip" style="color:var(--vermelho)">'+esc(x)+'</span>').join(' ')}</td>
       <td style="padding:9px 10px">${chip(v.status)}</td>`;
     tr.onclick = () => modalViagem(v);
+    tr.querySelector('.viagem-valor-detalhar').onclick=ev=>{ev.stopPropagation();modalGastosViagem(v)};
     tb.appendChild(tr);
   });
   tv.appendChild(tb);
@@ -4185,38 +4256,16 @@ function modalViagem(v){
     };
     pintaPlano(); c.appendChild(sp);
 
-    // centro de custo
+    // Custos são editados na origem, junto com seu espelho em Gastos.
     const s2=el('<div class="secao"><h4>Centro de custo</h4></div>');
-    const pintaCustos=()=>{
-      const antigo=s2.querySelector('.cc');if(antigo)antigo.remove();
-      const cc=el('<div class="cc"></div>');
-      const total=(v.custos||[]).reduce((s,x)=>s+(+x.valor||0),0);
-      const rol=el('<div class="rolagem"></div>');
-      if(v.custos.length){
-        rol.appendChild(tabela(v.custos,[
-          {k:'categoria',t:'Categoria',tipo:'select',opcoes:CFG('catCusto')},
-          {k:'descricao',t:'O quê',ph:'ex.: jantar restaurante'},
-          {k:'valor',t:'Valor',tipo:'moeda',w:130},
-          {k:'pago',t:'Pago com',tipo:'select',opcoes:['',...CFG('formasPagto')]},
-        ],()=>{salvar();pintaCustos()},`<td colspan="2">Total</td><td style="text-align:right">${brl2(total)}</td><td></td><td></td>`));
-      } else rol.innerHTML='<div class="vazio">Sem custos lançados. Some alimentação, hotel, passagem…</div>';
-      cc.appendChild(rol);
-      const vinculadas=despesasDoAviaoNaViagem(v);
-      if(vinculadas.length)cc.appendChild(el(`<div class="aviao-vinculo">🛩️ Despesas do avião: ${vinculadas.map(d=>`${esc(d.categoria||'Despesa')} · ${brl(+d.minhaCota||0)}`).join(' · ')}. Para editar, abra Universo Holding → Avião.</div>`));
-      // orçado x realizado: enquanto não há custos, vale o orçamento estimado
-      if(v.custos.length&&+v.gastos){
-        const dif=total-(+v.gastos);
-        cc.appendChild(el(`<div style="font-size:12.5px;color:var(--suave);margin-top:9px">
-          Orçado <b>${brl(v.gastos)}</b> · realizado <b style="color:var(--tinta)">${brl(total)}</b> ·
-          <b style="color:${dif>0?'var(--vermelho)':'var(--verde)'}">${dif>0?'estourou':'economizou'} ${brl(Math.abs(dif))}</b></div>`));
-      }
-      const b=el('<button class="mais">+ Lançar custo</button>');
-      b.onclick=()=>{v.custos.push({id:uid(),categoria:'Alimentação',descricao:'',valor:0,pago:''});salvar();pintaCustos()};
-      cc.appendChild(b);
-      if(v.custos.length) cc.appendChild(el(`<div style="margin-top:12px">${gRosca(CFG('catCusto').map(x=>({r:x,v:v.custos.filter(y=>y.categoria===x).reduce((s,y)=>s+(+y.valor||0),0)})))}</div>`));
-      s2.appendChild(cc);
-    };
-    pintaCustos();c.appendChild(s2);
+    const resumo=el('<div></div>');
+    function pintaCustos(){
+      const atualViagem=E.viagens.find(x=>x.id===v.id)||v;
+      resumo.replaceChildren(el('<p>Total da viagem: <strong>'+brl(custoViagem(atualViagem))+'</strong></p>'),acao('Ver gastos e comprovantes',()=>{fechar();modalGastosViagem(atualViagem)},'ghost'));
+    }
+    const b=el('<button class="mais">+ Lançar custo</button>');
+    b.onclick=()=>{const viagemAtual=E.viagens.find(x=>x.id===v.id)||v;fechar();if(viagemAtual.aviaoId==='principal')modalGastoViagemAviao(viagemAtual);else modalEditarCustoViagem(viagemAtual)};
+    s2.append(resumo,b);pintaCustos();c.append(s2);
 
     const s3=el('<div class="secao"><h4>Arquivos — reserva de hotel, passagem, comprovantes</h4></div>');
     s3.appendChild(areaArquivos('viagem:'+v.id,'Solte aqui a reserva do hotel, passagens e comprovantes'));
@@ -4227,7 +4276,7 @@ function modalViagem(v){
     imp.onclick=()=>imprimirViagem(v);
     s4.appendChild(imp);
     const del=el('<button class="btn ghost" style="color:var(--vermelho)">Apagar viagem</button>');
-    del.onclick=async()=>{const vinculadas=(E.aviao?.despesas||[]).filter(d=>d.viagemId===v.id);
+    del.onclick=async()=>{if((E.gastos||[]).some(g=>g.viagemId===v.id&&g.viagemCustoId)){alert('Esta viagem tem gastos vinculados. Apague as despesas no detalhamento antes de apagar a viagem.');return;}const vinculadas=(E.aviao?.despesas||[]).filter(d=>d.viagemId===v.id);
       if(!confirm('Apagar esta viagem e seus arquivos?'+(vinculadas.length?'\n\n'+vinculadas.length+' despesa(s) permanecerão no livro do avião, sem vínculo com a viagem.':'')))return;
       if(!await apagarAnexosDe('viagem:'+v.id))return;
       vinculadas.forEach(d=>{d.viagemId='';d.editadoManual=true});
@@ -13170,7 +13219,7 @@ function modalLancamentoGasto(g,novo=false){
     if(gastoVinculado(g)){
       for(const nome of ['valor','mes','data','vencimento','situacao','pagoEm','empresaId','natureza'])camposGasto.controles[nome].disabled=true;
       const origem=el('<p class="ff-note">Pagamento vinculado ao cadastro de origem. O comprovante é o mesmo nos dois lugares.</p>');
-      origem.appendChild(acao(g.aviaoTipo?'Abrir registro do avião':'Abrir imóvel',()=>{fechar();if(g.aviaoTipo){irTela('aviao');const item=E.aviao[g.aviaoTipo]?.find(x=>x.id===g.aviaoRegistroId);if(item)modalRegistroAviao(g.aviaoTipo,item);}else {filtro.holdingImovelId=g.holdingImovelId;irTela('universo-imoveis')}},'ghost'));c.appendChild(origem);
+      origem.appendChild(acao(g.aviaoTipo?'Abrir registro do avião':g.viagemCustoId?'Abrir gasto da viagem':'Abrir imóvel',()=>{fechar();if(g.aviaoTipo){irTela('aviao');const item=E.aviao[g.aviaoTipo]?.find(x=>x.id===g.aviaoRegistroId);if(item)modalRegistroAviao(g.aviaoTipo,item);}else if(g.viagemCustoId){irTela('viagens');const v=E.viagens.find(v=>v.id===g.viagemId);if(v)modalGastosViagem(v);}else {filtro.holdingImovelId=g.holdingImovelId;irTela('universo-imoveis')}},'ghost'));c.appendChild(origem);
     }
     if(novo)camposGasto.form.dataset.gastoNovoSync='';
     for(const o of camposGasto.controles.empresaId.options)o.textContent=o.value==='__sem_empresa__'?'Despesa pessoal (remover vínculo)':o.value?(E.empresasPJ||[]).find(e=>String(e.id)===o.value)?.nome||'Vínculo a conferir: '+o.value:'Sem empresa / pessoal';

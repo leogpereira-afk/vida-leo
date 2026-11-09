@@ -150,3 +150,18 @@
 .aviao-baixa-feedback{padding:12px;border:1px solid var(--linha);border-radius:10px;color:var(--verde);background:var(--papel)}
 .aviao-custos-filtros .btn[aria-pressed=true]{background:var(--av-azul-cl);border-color:var(--av-azul);color:var(--tinta)}
 @media(max-width:600px){.aviao-sheet-resumo.aviao-custos-resumo{grid-template-columns:repeat(2,minmax(0,1fr))}.aviao-custos-resumo>div:last-child{grid-column:1/-1}.aviao-viagem-acoes .btn{min-height:44px}.aviao-viagem>.aviao-viagem-acoes{width:100%}}
+.viagem-valor-detalhar{border:1px solid var(--linha);border-radius:9px;background:var(--papel);color:var(--tinta);font:inherit;font-weight:700;padding:9px 12px;white-space:nowrap;cursor:pointer;min-height:40px}
+.viagem-valor-detalhar:hover,.viagem-valor-detalhar:focus-visible{border-color:var(--azul);color:var(--azul)}
+.viagem-gastos-totais{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 24px 0}
+.viagem-gastos-totais>div{display:grid;gap:5px;padding:12px;border:1px solid var(--linha);border-radius:10px}
+.viagem-gastos-totais small,.viagem-gasto-item p{color:var(--suave);font-size:12px}
+.viagem-gastos-detalhes>.ff-note,.viagem-gastos-detalhes>.vazio{margin:16px 24px}
+.viagem-gastos-detalhes .btn{font-family:inherit}
+.viagem-gasto-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:16px 24px;border-bottom:1px solid var(--linha)}
+.viagem-gasto-item h4,.viagem-gasto-item p{margin:0 0 5px;overflow-wrap:anywhere}
+.viagem-gasto-acoes{grid-column:1/-1;display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.viagem-gasto-acoes .pagamento-comprovante{flex:1;margin:0;flex-direction:row;align-items:center;flex-wrap:wrap}
+.viagem-gastos-removidos{margin:16px 24px;padding:12px;border:1px solid var(--linha);border-radius:10px}
+.viagem-gastos-removidos details{padding:10px 0}
+.viagem-gastos-removidos .solta[hidden]{display:none}
+@media(max-width:600px){.viagem-gastos-totais{grid-template-columns:1fr 1fr;margin:16px 16px 0}.viagem-gastos-totais>div:first-child{grid-column:1/-1}.viagem-gasto-item{padding:16px}.viagem-gastos-removidos,.viagem-gastos-detalhes>.ff-note,.viagem-gastos-detalhes>.vazio{margin:16px}.viagem-valor-detalhar,.viagem-gasto-acoes .btn{min-height:44px}.viagem-gasto-acoes .pagamento-comprovante{flex-basis:100%}}

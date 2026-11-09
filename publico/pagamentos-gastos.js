@@ -1,7 +1,7 @@
-/* Vínculo único entre pagamentos dos imóveis/avião e o livro de Gastos.
+/* Vínculo único entre pagamentos dos imóveis, avião e viagens e o livro de Gastos.
    Consultar ou cadastrar um bem não importa pagamentos antigos. */
 function gastoVinculado(g) {
-  return Boolean(g && ((g.holdingImovelId && (g.holdingParcelaId || g.holdingPagamentoId || g.holdingDespesaId)) || (g.aviaoTipo && g.aviaoRegistroId)));
+  return Boolean(g && ((g.holdingImovelId && (g.holdingParcelaId || g.holdingPagamentoId || g.holdingDespesaId)) || (g.aviaoTipo && g.aviaoRegistroId) || (g.viagemId && g.viagemCustoId)));
 }
 function aviaoRefPagamento(tipo,id) {
   if (!['aportes','mensalidades','despesas'].includes(tipo) || typeof id!=='string' || !id.trim()) throw Error('Registro do avião inválido.');
@@ -10,6 +10,7 @@ function aviaoRefPagamento(tipo,id) {
 function gastoReferenciaOrigem(g) {
   if (!gastoVinculado(g)) return null;
   if (g.aviaoTipo) return aviaoRefPagamento(g.aviaoTipo,g.aviaoRegistroId);
+  if (g.viagemId&&g.viagemCustoId) return viagemRefCusto(g.viagemId,g.viagemCustoId);
   const tipo=g.holdingParcelaId?'parcela':g.holdingDespesaId?'despesa':'pagamento';
   return HoldingUI.refAnexos(g.holdingImovelId,tipo,g.holdingParcelaId||g.holdingDespesaId||g.holdingPagamentoId);
 }
@@ -23,6 +24,7 @@ function pagamentoReferenciaCompartilhada(ref) {
     const vinculos=[['parcela',g.holdingParcelaId],['despesa',g.holdingDespesaId],['pagamento',g.holdingPagamentoId]];
     if(vinculos.some(([tipo,id])=>id && HoldingUI.refAnexos(g.holdingImovelId,tipo,id)===ref))return gastoReferenciaOrigem(g);
   }
+  for(const v of E.viagens||[])if((v.custos||[]).some(c=>c.id&&viagemRefCusto(v.id,c.id)===ref))return ref;
   for (const i of E.holdingImoveis||[]) {
     for (const [chave,tipo] of [['parcelas','parcela'],['pagamentos','pagamento'],['despesas','despesa']]) {
       if ((i[chave]||[]).some(p=>HoldingUI.refAnexos(i.id,tipo,p.id)===ref)) return ref;
@@ -98,7 +100,7 @@ async function aviaoGravarRegistro(tipo,dados,baseItem=null,{excluir=false,viage
   try {salvar();} catch(erro) {E.aviao=antes.aviao;E.gastos=antes.gastos;E.viagens=antes.viagens;E._mt=antes.mt;falhaSync(erro);throw Error('Não foi possível salvar neste dispositivo. Confira o armazenamento e tente novamente.');}
   if(holdingLocal()) return 'Salvo neste dispositivo de prévia.';
   const confirmado=await enviarNuvem();
-  const presente=estado=>holdingMesmosDados(estado.aviao?.[tipo]?.find(x=>x.id===registro.id),excluir?null:registro)&&integrado.conferir(estado.gastos||[]);
+  const presente=estado=>holdingMesmosDados(estado.aviao?.[tipo]?.find(x=>x.id===registro.id),excluir?null:registro)&&integrado.conferir(estado.gastos||[])&&(!excluir||!atual||(estado.aviao?.registrosExcluidos||[]).some(h=>h.tipo===tipo&&holdingMesmosDados(h.registro,atual)&&holdingMesmosDados(h.gasto,integrado.anterior)));
   if(!presente(E)) holdingConflito();
   const remoto=!confirmado&&_tabConteudo?JSON.parse(_tabConteudo):null;
   return confirmado||(remoto&&presente(remoto))?'Salvo e sincronizado.':'Salvo neste dispositivo. Sincronização pendente.';
@@ -206,4 +208,46 @@ async function aviaoGravarSerieCustos(tipo,dados,quantidade,intervalo=1) {
   if(!presente(E))holdingConflito();
   const remoto=!confirmado&&_tabConteudo?JSON.parse(_tabConteudo):null;
   return confirmado||(remoto&&presente(remoto))?'Salvo e sincronizado.':'Salvo neste dispositivo. Sincronização pendente.';
+}
+
+function viagemRefCusto(viagemId,custoId) {
+  if([viagemId,custoId].some(id=>typeof id!=='string'||!id.trim()))throw Error('Gasto da viagem sem identificador.');
+  return 'viagem:'+encodeURIComponent(viagemId)+':custo:'+encodeURIComponent(custoId);
+}
+async function viagemGravarCusto(viagemId,dados,baseItem=null,{excluir=false}={}) {
+  const ref=viagemRefCusto(viagemId,dados.id);
+  await holdingConferirBase();
+  const viagem=E.viagens.find(v=>v.id===viagemId);
+  if(!viagem)throw Error('A viagem não existe mais.');
+  const lista=viagem.custos||[],atual=lista.find(x=>x.id===dados.id),registro={...dados,editadoManual:true};
+  if(lista.filter(x=>x.id===dados.id).length>1)throw Error('Identificador repetido nos gastos da viagem.');
+  if(baseItem&&(!atual||baseItem.id!==dados.id))holdingConflito();
+  if(!holdingMesmosDados(atual,baseItem)&&!holdingMesmosDados(atual,registro))holdingConflito();
+  if(!excluir){
+    if(!Number.isFinite(registro.valor)||registro.valor<=0||!Number.isSafeInteger(Math.round(registro.valor*100)))throw Error('Informe um valor maior que zero.');
+    if(!registro.descricao?.trim()&&!registro.categoria?.trim())throw Error('Informe a descrição ou a categoria.');
+    if(!['Pago','Pendente','Não informado'].includes(registro.situacao||'Não informado'))throw Error('Confira a situação do pagamento.');
+    if(registro.data&&!dataISOValida(registro.data))throw Error('Confira a data da despesa.');
+    if(registro.pagoEm&&(registro.situacao!=='Pago'||!dataISOValida(registro.pagoEm)))throw Error('Confira a data e a situação do pagamento.');
+  }
+  const integrado=prepararGastoAutomatico({viagemId,viagemCustoId:registro.id},ref,!excluir&&registro.situacao==='Pago'?{
+    oque:(viagem.evento||viagem.cidade||'Viagem')+' · '+(registro.descricao||registro.categoria),
+    valor:Math.round(registro.valor*100)/100,pagoEm:registro.pagoEm,...pagamentoEmpresa(viagem.gastosEmpresaId)
+  }:null);
+  if(!excluir&&registro.situacao!=='Pago'&&integrado.anterior)registro.historicoGastos=[...(atual?.historicoGastos||[]),{em:new Date().toISOString(),gasto:integrado.anterior}];
+  const proxima={...viagem,custos:excluir?lista.filter(x=>x.id!==registro.id):atual?lista.map(x=>x.id===registro.id?registro:x):[...lista,registro]};
+  if(excluir&&atual)proxima.custosExcluidos=[...(viagem.custosExcluidos||[]),{em:new Date().toISOString(),registro:atual,gasto:integrado.anterior||null}];
+  const antes={viagens:E.viagens,gastos:E.gastos,mt:E._mt};
+  E.viagens=E.viagens.map(v=>v.id===viagemId?proxima:v);E.gastos=integrado.gastos;
+  try{salvar();}catch(e){E.viagens=antes.viagens;E.gastos=antes.gastos;E._mt=antes.mt;falhaSync(e);throw Error('Não foi possível salvar neste dispositivo.');}
+  if(holdingLocal())return 'Salvo neste dispositivo de prévia.';
+  const confirmado=await enviarNuvem();
+  const presente=estado=>{const v=estado.viagens?.find(v=>v.id===viagemId);return Boolean(v)&&holdingMesmosDados(v.custos?.find(x=>x.id===registro.id),excluir?null:registro)&&integrado.conferir(estado.gastos||[])&&(!excluir||!atual||(v.custosExcluidos||[]).some(h=>holdingMesmosDados(h.registro,atual)&&holdingMesmosDados(h.gasto,integrado.anterior)));};
+  if(!presente(E))holdingConflito();
+  const remoto=!confirmado&&_tabConteudo?JSON.parse(_tabConteudo):null;
+  return confirmado||(remoto&&presente(remoto))?'Salvo e sincronizado.':'Salvo neste dispositivo. Sincronização pendente.';
+}
+function viagemLinhasGastos(viagem) {
+  return [...(viagem.custos||[]).map(item=>({item,origem:'viagem',valor:Math.round((+item.valor||0)*100)/100,descricao:item.descricao||item.categoria||'Gasto da viagem',categoria:item.categoria||'Outros',data:item.pagoEm||item.data||'',situacao:item.situacao||'Não informado',ref:item.id?viagemRefCusto(viagem.id,item.id):null})),
+    ...despesasDoAviaoNaViagem(viagem).map(item=>({item,origem:'aviao',valor:Math.round((+item.minhaCota||0)*100)/100,descricao:item.descricao||item.categoria||'Custo da aeronave',categoria:item.categoria||'Outros',data:item.pagoEm||item.data||'',situacao:item.status||'Pendente',ref:item.id?aviaoRefPagamento('despesas',item.id):null}))];
 }
