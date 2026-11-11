@@ -697,7 +697,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-compras.css?v=41f54a3f0db6">
 <link rel="stylesheet" href="./fortemais-imovel.css?v=b73c7dc3db60">
 <link rel="stylesheet" href="./fortemais-obras-dashboard.css?v=824a88aa1459">
-<link rel="stylesheet" href="./formularios-central.css?v=16e900224868">
+<link rel="stylesheet" href="./formularios-central.css?v=b109c094ad80">
 <link rel="stylesheet" href="./formularios-modulos.css?v=8befba9462e3">
 <link rel="stylesheet" href="./formularios-complementares.css?v=d7ff7b5ea4a5">
 <link rel="stylesheet" href="./viagens-formulario.css?v=2edb33a48019">
@@ -1791,6 +1791,64 @@ function agruparCamposFormulario(grade,defs,classeGrade='campos'){
     if(itens[i])conteudo.appendChild(itens[i]);
   });
 }
+/* As opções pertencem à configuração sincronizada; registros nunca são apagados aqui. */
+function marcarListaConfiguravel(select,opcoes,chave){
+  if(select.tagName!=='SELECT')return;
+  const k=chave||Object.keys(SEED.config).find(k=>CFG(k)===opcoes);
+  if(k&&Array.isArray(CFG(k))&&CFG(k).every(v=>typeof v==='string'))select.dataset.listaConfig=k;
+}
+function atualizarListasConfiguraveis(chave){
+  document.querySelectorAll('select[data-lista-config]').forEach(s=>{
+    if(s.dataset.listaConfig!==chave)return;
+    const valor=s.value,extras=JSON.parse(s.dataset.listaExtras||'[]');
+    s.innerHTML=opcoesSelect([...new Set([...extras,...CFG(chave)])],valor);
+    s.value=valor;
+  });
+}
+function prepararListasConfiguraveis(raiz){
+  raiz.querySelectorAll('select[data-lista-config]').forEach(select=>{
+    if(select.dataset.listaPreparada)return;select.dataset.listaPreparada='1';
+    const chave=select.dataset.listaConfig;
+    select.dataset.listaExtras=JSON.stringify([...select.options].map(o=>o.value).filter(v=>!CFG(chave).includes(v)));
+    const label=select.closest('label');
+    let alvo=select.parentElement;
+    if(label){
+      const wrap=el('<div class="lista-campo"></div>');
+      wrap.style.cssText=label.style.cssText;wrap.className+=' '+label.className;
+      label.replaceWith(wrap);wrap.appendChild(label);alvo=wrap;
+    }
+    const acoes=el('<div class="lista-opcoes"><button type="button">+ Adicionar opção</button><button type="button">− Remover opção</button><small role="status" aria-live="polite"></small></div>');
+    const [mais,menos]=acoes.querySelectorAll('button'),status=acoes.querySelector('small');
+    const nome=select.getAttribute('aria-label')||select.labels?.[0]?.textContent.trim()||chave;
+    mais.setAttribute('aria-label','Adicionar opção em '+nome);menos.setAttribute('aria-label','Remover opção de '+nome);
+    mais.onclick=()=>{
+      if(select.disabled)return;
+      abrirModal('Adicionar opção',nome,(c,fechar)=>{
+        const form=el('<form class="secao lista-nova"><label>Nome da opção<input required maxlength="120" autocomplete="off"></label><p role="alert"></p><div class="ff-actions"><button type="button" class="btn ghost">Cancelar</button><button type="submit" class="btn">Adicionar</button></div></form>');
+        form.querySelector('[type=button]').onclick=fechar;
+        form.onsubmit=e=>{e.preventDefault();const valor=form.querySelector('input').value.trim();if(!valor)return;
+          const lista=CFG(chave),existente=lista.find(x=>x.toLocaleLowerCase('pt-BR')===valor.toLocaleLowerCase('pt-BR'));
+          const anterior=E.config[chave];
+          try{if(!existente){E.config[chave]=[...lista,valor];salvar()}}
+          catch(err){E.config[chave]=anterior;form.querySelector('[role=alert]').textContent='Não foi possível guardar a opção. Tente novamente.';return}
+          atualizarListasConfiguraveis(chave);select.value=existente||valor;
+          select.dispatchEvent(new Event('change',{bubbles:true}));fechar();select.focus();
+        };c.appendChild(form);
+      },null,{recarregar:false});
+    };
+    menos.onclick=()=>{
+      if(select.disabled)return;const valor=select.value;
+      if(!valor||!CFG(chave).includes(valor)){status.textContent='Selecione uma opção da lista para remover.';return}
+      if(!confirm('Remover “'+valor+'” das opções? Os registros já cadastrados manterão esse valor.'))return;
+      const anterior=E.config[chave];
+      try{E.config[chave]=CFG(chave).filter(x=>x!==valor);salvar()}
+      catch(err){E.config[chave]=anterior;status.textContent='Não foi possível remover a opção. Tente novamente.';return}
+      atualizarListasConfiguraveis(chave);status.textContent='Removida da lista. Os valores já preenchidos foram preservados.';
+    };
+    alvo.appendChild(acoes);
+  });
+}
+
 function campos(obj,defs,aoMudar){
   const c=el('<div class="campos"></div>');
   defs.forEach(d=>{
@@ -1829,6 +1887,7 @@ function campos(obj,defs,aoMudar){
       if(d.rascunho&&inp.tagName!=='SELECT'&&d.aoGravar)inp.addEventListener('input',()=>grava(false));
       inp.addEventListener('change',grava);
     }
+    marcarListaConfiguravel(inp,d.opcoes,d.listaConfig);
     inp.id=uid();w.querySelector('label').htmlFor=inp.id;
     w.appendChild(inp);c.appendChild(w);
   });
@@ -2456,6 +2515,7 @@ function organizarAgenda(pagina,alvo){
 }
 
 function prepararTabelas(pagina){
+  prepararListasConfiguraveis(pagina);
   pagina.querySelectorAll('table').forEach(t=>{
     const linhas=[...t.querySelectorAll('tbody>tr')].filter(tr=>tr.closest('table')===t);
     const cabecalhos=[...t.querySelectorAll('thead>tr>th')].filter(x=>x.closest('table')===t);
@@ -2854,7 +2914,7 @@ function novoRegistroRotina(titulo,lista,base,defs,abrir){
          marca o valor atual e já preserva valor gravado que saiu da lista, e é
          a mesma função que a célula da tabela usa. */
       const inp=d.opcoes?el('<select>'+opcoesSelect(d.opcoes,registro[d.k],false)+'</select>'):el('<input type="'+(d.tipo||'text')+'">');
-      inp.name=d.k;inp.value=registro[d.k]??'';inp.required=!!d.obrigatorio;
+      marcarListaConfiguravel(inp,d.opcoes,d.listaConfig);inp.name=d.k;inp.value=registro[d.k]??'';inp.required=!!d.obrigatorio;
       if(d.tipo==='number'){inp.step='any';inp.inputMode='decimal';inp.min=d.min??'0'}
       if(d.ph)inp.placeholder=d.ph;
       label.appendChild(inp);grade.appendChild(label);
@@ -2884,10 +2944,10 @@ function novoRegistroRotina(titulo,lista,base,defs,abrir){
 function novaViagemRotina(noAviao=false){novoRegistroRotina('Nova viagem',E.viagens,{ida:hoje(),volta:hoje(),status:'Em Planejamento',hotel:'',transporte:noAviao?'Avião próprio':'',aviaoId:noAviao?'principal':'',gastos:0,obs:'',custos:[],passagens:[],hoteis:[],tickets:[],viajantes:[],tipo:'Trabalho',planejar:false,roteiro:[],lugares:[],carro:{}},[
   {k:'evento',t:'Nome da viagem',obrigatorio:true,ph:'Ex.: Férias em família'},
   {k:'cidade',t:'Destino',obrigatorio:true},{k:'ida',t:'Ida',tipo:'date',obrigatorio:true},{k:'volta',t:'Volta',tipo:'date',obrigatorio:true},
-  {k:'tipo',t:'Tipo',opcoes:CFG('tiposViagem')},{k:'gastos',t:'Orçamento estimado (R$)',tipo:'number'}],modalViagem)}
+  {k:'tipo',t:'Tipo',listaConfig:'tiposViagem',opcoes:CFG('tiposViagem')},{k:'gastos',t:'Orçamento estimado (R$)',tipo:'number'}],modalViagem)}
 function novoCompromissoRotina(data=hoje()){novoRegistroRotina('Novo compromisso',E.agenda,{data,hora:'',ate:'',tipo:CFG('tiposCompromisso')[0],obs:''},[
   {k:'titulo',t:'Compromisso',obrigatorio:true},{k:'data',t:'Data',tipo:'date',obrigatorio:true},{k:'hora',t:'Hora (opcional)',tipo:'time'},
-  {k:'ate',t:'Último dia (opcional)',tipo:'date'},{k:'local',t:'Local ou link'},{k:'tipo',t:'Tipo',opcoes:CFG('tiposCompromisso')}],modalCompromisso)}
+  {k:'ate',t:'Último dia (opcional)',tipo:'date'},{k:'local',t:'Local ou link'},{k:'tipo',t:'Tipo',listaConfig:'tiposCompromisso',opcoes:CFG('tiposCompromisso')}],modalCompromisso)}
 function viagemNoAno(v,ano){
   if(ano==='todos')return true;
   const ini=dataISOValida(v.ida)?v.ida:v.volta,fim=dataISOValida(v.volta)&&v.volta>=ini?v.volta:ini;
@@ -3220,7 +3280,7 @@ function modalGastoViagemAviao(viagem,aoFechar=null){
   abrirModal('Adicionar gasto à viagem',esc(viagem.evento||viagem.cidade||'Viagem'),(c,fechar)=>{
     const defs=[{k:'descricao',t:'O que foi gasto',full:true,ph:'Ex.: combustível ou taxa de pouso'},
       {k:'minhaCota',t:'Valor da minha parte (R$)',tipo:'moeda'},{k:'data',t:'Data do gasto / vencimento',tipo:'date'},
-      {k:'categoria',t:'Categoria',tipo:'select',opcoes:[...new Set([...aviaoCategoriasCustos(),...CFG('catCusto')])]},
+      {k:'categoria',t:'Categoria',tipo:'select',listaConfig:'catCusto',opcoes:[...new Set([...aviaoCategoriasCustos(),...CFG('catCusto')])]},
       {k:'status',t:'Situação',tipo:'select',opcoes:[{v:'Pago',t:'Já pago'},{v:'Pendente',t:'Em aberto'}]}];
     const sec=el('<div class="secao"></div>'),fs=campos(d,defs.map(x=>({...x,rascunho:true}))),erro=el('<p class="form-erro" role="alert"></p>');
     fs.querySelectorAll('input,select').forEach((inp,i)=>inp.dataset.k=defs[i].k);
@@ -3246,10 +3306,10 @@ function modalEditarCustoViagem(viagem,item=null,aoFechar=null){
   if(!d.id){alert('Este gasto está sem identificador. Confira o cadastro antes de editar.');return;}
   let salvando=false;
   abrirModal(item?'Editar gasto da viagem':'Adicionar gasto à viagem',esc(viagem.evento||viagem.cidade||'Viagem'),(c,fechar)=>{
-    const defs=[{k:'descricao',t:'Descrição',full:true},{k:'categoria',t:'Categoria',tipo:'select',opcoes:[...new Set([...CFG('catCusto'),d.categoria].filter(Boolean))]},
+    const defs=[{k:'descricao',t:'Descrição',full:true},{k:'categoria',t:'Categoria',tipo:'select',listaConfig:'catCusto',opcoes:[...new Set([...CFG('catCusto'),d.categoria].filter(Boolean))]},
       {k:'valor',t:'Valor (R$)',tipo:'moeda'},{k:'data',t:'Data da despesa (opcional)',tipo:'date'},
       {k:'situacao',t:'Pagamento',tipo:'select',opcoes:['Não informado','Pendente','Pago']},{k:'pagoEm',t:'Data do pagamento',tipo:'date'},
-      {k:'pago',t:'Forma de pagamento',tipo:'select',opcoes:[...new Set(['',...CFG('formasPagto'),d.pago].filter(x=>x!=null))]}];
+      {k:'pago',t:'Forma de pagamento',tipo:'select',listaConfig:'formasPagto',opcoes:[...new Set(['',...CFG('formasPagto'),d.pago].filter(x=>x!=null))]}];
     const sec=el('<div class="secao"></div>'),fs=campos(d,defs.map(x=>({...x,rascunho:true}))),erro=el('<p class="form-erro" role="alert"></p>');
     fs.querySelectorAll('input,select').forEach((x,i)=>x.dataset.k=defs[i].k);
     sec.append(fs,erro,el('<p class="ff-note">Ao salvar como pago, o valor entra uma única vez em Gastos. Os comprovantes são os mesmos nos dois lugares.</p>'));
@@ -3878,14 +3938,14 @@ function modalViagem(v){
     const basico=grupo('Viagem',[
       {k:'evento',t:'Evento'},{k:'cidade',t:'Cidade'},
       {k:'ida',t:'Ida',tipo:'date'},{k:'volta',t:'Volta',tipo:'date'},
-      {k:'status',t:'Status',tipo:'select',opcoes:CFG('statusViagem')},
+      {k:'status',t:'Status',tipo:'select',listaConfig:'statusViagem',opcoes:CFG('statusViagem')},
     ],'viagem-basico');
     const periodo=el('<p class="viagem-periodo" role="status" aria-live="polite"></p>');
     periodo.id=uid();basico.appendChild(periodo);
     ['ida','volta'].forEach(k=>controles[k].setAttribute('aria-describedby',periodo.id));
     grupo('Hospedagem e transporte',[
       {k:'hotel',t:'Hotel',ph:'nome / reserva'},
-      {k:'transporte',t:'Transporte',tipo:'select',opcoes:['',...CFG('transportes')]},
+      {k:'transporte',t:'Transporte',tipo:'select',listaConfig:'transportes',opcoes:['',...CFG('transportes')]},
       {k:'aviaoId',t:'Aeronave desta viagem',tipo:'select',opcoes:[{v:'',t:'Sem vínculo com o avião'},{v:'principal',t:'Meu avião'}],
         aoGravar:valor=>{if(!valor&&(E.aviao?.despesas||[]).some(d=>d.viagemId===v.id)){
           alert('Esta viagem tem despesas do avião vinculadas. Abra Universo Holding → Avião para desvinculá-las antes de remover a aeronave.');return false}
@@ -4104,7 +4164,7 @@ function modalViagem(v){
             v.tickets=v.tickets.filter(x=>x.id!==k.id);_emEdicao.delete(k.id);salvar();pintaTickets(); },
           campos:[
             {k:'nome',t:'O que é',ph:'ex.: Disney — Magic Kingdom',full:true},
-            {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposTicket')},
+            {k:'tipo',t:'Tipo',tipo:'select',listaConfig:'tiposTicket',opcoes:CFG('tiposTicket')},
             {k:'data',t:'Dia',tipo:'date'},
             {k:'hora',t:'Hora',tipo:'time'},
             {k:'local',t:'Onde',full:true,ph:'endereço, portão, setor'},
@@ -4714,7 +4774,7 @@ function modalCompromisso(a){
   abrirModal(esc(a.titulo||'Compromisso'),'Alterações salvas automaticamente nesta Central.',(c,fechar)=>{
     const sec=el('<div class="secao"></div>');
     sec.appendChild(campos(a,[{k:'titulo',t:'O quê',full:true,secaoFormulario:'Compromisso'},
-      {k:'local',t:'Onde',secaoFormulario:'Compromisso'},{k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposCompromisso'),secaoFormulario:'Compromisso'},
+      {k:'local',t:'Onde',secaoFormulario:'Compromisso'},{k:'tipo',t:'Tipo',tipo:'select',listaConfig:'tiposCompromisso',opcoes:CFG('tiposCompromisso'),secaoFormulario:'Compromisso'},
       {k:'data',t:'Data',tipo:'date',secaoFormulario:'Quando'},{k:'hora',t:'Hora',tipo:'time',secaoFormulario:'Quando'},
       {k:'ate',t:'Último dia (opcional)',tipo:'date',secaoFormulario:'Quando'},
       {k:'obs',t:'Observações',tipo:'textarea',full:true,secaoFormulario:'Observações'}]));
@@ -5017,7 +5077,7 @@ function vAgenda(m){
   m.appendChild(tabelaBloco('ag-lista','Meus compromissos','Compromissos cadastrados ou importados; use Abrir para ver os detalhes.',lista,[
     {k:'data',t:'Data',tipo:'date'},{k:'hora',t:'Hora',tipo:'time',w:100},
     {k:'titulo',t:'O quê',ph:'ex.: Jantar com a Pya'},{k:'local',t:'Onde',ph:'—'},
-    {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposCompromisso')},
+    {k:'tipo',t:'Tipo',tipo:'select',listaConfig:'tiposCompromisso',opcoes:CFG('tiposCompromisso')},
     {k:'obs',t:'Observação',ph:'—'},
   ],()=>({data:hoje(),hora:'',titulo:'',local:'',tipo:CFG('tiposCompromisso')[0],obs:''}),r,null,E.agenda,modalCompromisso));
 
@@ -5163,7 +5223,7 @@ function diasDemanda(d){
   return {txt:n+'d',dias:n,cor:n>60?'var(--vermelho)':n>30?'var(--areia)':''};
 }
 function novaDemandaRotina(){novoRegistroRotina('Nova demanda',E.demandas,{criada:hoje(),area:CFG('areasDemanda')[0],prioridade:'Média',status:'Aberta',concluidoEm:'',prazo:'',obs:''},[
-  {k:'titulo',t:'O que precisa ser feito',obrigatorio:true},{k:'area',t:'Área',opcoes:CFG('areasDemanda')},
+  {k:'titulo',t:'O que precisa ser feito',obrigatorio:true},{k:'area',t:'Área',listaConfig:'areasDemanda',opcoes:CFG('areasDemanda')},
   {k:'prazo',t:'Prazo (opcional)',tipo:'date'},{k:'prioridade',t:'Prioridade',opcoes:['Alta','Média','Baixa']},{k:'obs',t:'Próximo passo'}],modalDemanda)}
 
 function vDemandas(m){
@@ -5231,7 +5291,7 @@ function modalDemanda(d){
     const s1=el('<div class="secao"></div>');
     s1.appendChild(campos(d,[
       {k:'titulo',t:'Demanda',full:true,secaoFormulario:'O que precisa ser feito'},
-      {k:'area',t:'Área',tipo:'select',opcoes:CFG('areasDemanda'),secaoFormulario:'O que precisa ser feito'},
+      {k:'area',t:'Área',tipo:'select',listaConfig:'areasDemanda',opcoes:CFG('areasDemanda'),secaoFormulario:'O que precisa ser feito'},
       {k:'prioridade',t:'Prioridade',tipo:'select',opcoes:['Alta','Média','Baixa'],secaoFormulario:'O que precisa ser feito'},
       {k:'criada',t:'Aberta em',tipo:'date',secaoFormulario:'Acompanhamento'},
       {k:'prazo',t:'Prazo para concluir',tipo:'date',secaoFormulario:'Acompanhamento'},
@@ -5832,7 +5892,7 @@ function vSaude(m) {
   /* ---- 7. histórico familiar ---- */
   m.appendChild(tabelaBloco('sa-fam', 'Histórico familiar', 'informações familiares para compartilhar nas consultas', E.histFamiliar, [
     { k: 'parente', t: 'Parente', tipo: 'select', opcoes: ['Pai', 'Mãe', 'Avô paterno', 'Avó paterna', 'Avô materno', 'Avó materna', 'Irmão', 'Irmã', 'Outro'] },
-    { k: 'doenca', t: 'Doença', tipo: 'select', opcoes: ['',...CFG('doencasFamilia')] },
+    { k: 'doenca', t: 'Doença', tipo: 'select', listaConfig:'doencasFamilia',opcoes: ['',...CFG('doencasFamilia')] },
     { k: 'idade', t: 'Com que idade', tipo: 'number', num: 1, w: 130 },
     { k: 'situacao', t: 'Situação', tipo: 'select', opcoes: ['Vivo', 'Faleceu'] },
     { k: 'obs', t: 'Observação', ph: '—' },
@@ -7096,8 +7156,8 @@ async function fichaObraEm(raiz,o,fechar){
       </div>`,
       campos:[
         {k:'nome',t:'Nome da obra',ph:'ex.: Casa Vila Segura 27'},
-        {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposObra')},
-        {k:'status',t:'Status',tipo:'select',opcoes:CFG('statusObra')},
+        {k:'tipo',t:'Tipo',tipo:'select',listaConfig:'tiposObra',opcoes:CFG('tiposObra')},
+        {k:'status',t:'Status',tipo:'select',listaConfig:'statusObra',opcoes:CFG('statusObra')},
         {k:'empresa',t:'Por qual empresa correu',tipo:'select',opcoes:[...new Set(['Fortemais',...E.empresasPJ.map(x=>x.nome).filter(Boolean)])]},
         {k:'endereco',t:'Endereço',full:true},
         {k:'lote',t:'Lote'},{k:'quadra',t:'Quadra'},
@@ -7155,7 +7215,7 @@ async function fichaObraEm(raiz,o,fechar){
                 {k:'valor',t:'Valor',tipo:'moeda'},
                 {k:'nome',t:'O que foi'},
                 {k:'centro',t:'Plano de contas',tipo:'select',
-                  opcoes:[...new Set([ras.centro,...CFG('centrosObra')])]},
+                  listaConfig:'centrosObra',opcoes:[...new Set([ras.centro,...CFG('centrosObra')])]},
                 {k:'fornecedor',t:'Fornecedor'},
               ],()=>{}));
               const lin2=el('<div style="display:flex;gap:8px;margin-top:9px"></div>');
@@ -7264,7 +7324,7 @@ async function fichaObraEm(raiz,o,fechar){
       {k:'data',t:'Data',tipo:'date'},
       {k:'valor',t:'Valor',tipo:'moeda'},
       {k:'nome',t:'O que foi',ph:'ex.: diária pedreiro, taxa cartório'},
-      {k:'centro',t:'Centro de custo',tipo:'select',opcoes:CFG('centrosObra')},
+      {k:'centro',t:'Centro de custo',tipo:'select',listaConfig:'centrosObra',opcoes:CFG('centrosObra')},
       {k:'fornecedor',t:'Fornecedor / quem recebeu',tipo:'sugestao',
         opcoes:rr2?Object.keys(rr2.fornecedores).filter(x=>x!=='(sem fornecedor)').sort():[]},
     ],()=>{}));
@@ -8055,7 +8115,7 @@ function vCaixaVGV(m){
   t1.appendChild(tabelaBloco('cx-contas-t','','',E.contas,[
     {k:'nome',t:'Conta / dívida',ph:'ex.: conta do banco, cheque, dívida'},
     {k:'valor',t:'Valor',tipo:'moeda',w:150},
-    {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposConta'),w:130},
+    {k:'tipo',t:'Tipo',tipo:'select',listaConfig:'tiposConta',opcoes:CFG('tiposConta'),w:130},
     {k:'atualizacao',t:'Data da posição',tipo:'date',w:140},
   ],()=>({nome:'',valor:0,tipo:CFG('tiposConta')[0]}),r,
     `<td>Total</td><td class="num">${brl(c.totalContas)}</td><td></td><td></td>`,E.contas));
@@ -9647,7 +9707,7 @@ function formularioEstrategia(c,obj,defs,rotulo,gravar){
     let input;
     if(d.tipo==='select')input=seletor(obj[d.k]??'',d.opcoes,()=>{},d.t);
     else {input=el(d.tipo==='textarea'?'<textarea rows="4"></textarea>':'<input type="'+(d.tipo||'text')+'">');input.value=obj[d.k]??''}
-    input.name=d.k;if(d.req)input.required=true;if(d.ph)input.placeholder=d.ph;
+    marcarListaConfiguravel(input,d.opcoes,d.listaConfig);input.name=d.k;if(d.req)input.required=true;if(d.ph)input.placeholder=d.ph;
     if(d.tipo!=='select'&&d.tipo!=='date')input.maxLength=20000;
     label.appendChild(input);form.appendChild(label);
   });
@@ -9937,7 +9997,7 @@ function agendarOportunidade(o){
 }
 function novaOportunidade(){
   abrirModal('Nova oportunidade','Comece pela ideia e pelo próximo passo.',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');
-    devFormulario(b,[{k:'titulo',t:'Qual é a oportunidade?',req:true,full:true},{k:'tipo',t:'Tipo',opcoes:CFG('tipoOportunidade')},{k:'porque',t:'Por que vale estudar?',tipo:'textarea',full:true},{k:'proximoPasso',t:'Primeiro passo',full:true},{k:'ate',t:'Revisar até',tipo:'date'}],{},'Criar oportunidade',v=>{const o={id:uid(),...v,estagio:'Semente',links:[],obs:'',mexido:hoje(),criada:hoje()};const tamanho=E.oportunidades.length,mt=Object.getOwnPropertyDescriptor(E,'_mt');E.oportunidades.push(o);try{salvar()}catch(e){E.oportunidades.splice(tamanho);if(mt)Object.defineProperty(E,'_mt',mt);else delete E._mt;throw e}fechar();modalOport(o)});c.appendChild(b)},rr('oportunidades'));
+    devFormulario(b,[{k:'titulo',t:'Qual é a oportunidade?',req:true,full:true},{k:'tipo',t:'Tipo',listaConfig:'tipoOportunidade',opcoes:CFG('tipoOportunidade')},{k:'porque',t:'Por que vale estudar?',tipo:'textarea',full:true},{k:'proximoPasso',t:'Primeiro passo',full:true},{k:'ate',t:'Revisar até',tipo:'date'}],{},'Criar oportunidade',v=>{const o={id:uid(),...v,estagio:'Semente',links:[],obs:'',mexido:hoje(),criada:hoje()};const tamanho=E.oportunidades.length,mt=Object.getOwnPropertyDescriptor(E,'_mt');E.oportunidades.push(o);try{salvar()}catch(e){E.oportunidades.splice(tamanho);if(mt)Object.defineProperty(E,'_mt',mt);else delete E._mt;throw e}fechar();modalOport(o)});c.appendChild(b)},rr('oportunidades'));
 }
 const diasParado=o=>o.mexido?Math.round((new Date(hoje()+'T12:00')-new Date(String(o.mexido).slice(0,10)+'T12:00'))/864e5):null;
 // esfriou: parada há mais de 45 dias sem estar arquivada nem tocando
@@ -9985,7 +10045,7 @@ function modalOport(o,novoReg){
     const s1=el('<div class="secao"><h4>A ideia</h4></div>');
     s1.appendChild(campos(o,[
       {k:'titulo',t:'O que é',ph:'ex.: comprar sala comercial no centro',full:true},
-      {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tipoOportunidade')},
+      {k:'tipo',t:'Tipo',tipo:'select',listaConfig:'tipoOportunidade',opcoes:CFG('tipoOportunidade')},
       {k:'estagio',t:'Estágio',tipo:'select',opcoes:[...new Set([...ESTAGIOS,o.estagio].filter(Boolean))]},
       {k:'porque',t:'Por que isso me interessa',tipo:'textarea',full:true,
         ph:'o que te chamou a atenção — daqui a seis meses você não vai lembrar'},
@@ -11671,7 +11731,7 @@ function financeiroFormulario(c,defs,obj,gravar,fechar){
     const inp=d.tipo==='textarea'?el('<textarea rows="3"></textarea>'):d.opcoes?el('<select></select>'):el('<input>');
     if(d.opcoes){[...new Set([...d.opcoes,...((obj[d.k]??d.inicial)?[obj[d.k]??d.inicial]:[])])].forEach(v=>{const o=el('<option></option>');o.value=v;o.textContent=v||'Selecione';inp.appendChild(o)})}
     else if(d.tipo!=='textarea'){inp.type=d.tipo==='moeda'?'text':d.tipo||'text';if(d.tipo==='moeda')inp.setAttribute('inputmode','decimal')}
-    inp.id=uid();inp.name=d.k;lab.htmlFor=inp.id;inp.value=d.tipo==='moeda'?String(obj[d.k]??0).replace('.',','):obj[d.k]??d.inicial??'';
+    marcarListaConfiguravel(inp,d.opcoes,d.listaConfig);inp.id=uid();inp.name=d.k;lab.htmlFor=inp.id;inp.value=d.tipo==='moeda'?String(obj[d.k]??0).replace('.',','):obj[d.k]??d.inicial??'';
     if(d.opcoes){const selecionada=[...inp.options].find(o=>o.value===String(obj[d.k]??d.inicial??d.opcoes[0]??''));if(selecionada)selecionada.selected=true;}
     if(d.req)inp.required=true;if(d.ph)inp.placeholder=d.ph;controles[d.k]=inp;wrap.append(lab,inp);
     if(d.sugestoes?.length){const dl=el('<datalist></datalist>');dl.id=uid();d.sugestoes.forEach(v=>{const o=el('<option></option>');o.value=v;dl.appendChild(o)});inp.setAttribute('list',dl.id);wrap.appendChild(dl)}
@@ -11746,7 +11806,7 @@ function bancosConferirImportacao(contas){
 function bancoModal(b,origem){
   const novo=!b,registro=b||{id:uid(),_ffNovo:true};
   const defs=[{k:'banco',t:'Banco',req:true,grupo:'Identificação'},{k:'titular',t:'Titular',req:true,sugestoes:(E.empresasPJ||[]).map(e=>e.nome)},
-    {k:'codigoBanco',t:'Código do banco',ph:'3 dígitos',ajuda:'Número do banco, diferente da agência e da conta.'},{k:'doc',t:'CPF / CNPJ do titular'},{k:'tipo',t:'Tipo de conta',opcoes:['',...CFG('tiposContaBanco')]},
+    {k:'codigoBanco',t:'Código do banco',ph:'3 dígitos',ajuda:'Número do banco, diferente da agência e da conta.'},{k:'doc',t:'CPF / CNPJ do titular'},{k:'tipo',t:'Tipo de conta',listaConfig:'tiposContaBanco',opcoes:['',...CFG('tiposContaBanco')]},
     {k:'agencia',t:'Agência',grupo:'Conta e PIX'},{k:'conta',t:'Conta com dígito'},{k:'pix',t:'Chave PIX'},{k:'pixTipo',t:'Tipo da chave',opcoes:['','CNPJ','CPF','E-mail','Telefone','Aleatória','Conta e agência']},
     {k:'gerente',t:'Gerente / contato',grupo:'Contato e observações'},{k:'telefone',t:'Telefone'},
     {k:'contabilidadeId',t:'Contabilidade',opcoes:['',...(E.contabilidades||[]).map(x=>x.id)],
@@ -12021,7 +12081,7 @@ function seguroModal(x,novo=false){
   const defs=[
     {k:'titular',t:'De quem é',req:true,grupo:'Identificação',
      sugestoes:[...new Set([...empresas,...pessoas])],ajuda:'Empresa ou pessoa: é por aqui que a lista se agrupa.'},
-    {k:'tipo',t:'Tipo',opcoes:['',...CFG('tiposSeguro')]},
+    {k:'tipo',t:'Tipo',listaConfig:'tiposSeguro',opcoes:['',...CFG('tiposSeguro')]},
     {k:'item',t:'O que cobre',ph:'o carro, a casa, minha vida'},
     {k:'seguradora',t:'Seguradora',grupo:'Apólice'},{k:'apolice',t:'Apólice'},
     {k:'capital',t:'Capital segurado (R$)',tipo:'moeda',min:0},
@@ -12563,7 +12623,7 @@ function empresaModalFicha(emp){
   empresaFormulario(novo?'Nova empresa':'Editar dados da empresa','Salve a ficha para anexar documentos e organizar as contas.',[
     {k:'nome',grupo:'Identificação da empresa',t:'Nome da empresa',req:true},{k:'razaoSocial',t:'Razão social'},{k:'cnpj',t:'CNPJ',ph:'00.000.000/0001-00',ajuda:'Aceita CNPJ numérico ou com letras. A validação confere os dígitos; não consulta a Receita.'},{k:'abertura',t:'Data de abertura',tipo:'date'},
     {k:'atividade',grupo:'Cadastros e regime tributário',t:'Atividade / CNAE'},{k:'inscricaoEstadual',t:'Inscrição estadual'},{k:'inscricaoMunicipal',t:'Inscrição municipal'},
-    {k:'status',t:'Situação',opcoes:['Ativa','Em abertura','Em alteração','Baixada']},{k:'regime',t:'Regime tributário',opcoes:['',...CFG('regimes')]},
+    {k:'status',t:'Situação',opcoes:['Ativa','Em abertura','Em alteração','Baixada']},{k:'regime',t:'Regime tributário',listaConfig:'regimes',opcoes:['',...CFG('regimes')]},
     {k:'socios',grupo:'Sociedade e endereço',t:'Sócios e participação',full:true},{k:'endereco',t:'Endereço',full:true},{k:'cidade',t:'Cidade'},{k:'uf',t:'UF',opcoes:['','AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']},
     {k:'cep',t:'CEP'},{k:'contato',grupo:'Contatos e referências',t:'Contato principal'},{k:'telefone',t:'Telefone'},{k:'email',t:'E-mail',tipo:'email'},
     {k:'site',t:'Site',tipo:'url',ph:'https://'},{k:'contador',t:'Contabilidade'},{k:'contadorContato',t:'Contato da contabilidade'},
@@ -12581,7 +12641,7 @@ function empresaSalvarBanco(emp,b,novo,v,p=v){
 function empresaModalBanco(emp,b){
   const novo=!b;b=b||{id:uid(),tipo:''};
   empresaFormulario(novo?'Nova conta da empresa':'Editar conta da empresa','Agência, conta, PIX e contato. Não registre senhas ou códigos de acesso.',[
-    {k:'banco',t:'Banco',req:true},{k:'tipo',t:'Tipo da conta',opcoes:['',...CFG('tiposContaBanco')]},{k:'agencia',t:'Agência'},{k:'conta',t:'Conta'},
+    {k:'banco',t:'Banco',req:true},{k:'tipo',t:'Tipo da conta',listaConfig:'tiposContaBanco',opcoes:['',...CFG('tiposContaBanco')]},{k:'agencia',t:'Agência'},{k:'conta',t:'Conta'},
     {k:'pix',t:'Chave PIX'},{k:'gerente',t:'Gerente / contato'},{k:'obs',t:'Observações',tipo:'textarea',full:true}
   ],b,(v,p)=>empresaSalvarBanco(emp,b,novo,v,p));
 }
@@ -13212,7 +13272,7 @@ function modalBem(x,novo=false){
   abrirModal(esc(x.nome||'Novo bem'),'Confira a avaliação e o saldo devedor antes de salvar.',(c,fechar)=>{
     const editor=financeiroFormulario(c,[
       {k:'nome',t:'Nome do bem',full:true,req:true,ph:'Apartamento, veículo, terreno…'},
-      {k:'tipo',t:'Tipo',opcoes:CFG('tiposBem'),req:true},{k:'onde',t:'Localização',ph:'Cidade / endereço'},
+      {k:'tipo',t:'Tipo',listaConfig:'tiposBem',opcoes:CFG('tiposBem'),req:true},{k:'onde',t:'Localização',ph:'Cidade / endereço'},
       {k:'valor',t:'Valor da avaliação (R$)',tipo:'moeda',min:0,ajuda:'Zero mantém o bem como sem avaliação.'},
       {k:'falta',t:'Saldo devedor (R$)',tipo:'moeda',min:0,ajuda:'Informe o saldo ainda a pagar.'},
       {k:'avaliadoEm',t:'Data da avaliação',tipo:'date'},
@@ -13271,7 +13331,7 @@ function modalLancamentoGasto(g,novo=false){
       {k:'valor',t:'Valor (R$)',tipo:'moeda',req:true,naoZero:true,ajuda:'Use valor negativo somente para estorno.',secaoFormulario:'Dados da despesa'},
       {k:'mes',t:'Mês do gasto',tipo:'month',req:true,secaoFormulario:'Dados da despesa'},{k:'classe',t:'Categoria',opcoes:['Sem categoria',...categoriasGasto()],inicial:g.classe||g.categoria||'Sem categoria',req:true,secaoFormulario:'Dados da despesa'},
       {k:'empresaId',t:'Empresa (opcional)',opcoes:['','__sem_empresa__',...(E.empresasPJ||[]).filter(e=>e.id).map(e=>String(e.id))],ajuda:'Use a empresa do cadastro existente. Vazio mantém o gasto sem vínculo empresarial.',secaoFormulario:'Dados da despesa'},
-      {k:'pago',t:'Forma de pagamento',opcoes:['',...CFG('formasPagto')],secaoFormulario:'Pagamento'},
+      {k:'pago',t:'Forma de pagamento',listaConfig:'formasPagto',opcoes:['',...CFG('formasPagto')],secaoFormulario:'Pagamento'},
       {k:'data',t:'Data da despesa',tipo:'date',secaoFormulario:'Pagamento'},{k:'vencimento',t:'Vencimento',tipo:'date',secaoFormulario:'Pagamento'},
       {k:'situacao',t:'Pagamento',opcoes:['Não informado','Pendente','Pago'],inicial:g.situacao||'Não informado',secaoFormulario:'Pagamento'},
       {k:'pagoEm',t:'Data do pagamento',tipo:'date',secaoFormulario:'Pagamento'},
@@ -13500,7 +13560,7 @@ function vGastosBase(m,opcoes={}){
     {k:'classe',t:'Classificação',tipo:'select',opcoes:classes},
     {k:'oque',t:'O que foi',ph:'ex.: mercado, restaurante'},
     {k:'valor',t:'Valor',tipo:'moeda',w:140},
-    {k:'pago',t:'Pago com',tipo:'select',opcoes:['',...CFG('formasPagto')]},
+    {k:'pago',t:'Pago com',tipo:'select',listaConfig:'formasPagto',opcoes:['',...CFG('formasPagto')]},
   ],novoLanc,r,
     `<td colspan="3">Total variável</td><td style="text-align:right">${brl(varTot)}</td><td></td><td></td>`,E.gastos,
     g=>modalLancamentoGasto(g)));
@@ -13555,7 +13615,7 @@ function vGastosBase(m,opcoes={}){
     {k:'valor',t:'Valor',tipo:'moeda',w:140},
     {k:'ciclo',t:'Cobrança',tipo:'select',opcoes:['Mensal','Anual']},
     {k:'dia',t:'Vence dia',tipo:'number',num:1,w:100},
-    {k:'pago',t:'Pago com',tipo:'select',opcoes:['',...CFG('formasPagto')]},
+    {k:'pago',t:'Pago com',tipo:'select',listaConfig:'formasPagto',opcoes:['',...CFG('formasPagto')]},
     {k:'status',t:'Status',tipo:'select',opcoes:['Ativo','Cancelado']},
   ],()=>({item:CFG('catCasa')[0],onde:'',valor:0,ciclo:'Mensal',dia:'',pago:'',status:'Ativo'}),r,
     `<td colspan="2">Por mês</td><td style="text-align:right">${brl2(ativos(E.casa).reduce((s,x)=>s+valorMensal(x),0))}</td><td colspan="5"></td>`,E.casa,
@@ -13565,7 +13625,7 @@ function vGastosBase(m,opcoes={}){
   m.appendChild(tabelaBloco('gt-assin','🔄 Assinaturas','anual é dividido por 12 no custo mensal',E.assinaturas,[
     {k:'nome',t:'Serviço',ph:'ex.: Netflix'},{k:'valor',t:'Valor',tipo:'moeda',w:140},
     {k:'ciclo',t:'Cobrança',tipo:'select',opcoes:['Mensal','Anual']},{k:'dia',t:'Dia',tipo:'number',num:1,w:80},
-    {k:'pago',t:'Pago com',tipo:'select',opcoes:['',...CFG('formasPagto')]},
+    {k:'pago',t:'Pago com',tipo:'select',listaConfig:'formasPagto',opcoes:['',...CFG('formasPagto')]},
     {k:'status',t:'Status',tipo:'select',opcoes:['Ativa','Cancelar']},
     {k:'obs',t:'Uso',ph:'uso muito?'},
   ],()=>({nome:'',valor:0,ciclo:'Mensal',dia:'',pago:'',status:'Ativa',obs:''}),r,
@@ -13583,7 +13643,7 @@ function vGastosBase(m,opcoes={}){
   if(aVencer.length) m.appendChild(el(`<div class="aviso">🛡️ <b>${aVencer.length} seguro(s) renovando em breve:</b>
     ${aVencer.map(s=>esc(s.item||s.tipo||'seguro')+' ('+fmtDataAno(s.renova)+')').join(', ')}. Confira o vencimento e registre a nova vigência quando houver renovação.</div>`));
   m.appendChild(tabelaBloco('gt-seg','🛡️ Seguros','apólice, vigência e quanto pesa por mês',E.seguros,[
-    {k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposSeguro'),w:150},
+    {k:'tipo',t:'Tipo',tipo:'select',listaConfig:'tiposSeguro',opcoes:CFG('tiposSeguro'),w:150},
     {k:'item',t:'O que cobre',ph:'ex.: o carro, a casa, minha vida'},
     {k:'seguradora',t:'Seguradora',ph:'ex.: Porto'},
     {k:'apolice',t:'Apólice',ph:'nº'},
@@ -16020,7 +16080,7 @@ function devFormulario(c,defs,obj,rotulo,gravar){
   const controles={};for(const d of defs){const wrap=el('<div class="campo"></div>');if(d.full)wrap.style.gridColumn='1/-1';
     const label=el('<label></label>');label.textContent=d.t;const inp=d.tipo==='textarea'?el('<textarea rows="3"></textarea>'):d.opcoes?el('<select></select>'):el('<input>');
     if(d.opcoes)[...new Set([...d.opcoes,...(obj[d.k]!=null&&obj[d.k]!==''?[String(obj[d.k])]:[])])].forEach(v=>{const o=el('<option></option>');o.value=v;o.textContent=v;inp.appendChild(o)});else if(d.tipo!=='textarea')inp.type=d.tipo||'text';
-    inp.id=uid();inp.name=d.k;label.htmlFor=inp.id;inp.value=obj[d.k]??d.opcoes?.[0]??'';if(d.opcoes)[...inp.options].forEach(o=>o.selected=o.value===(obj[d.k]??d.opcoes[0]));inp.required=!!d.req;if(d.max)inp.max=d.max;if(d.ph)inp.placeholder=d.ph;
+    marcarListaConfiguravel(inp,d.opcoes,d.listaConfig);inp.id=uid();inp.name=d.k;label.htmlFor=inp.id;inp.value=obj[d.k]??d.opcoes?.[0]??'';if(d.opcoes)[...inp.options].forEach(o=>o.selected=o.value===(obj[d.k]??d.opcoes[0]));inp.required=!!d.req;if(d.max)inp.max=d.max;if(d.ph)inp.placeholder=d.ph;
     controles[d.k]=inp;wrap.append(label,inp);form.querySelector('.campos').appendChild(wrap);
   }
   const btn=el('<button type="submit" class="btn"></button>');btn.textContent=rotulo;form.appendChild(btn);
@@ -16041,7 +16101,7 @@ function devModalLeitura(l){abrirModal(esc(l.titulo),l.tipo||'Leitura dos regist
   if(l.pergunta)b.appendChild(el('<p class="dev-question">'+esc(l.pergunta)+'</p>'));
   b.appendChild(devFontesLinks(l.fontes));devFormulario(b,[{k:'status',t:'Isso me representa hoje?',opcoes:['A conferir','Reconheço','Quero trabalhar','Não me representa']},{k:'nota',t:'Meu exemplo ou correção',tipo:'textarea',full:true}],l,'Guardar minha percepção',v=>{devValidar(l,v.status,v.nota);fechar()});c.appendChild(b);
 })}
-function devModalAcao(p){abrirModal(p?'Editar desenvolvimento':'Novo desenvolvimento','Defina a prática e como vai perceber o avanço.',(c,fechar)=>{const b=el('<div class="secao"></div>');devFormulario(b,[{k:'habilidade',t:'O que quero desenvolver',req:true,full:true},{k:'area',t:'Área',opcoes:CFG('areasPDI')},{k:'status',t:'Situação',opcoes:['A desenvolver','Praticando','Dominado']},{k:'como',t:'Próximo passo concreto',tipo:'textarea',full:true},{k:'medida',t:'Como vou perceber a evolução',tipo:'textarea',full:true},{k:'ate',t:'Data de revisão',tipo:'date'},{k:'porque',t:'Por que isso importa',tipo:'textarea',full:true}],p||{},'Salvar desenvolvimento',v=>{if(p){Object.assign(p,v);if(!E.pdi.some(x=>x.id===p.id))E.pdi.push(p)}else E.pdi.push({id:uid(),...v});salvar();fechar()});c.appendChild(b)})}
+function devModalAcao(p){abrirModal(p?'Editar desenvolvimento':'Novo desenvolvimento','Defina a prática e como vai perceber o avanço.',(c,fechar)=>{const b=el('<div class="secao"></div>');devFormulario(b,[{k:'habilidade',t:'O que quero desenvolver',req:true,full:true},{k:'area',t:'Área',listaConfig:'areasPDI',opcoes:CFG('areasPDI')},{k:'status',t:'Situação',opcoes:['A desenvolver','Praticando','Dominado']},{k:'como',t:'Próximo passo concreto',tipo:'textarea',full:true},{k:'medida',t:'Como vou perceber a evolução',tipo:'textarea',full:true},{k:'ate',t:'Data de revisão',tipo:'date'},{k:'porque',t:'Por que isso importa',tipo:'textarea',full:true}],p||{},'Salvar desenvolvimento',v=>{if(p){Object.assign(p,v);if(!E.pdi.some(x=>x.id===p.id))E.pdi.push(p)}else E.pdi.push({id:uid(),...v});salvar();fechar()});c.appendChild(b)})}
 function devModalFonte(){abrirModal('Adicionar fonte','Guarde a referência de um relatório, feedback ou documento.',(c,fechar)=>{const b=el('<div class="secao"></div>');devFormulario(b,[{k:'titulo',t:'Nome do documento',req:true,full:true},{k:'tipo',t:'Tipo',opcoes:['Relatório','Plano pessoal','Análise interpretativa','Referência pessoal']},{k:'dataDocumento',t:'Data do documento',tipo:'date',max:hoje()},{k:'url',t:'Link do original (opcional)',tipo:'url',full:true},{k:'resumo',t:'O que este documento registra',tipo:'textarea',full:true},{k:'limites',t:'O que ainda preciso conferir',tipo:'textarea',full:true}],{},'Guardar fonte',v=>{if(v.url&&!devURL(v.url))throw new Error('Use um link HTTPS válido.');if(v.dataDocumento>hoje())throw new Error('Use uma data até hoje.');devDados().fontes.push({id:uid(),...v,importadoEm:new Date().toISOString(),origem:'Cadastro manual'});salvar();fechar()});c.appendChild(b)})}
 function devFontesLinks(ids){const w=el('<div class="dev-sources-links"></div>');(ids||[]).forEach(id=>{const f=devDados().fontes.find(f=>f.id===id);if(!f)return;const u=devURL(f.url);const a=el(u?'<a target="_blank" rel="noopener noreferrer"></a>':'<span></span>');if(u)a.href=u;a.textContent=f.titulo;w.appendChild(a)});return w}
 function devPainelRoda(){
@@ -16381,7 +16441,7 @@ function vGuia(m) {
   m.appendChild(tabelaBloco('gu-rituais-ed', 'Editar rituais', '', E.rituais, [
     { k: 'ritual', t: 'Ritual', ph: 'ex.: Jantar de domingo' },
     { k: 'comQuem', t: 'Com quem', ph: 'ex.: família toda' },
-    { k: 'frequencia', t: 'A cada', tipo: 'select', opcoes: CFG('frequencias') },
+    { k: 'frequencia', t: 'A cada', tipo: 'select', listaConfig:'frequencias',opcoes: CFG('frequencias') },
     { k: 'ultima', t: 'Última vez', tipo: 'date' },
     { k: 'obs', t: 'Observação', ph: '—' },
   ], () => ({ ritual: '', comQuem: '', frequencia: 'Mensal', ultima: '', obs: '' }), r));
@@ -16411,7 +16471,7 @@ function vGuia(m) {
   /* ---- 6. PARA ELES ---- */
   m.appendChild(tabelaBloco('gu-paraeles', '💛 Para eles', 'o que você quer dar, ensinar ou viver com cada um', E.paraEles, [
     { k: 'pessoa', t: 'Para quem', ph: 'nome' },
-    { k: 'tipo', t: 'O quê', tipo: 'select', opcoes: CFG('tiposParaEles') },
+    { k: 'tipo', t: 'O quê', tipo: 'select', listaConfig:'tiposParaEles',opcoes: CFG('tiposParaEles') },
     { k: 'oque', t: 'Descrição', ph: 'ex.: ensinar a pescar' },
     { k: 'quando', t: 'Quando', tipo: 'date' },
     { k: 'status', t: 'Status', tipo: 'select', opcoes: ['Ideia', 'Planejado', 'Feito'] },
@@ -16528,7 +16588,7 @@ function vGuia(m) {
   m.appendChild(bloco('gu-plano', '📆 Plano pessoal do ano', 'metas pessoais, separadas por ano', pl));
   m.appendChild(tabelaBloco('gu-plano-ed', 'Editar o plano de ' + anoPlan, 'uma linha por objetivo',
     doPlano, [
-      { k: 'area', t: 'Área', tipo: 'select', opcoes: CFG('areasMeta'), w: 150 },
+      { k: 'area', t: 'Área', tipo: 'select', listaConfig:'areasMeta',opcoes: CFG('areasMeta'), w: 150 },
       { k: 'oque', t: 'O que quero que seja verdade', ph: 'ex.: correr 10km em 49min' },
       { k: 'medida', t: 'Como vou saber', ph: 'o número que prova' },
       { k: 'ate', t: 'Até quando', tipo: 'date', w: 150 },
@@ -16543,7 +16603,7 @@ function vGuia(m) {
   m.appendChild(tabelaBloco('gu-pdi', '📈 PDI — o que preciso desenvolver',
     'habilidade por habilidade, com o próximo passo concreto', E.pdi, [
       { k: 'habilidade', t: 'Habilidade', ph: 'ex.: falar em público' },
-      { k: 'area', t: 'Área', tipo: 'select', opcoes: CFG('areasPDI'), w: 150 },
+      { k: 'area', t: 'Área', tipo: 'select', listaConfig:'areasPDI',opcoes: CFG('areasPDI'), w: 150 },
       { k: 'porque', t: 'Por que importa', ph: 'o que destrava' },
       { k: 'como', t: 'Próximo passo', ph: 'curso, mentor, prática' },
       { k: 'ate', t: 'Até quando', tipo: 'date', w: 150 },
@@ -16557,7 +16617,7 @@ function vGuia(m) {
     lidos ? lidos + ' lido(s) — a fila é o que você decidiu aprender' : 'a fila é o que você decidiu aprender', E.livros, [
       { k: 'titulo', t: 'Livro', ph: 'título' },
       { k: 'autor', t: 'Autor', ph: '—' },
-      { k: 'area', t: 'Para quê', tipo: 'select', opcoes: CFG('areasPDI'), w: 150 },
+      { k: 'area', t: 'Para quê', tipo: 'select', listaConfig:'areasPDI',opcoes: CFG('areasPDI'), w: 150 },
       { k: 'status', t: 'Situação', tipo: 'select', opcoes: ['Quero ler', 'Lendo', 'Lido', 'Larguei'], w: 140 },
       { k: 'nota', t: 'Nota 0-10', tipo: 'number', num: 1, w: 110 },
       { k: 'oQueFicou', t: 'O que ficou', ph: 'a ideia que você usa' },
@@ -16570,16 +16630,16 @@ function vGuia(m) {
 }
 
 // pessoa com anexo de documentos
-function novoRitual(){abrirModal('Novo ritual','Um encontro ou hábito que você quer repetir.',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');devFormulario(b,[{k:'ritual',t:'O que vamos repetir?',req:true,full:true},{k:'comQuem',t:'Com quem?',full:true},{k:'frequencia',t:'A cada',opcoes:CFG('frequencias')},{k:'ultima',t:'Última vez (se já aconteceu)',tipo:'date',max:hoje()},{k:'obs',t:'O que quero lembrar',tipo:'textarea',full:true}],{frequencia:'Mensal'},'Criar ritual',v=>{if(v.ultima>hoje())throw new Error('Use uma data até hoje para a última vez.');E.rituais.push({id:uid(),...v});salvar();abreBloco('gu-rituais');fechar()});c.appendChild(b)},rr('guia'))}
-function novaIdeiaParaEles(){abrirModal('Ideia para uma pessoa','Um presente, aprendizado ou momento para viver juntos.',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');devFormulario(b,[{k:'oque',t:'O que quero proporcionar?',req:true,full:true},{k:'pessoa',t:'Para quem?',req:true,full:true},{k:'tipo',t:'Tipo',opcoes:CFG('tiposParaEles')},{k:'quando',t:'Quando',tipo:'date'}],{},'Guardar ideia',v=>{E.paraEles.push({id:uid(),...v,status:'Ideia'});salvar();abreBloco('gu-paraeles');fechar()});c.appendChild(b)},rr('guia'))}
-function novaPessoa(){abrirModal('Nova pessoa','Quem você quer manter por perto?',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');devFormulario(b,[{k:'nome',t:'Nome',req:true,full:true},{k:'relacao',t:'Quem é',opcoes:CFG('relacoes')},{k:'nascimento',t:'Nascimento',tipo:'date',max:hoje()}],{},'Cadastrar pessoa',v=>{if(v.nascimento>hoje())throw new Error('O nascimento não pode estar no futuro.');const p={id:uid(),...v,gosta:'',obs:''};E.pessoas.push(p);salvar();fechar();modalPessoa(p)});c.appendChild(b)},rr('guia'))}
-function novaMeta(){abrirModal('Nova meta','Defina uma conquista e o primeiro passo para chegar lá.',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');devFormulario(b,[{k:'meta',t:'O que quero conquistar',req:true,full:true},{k:'area',t:'Área',opcoes:CFG('areasMeta')},{k:'horizonte',t:'Horizonte',opcoes:CFG('horizonteMeta')},{k:'prazo',t:'Até quando',tipo:'date'},{k:'primeiroPasso',t:'Primeiro passo concreto',full:true}],{},'Criar meta',v=>{const {primeiroPasso,...dados}=v;const x={id:uid(),...dados,status:'Aberta',obs:'',passos:primeiroPasso?[{id:uid(),texto:primeiroPasso,feito:false}]:[]};E.metas.push(x);salvar();fechar();modalMeta(x)});c.appendChild(b)},rr('guia'))}
+function novoRitual(){abrirModal('Novo ritual','Um encontro ou hábito que você quer repetir.',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');devFormulario(b,[{k:'ritual',t:'O que vamos repetir?',req:true,full:true},{k:'comQuem',t:'Com quem?',full:true},{k:'frequencia',t:'A cada',listaConfig:'frequencias',opcoes:CFG('frequencias')},{k:'ultima',t:'Última vez (se já aconteceu)',tipo:'date',max:hoje()},{k:'obs',t:'O que quero lembrar',tipo:'textarea',full:true}],{frequencia:'Mensal'},'Criar ritual',v=>{if(v.ultima>hoje())throw new Error('Use uma data até hoje para a última vez.');E.rituais.push({id:uid(),...v});salvar();abreBloco('gu-rituais');fechar()});c.appendChild(b)},rr('guia'))}
+function novaIdeiaParaEles(){abrirModal('Ideia para uma pessoa','Um presente, aprendizado ou momento para viver juntos.',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');devFormulario(b,[{k:'oque',t:'O que quero proporcionar?',req:true,full:true},{k:'pessoa',t:'Para quem?',req:true,full:true},{k:'tipo',t:'Tipo',listaConfig:'tiposParaEles',opcoes:CFG('tiposParaEles')},{k:'quando',t:'Quando',tipo:'date'}],{},'Guardar ideia',v=>{E.paraEles.push({id:uid(),...v,status:'Ideia'});salvar();abreBloco('gu-paraeles');fechar()});c.appendChild(b)},rr('guia'))}
+function novaPessoa(){abrirModal('Nova pessoa','Quem você quer manter por perto?',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');devFormulario(b,[{k:'nome',t:'Nome',req:true,full:true},{k:'relacao',t:'Quem é',listaConfig:'relacoes',opcoes:CFG('relacoes')},{k:'nascimento',t:'Nascimento',tipo:'date',max:hoje()}],{},'Cadastrar pessoa',v=>{if(v.nascimento>hoje())throw new Error('O nascimento não pode estar no futuro.');const p={id:uid(),...v,gosta:'',obs:''};E.pessoas.push(p);salvar();fechar();modalPessoa(p)});c.appendChild(b)},rr('guia'))}
+function novaMeta(){abrirModal('Nova meta','Defina uma conquista e o primeiro passo para chegar lá.',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');devFormulario(b,[{k:'meta',t:'O que quero conquistar',req:true,full:true},{k:'area',t:'Área',listaConfig:'areasMeta',opcoes:CFG('areasMeta')},{k:'horizonte',t:'Horizonte',listaConfig:'horizonteMeta',opcoes:CFG('horizonteMeta')},{k:'prazo',t:'Até quando',tipo:'date'},{k:'primeiroPasso',t:'Primeiro passo concreto',full:true}],{},'Criar meta',v=>{const {primeiroPasso,...dados}=v;const x={id:uid(),...dados,status:'Aberta',obs:'',passos:primeiroPasso?[{id:uid(),texto:primeiroPasso,feito:false}]:[]};E.metas.push(x);salvar();fechar();modalMeta(x)});c.appendChild(b)},rr('guia'))}
 function modalPessoa(p) {
   abrirModal(esc(p.nome || 'Nova pessoa'), esc(p.relacao || ''), (c, fechar) => {
     const s1 = el('<div class="secao"></div>');
     s1.appendChild(campos(p, [
       { k: 'nome', t: 'Nome', full: true, secaoFormulario: 'Identificação' },
-      { k: 'relacao', t: 'Quem é', tipo: 'select', opcoes: CFG('relacoes'), secaoFormulario: 'Identificação' },
+      { k: 'relacao', t: 'Quem é', tipo: 'select', listaConfig:'relacoes',opcoes: CFG('relacoes'), secaoFormulario: 'Identificação' },
       { k: 'nascimento', t: 'Nascimento', tipo: 'date', secaoFormulario: 'Identificação' },
       { k: 'gosta', t: 'O que gosta', full: true, ph: 'ajuda na hora do presente', secaoFormulario: 'Preferências e notas' },
       { k: 'obs', t: 'Observações', tipo: 'textarea', full: true, secaoFormulario: 'Preferências e notas' },
@@ -16666,8 +16726,8 @@ function modalMeta(x){
     const s1=el('<div class="secao"><h4>A meta</h4></div>');
     s1.appendChild(campos(x,[
       {k:'meta',t:'Meta',full:true,ph:'ex.: Chegar a 82 kg'},
-      {k:'area',t:'Área',tipo:'select',opcoes:CFG('areasMeta')},
-      {k:'horizonte',t:'Horizonte',tipo:'select',opcoes:CFG('horizonteMeta')},
+      {k:'area',t:'Área',tipo:'select',listaConfig:'areasMeta',opcoes:CFG('areasMeta')},
+      {k:'horizonte',t:'Horizonte',tipo:'select',listaConfig:'horizonteMeta',opcoes:CFG('horizonteMeta')},
       {k:'prazo',t:'Até quando',tipo:'date'},
       {k:'status',t:'Status',tipo:'select',opcoes:['Aberta','Fazendo','Concluída','Parada']},
       {k:'obs',t:'Por que isso importa',tipo:'textarea',full:true},

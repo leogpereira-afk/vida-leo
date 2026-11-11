@@ -77,3 +77,16 @@
 @media(prefers-reduced-motion:reduce){
  :is(.campo,.ff-field,.rotina-form-campos,.strategy-form,.ag-campos) :is(input,select,textarea){transition:none}
 }
+/* Gestão das listas no próprio preenchimento, sem tocar em registros antigos. */
+.lista-campo{min-width:0;display:grid;gap:5px;align-content:start}
+.lista-campo>label{display:grid;gap:5px;font-size:12px;font-weight:500}
+.lista-opcoes{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:5px}
+.lista-opcoes>button{border:0;background:transparent;color:var(--marca);font:inherit;font-size:12px;min-height:32px;padding:4px 0;text-align:left;cursor:pointer}
+.lista-opcoes>button:focus-visible{outline:2px solid var(--marca);outline-offset:2px;border-radius:4px}
+.lista-opcoes>small{flex-basis:100%;color:var(--suave);font-size:12px;line-height:1.4}
+.lista-opcoes>small:empty{display:none}
+:is(.campo,.ff-field,.lista-campo):has(select:disabled)>.lista-opcoes{display:none}
+.lista-nova>label{display:grid;gap:8px;font-size:13px}
+.lista-nova input{width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border:1px solid var(--controle,var(--linha));border-radius:10px;background:var(--card);color:var(--tinta);font:inherit}
+.lista-nova>[role=alert]{color:var(--vermelho);font-size:13px}
+@media(max-width:600px){.lista-opcoes>button{min-height:44px}.lista-nova input{font-size:16px}.lista-campo{grid-column:1/-1}}
