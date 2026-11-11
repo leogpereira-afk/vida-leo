@@ -697,6 +697,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-compras.css?v=41f54a3f0db6">
 <link rel="stylesheet" href="./fortemais-imovel.css?v=b73c7dc3db60">
 <link rel="stylesheet" href="./fortemais-obras-dashboard.css?v=824a88aa1459">
+<link rel="stylesheet" href="./viagens-formulario.css?v=2edb33a48019">
 </head>
 <body>
 <a class="pular" href="#main">Pular para o conteúdo</a>
@@ -3838,21 +3839,55 @@ function imprimirViagem(v) {
 
 function modalViagem(v){
   ['custos','passagens','hoteis','tickets','viajantes','roteiro','lugares'].forEach(k=>{if(!Array.isArray(v[k]))v[k]=[]});
+  let prepararSaida=()=>true;
   abrirModal(esc(v.evento||'Nova viagem'),`${esc(v.cidade||'')} · ${fmtDataLonga(v.ida)} → ${fmtDataLonga(v.volta)}`,(c,fechar)=>{
-    const s1=el('<div class="secao"><h4>Dados da viagem</h4></div>');
-    s1.appendChild(campos(v,[
+    const modal=c.closest('.modal');modal.classList.add('viagem-edicao');
+    const s1=el('<div class="secao viagem-dados"></div>');
+    const controles={};
+    const grupo=(titulo,defs,classe='')=>{
+      const bloco=el('<fieldset class="viagem-grupo"><legend></legend></fieldset>');
+      bloco.querySelector('legend').textContent=titulo;
+      const grade=campos(v,defs);grade.classList.add(classe||'viagem-grade');
+      [...grade.children].forEach((campo,i)=>{
+        const controle=campo.querySelector('input,select,textarea');
+        campo.dataset.viagemCampo=defs[i].k;controle.name=defs[i].k;controles[defs[i].k]=controle;
+      });
+      bloco.appendChild(grade);s1.appendChild(bloco);return bloco;
+    };
+    const basico=grupo('Viagem',[
       {k:'evento',t:'Evento'},{k:'cidade',t:'Cidade'},
       {k:'ida',t:'Ida',tipo:'date'},{k:'volta',t:'Volta',tipo:'date'},
+      {k:'status',t:'Status',tipo:'select',opcoes:CFG('statusViagem')},
+    ],'viagem-basico');
+    const periodo=el('<p class="viagem-periodo" role="status" aria-live="polite"></p>');
+    periodo.id=uid();basico.appendChild(periodo);
+    ['ida','volta'].forEach(k=>controles[k].setAttribute('aria-describedby',periodo.id));
+    grupo('Hospedagem e transporte',[
       {k:'hotel',t:'Hotel',ph:'nome / reserva'},
       {k:'transporte',t:'Transporte',tipo:'select',opcoes:['',...CFG('transportes')]},
       {k:'aviaoId',t:'Aeronave desta viagem',tipo:'select',opcoes:[{v:'',t:'Sem vínculo com o avião'},{v:'principal',t:'Meu avião'}],
         aoGravar:valor=>{if(!valor&&(E.aviao?.despesas||[]).some(d=>d.viagemId===v.id)){
           alert('Esta viagem tem despesas do avião vinculadas. Abra Universo Holding → Avião para desvinculá-las antes de remover a aeronave.');return false}
           return true}},
-      {k:'status',t:'Status',tipo:'select',opcoes:CFG('statusViagem')},
-      {k:'gastos',t:'Orçamento estimado (R$)',tipo:'number'},
+    ],'viagem-logistica');
+    grupo('Planejamento',[
+      {k:'gastos',t:'Orçamento estimado (R$)',tipo:'moeda'},
       {k:'obs',t:'Observações',tipo:'textarea',full:true},
-    ]));
+    ],'viagem-planejamento');
+    controles.obs.rows=2;
+    prepararSaida=()=>{
+      if(controles.gastos.gravarEntrada?.()===false){controles.gastos.focus();return false}
+      return true;
+    };
+    const atualizarPeriodo=()=>{
+      const valido=dataISOValida(v.ida)&&dataISOValida(v.volta),invertido=valido&&v.volta<v.ida;
+      periodo.textContent=invertido?'A volta está antes da ida. Confira as datas.':valido?`${diasEntre(v.ida,v.volta)} ${diasEntre(v.ida,v.volta)===1?'dia':'dias'} de viagem`:'Informe ida e volta para conferir o período.';
+      periodo.classList.toggle('viagem-periodo-invalido',invertido);
+      if(invertido)controles.volta.setAttribute('aria-invalid','true');else controles.volta.removeAttribute('aria-invalid');
+      modal.querySelector('header h3').textContent=v.evento||'Nova viagem';
+      modal.querySelector('header p').textContent=[v.cidade,[fmtDataLonga(v.ida),fmtDataLonga(v.volta)].filter(Boolean).join(' → ')].filter(Boolean).join(' · ');
+    };
+    s1.addEventListener('input',atualizarPeriodo);s1.addEventListener('change',atualizarPeriodo);atualizarPeriodo();
     c.appendChild(s1);
 
     /* ---- PASSAGENS ----
@@ -4126,6 +4161,7 @@ function modalViagem(v){
                :'⚠️ <b>Tem documento pendente</b> — resolva antes de fechar a viagem.'}</div>`));
       const cor=i=>i.ruim?'var(--vermelho)':i.aviso?'var(--ambar,#b26a00)':'var(--verde)';
       const abrirItem=i=>{
+        if(!prepararSaida())return;
         fechar();
         if(i.tipo==='vacina'){abreBloco('sa-vac');irTela('saude');return}
         filtro.docPessoa=i.nome;filtro.docBusca=i.registro?.nome||i.doc;filtro.docStatus='Todos';
@@ -4261,30 +4297,32 @@ function modalViagem(v){
     const resumo=el('<div></div>');
     function pintaCustos(){
       const atualViagem=E.viagens.find(x=>x.id===v.id)||v;
-      resumo.replaceChildren(el('<p>Total da viagem: <strong>'+brl(custoViagem(atualViagem))+'</strong></p>'),acao('Ver gastos e comprovantes',()=>{fechar();modalGastosViagem(atualViagem)},'ghost'));
+      resumo.replaceChildren(el('<p>Total da viagem: <strong>'+brl(custoViagem(atualViagem))+'</strong></p>'),acao('Ver gastos e comprovantes',()=>{if(!prepararSaida())return;fechar();modalGastosViagem(atualViagem)},'ghost'));
     }
     const b=el('<button class="mais">+ Lançar custo</button>');
-    b.onclick=()=>{const viagemAtual=E.viagens.find(x=>x.id===v.id)||v;fechar();if(viagemAtual.aviaoId==='principal')modalGastoViagemAviao(viagemAtual);else modalEditarCustoViagem(viagemAtual)};
+    b.onclick=()=>{if(!prepararSaida())return;const viagemAtual=E.viagens.find(x=>x.id===v.id)||v;fechar();if(viagemAtual.aviaoId==='principal')modalGastoViagemAviao(viagemAtual);else modalEditarCustoViagem(viagemAtual)};
     s2.append(resumo,b);pintaCustos();c.append(s2);
 
     const s3=el('<div class="secao"><h4>Arquivos — reserva de hotel, passagem, comprovantes</h4></div>');
     s3.appendChild(areaArquivos('viagem:'+v.id,'Solte aqui a reserva do hotel, passagens e comprovantes'));
     c.appendChild(s3);
 
-    const s4=el('<div class="secao" style="display:flex;gap:9px"></div>');
-    const imp=el('<button class="btn ghost">🖨 Salvar roteiro</button>');
-    imp.onclick=()=>imprimirViagem(v);
+    const s4=el('<div class="secao viagem-acoes" style="display:flex;gap:9px"></div>');
+    const imp=el('<button class="btn ghost">Imprimir / PDF</button>');
+    imp.title='Abrir o roteiro para imprimir ou salvar em PDF';
+    imp.onclick=()=>{if(prepararSaida())imprimirViagem(v)};
     s4.appendChild(imp);
-    const del=el('<button class="btn ghost" style="color:var(--vermelho)">Apagar viagem</button>');
-    del.onclick=async()=>{if((E.gastos||[]).some(g=>g.viagemId===v.id&&g.viagemCustoId)){alert('Esta viagem tem gastos vinculados. Apague as despesas no detalhamento antes de apagar a viagem.');return;}const vinculadas=(E.aviao?.despesas||[]).filter(d=>d.viagemId===v.id);
+    const del=el('<button class="btn ghost viagem-apagar">Apagar viagem</button>');
+    del.onclick=async()=>{if(!prepararSaida())return;if((E.gastos||[]).some(g=>g.viagemId===v.id&&g.viagemCustoId)){alert('Esta viagem tem gastos vinculados. Apague as despesas no detalhamento antes de apagar a viagem.');return;}const vinculadas=(E.aviao?.despesas||[]).filter(d=>d.viagemId===v.id);
       if(!confirm('Apagar esta viagem e seus arquivos?'+(vinculadas.length?'\n\n'+vinculadas.length+' despesa(s) permanecerão no livro do avião, sem vínculo com a viagem.':'')))return;
       if(!await apagarAnexosDe('viagem:'+v.id))return;
       vinculadas.forEach(d=>{d.viagemId='';d.editadoManual=true});
-      E.viagens=E.viagens.filter(x=>x.id!==v.id);salvar();fechar()};
+      E.viagens=E.viagens.filter(x=>x.id!==v.id);salvar();prepararSaida=()=>true;fechar()};
     s4.appendChild(del);s4.appendChild(el('<span class="cresce"></span>'));
-    const ok=el('<button class="btn">Pronto</button>');ok.onclick=fechar;s4.appendChild(ok);
+    const nota=el('<span class="viagem-gravacao">Gravação automática</span>');s4.appendChild(nota);
+    const ok=el('<button class="btn">Concluir</button>');ok.onclick=fechar;s4.appendChild(ok);
     c.appendChild(s4);
-  });
+  },undefined,{antesFechar:()=>prepararSaida()});
 }
 
 /* ===================== AGENDA ===================== */

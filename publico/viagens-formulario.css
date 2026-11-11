@@ -1,0 +1,50 @@
+/* Só a ficha de viagem: o restante da Central mantém seu próprio layout. */
+.modal.viagem-edicao{width:min(900px,100%);max-width:900px}
+.viagem-edicao>header{padding:20px 24px 16px}
+.viagem-edicao>header h3{font-size:21px;line-height:1.3}
+.viagem-edicao>header p{font-size:13px;margin-top:6px}
+.viagem-edicao :is(.btn,.secao h4){font-family:inherit}
+.viagem-edicao .secao.viagem-dados{padding:20px 24px 24px}
+.viagem-grupo{border:0;min-width:0;margin:0;padding:0}
+.viagem-grupo+.viagem-grupo{margin-top:20px;padding-top:18px;border-top:1px solid var(--linha)}
+.viagem-grupo legend{float:left;width:100%;padding:0;margin-bottom:12px;font-size:12px;font-weight:600;letter-spacing:.025em;color:var(--suave)}
+.viagem-grupo legend+.campos{clear:both}
+.viagem-edicao .campos{gap:12px 16px}
+.viagem-edicao .viagem-basico{grid-template-columns:repeat(6,minmax(0,1fr))}
+.viagem-basico [data-viagem-campo=evento],.viagem-basico [data-viagem-campo=cidade]{grid-column:span 3}
+.viagem-basico [data-viagem-campo=ida],.viagem-basico [data-viagem-campo=volta],.viagem-basico [data-viagem-campo=status]{grid-column:span 2}
+.viagem-edicao .viagem-logistica{grid-template-columns:repeat(3,minmax(0,1fr))}
+.viagem-edicao .viagem-planejamento{grid-template-columns:minmax(0,1fr) minmax(0,2fr);align-items:start}
+.viagem-planejamento [data-viagem-campo=obs]{grid-column:auto!important}
+.viagem-edicao .campo label{font-size:12px;font-weight:500;margin-bottom:5px}
+.viagem-edicao .campo :is(input,select,textarea){min-height:44px;padding:10px 12px;font-size:14px;line-height:1.4;border:1px solid var(--controle,var(--linha));border-radius:10px;background:var(--card);box-shadow:0 1px 2px #20211f03;transition:border-color .12s,box-shadow .12s}
+.viagem-edicao .campo :is(input,select,textarea):focus{outline:2px solid var(--marca);outline-offset:2px;border-color:var(--marca);box-shadow:none}
+.viagem-edicao .campo textarea{min-height:72px;height:72px;resize:vertical}
+.viagem-edicao .campo [aria-invalid=true]{border-color:var(--vermelho)}
+.viagem-periodo{font-size:12px;color:var(--suave);margin-top:9px;min-height:18px}
+.viagem-periodo-invalido{color:var(--vermelho)}
+.viagem-edicao .modal-acoes.viagem-acoes{align-items:center;padding:12px 24px;gap:10px!important}
+.viagem-acoes .btn{min-height:44px}
+.viagem-edicao .viagem-apagar{border-color:transparent;background:transparent;color:var(--vermelho);font-size:12px;padding-inline:8px}
+.viagem-gravacao{color:var(--suave);font-size:11px}
+@media(max-width:700px){
+ .viagem-edicao .viagem-logistica{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .viagem-logistica [data-viagem-campo=hotel]{grid-column:1/-1}
+}
+@media(max-width:600px){
+ .modal.viagem-edicao{max-height:calc(100dvh - 16px)}
+ .viagem-edicao>header{padding:16px}
+ .viagem-edicao>header h3{font-size:19px}
+ .viagem-edicao .secao.viagem-dados{padding:16px}
+ .viagem-edicao .campos{grid-template-columns:minmax(0,1fr);gap:12px}
+ .viagem-edicao .campos>.campo{grid-column:auto!important}
+ .viagem-edicao .campo :is(input,select,textarea){font-size:16px}
+ .viagem-grupo+.viagem-grupo{margin-top:16px;padding-top:16px}
+ .viagem-edicao .modal-acoes.viagem-acoes{display:grid!important;grid-template-columns:1fr 1fr;gap:8px!important;padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+ .viagem-acoes>.cresce{display:none}
+ .viagem-acoes>.btn:first-child{grid-column:1;grid-row:1}
+ .viagem-acoes>.btn:last-child{grid-column:2;grid-row:1;margin:0}
+ .viagem-acoes>.viagem-apagar{grid-column:1;grid-row:2;justify-self:start}
+ .viagem-gravacao{grid-column:2;grid-row:2;justify-self:end;text-align:right}
+}
+@media(prefers-reduced-motion:reduce){.viagem-edicao .campo :is(input,select,textarea){transition:none}}
