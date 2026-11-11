@@ -1,0 +1,79 @@
+/* Mesmo acabamento da ficha de viagem, sem alterar gravação ou controles.
+   O escopo são os editores: tabelas, filtros e leitores mantêm seus layouts. */
+.modal:has(:is(.campos,.ff-form,.rotina-form,.strategy-form,.dev-form)):not(.viagem-edicao){max-width:880px}
+.modal:has(:is(.campos,.ff-form,.rotina-form,.strategy-form,.dev-form)):not(.viagem-edicao)>header{padding:20px 24px 16px}
+.modal:has(:is(.campos,.ff-form,.rotina-form,.strategy-form,.dev-form)):not(.viagem-edicao)>header h3{font-size:21px;line-height:1.3}
+.modal:has(:is(.campos,.ff-form,.rotina-form,.strategy-form,.dev-form)):not(.viagem-edicao)>header p{font-size:13px;line-height:1.5;margin-top:6px}
+.modal:not(.viagem-edicao) .secao:has(>.campos),.modal:not(.viagem-edicao) .secao:has(>.formulario-grupos){padding:20px 24px}
+.modal :is(.secao h4,.btn),:is(.ff-form,.rotina-form,.strategy-form,.dev-form,.ag-form) .btn{font-family:inherit}
+.modal:has(:is(.campos,.ff-form,.rotina-form,.strategy-form,.dev-form)):not(.viagem-edicao) .secao>h4{font-size:12px;font-weight:600;letter-spacing:.025em;color:var(--suave);margin-bottom:12px}
+
+/* Grades já existentes: manter spans, campos condicionais e detalhes. */
+.campos,.mcorpo .ff-fields,.rotina-form-campos,.ag-campos{gap:12px 16px;align-items:start}
+:is(.campo,.ff-field,.rotina-form-campos>label,.strategy-form>label,.strategy-form .lider-form-grupo label,.ag-campos>label){min-width:0}
+:is(.campo,.ff-field)>label,:is(.rotina-form-campos,.strategy-form,.ag-campos) label>span{font-size:12px;font-weight:500;line-height:1.4;color:var(--tinta)}
+.campo>label{margin-bottom:5px}
+.ff-field{gap:5px}
+:is(.rotina-form-campos,.strategy-form,.ag-campos)>label{gap:5px;font-size:12px;font-weight:500;line-height:1.4}
+.strategy-form{gap:12px 16px}
+.strategy-form .lider-form-grupo>div{gap:12px 16px}
+
+/* Não atingir uploads ocultos, switches, avaliações ou inputs de tabelas. */
+:is(.campo,.ff-field,.rotina-form-campos,.strategy-form,.ag-campos) :is(input:not([type=checkbox],[type=radio],[type=file],[type=range],[type=color],[type=hidden],[type=button],[type=submit]),select,textarea):not([hidden]){box-sizing:border-box;width:100%;min-width:0;max-width:100%;padding:10px 12px;border:1px solid var(--controle,var(--linha));border-radius:10px;background:var(--card);color:var(--tinta);font-family:inherit;font-size:14px;font-weight:400;line-height:1.4;box-shadow:0 1px 2px #20211f03;transition:border-color .12s,box-shadow .12s}
+:is(.campo,.ff-field,.rotina-form-campos,.strategy-form,.ag-campos) :is(input:not([type=checkbox],[type=radio],[type=file],[type=range],[type=color],[type=hidden],[type=button],[type=submit]),select):not([hidden]){min-height:44px}
+:is(.campo,.ff-field,.rotina-form-campos,.strategy-form,.ag-campos) :is(input,select,textarea):focus-visible{outline:2px solid var(--marca);outline-offset:2px;border-color:var(--marca);box-shadow:none}
+:is(.campo,.ff-field,.rotina-form-campos,.strategy-form,.ag-campos) :is(input,select,textarea)[aria-invalid=true]{border-color:var(--vermelho)}
+:is(.campo,.ff-field,.rotina-form-campos,.strategy-form,.ag-campos) :is(input,select,textarea):disabled{background:var(--bg);color:var(--suave);cursor:not-allowed}
+:is(.campo,.ff-field,.rotina-form-campos,.strategy-form,.ag-campos) input[readonly]{background:var(--bg)}
+/* Só os campos de notas curtas; rows maiores e editores de importação ficam intactos. */
+.campo>textarea:not([rows]),.ff-field>textarea[rows="3"],.dev-form .campo>textarea[rows="3"]{min-height:72px;resize:vertical}
+.campo>textarea:not([rows]){height:72px}
+.ff-field small{font-size:12px;line-height:1.45;color:var(--suave)}
+
+/* Seções leves como em Viagens, sem cartões aninhados. */
+.campos.formulario-grupos,.mcorpo .ff-fields.formulario-grupos{display:block;min-width:0}
+.formulario-grupo{border:0;padding:0;margin:0;min-width:0}
+.formulario-grupo+.formulario-grupo{margin-top:20px;padding-top:18px;border-top:1px solid var(--linha)}
+.formulario-grupo>legend{float:left;width:100%;padding:0;margin-bottom:12px;font-size:12px;font-weight:600;letter-spacing:.025em;color:var(--suave)}
+.formulario-grupo>legend+:is(.campos,.ff-fields){clear:both}
+:is(.empresa-form-grupo,.lider-form-grupo){min-width:0}
+:is(.empresa-form-grupo,.lider-form-grupo)>legend{font-family:inherit;font-size:12px;font-weight:600;letter-spacing:.025em;color:var(--suave)}
+.ff-more-fields>summary{min-height:44px;box-sizing:border-box;padding-block:12px;font-size:13px}
+.ff-more-fields[open]>.ff-fields{margin-top:12px}
+
+/* Ações mantêm seus textos e comportamento: Salvar, Concluir ou ação de negócio. */
+.modal:not(.viagem-edicao) .modal-acoes{gap:10px!important;padding:12px 24px;align-items:center}
+:is(.ff-actions,.rotina-form-acoes,.strategy-form-footer,.ag-acoes){gap:10px;padding-top:12px;margin-top:4px;align-items:center}
+.modal-acoes>.btn,:is(.ff-actions,.rotina-form-acoes,.strategy-form-footer,.ag-acoes)>.btn,.dev-form>button[type=submit]{min-height:44px;font-family:inherit;white-space:normal}
+.ff-actions{padding-bottom:12px}
+.dev-form>button[type=submit]{margin-top:16px}
+.strategy-form-footer>span{font-size:12px;line-height:1.5;color:var(--suave)}
+.modal:not(.viagem-edicao) .modal-acoes>.cresce{min-width:0}
+
+/* Editores de rendimentos e importação documental mantêm sua composição. */
+:is(.ra-copia-form,.db-fav-form) .ra-field{display:grid;gap:5px;min-width:0;font-size:12px;font-weight:500}
+:is(.ra-copia-form,.db-fav-form) :is(input,select),.doc-revisao-upload textarea{box-sizing:border-box;width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid var(--controle,var(--linha));border-radius:10px;background:var(--card);color:var(--tinta);font-family:inherit;font-size:14px;line-height:1.4}
+:is(.ra-copia-form,.db-fav-form) :is(input,select):focus-visible,.doc-revisao-upload textarea:focus-visible{outline:2px solid var(--marca);outline-offset:2px}
+.db-fav-form>button{min-height:44px;font-family:inherit}
+.doc-revisao-upload textarea{min-height:140px;resize:vertical}
+
+@media(max-width:600px){
+ .modal:has(:is(.campos,.ff-form,.rotina-form,.strategy-form,.dev-form)):not(.viagem-edicao){max-height:calc(100dvh - 16px)}
+ .modal:has(:is(.campos,.ff-form,.rotina-form,.strategy-form,.dev-form)):not(.viagem-edicao)>header{padding:16px}
+ .modal:has(:is(.campos,.ff-form,.rotina-form,.strategy-form,.dev-form)):not(.viagem-edicao)>header h3{font-size:19px}
+ .modal:not(.viagem-edicao) .secao:has(>.campos),.modal:not(.viagem-edicao) .secao:has(>.formulario-grupos){padding:16px}
+ .campos,.mcorpo .ff-fields,.rotina-form-campos,.ag-campos{grid-template-columns:minmax(0,1fr);gap:12px}
+ .campos>.campo,.rotina-form-campos>label,.ag-campos>label{grid-column:1/-1!important}
+ :is(.campo,.ff-field,.rotina-form-campos,.strategy-form,.ag-campos) :is(input:not([type=checkbox],[type=radio],[type=file],[type=range],[type=color],[type=hidden],[type=button],[type=submit]),select,textarea):not([hidden]){font-size:16px}
+ .formulario-grupo+.formulario-grupo{margin-top:16px;padding-top:16px}
+ .modal:not(.viagem-edicao) .modal-acoes{padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom))}
+ .modal:not(.viagem-edicao) .modal-acoes>.btn{flex:1 1 auto;margin-left:0}
+ .modal:not(.viagem-edicao) .modal-acoes>.cresce{display:none}
+ :is(.ff-actions,.rotina-form-acoes,.ag-acoes)>.btn{flex:1 1 auto}
+ .strategy-form-footer{gap:8px}
+ .strategy-form-footer>span{flex:1 1 100%}
+ :is(.ra-copia-form,.db-fav-form) :is(input,select),.doc-revisao-upload textarea{font-size:16px}
+}
+@media(prefers-reduced-motion:reduce){
+ :is(.campo,.ff-field,.rotina-form-campos,.strategy-form,.ag-campos) :is(input,select,textarea){transition:none}
+}

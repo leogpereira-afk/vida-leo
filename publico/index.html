@@ -697,6 +697,9 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-compras.css?v=41f54a3f0db6">
 <link rel="stylesheet" href="./fortemais-imovel.css?v=b73c7dc3db60">
 <link rel="stylesheet" href="./fortemais-obras-dashboard.css?v=824a88aa1459">
+<link rel="stylesheet" href="./formularios-central.css?v=16e900224868">
+<link rel="stylesheet" href="./formularios-modulos.css?v=8befba9462e3">
+<link rel="stylesheet" href="./formularios-complementares.css?v=d7ff7b5ea4a5">
 <link rel="stylesheet" href="./viagens-formulario.css?v=2edb33a48019">
 </head>
 <body>
@@ -1720,7 +1723,8 @@ function abrirModal(titulo,sub,montar,aoFechar,opcoes={}){
     if(f!==document.querySelector('#modais .fundo:last-child'))return;
     if(ev.key==='Escape'){ev.preventDefault();ev.stopImmediatePropagation();fechar();return}
     if(ev.key==='Tab'){
-      const itens=[...f.querySelectorAll('button,input,select,textarea,a[href],[tabindex="0"]')].filter(x=>!x.disabled&&x.getClientRects().length);
+      const recolhidos=[...f.querySelectorAll('details:not([open])')];
+      const itens=[...f.querySelectorAll('button,input,select,textarea,a[href],summary,[tabindex="0"]')].filter(x=>!x.disabled&&x.getClientRects().length&&!x.matches('[tabindex="-1"]')&&!recolhidos.some(d=>d.contains(x)&&![...d.children].find(n=>n.tagName==='SUMMARY')?.contains(x)));
       const primeiro=itens[0],ultimo=itens.at(-1);
       if(!primeiro){ev.preventDefault();f.querySelector('.modal').focus();return}
       if(ev.shiftKey&&(document.activeElement===primeiro||!itens.includes(document.activeElement))){ev.preventDefault();ultimo.focus()}
@@ -1771,6 +1775,22 @@ function opcoesSelect(opcoes,valor,preservarFora=true){
     .map(o=>`<option value="${esc(o.v)}"${o.v===v?' selected':''}>${esc(o.t)}</option>`).join('');
 }
 
+/* Agrupamento apenas visual: move os mesmos controles, preservando eventos,
+   referências, valores e a ordem das definições. Sem metadados, não altera a grade. */
+function agruparCamposFormulario(grade,defs,classeGrade='campos'){
+  if(!defs.some(d=>d.secaoFormulario))return;
+  const itens=[...grade.children];let anterior,conteudo;
+  grade.classList.add('formulario-grupos');
+  defs.forEach((d,i)=>{
+    const nome=d.secaoFormulario||'Outros dados';
+    if(nome!==anterior){
+      const grupo=el('<fieldset class="formulario-grupo"><legend></legend></fieldset>');
+      grupo.querySelector('legend').textContent=nome;
+      conteudo=el('<div></div>');conteudo.className=classeGrade;grupo.appendChild(conteudo);grade.appendChild(grupo);anterior=nome;
+    }
+    if(itens[i])conteudo.appendChild(itens[i]);
+  });
+}
 function campos(obj,defs,aoMudar){
   const c=el('<div class="campos"></div>');
   defs.forEach(d=>{
@@ -1812,6 +1832,7 @@ function campos(obj,defs,aoMudar){
     inp.id=uid();w.querySelector('label').htmlFor=inp.id;
     w.appendChild(inp);c.appendChild(w);
   });
+  agruparCamposFormulario(c,defs);
   return c;
 }
 
@@ -4692,16 +4713,18 @@ function proximosCompromissos(lista,data=hoje()){
 function modalCompromisso(a){
   abrirModal(esc(a.titulo||'Compromisso'),'Alterações salvas automaticamente nesta Central.',(c,fechar)=>{
     const sec=el('<div class="secao"></div>');
-    sec.appendChild(campos(a,[{k:'titulo',t:'O quê',full:true},{k:'data',t:'Data',tipo:'date'},
-      {k:'hora',t:'Hora',tipo:'time'},{k:'ate',t:'Último dia (opcional)',tipo:'date'},
-      {k:'local',t:'Onde'},{k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposCompromisso')},
-      {k:'obs',t:'Observações',tipo:'textarea',full:true}]));
+    sec.appendChild(campos(a,[{k:'titulo',t:'O quê',full:true,secaoFormulario:'Compromisso'},
+      {k:'local',t:'Onde',secaoFormulario:'Compromisso'},{k:'tipo',t:'Tipo',tipo:'select',opcoes:CFG('tiposCompromisso'),secaoFormulario:'Compromisso'},
+      {k:'data',t:'Data',tipo:'date',secaoFormulario:'Quando'},{k:'hora',t:'Hora',tipo:'time',secaoFormulario:'Quando'},
+      {k:'ate',t:'Último dia (opcional)',tipo:'date',secaoFormulario:'Quando'},
+      {k:'obs',t:'Observações',tipo:'textarea',full:true,secaoFormulario:'Observações'}]));
     if(a.googleId){
       sec.appendChild(el('<p class="aviso">Data, título e local acompanham o Google automaticamente. Observações e tipo são mantidos nesta Central; versões anteriores ficam no histórico.</p>'));
       if(a.googleDescricao)sec.appendChild(el('<details open><summary>Informações do Google</summary><div style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(a.googleDescricao)+'</div></details>'));
       if(a.googleLink)sec.appendChild(el('<a class="btn ghost" target="_blank" rel="noopener" href="'+esc(urlSegura(a.googleLink))+'">Abrir no Google Agenda ↗</a>'));
     }
-    const pronto=el('<button class="btn">Pronto</button>');pronto.onclick=fechar;sec.appendChild(pronto);c.appendChild(sec);
+    const pronto=el('<button class="btn">Pronto</button>');pronto.onclick=fechar;c.appendChild(sec);
+    const rodape=el('<div class="secao modal-acoes"></div>');rodape.appendChild(pronto);c.appendChild(rodape);
   });
 }
 
@@ -5205,16 +5228,16 @@ function vDemandas(m){
 }
 function modalDemanda(d){
   abrirModal(esc(d.titulo||'Nova demanda'),esc(d.area||''),(c,fechar)=>{
-    const s1=el('<div class="secao"><h4>Dados</h4></div>');
+    const s1=el('<div class="secao"></div>');
     s1.appendChild(campos(d,[
-      {k:'titulo',t:'Demanda',full:true},
-      {k:'area',t:'Área',tipo:'select',opcoes:CFG('areasDemanda')},
-      {k:'criada',t:'Aberta em',tipo:'date'},
-      {k:'prioridade',t:'Prioridade',tipo:'select',opcoes:['Alta','Média','Baixa']},
-      {k:'prazo',t:'Prazo para concluir',tipo:'date'},
-      {k:'status',t:'Status',tipo:'select',opcoes:['Aberta','Fazendo','Parada','Concluída']},
-      {k:'concluidoEm',t:'Concluída em',tipo:'date'},
-      {k:'obs',t:'Próximo passo / notas',tipo:'textarea',full:true},
+      {k:'titulo',t:'Demanda',full:true,secaoFormulario:'O que precisa ser feito'},
+      {k:'area',t:'Área',tipo:'select',opcoes:CFG('areasDemanda'),secaoFormulario:'O que precisa ser feito'},
+      {k:'prioridade',t:'Prioridade',tipo:'select',opcoes:['Alta','Média','Baixa'],secaoFormulario:'O que precisa ser feito'},
+      {k:'criada',t:'Aberta em',tipo:'date',secaoFormulario:'Acompanhamento'},
+      {k:'prazo',t:'Prazo para concluir',tipo:'date',secaoFormulario:'Acompanhamento'},
+      {k:'status',t:'Status',tipo:'select',opcoes:['Aberta','Fazendo','Parada','Concluída'],secaoFormulario:'Acompanhamento'},
+      {k:'concluidoEm',t:'Concluída em',tipo:'date',secaoFormulario:'Acompanhamento'},
+      {k:'obs',t:'Próximo passo / notas',tipo:'textarea',full:true,secaoFormulario:'Próximo passo'},
     ]));
     if(diasDemanda(d).dias!==null){const dd=diasDemanda(d);
       s1.appendChild(el('<div style="padding-top:9px;font-size:12.5px;color:var(--suave)">'+
@@ -11654,6 +11677,7 @@ function financeiroFormulario(c,defs,obj,gravar,fechar){
     if(d.sugestoes?.length){const dl=el('<datalist></datalist>');dl.id=uid();d.sugestoes.forEach(v=>{const o=el('<option></option>');o.value=v;dl.appendChild(o)});inp.setAttribute('list',dl.id);wrap.appendChild(dl)}
     if(d.ajuda){const nota=el('<small></small>');nota.textContent=d.ajuda;wrap.appendChild(nota)}form.querySelector('.ff-fields').appendChild(wrap);
   }
+  agruparCamposFormulario(form.querySelector('.ff-fields'),defs,'ff-fields');
   form.querySelector('button[type=button]').onclick=fechar;
   form.onsubmit=ev=>{ev.preventDefault();const erro=form.querySelector('[role=alert]');try{
     const valores={},patch={};for(const d of defs){let v=String(controles[d.k].value??'').trim();if(d.req&&!v)throw new Error('Preencha '+d.t.toLowerCase()+'.');
@@ -13243,16 +13267,16 @@ function modalLancamentoGasto(g,novo=false){
   const empresaAnterior=g.empresa,empresaNomeAnterior=g.empresaNome;
   if(novo)g._ffNovo=true;
   abrirModal(esc(g.oque||'Novo gasto'),'Este lançamento entra nos totais depois de salvar.',(c,fechar)=>{
-    const camposGasto=financeiroFormulario(c,[{k:'oque',t:'Descrição',full:true,req:true,ph:'Ex.: Copasa, Cemig, escola, compras pessoais'},
-      {k:'valor',t:'Valor (R$)',tipo:'moeda',req:true,naoZero:true,ajuda:'Use valor negativo somente para estorno.'},
-      {k:'mes',t:'Mês do gasto',tipo:'month',req:true},{k:'classe',t:'Categoria',opcoes:['Sem categoria',...categoriasGasto()],inicial:g.classe||g.categoria||'Sem categoria',req:true},
-      {k:'empresaId',t:'Empresa (opcional)',opcoes:['','__sem_empresa__',...(E.empresasPJ||[]).filter(e=>e.id).map(e=>String(e.id))],ajuda:'Use a empresa do cadastro existente. Vazio mantém o gasto sem vínculo empresarial.'},
-      {k:'pago',t:'Forma de pagamento',opcoes:['',...CFG('formasPagto')]},
-      {k:'data',t:'Data da despesa',tipo:'date'},{k:'vencimento',t:'Vencimento',tipo:'date'},
-      {k:'situacao',t:'Pagamento',opcoes:['Não informado','Pendente','Pago'],inicial:g.situacao||'Não informado'},
-      {k:'pagoEm',t:'Data do pagamento',tipo:'date'},
-      {k:'natureza',t:'Natureza',opcoes:['Despesa pessoal','Estorno'],inicial:(+g.valor<0?'Estorno':'Despesa pessoal')},
-      {k:'obs',t:'Observações',tipo:'textarea',full:true}],
+    const camposGasto=financeiroFormulario(c,[{k:'oque',t:'Descrição',full:true,req:true,ph:'Ex.: Copasa, Cemig, escola, compras pessoais',secaoFormulario:'Dados da despesa'},
+      {k:'valor',t:'Valor (R$)',tipo:'moeda',req:true,naoZero:true,ajuda:'Use valor negativo somente para estorno.',secaoFormulario:'Dados da despesa'},
+      {k:'mes',t:'Mês do gasto',tipo:'month',req:true,secaoFormulario:'Dados da despesa'},{k:'classe',t:'Categoria',opcoes:['Sem categoria',...categoriasGasto()],inicial:g.classe||g.categoria||'Sem categoria',req:true,secaoFormulario:'Dados da despesa'},
+      {k:'empresaId',t:'Empresa (opcional)',opcoes:['','__sem_empresa__',...(E.empresasPJ||[]).filter(e=>e.id).map(e=>String(e.id))],ajuda:'Use a empresa do cadastro existente. Vazio mantém o gasto sem vínculo empresarial.',secaoFormulario:'Dados da despesa'},
+      {k:'pago',t:'Forma de pagamento',opcoes:['',...CFG('formasPagto')],secaoFormulario:'Pagamento'},
+      {k:'data',t:'Data da despesa',tipo:'date',secaoFormulario:'Pagamento'},{k:'vencimento',t:'Vencimento',tipo:'date',secaoFormulario:'Pagamento'},
+      {k:'situacao',t:'Pagamento',opcoes:['Não informado','Pendente','Pago'],inicial:g.situacao||'Não informado',secaoFormulario:'Pagamento'},
+      {k:'pagoEm',t:'Data do pagamento',tipo:'date',secaoFormulario:'Pagamento'},
+      {k:'natureza',t:'Natureza',opcoes:['Despesa pessoal','Estorno'],inicial:(+g.valor<0?'Estorno':'Despesa pessoal'),secaoFormulario:'Pagamento'},
+      {k:'obs',t:'Observações',tipo:'textarea',full:true,secaoFormulario:'Observações'}],
       g,(v,patch)=>{financeiroValidarGasto(v);if(Object.hasOwn(patch,'empresaId')){if(v.empresaId==='__sem_empresa__')patch.empresaId=v.empresaId='';const empresa=(E.empresasPJ||[]).find(e=>String(e.id)===v.empresaId);if(v.empresaId&&!empresa)throw Error('A empresa não está mais no cadastro. Confira o vínculo.');if(g.empresa!==empresaAnterior||g.empresaNome!==empresaNomeAnterior)throw Error('O vínculo mudou em outra sessão. Reabra a ficha.');patch.empresa=v.empresa=empresa?.nome||'';if(g.empresaNome!==undefined)patch.empresaNome=v.empresaNome=empresa?.nome||'';}financeiroSalvarRegistro(E.gastos,g,v,patch)},fechar);
     if(gastoVinculado(g)){
       for(const nome of ['valor','mes','data','vencimento','situacao','pagoEm','empresaId','natureza'])camposGasto.controles[nome].disabled=true;
@@ -15924,13 +15948,13 @@ function modalDoc(d){
   filtro.docAba='documentos';
   abrirModal(esc(d.nome||'Novo documento'),esc(d.dono||''),(c,fechar)=>{
     const preenchimento=el('<section class="documento-preenchimento-editor" aria-label="Preenchimento do cadastro"></section>');c.appendChild(preenchimento);
-    const s1=el('<div class="secao"><h4>Dados</h4></div>');
+    const s1=el('<div class="secao"></div>');
     const defsDoc=[
-      {k:'nome',t:'Documento',ph:'Nome ou tipo do documento',full:true},
-      {k:'dono',t:'De quem',ph:'Léo, esposa, filho…'},
-      {k:'numero',t:'Número / referência',ph:'Número ou referência que identifique o documento'},{k:'validade',t:'Válido até',tipo:'date'},
-      {k:'onde',t:'Onde está o original',ph:'Ex.: cofre, gaveta ou pasta digital'},
-      {k:'obs',t:'Observações',tipo:'textarea',full:true},
+      {k:'nome',t:'Documento',ph:'Nome ou tipo do documento',full:true,secaoFormulario:'Identificação'},
+      {k:'dono',t:'De quem',ph:'Léo, esposa, filho…',secaoFormulario:'Identificação'},
+      {k:'numero',t:'Número / referência',ph:'Número ou referência que identifique o documento',secaoFormulario:'Identificação'},{k:'validade',t:'Válido até',tipo:'date',secaoFormulario:'Validade e localização'},
+      {k:'onde',t:'Onde está o original',ph:'Ex.: cofre, gaveta ou pasta digital',secaoFormulario:'Validade e localização'},
+      {k:'obs',t:'Observações',tipo:'textarea',full:true,secaoFormulario:'Validade e localização'},
     ];
     const dados=campos(d,defsDoc);s1.appendChild(dados);
     const controles=[...dados.querySelectorAll('input,textarea')];controles.forEach((input,i)=>{input.name=defsDoc[i].k});
@@ -16552,13 +16576,13 @@ function novaPessoa(){abrirModal('Nova pessoa','Quem você quer manter por perto
 function novaMeta(){abrirModal('Nova meta','Defina uma conquista e o primeiro passo para chegar lá.',(c,fechar)=>{const b=el('<div class="secao planos-entry"></div>');devFormulario(b,[{k:'meta',t:'O que quero conquistar',req:true,full:true},{k:'area',t:'Área',opcoes:CFG('areasMeta')},{k:'horizonte',t:'Horizonte',opcoes:CFG('horizonteMeta')},{k:'prazo',t:'Até quando',tipo:'date'},{k:'primeiroPasso',t:'Primeiro passo concreto',full:true}],{},'Criar meta',v=>{const {primeiroPasso,...dados}=v;const x={id:uid(),...dados,status:'Aberta',obs:'',passos:primeiroPasso?[{id:uid(),texto:primeiroPasso,feito:false}]:[]};E.metas.push(x);salvar();fechar();modalMeta(x)});c.appendChild(b)},rr('guia'))}
 function modalPessoa(p) {
   abrirModal(esc(p.nome || 'Nova pessoa'), esc(p.relacao || ''), (c, fechar) => {
-    const s1 = el('<div class="secao"><h4>Dados</h4></div>');
+    const s1 = el('<div class="secao"></div>');
     s1.appendChild(campos(p, [
-      { k: 'nome', t: 'Nome', full: true },
-      { k: 'relacao', t: 'Quem é', tipo: 'select', opcoes: CFG('relacoes') },
-      { k: 'nascimento', t: 'Nascimento', tipo: 'date' },
-      { k: 'gosta', t: 'O que gosta', full: true, ph: 'ajuda na hora do presente' },
-      { k: 'obs', t: 'Observações', tipo: 'textarea', full: true },
+      { k: 'nome', t: 'Nome', full: true, secaoFormulario: 'Identificação' },
+      { k: 'relacao', t: 'Quem é', tipo: 'select', opcoes: CFG('relacoes'), secaoFormulario: 'Identificação' },
+      { k: 'nascimento', t: 'Nascimento', tipo: 'date', secaoFormulario: 'Identificação' },
+      { k: 'gosta', t: 'O que gosta', full: true, ph: 'ajuda na hora do presente', secaoFormulario: 'Preferências e notas' },
+      { k: 'obs', t: 'Observações', tipo: 'textarea', full: true, secaoFormulario: 'Preferências e notas' },
     ]));
     c.appendChild(s1);
     const s2 = el('<div class="secao"><h4>Documentos e fotos</h4></div>');

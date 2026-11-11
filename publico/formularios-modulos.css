@@ -1,0 +1,101 @@
+/* Mesmo acabamento da ficha de viagem nos editores especializados.
+   As grades, estados, alturas de textos e ações continuam nos módulos de origem. */
+:is(.holding-form,.hcar-editor,.sui-form,.rotina-form,.compra-saude-form,.fmd-form,.fmim-editor,.fmc-editor,.fmdoc-editor,.fmkt-editor [data-admin-form]){
+ --formulario-foco:var(--marca,var(--fm-foco,var(--sui-marca,var(--mkt-acento,#0a7f84))));
+ --formulario-linha:var(--controle,var(--holding-linha,var(--linha,#dce2e3)));
+ --formulario-papel:var(--holding-papel,var(--card,#fff));
+ min-width:0;
+}
+:is(.holding-form,.hcar-editor){--formulario-foco:var(--marca,var(--holding-dourado,#b09c62))}
+.fmd-form{--formulario-foco:var(--marca,var(--fmd-azul,#345f94))}
+.fmkt-editor [data-admin-form]{--formulario-foco:var(--marca,var(--mkt-acento,#6250cf))}
+
+/* Só grades de campos: linhas de materiais, horários, dias e tabelas mantêm sua composição. */
+.holding-inline .holding-form,.hcar-editor,.sui-form .sui-form-grid,
+.rotina-form .rotina-form-campos,.compra-saude-form,.fmd-form .fmd-form-grid,
+.fmim-editor .fmim-grade,.fmc-editor .fmc-grade,.fmdoc-editor .fmdoc-editor-grade,
+.fmkt-editor [data-admin-form] .fmkt-admin-grid{gap:12px 16px}
+.holding-form{gap:12px;padding:16px}
+.holding-inline .holding-form{padding:14px}
+.hcar-editor{padding:14px;border-radius:12px}
+:is(.fmim-editor,.fmc-editor,.fmdoc-editor){border-radius:12px}
+
+.holding-form .holding-campo,.hcar-editor .hcar-campo,
+.sui-form label:not(.sui-check),.rotina-form label:not(.trat-campo-check):not(.trat-dia-chip),
+.compra-saude-form>label,.fmd-form .fmd-campo,.fmim-editor .fmim-campo,
+.fmc-editor .fmc-campo,.fmdoc-editor .fmdoc-campo,.fmkt-editor [data-admin-form] label{
+ min-width:0;gap:5px;font-size:12px;font-weight:500;line-height:1.4;
+}
+.fmd-form .fmd-editor-principal>.fmd-campo>span,
+.fmc-editor .fmc-campo>span,.fmdoc-editor .fmdoc-campo>span{font-weight:500}
+
+/* Checkbox/radio/file/range/color e campos ocultos não participam deste acabamento.
+   Não impõe largura: os horários e controles de linhas têm tamanhos próprios. */
+:is(.holding-form,.hcar-editor,.sui-form,.rotina-form,.compra-saude-form,.fmd-form,.fmim-editor,.fmc-editor,.fmdoc-editor,.fmkt-editor [data-admin-form])
+:is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=color]):not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]):not([type=image]),select,textarea):not([hidden]){
+ box-sizing:border-box;min-width:0;max-width:100%;padding:10px 12px;
+ border-radius:10px;font-family:inherit;font-size:14px;line-height:1.4;font-weight:400;
+}
+:is(.holding-form,.hcar-editor,.sui-form,.rotina-form,.compra-saude-form,.fmd-form,.fmim-editor,.fmc-editor,.fmdoc-editor,.fmkt-editor [data-admin-form])
+:is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=color]):not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]):not([type=image]),select):not([hidden]){min-height:44px}
+
+/* Aparência dos estados readonly, disabled e inválido continua com o módulo. */
+:is(.holding-form,.hcar-editor,.sui-form,.rotina-form,.compra-saude-form,.fmd-form,.fmim-editor,.fmc-editor,.fmdoc-editor,.fmkt-editor [data-admin-form])
+:is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=color]):not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]):not([type=image]),select,textarea):not([hidden]):not([readonly]):not(:disabled):not([aria-invalid=true]){
+ border:1px solid var(--formulario-linha);background:var(--formulario-papel);
+ color:var(--holding-ink,var(--tinta,inherit));box-shadow:0 1px 2px #20211f03;
+ transition:border-color .12s,box-shadow .12s;
+}
+:is(.holding-form,.hcar-editor,.sui-form,.rotina-form,.compra-saude-form,.fmd-form,.fmim-editor,.fmc-editor,.fmdoc-editor,.fmkt-editor [data-admin-form])
+:is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=color]):not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]):not([type=image]),select,textarea):not([hidden]):not([aria-invalid=true]):focus{
+ outline:2px solid var(--formulario-foco);outline-offset:2px;
+ border-color:var(--formulario-foco);box-shadow:none;
+}
+
+/* O mínimo só complementa textos sem altura própria; não fixa altura nem limita rows. */
+.sui-form textarea,.fmkt-editor [data-admin-form] textarea{min-height:72px;resize:vertical}
+.rotina-form .trat-campo-longo textarea{min-height:90px}
+.fmkt-editor [data-admin-form] select{width:100%}
+@media(min-width:701px){
+ .rotina-form.trat-programar .trat-orientacao textarea:not([hidden]){min-height:72px}
+}
+
+.holding-form .holding-form-cab :is(h2,h3),.hcar-editor>h4,
+.fmim-editor>h4,.fmc-editor>h4,.fmdoc-editor>h4{font-size:16px;line-height:1.35;font-weight:650}
+.holding-form .holding-form-acoes,.hcar-editor .hcar-editor-acoes,
+.sui-form>footer,.rotina-form>.rotina-form-acoes,
+.compra-saude-form>.trat-actions,.fmim-editor>.fmim-acoes,
+.fmc-editor>.fmc-acoes,.fmdoc-editor>.fmdoc-acoes,
+.fmkt-editor [data-admin-form]>.fmkt-acoes{
+ gap:10px;align-items:center;flex-wrap:wrap;
+ padding-top:12px;border-top:1px solid var(--holding-linha,var(--linha,#dce2e3));
+}
+.fmd-form>.fmd-editor-acoes{gap:10px;padding-block:12px;flex-wrap:wrap}
+.holding-form .holding-form-acoes>button,.hcar-editor .hcar-editor-acoes>button,
+.sui-form>footer>button,.rotina-form>.rotina-form-acoes>button,
+.compra-saude-form>.trat-actions>button,.fmd-form>.fmd-editor-acoes>button,
+.fmim-editor>.fmim-acoes>button,.fmc-editor>.fmc-acoes>button,
+.fmdoc-editor>.fmdoc-acoes>button,.fmkt-editor [data-admin-form]>.fmkt-acoes>button{
+ min-height:44px;font-family:inherit;white-space:normal;overflow-wrap:anywhere;
+}
+.sui-form .sui-form-extras>summary,.rotina-form .trat-form-extras>summary{
+ min-height:32px;padding-block:6px;font-size:12px;font-weight:600;
+}
+
+@media(max-width:700px){
+ :is(.holding-form,.hcar-editor,.sui-form,.rotina-form,.compra-saude-form,.fmd-form,.fmim-editor,.fmc-editor,.fmdoc-editor,.fmkt-editor [data-admin-form])
+ :is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=color]):not([type=hidden]):not([type=button]):not([type=submit]):not([type=reset]):not([type=image]),select,textarea):not([hidden]){font-size:16px}
+ .holding-form .holding-campo,.hcar-editor .hcar-campo,
+ .sui-form label:not(.sui-check),.rotina-form label:not(.trat-campo-check):not(.trat-dia-chip),
+ .compra-saude-form>label,.fmd-form .fmd-campo,.fmim-editor .fmim-campo,
+ .fmc-editor .fmc-campo,.fmdoc-editor .fmdoc-campo,.fmkt-editor [data-admin-form] label{font-size:13px}
+ .holding-inline .holding-form,.hcar-editor{padding:12px}
+ .holding-inline .holding-form,.hcar-editor,.sui-form .sui-form-grid,
+ .rotina-form .rotina-form-campos,.compra-saude-form,.fmd-form .fmd-form-grid,
+ .fmim-editor .fmim-grade,.fmc-editor .fmc-grade,.fmdoc-editor .fmdoc-editor-grade,
+ .fmkt-editor [data-admin-form] .fmkt-admin-grid{gap:12px}
+}
+@media(prefers-reduced-motion:reduce){
+ :is(.holding-form,.hcar-editor,.sui-form,.rotina-form,.compra-saude-form,.fmd-form,.fmim-editor,.fmc-editor,.fmdoc-editor,.fmkt-editor [data-admin-form])
+ :is(input,select,textarea){transition:none}
+}

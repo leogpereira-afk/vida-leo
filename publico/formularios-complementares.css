@@ -1,0 +1,93 @@
+/* Complementos do padrão de Viagens para editores que não usam .campos.
+   Escopo explícito: não alcança filtros, tabelas, arquivos ou controles ocultos. */
+:is(.editor-lista-mobile,.db-memoria-form,[data-donboy-teste],.db-email-item,.docpf-adicionar,.docpf-remover,.annual-form,.aviao-import,.aviao-recorrencia,.dev-rating) :is(input:not([type=checkbox],[type=radio],[type=file],[type=color],[type=hidden],[hidden]),select:not([hidden]),textarea:not([hidden])),
+[data-bid="cf-marcas"] input.bNome:not([hidden]),
+.modal .passo .tx input[type=text]:not([hidden]),
+.modal .secao>textarea.inp:not([hidden]){
+ box-sizing:border-box;min-width:0;max-width:100%;min-height:44px;padding:10px 12px;
+ border:1px solid var(--controle,var(--linha));border-radius:10px;
+ background:var(--card);color:var(--tinta);font-family:inherit;font-size:14px;line-height:1.4;
+ box-shadow:0 1px 2px #20211f03;transition:border-color .12s,box-shadow .12s;
+}
+:is(.editor-lista-mobile,.db-memoria-form,[data-donboy-teste],.db-email-item,.docpf-adicionar,.docpf-remover,.annual-form,.aviao-import,.aviao-recorrencia,.dev-rating) :is(input:not([type=checkbox],[type=radio],[type=file],[type=color],[type=hidden],[hidden]),select:not([hidden]),textarea:not([hidden])):focus,
+[data-bid="cf-marcas"] input.bNome:focus,
+.modal .passo .tx input[type=text]:focus,
+.modal .secao>textarea.inp:focus{
+ outline:2px solid var(--marca);outline-offset:2px;border-color:var(--marca);box-shadow:none;
+}
+:is(.editor-lista-mobile,.db-memoria-form,[data-donboy-teste],.db-email-item,.docpf-adicionar,.docpf-remover,.annual-form,.aviao-import,.aviao-recorrencia,.dev-rating) :is(input:not([type=checkbox],[type=radio],[type=file],[type=color],[type=hidden],[hidden]),select:not([hidden]),textarea:not([hidden]))[aria-invalid=true]{border-color:var(--vermelho)}
+:is(.db-memoria-form,[data-donboy-teste],.db-email-item,.docpf-adicionar,.docpf-remover,.annual-form,.aviao-import,.aviao-recorrencia) label{
+ font-size:12px;font-weight:500;line-height:1.45;
+}
+:is(.db-memoria-form,[data-donboy-teste],.db-email-item,.docpf-adicionar,.docpf-remover,.annual-form,.aviao-import,.aviao-recorrencia) :is(input:not([type=checkbox],[type=radio],[type=file],[type=color],[type=hidden],[hidden]),select:not([hidden]),textarea:not([hidden])):disabled{
+ opacity:.65;cursor:not-allowed;
+}
+
+/* Listas e nomes de marcas continuam sendo edições rápidas, na própria página. */
+.editor-lista-mobile>form{gap:12px!important;align-items:center}
+.editor-lista-mobile>form>input[type=text]{border-radius:10px!important;padding:10px 12px!important;background:var(--card)!important}
+.editor-lista-mobile>form>.btn{min-height:44px}
+[data-bid="cf-marcas"] input.bNome{padding:10px 12px!important;border-radius:10px!important}
+
+/* Mantém a área de upload, as etapas e os estados de envio do Don Boy. */
+.db-memoria-form{gap:12px 16px}
+.db-memoria-form label{margin-bottom:5px}
+.db-memoria-campos{gap:12px;min-width:0}
+.db-memoria-form>div{min-width:0}
+.db-memoria-form .db-memoria-link textarea,.db-teste [data-donboy-teste]>textarea{display:block;width:100%;min-height:90px;resize:vertical}
+[data-donboy-teste]>label{display:block;margin-bottom:5px}
+.db-email-item>label,.db-email-data>label{display:grid;gap:5px;margin:12px 0}
+.db-email-data{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.db-email-data>label{min-width:0}
+.db-email-item .db-teste-acoes{display:flex;flex-wrap:wrap;gap:12px}
+:is(.db-memoria-enviar,[data-donboy-teste] .db-teste-acoes,.db-email-item .db-teste-acoes)>.btn{min-height:44px}
+
+/* Gerenciador de titulares e definição do ano, sem alterar seus fluxos. */
+.docpf-adicionar>label{margin-bottom:5px}
+.docpf-adicionar>div,.docpf-acoes{gap:12px}
+.docpf-remover>label,.annual-form>label{display:grid;gap:5px}
+.docpf-adicionar .btn,.docpf-acoes .btn{min-height:44px}
+.annual-form{gap:12px}
+.annual-form>label>input{width:100%}
+
+/* A colagem conserva espaço para várias linhas, sem a altura das notas comuns. */
+.aviao-import{padding:12px 0}
+.aviao-import>label{margin:12px 0 0}
+.aviao-import>label:first-child{margin-top:0}
+.aviao-import label>:is(input,textarea){margin-top:5px}
+.aviao-import.aviao-colagem textarea{min-height:140px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.aviao-recorrencia{gap:12px 16px}
+.aviao-recorrencia>label{flex:1 1 180px;min-width:0;gap:5px}
+.aviao-recorrencia>label>:is(input,select){width:100%}
+
+/* Notas e passos mantêm seus controles de conclusão e sua ordem original. */
+.dev-rating-grid{column-gap:16px}
+.dev-rating{gap:12px;font-size:12px;font-weight:500}
+.dev-rating-grid .dev-rating>select{flex:0 0 132px;width:132px;max-width:50%}
+.modal .passo .tx{min-width:0}
+.modal .passo .tx input[type=text]{width:100%}
+.modal .secao>textarea.inp{min-height:90px;resize:vertical}
+
+@media(max-width:600px){
+ :is(.editor-lista-mobile,.db-memoria-form,[data-donboy-teste],.db-email-item,.docpf-adicionar,.docpf-remover,.annual-form,.aviao-import,.aviao-recorrencia,.dev-rating) :is(input:not([type=checkbox],[type=radio],[type=file],[type=color],[type=hidden],[hidden]),select:not([hidden]),textarea:not([hidden])),
+ [data-bid="cf-marcas"] input.bNome,
+ .modal .passo .tx input[type=text]:not([hidden]),
+ .modal .secao>textarea.inp:not([hidden]){font-size:16px}
+ [data-bid="cf-marcas"] input.bNome{font-size:16px!important}
+ .editor-lista-mobile>form>input[type=text]{min-width:0!important;flex:1 1 150px}
+ .db-memoria-form,.db-email-data{grid-template-columns:minmax(0,1fr);gap:12px}
+ .db-email-data>label:last-child{grid-column:auto}
+ .db-email-data>label{margin:0}
+ .db-email-item .db-teste-acoes>.btn{flex:1 1 180px}
+ .docpf-adicionar>div{flex-direction:column;align-items:stretch}
+ .docpf-adicionar>div>input{width:100%}
+ .docpf-acoes>.btn{flex:1 1 140px}
+ .aviao-recorrencia>label{flex-basis:100%}
+ .aviao-import label>input{max-width:100%}
+}
+@media(prefers-reduced-motion:reduce){
+ :is(.editor-lista-mobile,.db-memoria-form,[data-donboy-teste],.db-email-item,.docpf-adicionar,.docpf-remover,.annual-form,.aviao-import,.aviao-recorrencia,.dev-rating) :is(input,select,textarea),
+ [data-bid="cf-marcas"] input.bNome,
+ .modal .passo .tx input[type=text],
+ .modal .secao>textarea.inp{transition:none}
+}
