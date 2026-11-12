@@ -90,3 +90,13 @@
 .lista-nova input{width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border:1px solid var(--controle,var(--linha));border-radius:10px;background:var(--card);color:var(--tinta);font:inherit}
 .lista-nova>[role=alert]{color:var(--vermelho);font-size:13px}
 @media(max-width:600px){.lista-opcoes>button{min-height:44px}.lista-nova input{font-size:16px}.lista-campo{grid-column:1/-1}}
+.aviso-opcao-sync{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:2000;display:flex;align-items:center;gap:12px;width:max-content;max-width:min(620px,calc(100vw - 32px));box-sizing:border-box;padding:12px 16px;background:var(--card);color:var(--tinta);border:1px solid var(--linha);border-left:4px solid var(--marca);border-radius:12px;box-shadow:0 8px 28px #0003;font-size:13px;line-height:1.5}
+.aviso-opcao-sync[hidden],.aviso-opcao-sync [hidden]{display:none!important}
+.aviso-opcao-sync[data-estado=erro]{border-left-color:var(--vermelho)}
+.aviso-opcao-sync[data-estado=sucesso]{border-left-color:var(--verde,var(--marca))}
+.lista-opcoes small[data-estado=erro]{color:var(--vermelho)}
+.aviso-opcao-sync>.btn{white-space:normal;min-height:44px;flex-shrink:0;font-family:inherit}
+.aviso-opcao-sync>.fechar{flex-shrink:0;width:44px;height:44px}
+@media(max-width:600px){.aviso-opcao-sync{bottom:max(12px,env(safe-area-inset-bottom));flex-wrap:wrap;gap:8px}.aviso-opcao-sync>span{flex:1 1 calc(100% - 60px)}.aviso-opcao-sync>.fechar{position:absolute;right:8px;top:8px}.aviso-opcao-sync>span{padding-right:40px}.aviso-opcao-sync>.btn{width:100%}}
+/* Mantém Salvar e Cancelar acessíveis enquanto o aviso estiver visível. */
+body:has(#modais .fundo) .aviso-opcao-sync{bottom:max(84px,calc(env(safe-area-inset-bottom) + 76px))}

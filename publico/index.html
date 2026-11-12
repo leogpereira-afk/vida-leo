@@ -697,7 +697,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./fortemais-compras.css?v=41f54a3f0db6">
 <link rel="stylesheet" href="./fortemais-imovel.css?v=b73c7dc3db60">
 <link rel="stylesheet" href="./fortemais-obras-dashboard.css?v=824a88aa1459">
-<link rel="stylesheet" href="./formularios-central.css?v=b109c094ad80">
+<link rel="stylesheet" href="./formularios-central.css?v=dbd635ee05be">
 <link rel="stylesheet" href="./formularios-modulos.css?v=8befba9462e3">
 <link rel="stylesheet" href="./formularios-complementares.css?v=d7ff7b5ea4a5">
 <link rel="stylesheet" href="./viagens-formulario.css?v=2edb33a48019">
@@ -1792,6 +1792,41 @@ function agruparCamposFormulario(grade,defs,classeGrade='campos'){
   });
 }
 /* As opções pertencem à configuração sincronizada; registros nunca são apagados aqui. */
+let avisoOpcaoSync=null;
+function mostrarAvisoOpcao(texto,estado,tentar=false){
+  let box=document.getElementById('aviso-opcao-sync');
+  if(!box){
+    box=el('<aside id="aviso-opcao-sync" class="aviso-opcao-sync"><span role="status" aria-live="polite" aria-atomic="true"></span><button type="button" class="btn ghost" hidden>Tentar sincronizar</button><button type="button" class="fechar" aria-label="Fechar aviso">×</button></aside>');
+    box.querySelector('.btn').onclick=()=>sincronizarAgora();
+    box.querySelector('.fechar').onclick=()=>{box.hidden=true};document.body.appendChild(box);
+  }
+  if(box.querySelector('span').textContent!==texto)box.hidden=false;
+  box.dataset.estado=estado;box.querySelector('span').textContent=texto;box.querySelector('.btn').hidden=!tentar;
+  if(avisoOpcaoSync)document.querySelectorAll('select[data-lista-config]').forEach(select=>{
+    if(select.dataset.listaConfig!==avisoOpcaoSync.chave)return;
+    const status=select.closest('.campo,.ff-field,.lista-campo')?.querySelector('.lista-opcoes small');
+    if(status){status.textContent=texto;status.dataset.estado=estado;const repetir=status.parentElement.querySelector('[data-repetir-sync]');if(repetir)repetir.hidden=!tentar}
+  });
+}
+function registrarAvisoOpcao(chave,remocao=false){
+  avisoOpcaoSync={chave,esperado:JSON.stringify(CFG(chave)),remocao};
+  atualizarAvisoOpcao('alterações pendentes');
+}
+function atualizarAvisoOpcao(situacao){
+  if(!avisoOpcaoSync)return;
+  const a=avisoOpcaoSync;let confirmado=false;
+  try{confirmado=!!_tabConteudo&&JSON.stringify(JSON.parse(_tabConteudo).config?.[a.chave])===a.esperado&&JSON.stringify(CFG(a.chave))===a.esperado}catch(_){}
+  if(confirmado){mostrarAvisoOpcao(a.remocao?'Opção removida e sincronizada. Registros anteriores preservados.':'Opção salva e sincronizada. Disponível nos outros aparelhos ao sincronizar.','sucesso');return}
+  if(situacao==='atualizado de outro acesso'){
+    mostrarAvisoOpcao('Outro acesso atualizou a lista. Não foi possível confirmar esta alteração; confira a opção antes de adicioná-la novamente.','erro');return;
+  }
+  if(/sem conexão|não concluída|indisponível|cheio|conferência|tente sincronizar|recarregue/.test(situacao)){
+    mostrarAvisoOpcao('Opção salva neste aparelho, mas a sincronização não foi confirmada. '+situacao+'.','erro',true);return;
+  }
+  if(!pegaToken()&&!DEV){mostrarAvisoOpcao('Opção salva neste aparelho. Entre novamente na Central para sincronizar.','erro');return}
+  mostrarAvisoOpcao(situacao==='enviando…'?'Sincronizando a opção…':'Opção salva neste aparelho. Aguardando sincronização.','pendente');
+}
+
 function marcarListaConfiguravel(select,opcoes,chave){
   if(select.tagName!=='SELECT')return;
   const k=chave||Object.keys(SEED.config).find(k=>CFG(k)===opcoes);
@@ -1817,7 +1852,8 @@ function prepararListasConfiguraveis(raiz){
       wrap.style.cssText=label.style.cssText;wrap.className+=' '+label.className;
       label.replaceWith(wrap);wrap.appendChild(label);alvo=wrap;
     }
-    const acoes=el('<div class="lista-opcoes"><button type="button">+ Adicionar opção</button><button type="button">− Remover opção</button><small role="status" aria-live="polite"></small></div>');
+    const acoes=el('<div class="lista-opcoes"><button type="button">+ Adicionar opção</button><button type="button">− Remover opção</button><small role="status" aria-live="polite"></small><button type="button" data-repetir-sync hidden>Tentar sincronizar</button></div>');
+    acoes.querySelector('[data-repetir-sync]').onclick=()=>sincronizarAgora();
     const [mais,menos]=acoes.querySelectorAll('button'),status=acoes.querySelector('small');
     const nome=select.getAttribute('aria-label')||select.labels?.[0]?.textContent.trim()||chave;
     mais.setAttribute('aria-label','Adicionar opção em '+nome);menos.setAttribute('aria-label','Remover opção de '+nome);
@@ -1830,9 +1866,9 @@ function prepararListasConfiguraveis(raiz){
           const lista=CFG(chave),existente=lista.find(x=>x.toLocaleLowerCase('pt-BR')===valor.toLocaleLowerCase('pt-BR'));
           const anterior=E.config[chave];
           try{if(!existente){E.config[chave]=[...lista,valor];salvar()}}
-          catch(err){E.config[chave]=anterior;form.querySelector('[role=alert]').textContent='Não foi possível guardar a opção. Tente novamente.';return}
+          catch(err){E.config[chave]=anterior;avisoOpcaoSync=null;form.querySelector('[role=alert]').textContent='Não foi possível guardar a opção. Tente novamente.';mostrarAvisoOpcao('Não foi possível salvar a opção neste aparelho. Confira o armazenamento e tente novamente.','erro');return}
           atualizarListasConfiguraveis(chave);select.value=existente||valor;
-          select.dispatchEvent(new Event('change',{bubbles:true}));fechar();select.focus();
+          select.dispatchEvent(new Event('change',{bubbles:true}));fechar();select.focus();registrarAvisoOpcao(chave);
         };c.appendChild(form);
       },null,{recarregar:false});
     };
@@ -1842,8 +1878,8 @@ function prepararListasConfiguraveis(raiz){
       if(!confirm('Remover “'+valor+'” das opções? Os registros já cadastrados manterão esse valor.'))return;
       const anterior=E.config[chave];
       try{E.config[chave]=CFG(chave).filter(x=>x!==valor);salvar()}
-      catch(err){E.config[chave]=anterior;status.textContent='Não foi possível remover a opção. Tente novamente.';return}
-      atualizarListasConfiguraveis(chave);status.textContent='Removida da lista. Os valores já preenchidos foram preservados.';
+      catch(err){E.config[chave]=anterior;avisoOpcaoSync=null;status.textContent='Não foi possível remover a opção. Tente novamente.';mostrarAvisoOpcao(status.textContent,'erro');return}
+      atualizarListasConfiguraveis(chave);registrarAvisoOpcao(chave,true);
     };
     alvo.appendChild(acoes);
   });
@@ -17435,7 +17471,7 @@ async function apiSync(metodo,corpo){
   return r.json();
 }
 let syncTimer=null;
-function pintaSync(t){const x=document.getElementById('stSync');if(x){x.textContent='☁ '+t;x.removeAttribute('title')}if(typeof saudeNotificarSync==='function')saudeNotificarSync(t)}
+function pintaSync(t){const x=document.getElementById('stSync');if(x){x.textContent='☁ '+t;x.removeAttribute('title')}if(typeof saudeNotificarSync==='function')saudeNotificarSync(t);atualizarAvisoOpcao(t)}
 function falhaSync(e){
   let texto='sincronização não concluída — tente novamente',detalhe='A sincronização não foi confirmada. Confira a versão local e as cópias preservadas antes de tentar novamente.';
   if(erroQuotaLocal(e)){texto='armazenamento cheio — sincronização pendente';detalhe='Não houve espaço para guardar uma cópia segura. Seus dados locais e formulários foram mantidos. Baixe um backup em Ferramentas e backup antes de qualquer limpeza.'}
