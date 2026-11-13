@@ -441,6 +441,38 @@
     abrir.setAttribute('aria-expanded','false');
     return abrir;
   }
+  function controleExclusao(contexto, imovel, item, rotulo) {
+    const form=elemento('form','holding-exclusao'),apagar=elemento('button','holding-link holding-apagar-despesa','Apagar despesa');
+    apagar.type='submit';apagar.setAttribute('aria-label','Apagar despesa: '+rotulo);
+    const erro=elemento('p','holding-erro');erro.hidden=true;erro.setAttribute('role','alert');form.append(apagar,erro);
+    const base=structuredClone(item),baseImovel={id:imovel.id,nome:imovel.nome,totalCentavos:imovel.totalCentavos};
+    form.addEventListener('submit',async ev=>{
+      ev.preventDefault();if(apagar.disabled || !disponivel(contexto))return;
+      if(contexto.container.querySelector('.solta[aria-busy="true"]')){mostrarErro(form,'Aguarde o envio do comprovante antes de apagar.');return;}
+      if(!confirm('Apagar a despesa “'+item.descricao+'” de '+imovel.nome+' e retirar seu lançamento vinculado de Gastos? Os dados e comprovantes ficam preservados no histórico. Só esta cobrança será apagada.'))return;
+      const controles=[...contexto.container.querySelectorAll('button,input,select')].filter(x=>!x.disabled);
+      controles.forEach(x=>x.disabled=true);form.setAttribute('aria-busy','true');erro.hidden=true;apagar.textContent='Apagando…';
+      try{
+        const resposta=await contexto.api.excluirDespesa(imovel.id,item.id,base,baseImovel);
+        if(form.isConnected)contexto.desenhar('Despesa apagada. '+(resposta || ''),imovel.id);
+      }catch(e){mostrarErro(form,e.message || 'Não foi possível apagar a despesa.');}
+      finally{form.removeAttribute('aria-busy');controles.forEach(x=>x.disabled=false);apagar.textContent='Apagar despesa';}
+    });
+    return form;
+  }
+  function historicoDespesas(imovel) {
+    const registros=imovel.despesasExcluidas || [];
+    if(!registros.length)return null;
+    const historico=elemento('details','holding-historico holding-despesas-removidas');
+    historico.append(elemento('summary','',`Despesas removidas (${registros.length})`),elemento('p','holding-painel-nota','Fora dos totais. Dados e comprovantes preservados para consulta.'));
+    for(const h of [...registros].reverse()){
+      const d=h.registro,linha=elemento('details','holding-despesa-removida');
+      linha.append(elemento('summary','',`${d.descricao} · ${d.valorCentavos==null?'Valor a informar':dinheiro(d.valorCentavos)} · removida em ${dataBR(h.em.slice(0,10))}`));
+      linha.append(elemento('p','holding-painel-nota',d.pagoEm?'Pago em '+dataBR(d.pagoEm):'Sem pagamento registrado'));
+      linha.append(areaArquivos(h.ref || refAnexos(imovel.id,'despesa',d.id),'Comprovantes preservados',true));historico.append(linha);
+    }
+    return historico;
+  }
   function tabelaMensal(contexto, imovel, linhas, despesa) {
     const colunas=['Mês/ano','Descrição','Vencimento','Valor','Pago','Data do pagamento','Situação','Ações'];
     const tabela=elemento('table','holding-controle-mensal');
@@ -484,6 +516,7 @@
         editar.setAttribute('aria-label',`Editar: ${rotulo}`);celulas[7].append(editar);
       }
       celulas[7].append(pagoEm?pagamentoComprovante(referencia,rotulo,anexos):anexos);
+      if(despesa)celulas[7].append(controleExclusao(contexto,imovel,item,rotulo));
       body.append(tr);
     }
     return tabela;
@@ -552,6 +585,7 @@
     else if (filtradas.length) sec.append(elemento('p','holding-vazio',exibicao==='pendentes' ? aquisicao?.saldo>0 ? 'Nenhuma parcela pendente cadastrada neste recorte. A dívida restante está no resumo acima.' : 'Nenhum lançamento pendente neste período.' : 'Nenhum lançamento pago neste período.'));
     else sec.append(elemento('p','holding-vazio',linhas.length?'Nenhum lançamento neste recorte.':despesa?'Nenhuma despesa lançada.':'Nenhuma parcela cadastrada.'));
     if (!despesa) {sec.append(historico(contexto,imovel,abrirHistorico));sec.append(historicoPlanos(imovel));}
+    else {const removidas=historicoDespesas(imovel);if(removidas)sec.append(removidas);}
     return sec;
   }
   function historicoPlanos(imovel) {

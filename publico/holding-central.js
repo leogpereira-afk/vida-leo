@@ -224,6 +224,31 @@ function holdingPagarDespesa(imovelId, despesaId, baseDespesa, baseImovel) {
   });
 }
 
+async function holdingExcluirDespesa(imovelId, despesaId, baseDespesa, baseImovel) {
+  await holdingConferirBase();
+  const carteira = holdingCarteira(), imovel = carteira.find(i => i.id === imovelId);
+  const despesa = imovel?.despesas?.find(d => d.id === despesaId);
+  if (!imovel || !despesa || baseDespesa?.id !== despesaId || baseImovel?.id !== imovelId ||
+      !holdingMesmosDados(despesa,baseDespesa) ||
+      !holdingMesmosDados(holdingMetadadosImovel(imovel),holdingMetadadosImovel(baseImovel))) holdingConflito();
+  const ref = HoldingUI.refAnexos(imovelId,'despesa',despesaId);
+  const integrado = prepararGastoAutomatico({holdingImovelId:imovelId,holdingDespesaId:despesaId},ref,null);
+  if (integrado.anterior && (integrado.anterior.holdingParcelaId || integrado.anterior.holdingPagamentoId || integrado.anterior.aviaoTipo || integrado.anterior.viagemCustoId)) {
+    throw Error('Este pagamento também está vinculado à aquisição ou a outro cadastro. Confira o vínculo antes de apagar a despesa.');
+  }
+  const historico = {em:new Date().toISOString(),registro:structuredClone(despesa),
+    gasto:integrado.anterior ? structuredClone(integrado.anterior) : null,ref:holdingAnexosCompartilhados(ref) || ref};
+  const proximo = {...imovel,despesas:imovel.despesas.filter(d => d.id !== despesaId),
+    despesasExcluidas:[...(imovel.despesasExcluidas || []),historico]};
+  const proxima = HoldingModelo.validarCarteira(carteira.map(i => i.id === imovelId ? proximo : i));
+  holdingPersistir(carteira,proxima,integrado.gastos);
+  return holdingConfirmarGravacao(lista => {
+    const salvo = lista.find(i => i.id === imovelId);
+    return salvo && !(salvo.despesas || []).some(d => d.id === despesaId) &&
+      (salvo.despesasExcluidas || []).some(h => holdingMesmosDados(h,historico));
+  },integrado.conferir);
+}
+
 function vUniversoImoveis(m) {
   HoldingUI.render(m, {
     listar: holdingCarteira,
@@ -238,7 +263,8 @@ function vUniversoImoveis(m) {
     editarParcela: holdingEditarParcela,
     pagarParcela: holdingPagarParcela,
     gravarDespesa: holdingGravarDespesa,
-    pagarDespesa: holdingPagarDespesa
+    pagarDespesa: holdingPagarDespesa,
+    excluirDespesa: holdingExcluirDespesa
   });
   delete filtro.holdingImovelId;
 }

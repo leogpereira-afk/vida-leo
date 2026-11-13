@@ -669,7 +669,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./saude-visual.css?v=81aa61302df9">
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
 <link rel="stylesheet" href="./aviao.css?v=fdfe84271e73">
-<link rel="stylesheet" href="./holding.css?v=30b9ea6e9c03">
+<link rel="stylesheet" href="./holding.css?v=39b08bd412bd">
 <link rel="stylesheet" href="./holding-carteira.css?v=83713a7fb584">
 <link rel="stylesheet" href="./holding-resumo.css?v=42f98a13cd9a">
 <link rel="stylesheet" href="./fortemais-previsao.css?v=cdb9222e7265">
@@ -740,9 +740,9 @@ tr:hover .lixo{opacity:1}
 <script src="./holding-carteira-central.js?v=3ac72367d43d"></script>
 <script src="./holding-carteira-ui.js?v=83ca93590eb2"></script>
 <script src="./holding-dashboard.js?v=2f9ca019d684"></script>
-<script src="./holding-ui.js?v=c560fcbb14b3"></script>
-<script src="./pagamentos-gastos.js?v=364abfa19917"></script>
-<script src="./holding-central.js?v=9a7b4aad269e"></script>
+<script src="./holding-ui.js?v=84e7ec40befb"></script>
+<script src="./pagamentos-gastos.js?v=04b1a5566d8b"></script>
+<script src="./holding-central.js?v=43eea7439391"></script>
 <script src="./inicio-google.js?v=75bfe0d51b19"></script>
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
 <script src="./marketing-fortemais.js?v=cbf67399c021"></script>
@@ -1950,7 +1950,7 @@ function areaArquivos(ref,dica,somenteLeitura=false){
     <button type="button" class="solta">📎 ${dica||'Clique ou arraste arquivos aqui'}</button>
     <input type="file" multiple hidden></div>`);
   const lista=c.querySelector('.arqs'),solta=c.querySelector('.solta'),inp=c.querySelector('input');
-  if(somenteLeitura){solta.disabled=true;solta.hidden=true;inp.disabled=true}
+  if(somenteLeitura){c.classList.add('arquivos-somente-leitura');solta.disabled=true;solta.hidden=true;inp.disabled=true}
   const pintar=async()=>{
     lista.innerHTML='<div style="color:var(--suave);font-size:12.5px">Carregando…</div>';
     let as=[];
@@ -3090,8 +3090,9 @@ function mesclarAviaoImportado(atual,p){
   if(p.manutencaoTotalAtual!=null)proximo.manutencaoTotalAtual=p.manutencaoTotalAtual;
   for(const k of ['aportes','mensalidades','despesas']){
     const anteriores=atual[k]||[],porChave=new Map(anteriores.filter(x=>x.chave).map(x=>[x.chave,x]));
+    const removidas=new Set((atual.registrosExcluidos||[]).filter(h=>h.tipo===k&&h.registro?.chave).map(h=>h.registro.chave));
     const vistos=new Set();
-    const importados=p[k].map(x=>{
+    const importados=p[k].filter(x=>!removidas.has(x.chave)).map(x=>{
       vistos.add(x.chave);const ant=porChave.get(x.chave);
       const item={...ant,...x,id:ant?.id||uid(),origem:'planilha'};
       // Decisões feitas na tela são preservadas numa segunda importação.
@@ -3419,6 +3420,24 @@ function tabelaAviao(titulos,registros,linha,editar,{nome='',rodape=[],numericas
     b.setAttribute('aria-label','Editar '+nome.toLowerCase()+' · '+(x.descricao||x.competencia||x.data||''));
     tr.lastElementChild.appendChild(b);
     const colecao=tipo||x.colecao;
+    if(['mensalidades','despesas'].includes(colecao)){
+      const base=structuredClone(E.aviao[colecao]?.find(y=>y.id===x.id));
+      const aviso=el('<small class="aviao-exclusao-status" role="alert"></small>');let apagando=false;
+      const apagar=acao('Apagar custo',async()=>{
+        if(apagando||apagar.disabled)return;
+        if(document.querySelector('#main .solta[aria-busy="true"]')){aviso.textContent='Aguarde o envio do comprovante antes de apagar.';return;}
+        if(!confirm('Apagar “'+(x.descricao||x.competencia||'Custo da aeronave')+'” e retirar seu lançamento vinculado de Gastos? Os dados e comprovantes ficam preservados no histórico. Só esta cobrança será apagada.'))return;
+        apagando=true;const controles=[...document.querySelectorAll('#main button,#main input,#main select')].filter(y=>!y.disabled);controles.forEach(y=>y.disabled=true);tr.setAttribute('aria-busy','true');aviso.textContent='Apagando…';
+        try{
+          const mensagem=await aviaoGravarRegistro(colecao,base,base,{excluir:true});
+          tela();const feedback=el('<p class="aviao-baixa-feedback" role="status"></p>');feedback.textContent='Custo apagado. '+mensagem;
+          document.querySelector('.aviao-custos-unificados,.aviao-dashboard')?.prepend(feedback);
+        }catch(e){aviso.textContent=e.message||'Não foi possível apagar o custo.';}
+        finally{apagando=false;tr.removeAttribute('aria-busy');controles.forEach(y=>y.disabled=false);}
+      },'ghost aviao-apagar-custo');
+      apagar.setAttribute('aria-label','Apagar custo · '+(x.descricao||x.competencia||'Custo da aeronave')+' · '+fmtDataAno(x.vencimento||x.data));
+      tr.lastElementChild.append(apagar,aviso);
+    }
     if(pagamentoRapido&&['mensalidades','despesas'].includes(colecao)&&x.status!=='Pago'&&x.status!=='Cancelado'){
       const origem=E.aviao[colecao]?.find(y=>y.id===x.id),base=origem&&structuredClone(origem);
       let salvando=false;

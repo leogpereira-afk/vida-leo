@@ -203,3 +203,11 @@
 .gasto-categoria .finance-expense-row{flex-wrap:wrap}
 .finance-expense-row>.pagamento-comprovante{flex-basis:100%;flex-direction:row;align-items:center;justify-content:space-between;gap:10px;margin:0 0 8px}
 @media(max-width:600px){.pagamento-comprovante button{min-height:44px}.finance-expense-row>.pagamento-comprovante{flex-wrap:wrap}}
+.holding-area .holding-apagar-despesa{min-height:40px;padding:6px 8px;border:1px solid var(--holding-linha);border-radius:6px;background:var(--holding-papel);text-align:left}
+.holding-exclusao{margin-top:5px}
+.holding-despesa-removida{margin-top:10px;padding:10px;border:1px solid var(--holding-linha);border-radius:8px}
+.holding-despesas-removidas summary,.aviao-historico-removidos summary{cursor:pointer;min-height:40px;overflow-wrap:anywhere}
+.aviao-historico-removidos>details{margin-top:10px;padding:10px;border:1px solid var(--linha);border-radius:8px}
+.arquivos-somente-leitura .solta[hidden],.arquivos-somente-leitura .lixo[hidden]{display:none}
+.aviao-exclusao-status{display:block;color:var(--vermelho);white-space:normal;font-size:12px}
+@media(max-width:600px){.holding-area .holding-apagar-despesa,.aviao-apagar-custo{min-height:44px}}

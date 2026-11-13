@@ -108,10 +108,13 @@ async function aviaoGravarRegistro(tipo,dados,baseItem=null,{excluir=false,viage
 function aviaoHistoricoRegistros() {
   const historico=E.aviao?.registrosExcluidos||[];
   if(!historico.length)return null;
-  const area=el('<details class="ff-attachments"><summary>Histórico de registros removidos</summary></details>');
+  const area=el('<details class="ff-attachments aviao-historico-removidos"><summary>Histórico de registros removidos ('+historico.length+')</summary></details>');
   for(const h of [...historico].reverse()) {
     const registro=h.registro,linha=el('<details><summary></summary></details>');
-    linha.querySelector('summary').textContent=(registro.descricao||registro.competencia||registro.data||'Pagamento')+' · '+brl(registro.valor??registro.minhaCota)+' · removido em '+fmtDataAno(h.em.slice(0,10));
+    const nome=registro.descricao||(h.tipo==='mensalidades'?'Mensalidade · '+fmtDataAno(registro.competencia):registro.data?fmtDataAno(registro.data):'Pagamento');
+    linha.querySelector('summary').textContent=nome+' · '+brl(registro.valor??registro.minhaCota)+' · removido em '+fmtDataAno(h.em.slice(0,10));
+    const pagamento=h.tipo==='aportes'?registro.data:registro.pagoEm;
+    const situacao=el('<p class="ff-note"></p>');situacao.textContent=h.tipo==='aportes'||registro.status==='Pago'?'Pago · '+(pagamento?fmtDataAno(pagamento):'data a informar'):'Sem pagamento registrado';linha.append(situacao);
     linha.appendChild(areaArquivos(aviaoRefPagamento(h.tipo,registro.id),'Comprovantes preservados',true));area.appendChild(linha);
   }
   return area;
