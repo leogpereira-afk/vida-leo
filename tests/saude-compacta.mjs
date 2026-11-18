@@ -97,7 +97,7 @@ test('linhas: período e busca combinam sem alterar ordem dos cadastros ou perde
 });
 test('abas: emojis identificam as áreas sem trocar identificadores e navegação',()=>{
   const a=app();a.run("saudePainel(document.getElementById('main'))");
-  const areas=JSON.parse(a.run('JSON.stringify(SAUDE_AREAS)'));assert.deepEqual(areas.map(x=>x[0]),['resumo','exames','medidas','queixas','tratamentos','cuidados','documentos']);
+  const areas=JSON.parse(a.run('JSON.stringify(SAUDE_AREAS)'));assert.deepEqual(areas.map(x=>x[0]),['resumo','exames','medidas','queixas','tratamentos','cuidados','esportes','documentos']);
   for(const [id,label] of areas)assert.match(label,/\p{Extended_Pictographic}/u,'a aba '+id+' precisa de identificação visual');
   const exame=[...a.document.querySelectorAll('[aria-controls=sui-area]')].find(b=>b.textContent.includes('Exames'));assert.ok(exame);exame.onclick();assert.equal(a.run('SaudeUI.area'),'exames');
 });
@@ -130,12 +130,12 @@ test('abertura em linhas e alternância de evolução preservam filtros, gráfic
   assert.equal(a.run('JSON.stringify(E)'),antes,'trocar visualização não grava preferências nem cadastros');
 });
 
-test('seletor móvel oferece as sete áreas e usa a mesma navegação sem gravar registros',()=>{
+test('seletor móvel oferece as oito áreas e usa a mesma navegação sem gravar registros',()=>{
   const a=app();a.run("var navegacoes=[];saudeIr=id=>navegacoes.push(id);tratamentoAbrirVisaoGeral=()=>navegacoes.push('tratamentos');saudePainel(document.getElementById('main'))");
   const select=a.document.querySelector('[aria-label="Área da Saúde"]');
-  assert.deepEqual([...select.options].map(o=>o.value),['resumo','exames','medidas','queixas','tratamentos','cuidados','documentos']);
-  const antes=a.run('JSON.stringify(E)');for(const id of ['resumo','exames','medidas','queixas','tratamentos','cuidados','documentos']){select.value=id;select.onchange()}
-  assert.deepEqual(JSON.parse(a.run('JSON.stringify(navegacoes)')),['resumo','exames','medidas','queixas','tratamentos','cuidados','documentos']);assert.equal(a.run('JSON.stringify(E)'),antes);
+  assert.deepEqual([...select.options].map(o=>o.value),['resumo','exames','medidas','queixas','tratamentos','cuidados','esportes','documentos']);
+  const antes=a.run('JSON.stringify(E)');for(const id of ['resumo','exames','medidas','queixas','tratamentos','cuidados','esportes','documentos']){select.value=id;select.onchange()}
+  assert.deepEqual(JSON.parse(a.run('JSON.stringify(navegacoes)')),['resumo','exames','medidas','queixas','tratamentos','cuidados','esportes','documentos']);assert.equal(a.run('JSON.stringify(E)'),antes);
 });
 test('abertura pelo valor ou nome conserva identidade e edição em todos os históricos',()=>{
   const a=app();a.run("var abertos=[];saudeEditarRegistro=(tipo,r)=>abertos.push([tipo,r.id])");
