@@ -159,6 +159,18 @@ function saudeEsportes(){
     nota.append(no('p','','O botão Atualizar estudos consulta novas publicações. Ele não altera as orientações revisadas nem monta uma prescrição de treino.'));raiz.append(nota,rodape());
   }
 
+  const atlas={
+    peito:['supino','Supino reto com barra'],
+    quadriceps:['agachamento','Agachamento com barra nas costas'],
+    biceps:['rosca','Rosca com halteres']
+  };
+  function linkAtlas(movimento){
+    const [vista,titulo]=movimento;
+    const a=no('a','esp-botao',titulo);
+    a.href='atlas/?vista='+vista+'&animar=1';a.target='_blank';a.rel='noopener noreferrer';
+    a.setAttribute('aria-label','Abrir '+titulo+' no atlas 3D em nova aba');
+    return a;
+  }
   function cardConteudo(item,index,m,secao){
     const detalhe=no('details','esp-item');detalhe.dataset.espItem='';
     const summary=no('summary'),grupo=no('span','esp-summary-text'),linha=no('span','esp-item-resumo');
@@ -168,6 +180,11 @@ function saudeEsportes(){
     const conteudo=no('div','esp-item-detalhes');
     if(visual){const fig=no('figure','esp-guia-figura');fig.append(imagem(visual.src,visual.alt,'esp-item-imagem'),no('figcaption','',visual.kind==='diagram'?'Esquema educativo · exemplos visuais não são metas individuais.':secao==='training'?'Imagem ilustrativa · confira os pontos de execução abaixo.':'Imagem ilustrativa da categoria · compare os critérios de escolha abaixo.'));const ampliar=no('a','esp-ampliar-imagem','Ver imagem em tamanho maior ↗');ampliar.href=visual.src;ampliar.target='_blank';ampliar.rel='noopener noreferrer';ampliar.setAttribute('aria-label','Ampliar imagem de '+item.title+' em nova aba');fig.append(ampliar);conteudo.append(fig)}
     if(secao==='training'&&typeof SaudeEsportes3D==='object'){const studio=SaudeEsportes3D.create(m.id,index,item);if(studio)conteudo.prepend(studio)}
+    if(secao==='training'&&m.id==='musculacao'&&atlas[item.id]){
+      const bloco=no('section','esp-guia-bloco');
+      bloco.append(no('h4','','Atlas do movimento em 3D'),linkAtlas(atlas[item.id]));
+      conteudo.prepend(bloco);
+    }
     function paragrafo(titulo,texto,classe=''){if(!texto)return;const bloco=no('section','esp-guia-bloco '+classe);bloco.append(no('h4','',titulo),no('p','',texto));conteudo.append(bloco)}
     function pontos(titulo,itens,ordenada=false){if(!lista(itens).length)return;const bloco=no('section','esp-guia-bloco'),ul=no(ordenada?'ol':'ul');bloco.append(no('h4','',titulo));itens.forEach(x=>ul.append(no('li','',x)));bloco.append(ul);conteudo.append(bloco)}
     paragrafo(secao==='training'?'Entenda o movimento':'O conceito',item.text);
@@ -228,7 +245,15 @@ function saudeEsportes(){
     const pintar=()=>{
       painel.querySelectorAll('.esp-movimento').forEach(n=>n.espDispose?.());painel.replaceChildren();const atual=SaudeEsportesUI.secao;
       if(atual==='studies'){contador.textContent='';estudos(m,painel);return}
-      const originais=lista(m[atual]),visiveis=originais.filter(x=>corresponde(textoItem(x)));
+      const originais=lista(m[atual]),visiveis=originais.filter(x=>corresponde(textoItem(x)) ||
+        (m.id==='musculacao' && atual==='training' && atlas[x.id] && corresponde(atlas[x.id][1])));
+      if(m.id==='musculacao' && atual==='training'){
+        const encontrados=Object.values(atlas).filter(([,titulo])=>corresponde(titulo));
+        if(encontrados.length){
+          const nav=no('nav','esp-atlas');nav.setAttribute('aria-label','Atlas do movimento em 3D');
+          nav.append(no('h3','','Atlas do movimento em 3D'),...encontrados.map(linkAtlas));painel.append(nav);
+        }
+      }
       const total=visiveis.length+(atual==='gear'?lista(m.products).filter(p=>corresponde(textoItem(p))).length:0);
       contador.textContent=SaudeEsportesUI.busca?total+' resultado'+(total===1?'':'s'):'';
       if(!visiveis.length){painel.append(estadoVazio('Nenhum conteúdo encontrado',SaudeEsportesUI.busca?'Tente outro termo ou limpe a busca.':'O conteúdo desta seção será incluído na próxima revisão.'));if(atual!=='gear')return}

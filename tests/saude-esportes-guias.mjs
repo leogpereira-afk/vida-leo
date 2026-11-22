@@ -79,3 +79,21 @@ test('guias UI: vocabulário e equipamentos têm imagens e explicação além do
   root.querySelector('.esp-voltar').click();
  }
 });
+
+test('atlas em Musculação abre a variação correta de cada exercício e filtra por nome',()=>{
+ const {root}=app();
+ root.querySelector('[data-esp-modalidade="musculacao"]').click();
+ const nav=root.querySelector('nav.esp-atlas');
+ assert.ok(nav);
+ for(const [nome,vista] of [['Supino reto com barra','supino'],['Agachamento com barra nas costas','agachamento'],['Rosca com halteres','rosca']]){
+   const href='atlas/?vista='+vista+'&animar=1';
+   assert.equal(nav.querySelector('a[href="'+href+'"]').textContent,nome);
+   const related=root.querySelector('[data-esp-item] a[href="'+href+'"]');
+   assert.equal(related?.textContent,nome);
+ }
+ const busca=root.querySelector('input[type="search"]');
+ busca.value='barra nas costas';busca.oninput();
+ assert.equal(root.querySelectorAll('.esp-atlas a').length,1);
+ assert.ok(root.querySelector('[data-esp-item] a[href="atlas/?vista=agachamento&animar=1"]'));
+ assert.ok(existsSync(new URL('atlas/index.html',base)));
+});
