@@ -165,3 +165,19 @@
 .viagem-gastos-removidos details{padding:10px 0}
 .viagem-gastos-removidos .solta[hidden]{display:none}
 @media(max-width:600px){.viagem-gastos-totais{grid-template-columns:1fr 1fr;margin:16px 16px 0}.viagem-gastos-totais>div:first-child{grid-column:1/-1}.viagem-gasto-item{padding:16px}.viagem-gastos-removidos,.viagem-gastos-detalhes>.ff-note,.viagem-gastos-detalhes>.vazio{margin:16px}.viagem-valor-detalhar,.viagem-gasto-acoes .btn{min-height:44px}.viagem-gasto-acoes .pagamento-comprovante{flex-basis:100%}}
+
+.aviao-simulador{background:var(--card);border:1px solid var(--linha);border-radius:16px;padding:clamp(16px,3vw,28px);max-width:950px}
+.aviao-simulador header p,.aviao-sim-ref p{color:var(--suave);font-size:13px;line-height:1.5;margin:5px 0 14px}
+.aviao-simulador h2,.aviao-simulador h3{margin:0}
+.aviao-sim-ref{color:var(--av-azul);padding:12px 14px;background:var(--av-azul-cl);border-radius:9px;margin:14px 0}
+.aviao-sim-ref summary{cursor:pointer;font-weight:650}
+.aviao-simulador dl{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px 10px;margin:12px 0;font-size:13px}
+.aviao-simulador dl:empty{display:none}
+.aviao-simulador dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.aviao-sim-form fieldset{min-width:0;border:0;padding:0;margin:18px 0}
+.aviao-sim-form legend,.aviao-sim-total h3{font-weight:650;font-size:15px;margin-bottom:8px}
+.aviao-sim-grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(160px,100%),1fr));gap:12px}
+.aviao-sim-grade label{display:flex;flex-direction:column;justify-content:space-between;gap:6px;font-size:13px}
+.aviao-sim-grade input{min-width:0;width:100%;min-height:40px;padding:8px;border:1px solid var(--linha);border-radius:8px;color:var(--tinta);background:var(--papel);font:inherit}
+.aviao-sim-total{margin-top:16px;padding:15px;border:1px solid var(--linha);border-radius:10px}
+.aviao-sim-total strong{color:var(--av-azul);font-size:clamp(18px,3vw,25px);font-variant-numeric:tabular-nums}

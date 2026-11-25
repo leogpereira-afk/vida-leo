@@ -669,7 +669,7 @@ tr:hover .lixo{opacity:1}
 <link rel="stylesheet" href="./saude-painel.css?v=1449c43115ae">
 <link rel="stylesheet" href="./saude-visual.css?v=81aa61302df9">
 <link rel="stylesheet" href="./rendimentos-graficos.css?v=a3bb6e46e66a">
-<link rel="stylesheet" href="./aviao.css?v=fdfe84271e73">
+<link rel="stylesheet" href="./aviao.css?v=6e46a20659e7">
 <link rel="stylesheet" href="./holding.css?v=39b08bd412bd">
 <link rel="stylesheet" href="./holding-carteira.css?v=83713a7fb584">
 <link rel="stylesheet" href="./holding-resumo.css?v=42f98a13cd9a">
@@ -743,6 +743,7 @@ tr:hover .lixo{opacity:1}
 <script src="./holding-dashboard.js?v=2f9ca019d684"></script>
 <script src="./holding-ui.js?v=84e7ec40befb"></script>
 <script src="./pagamentos-gastos.js?v=04b1a5566d8b"></script>
+<script src="./aviao-simulador.js?v=a76c529ccb88"></script>
 <script src="./holding-central.js?v=43eea7439391"></script>
 <script src="./inicio-google.js?v=75bfe0d51b19"></script>
 <script src="./marketing-direto.js?v=680abdbb7542"></script>
@@ -3675,8 +3676,9 @@ function vAviao(m){
       <p>${esc(a.matricula||'Cadastre a aeronave para começar')}${a.titularidade?' · '+esc(a.titularidade):''}</p>
     </div><span class="cresce"></span><div class="aviao-participacao">${a.participacao!=null?(a.participacao*100).toLocaleString('pt-BR')+'%':'—'}<small>participação na aeronave</small></div>
   </div>`));
-  const abas=[['visao','Visão geral'],['sobre','Sobre o avião'],['gastos','📊 Gastos'],['custos','Custos da aeronave'],['viagens','Viagens']];
-  const atualAba=abas.some(([id])=>id===filtro.aviaoAba)?filtro.aviaoAba:'visao';
+  const abas=[['visao','Visão geral'],['sobre','Sobre o avião'],['simular','Simular viagem'],['gastos','📊 Gastos'],['custos','Custos da aeronave'],['viagens','Viagens']];
+  const abaPedida=filtro.aviaoAba || new URLSearchParams(location.search).get('aba');
+  const atualAba=abas.some(([id])=>id===abaPedida)?abaPedida:'visao';
   const nav=el('<nav class="aviao-abas" aria-label="Seções do avião"></nav>');
   abas.forEach(([id,rot])=>{const b=el(`<button type="button" ${id===atualAba?'class="on" aria-current="page"':''}>${rot}</button>`);b.onclick=()=>{filtro.aviaoAba=id;tela()};nav.appendChild(b)});
   m.appendChild(nav);
@@ -3737,6 +3739,7 @@ function vAviao(m){
     m.appendChild(ponte);
     return;
   }
+  if(atualAba==='simular'){painelSimuladorAviao(m,a);return}
   if(atualAba==='gastos'){vDashboardAviao(m);return}
   if(atualAba==='custos'){vPlanilhaAviao(m);return}
   const trips=el('<div class="corpo"></div>');
